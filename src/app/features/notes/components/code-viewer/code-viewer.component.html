@@ -1,0 +1,10 @@
+@for (line of lines(); track $index) {
+  <div class="code-line">
+    <span class="line-no">{{ $index + 1 }}</span>
+    <span class="line-content">
+      @for (token of line; track $index) {
+        <span [class]="'tok-' + token.type">{{ token.text }}</span>
+      }
+    </span>
+  </div>
+}

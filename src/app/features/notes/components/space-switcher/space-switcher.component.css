@@ -1,0 +1,66 @@
+.space-switch-wrapper {
+  position: relative;
+}
+
+.space-switch {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-0);
+}
+
+.chev {
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.space-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.space-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.space-option {
+  all: unset;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.space-option:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+.space-option.active {
+  color: var(--amber);
+}

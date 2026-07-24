@@ -1,0 +1,55 @@
+.canvas-section {
+  margin-bottom: 28px;
+}
+
+.canvas-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-2);
+  font-weight: 700;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.canvas-section-title .n {
+  font-family: var(--font-mono);
+  color: var(--text-2);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.card.ghost {
+  all: unset;
+  box-sizing: border-box;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  height: 150px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  font-size: 12px;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.card.ghost:hover {
+  color: var(--amber);
+  border-color: var(--amber-dim);
+}
+
+.ghost-plus {
+  font-size: 20px;
+}

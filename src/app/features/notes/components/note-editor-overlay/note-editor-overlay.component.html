@@ -1,0 +1,38 @@
+@if (note(); as note) {
+  <div class="overlay-backdrop" (click)="onBackdropClick($event)">
+    <div class="overlay-panel">
+      <div class="overlay-toolbar">
+        <input
+          #titleInput
+          class="overlay-title-input"
+          [value]="note.title"
+          (change)="titleChanged.emit(titleInput.value)"
+        />
+        <button type="button" class="toolbar-btn" [class.pinned]="note.pinned" (click)="pinToggled.emit()">
+          📌 {{ note.pinned ? 'Épinglée' : 'Épingler' }}
+        </button>
+        <button type="button" class="toolbar-btn">📁 Déplacer</button>
+        <button type="button" class="toolbar-btn">⋯</button>
+        <button type="button" class="close-btn" (click)="closed.emit()">✕</button>
+      </div>
+
+      <div class="overlay-meta-row">
+        <span>{{ note.source }}</span>
+        <span>·</span>
+        <div class="overlay-tags">
+          @for (tag of note.tags; track tag) {
+            <app-tag-pill [label]="tag" [active]="true" [interactive]="false" />
+          }
+        </div>
+        <app-lifecycle-badge [lifecycle]="note.lifecycle" />
+      </div>
+
+      <app-code-viewer class="overlay-body" [content]="note.content" [language]="note.language" />
+
+      <div class="overlay-footer">
+        <span>{{ languageLabel() }} · {{ lineCount() }} lignes · {{ byteSize() }} octets</span>
+        <span>Modifiée {{ note.updatedAt | relativeTime }}</span>
+      </div>
+    </div>
+  </div>
+}

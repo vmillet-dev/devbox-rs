@@ -1,0 +1,21 @@
+<button
+  type="button"
+  class="card"
+  [class.pinned]="note().pinned"
+  [class.selected]="selected()"
+  (click)="onOpen()"
+>
+  <div class="card-top">
+    <app-language-badge [language]="note().language" />
+  </div>
+  <div class="card-title">{{ note().title }}</div>
+  <div class="card-snippet">{{ snippet() }}</div>
+  <div class="card-footer">
+    <span [class.stale]="footerStale()">{{ footerLabel() }}</span>
+    <div class="card-tags">
+      @for (tag of displayedTags(); track tag) {
+        <span>#{{ tag }}</span>
+      }
+    </div>
+  </div>
+</button>

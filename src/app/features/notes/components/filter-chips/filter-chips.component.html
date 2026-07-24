@@ -1,0 +1,12 @@
+<div class="filter-chips">
+  @for (filter of filters; track filter.key) {
+    <button
+      type="button"
+      class="chip"
+      [class.active]="active() === filter.key"
+      (click)="filterChanged.emit(filter.key)"
+    >
+      {{ filter.label }}
+    </button>
+  }
+</div>

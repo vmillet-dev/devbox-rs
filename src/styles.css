@@ -2,25 +2,32 @@
 
 /*
  * IMPORTANT : ces variables doivent vivre ICI (fichier global, non scopé),
- * et non dans app.component.css. Angular applique une "encapsulation" aux
+ * et non dans un *.component.css. Angular applique une "encapsulation" aux
  * styles de composant (ViewEncapsulation.Emulated) : un sélecteur `:root`
  * écrit dans un fichier *.component.css est réécrit en `:root[_ngcontent-xxx]`,
  * qui ne correspond jamais à la vraie balise <html>. Les variables seraient
- * alors invalides -> `color: var(--text)` retomberait sur le noir par défaut
- * du navigateur, même si le fond (non hérité) reste sombre. D'où un rendu
- * "fond sombre + texte noir illisible".
+ * alors invalides -> `color: var(--text-0)` retomberait sur le noir par défaut
+ * du navigateur, même si le fond (non hérité) reste sombre.
  */
 :root {
-  --bg: #0d0f13;
-  --panel-bg: #14171d;
-  --border: #232733;
-  --text: #e6e8ee;
-  --text-muted: #8b91a1;
-  --accent: #e3b341;
-  --accent-soft: rgba(227, 179, 65, 0.14);
-  --error: #ef6461;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+  --bg-0: #15171c;
+  --bg-1: #1b1e25;
+  --bg-2: #22252e;
+  --bg-3: #2a2e39;
+  --line: #333947;
+  --line-soft: #282c37;
+  --text-0: #eef0f4;
+  --text-1: #aab0c0;
+  --text-2: #6e7488;
+  --amber: #e8a33d;
+  --amber-dim: #8a662a;
+  --green: #6fbf8b;
+  --blue: #6f9bd1;
+  --red: #d1706f;
+  --purple: #a98fd1;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Dit explicitement au navigateur/WebView (donc à WebView2 sur Windows)
      que cette appli est sombre par conception. Ça évite que le thème clair/
@@ -31,18 +38,35 @@
 
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 html,
 body {
-  margin: 0;
   height: 100%;
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
+  background: var(--bg-0);
+  color: var(--text-0);
   font-family: var(--font-sans);
+  font-size: 14px;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-3);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }

@@ -1,0 +1,28 @@
+.tag-pill {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  color: var(--text-1);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tag-pill:hover,
+.tag-pill.on {
+  border-color: var(--amber-dim);
+  color: var(--amber);
+}
+
+.tag-pill.static {
+  cursor: default;
+}
+
+.tag-pill.static:hover {
+  border-color: var(--line-soft);
+  color: var(--text-1);
+}

@@ -1,0 +1,19 @@
+<div class="space-switch-wrapper">
+  <button type="button" class="space-switch" (click)="toggle()">
+    <span class="space-dot"></span> {{ activeSpace().name }} <span class="chev">▾</span>
+  </button>
+  @if (open()) {
+    <div class="space-dropdown">
+      @for (space of spaces(); track space.id) {
+        <button
+          type="button"
+          class="space-option"
+          [class.active]="space.id === activeSpace().id"
+          (click)="select(space)"
+        >
+          {{ space.name }}
+        </button>
+      }
+    </div>
+  }
+</div>

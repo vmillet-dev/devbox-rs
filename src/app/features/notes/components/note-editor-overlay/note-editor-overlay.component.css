@@ -1,0 +1,114 @@
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 11, 14, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.overlay-panel {
+  width: min(880px, 90vw);
+  height: min(640px, 85vh);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+}
+
+.overlay-toolbar {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.overlay-title-input {
+  all: unset;
+  box-sizing: border-box;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-0);
+  flex: 1;
+  font-family: var(--font-sans);
+}
+
+.toolbar-btn {
+  all: unset;
+  box-sizing: border-box;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  color: var(--text-1);
+  border-radius: 7px;
+  padding: 6px 11px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.toolbar-btn:hover {
+  border-color: var(--amber-dim);
+  color: var(--text-0);
+}
+
+.toolbar-btn.pinned {
+  color: var(--amber);
+  border-color: var(--amber-dim);
+  background: rgba(232, 163, 61, 0.08);
+}
+
+.close-btn {
+  all: unset;
+  box-sizing: border-box;
+  color: var(--text-2);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.close-btn:hover {
+  color: var(--text-0);
+}
+
+.overlay-meta-row {
+  padding: 9px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.overlay-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.overlay-meta-row app-lifecycle-badge {
+  margin-left: auto;
+}
+
+.overlay-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.overlay-footer {
+  padding: 8px 20px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+}

@@ -1,0 +1,11 @@
+<label class="search-bar">
+  🔍
+  <input
+    #searchInput
+    type="text"
+    placeholder="Rechercher une note, un tag, du code..."
+    [value]="query()"
+    (input)="onInput(searchInput.value)"
+  />
+  <span class="kbd">⌘K</span>
+</label>

@@ -1,0 +1,26 @@
+<app-notes-topbar
+  [spaces]="spaces"
+  [activeSpace]="activeSpace()"
+  [searchQuery]="store.searchQuery()"
+  [activeFilter]="store.activeFilter()"
+  (spaceChanged)="activeSpaceId.set($event)"
+  (searchQueryChanged)="store.setSearchQuery($event)"
+  (filterChanged)="store.setFilter($event)"
+  (newNoteRequested)="store.createDraftNote()"
+/>
+
+<app-tag-rail [tags]="store.allTags()" [activeTags]="store.selectedTags()" (tagToggled)="store.toggleTag($event)" />
+
+<app-note-canvas
+  [sections]="store.sections()"
+  [selectedNoteId]="store.selectedNoteId()"
+  (noteOpened)="store.openNote($event)"
+  (createRequested)="store.createDraftNote()"
+/>
+
+<app-note-editor-overlay
+  [note]="store.selectedNote()"
+  (closed)="store.closeOverlay()"
+  (titleChanged)="onTitleChanged($event)"
+  (pinToggled)="onPinToggled()"
+/>

@@ -1,0 +1,10 @@
+<div class="canvas">
+  @for (section of sections(); track section.key) {
+    <app-note-section
+      [section]="section"
+      [selectedNoteId]="selectedNoteId()"
+      (noteOpened)="noteOpened.emit($event)"
+      (createRequested)="createRequested.emit()"
+    />
+  }
+</div>

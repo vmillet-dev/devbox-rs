@@ -1,0 +1,17 @@
+<div class="canvas-section">
+  <div class="canvas-section-title">
+    {{ section().title }}
+    <span class="n">· {{ section().notes.length }}{{ section().hint ? ' · ' + section().hint : '' }}</span>
+  </div>
+  <div class="card-grid">
+    @for (note of section().notes; track note.id) {
+      <app-note-card [note]="note" [selected]="note.id === selectedNoteId()" (opened)="noteOpened.emit($event)" />
+    }
+    @if (section().showCreateGhost) {
+      <button type="button" class="card ghost" (click)="createRequested.emit()">
+        <span class="ghost-plus">+</span>
+        <span>Coller ou créer</span>
+      </button>
+    }
+  </div>
+</div>

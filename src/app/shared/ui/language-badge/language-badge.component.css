@@ -1,0 +1,38 @@
+.lang-tag {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.lang-json {
+  background: rgba(111, 155, 209, 0.15);
+  color: var(--blue);
+}
+
+.lang-py {
+  background: rgba(111, 191, 139, 0.15);
+  color: var(--green);
+}
+
+.lang-sql {
+  background: rgba(169, 143, 209, 0.15);
+  color: var(--purple);
+}
+
+.lang-txt {
+  background: rgba(170, 176, 192, 0.15);
+  color: var(--text-1);
+}
+
+.lang-js {
+  background: rgba(232, 163, 61, 0.15);
+  color: var(--amber);
+}
+
+.lang-yml {
+  background: rgba(209, 111, 111, 0.15);
+  color: var(--red);
+}
