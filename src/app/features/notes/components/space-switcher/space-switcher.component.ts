@@ -4,7 +4,7 @@ import { Space } from '../../../../core/models/space.model';
 @Component({
   selector: 'app-space-switcher',
   templateUrl: './space-switcher.component.html',
-  styleUrl: './space-switcher.component.css',
+  styleUrl: './space-switcher.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '(document:click)': 'onDocumentClick($event)',

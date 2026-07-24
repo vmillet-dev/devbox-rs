@@ -4,7 +4,7 @@ import { LANGUAGE_LABELS, LanguageTag } from '../../../core/models/language.mode
 @Component({
   selector: 'app-language-badge',
   templateUrl: './language-badge.component.html',
-  styleUrl: './language-badge.component.css',
+  styleUrl: './language-badge.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LanguageBadgeComponent {

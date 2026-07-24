@@ -1,0 +1,38 @@
+// Patterns partagés entre les composants, pour éviter que chaque composant
+// ne réécrive sa propre variante de "bouton sans style", "carte" ou "badge
+// teinté". À utiliser via `@use 'mixins' as *;` (résolu grâce à
+// stylePreprocessorOptions.includePaths dans angular.json).
+
+// Neutralise le rendu natif d'un <button>/<input> utilisé comme brique de
+// base pour un contrôle custom (chip, carte, champ de recherche...).
+@mixin unstyled-control {
+  all: unset;
+  box-sizing: border-box;
+}
+
+// Surface "carte" : fond + bordure + arrondi. Sert aux cartes, dropdowns,
+// panneaux d'overlay, barres de recherche, boutons de toolbar...
+@mixin surface($bg: var(--bg-2), $radius: 8px, $border-color: var(--line-soft)) {
+  background: $bg;
+  border: 1px solid $border-color;
+  border-radius: $radius;
+}
+
+// État "accent" (survol/actif/sélectionné) partagé par chips, tags, options
+// de menu et carte fantôme : bordure ambrée + texte ambré.
+@mixin accent-state($color: var(--amber), $border: var(--amber-dim)) {
+  border-color: $border;
+  color: $color;
+}
+
+// Badge teinté façon "pill" (lifecycle badge, tag de langage) : fond
+// translucide + texte plein dans la même teinte, à partir d'une variable
+// CSS RGB (ex. --amber-rgb) pour ne pas dupliquer chaque couleur en hex.
+@mixin tint-badge($rgb-var, $bg-alpha: 0.15, $border-alpha: null) {
+  background: rgba(var(#{$rgb-var}), $bg-alpha);
+  color: rgb(var(#{$rgb-var}));
+
+  @if $border-alpha {
+    border: 1px solid rgba(var(#{$rgb-var}), $border-alpha);
+  }
+}

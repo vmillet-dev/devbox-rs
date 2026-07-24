@@ -9,7 +9,7 @@ import { FilterChipsComponent } from '../filter-chips/filter-chips.component';
   selector: 'app-notes-topbar',
   imports: [SpaceSwitcherComponent, SearchBoxComponent, FilterChipsComponent],
   templateUrl: './notes-topbar.component.html',
-  styleUrl: './notes-topbar.component.css',
+  styleUrl: './notes-topbar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NotesTopbarComponent {

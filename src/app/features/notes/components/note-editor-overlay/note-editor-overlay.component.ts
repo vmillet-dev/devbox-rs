@@ -10,7 +10,7 @@ import { CodeViewerComponent } from '../code-viewer/code-viewer.component';
   selector: 'app-note-editor-overlay',
   imports: [TagPillComponent, LifecycleBadgeComponent, CodeViewerComponent, RelativeTimePipe],
   templateUrl: './note-editor-overlay.component.html',
-  styleUrl: './note-editor-overlay.component.css',
+  styleUrl: './note-editor-overlay.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '(document:keydown.escape)': 'onEscape()',

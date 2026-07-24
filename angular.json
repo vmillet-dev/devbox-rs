@@ -10,7 +10,7 @@
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
-          "style": "css",
+          "style": "scss",
           "changeDetection": "OnPush"
         }
       },
@@ -24,6 +24,9 @@
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
+            "stylePreprocessorOptions": {
+              "includePaths": ["src/styles"]
+            },
             "assets": [
               {
                 "glob": "**/*",
@@ -31,7 +34,7 @@
                 "output": "assets"
               }
             ],
-            "styles": ["src/styles.css"]
+            "styles": ["src/styles.scss"]
           },
           "configurations": {
             "production": {

@@ -6,7 +6,7 @@ import { NoteSectionComponent } from '../note-section/note-section.component';
   selector: 'app-note-canvas',
   imports: [NoteSectionComponent],
   templateUrl: './note-canvas.component.html',
-  styleUrl: './note-canvas.component.css',
+  styleUrl: './note-canvas.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NoteCanvasComponent {

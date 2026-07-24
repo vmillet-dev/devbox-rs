@@ -1,9 +1,8 @@
+@use 'mixins' as *;
+
 .card {
-  all: unset;
-  box-sizing: border-box;
-  background: var(--bg-1);
-  border: 1px solid var(--line-soft);
-  border-radius: 10px;
+  @include unstyled-control;
+  @include surface(var(--bg-1), 10px);
   padding: 14px;
   cursor: pointer;
   display: flex;

@@ -1,3 +1,5 @@
+@use 'mixins' as *;
+
 .topbar {
   display: flex;
   align-items: center;
@@ -8,13 +10,12 @@
 }
 
 .new-note-btn {
-  all: unset;
-  box-sizing: border-box;
+  @include unstyled-control;
   display: flex;
   align-items: center;
   gap: 6px;
   background: var(--amber);
-  color: #1a1508;
+  color: var(--amber-ink);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 700;

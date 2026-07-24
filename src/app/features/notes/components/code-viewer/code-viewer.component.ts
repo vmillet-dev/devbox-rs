@@ -53,7 +53,7 @@ function tokenizeJsonLine(line: string): CodeToken[] {
 @Component({
   selector: 'app-code-viewer',
   templateUrl: './code-viewer.component.html',
-  styleUrl: './code-viewer.component.css',
+  styleUrl: './code-viewer.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CodeViewerComponent {

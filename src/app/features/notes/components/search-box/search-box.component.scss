@@ -1,19 +1,19 @@
+@use 'mixins' as *;
+
 .search-bar {
   flex: 1;
   max-width: 520px;
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--bg-2);
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  @include surface;
   padding: 7px 12px;
   color: var(--text-2);
   font-size: 13px;
 }
 
 .search-bar input {
-  all: unset;
+  @include unstyled-control;
   flex: 1;
   color: var(--text-0);
   font-family: var(--font-sans);

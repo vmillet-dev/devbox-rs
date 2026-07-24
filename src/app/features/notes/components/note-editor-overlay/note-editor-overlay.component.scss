@@ -1,7 +1,9 @@
+@use 'mixins' as *;
+
 .overlay-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(10, 11, 14, 0.6);
+  background: rgba(var(--backdrop-rgb), 0.6);
   backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
@@ -12,13 +14,11 @@
 .overlay-panel {
   width: min(880px, 90vw);
   height: min(640px, 85vh);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  @include surface(var(--bg-1), 14px, var(--line));
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-overlay);
 }
 
 .overlay-toolbar {
@@ -30,8 +30,7 @@
 }
 
 .overlay-title-input {
-  all: unset;
-  box-sizing: border-box;
+  @include unstyled-control;
   font-size: 16px;
   font-weight: 600;
   color: var(--text-0);
@@ -40,12 +39,9 @@
 }
 
 .toolbar-btn {
-  all: unset;
-  box-sizing: border-box;
-  background: var(--bg-2);
-  border: 1px solid var(--line-soft);
+  @include unstyled-control;
+  @include surface($radius: 7px);
   color: var(--text-1);
-  border-radius: 7px;
   padding: 6px 11px;
   font-size: 12px;
   cursor: pointer;
@@ -55,19 +51,16 @@
 }
 
 .toolbar-btn:hover {
-  border-color: var(--amber-dim);
-  color: var(--text-0);
+  @include accent-state(var(--text-0), var(--amber-dim));
 }
 
 .toolbar-btn.pinned {
-  color: var(--amber);
+  @include tint-badge('--amber-rgb', 0.08);
   border-color: var(--amber-dim);
-  background: rgba(232, 163, 61, 0.08);
 }
 
 .close-btn {
-  all: unset;
-  box-sizing: border-box;
+  @include unstyled-control;
   color: var(--text-2);
   font-size: 18px;
   cursor: pointer;

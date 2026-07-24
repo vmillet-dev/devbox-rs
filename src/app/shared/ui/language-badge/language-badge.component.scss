@@ -1,0 +1,34 @@
+@use 'mixins' as *;
+
+.lang-tag {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.lang-json {
+  @include tint-badge('--blue-rgb');
+}
+
+.lang-py {
+  @include tint-badge('--green-rgb');
+}
+
+.lang-sql {
+  @include tint-badge('--purple-rgb');
+}
+
+.lang-txt {
+  @include tint-badge('--text-1-rgb');
+}
+
+.lang-js {
+  @include tint-badge('--amber-rgb');
+}
+
+.lang-yml {
+  @include tint-badge('--red-rgb');
+}

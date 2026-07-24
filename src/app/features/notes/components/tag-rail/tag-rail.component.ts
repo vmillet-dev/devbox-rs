@@ -5,7 +5,7 @@ import { TagPillComponent } from '../../../../shared/ui/tag-pill/tag-pill.compon
   selector: 'app-tag-rail',
   imports: [TagPillComponent],
   templateUrl: './tag-rail.component.html',
-  styleUrl: './tag-rail.component.css',
+  styleUrl: './tag-rail.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TagRailComponent {

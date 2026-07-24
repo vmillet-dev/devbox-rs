@@ -1,11 +1,11 @@
+@use 'mixins' as *;
+
 .tag-pill {
   font: inherit;
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 4px 10px;
-  border-radius: 12px;
-  background: var(--bg-2);
-  border: 1px solid var(--line-soft);
+  @include surface($radius: 12px);
   color: var(--text-1);
   cursor: pointer;
   white-space: nowrap;
@@ -14,8 +14,7 @@
 
 .tag-pill:hover,
 .tag-pill.on {
-  border-color: var(--amber-dim);
-  color: var(--amber);
+  @include accent-state;
 }
 
 .tag-pill.static {
@@ -23,6 +22,5 @@
 }
 
 .tag-pill.static:hover {
-  border-color: var(--line-soft);
-  color: var(--text-1);
+  @include accent-state(var(--text-1), var(--line-soft));
 }

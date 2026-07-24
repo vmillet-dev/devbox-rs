@@ -7,7 +7,7 @@ import { LanguageBadgeComponent } from '../../../../shared/ui/language-badge/lan
   selector: 'app-note-card',
   imports: [LanguageBadgeComponent],
   templateUrl: './note-card.component.html',
-  styleUrl: './note-card.component.css',
+  styleUrl: './note-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NoteCardComponent {

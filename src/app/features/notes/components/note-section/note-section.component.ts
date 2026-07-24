@@ -6,7 +6,7 @@ import { NoteCardComponent } from '../note-card/note-card.component';
   selector: 'app-note-section',
   imports: [NoteCardComponent],
   templateUrl: './note-section.component.html',
-  styleUrl: './note-section.component.css',
+  styleUrl: './note-section.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NoteSectionComponent {

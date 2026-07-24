@@ -5,7 +5,7 @@ import { formatExpiry, isExpiringSoon } from '../../../core/utils/relative-time.
 @Component({
   selector: 'app-lifecycle-badge',
   templateUrl: './lifecycle-badge.component.html',
-  styleUrl: './lifecycle-badge.component.css',
+  styleUrl: './lifecycle-badge.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LifecycleBadgeComponent {

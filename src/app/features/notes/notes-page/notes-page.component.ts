@@ -10,7 +10,7 @@ import { NoteEditorOverlayComponent } from '../components/note-editor-overlay/no
   selector: 'app-notes-page',
   imports: [NotesTopbarComponent, TagRailComponent, NoteCanvasComponent, NoteEditorOverlayComponent],
   templateUrl: './notes-page.component.html',
-  styleUrl: './notes-page.component.css',
+  styleUrl: './notes-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '(document:keydown)': 'onKeydown($event)',

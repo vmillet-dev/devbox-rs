@@ -10,7 +10,7 @@ const FILTERS: ReadonlyArray<{ key: NoteFilter; label: string }> = [
 @Component({
   selector: 'app-filter-chips',
   templateUrl: './filter-chips.component.html',
-  styleUrl: './filter-chips.component.css',
+  styleUrl: './filter-chips.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FilterChipsComponent {

@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 @Component({
   selector: 'app-tag-pill',
   templateUrl: './tag-pill.component.html',
-  styleUrl: './tag-pill.component.css',
+  styleUrl: './tag-pill.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TagPillComponent {

@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, input, output, viewChil
 @Component({
   selector: 'app-search-box',
   templateUrl: './search-box.component.html',
-  styleUrl: './search-box.component.css',
+  styleUrl: './search-box.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SearchBoxComponent {

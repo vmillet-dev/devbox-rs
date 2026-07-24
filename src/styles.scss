@@ -1,10 +1,12 @@
-/* Styles globaux de DevBox */
+// Styles globaux de DevBox — c'est le fichier "thème" de l'app : toutes les
+// couleurs et polices vivent ici en variables CSS, et les composants ne font
+// que les consommer via var(--xxx).
 
 /*
  * IMPORTANT : ces variables doivent vivre ICI (fichier global, non scopé),
- * et non dans un *.component.css. Angular applique une "encapsulation" aux
+ * et non dans un *.component.scss. Angular applique une "encapsulation" aux
  * styles de composant (ViewEncapsulation.Emulated) : un sélecteur `:root`
- * écrit dans un fichier *.component.css est réécrit en `:root[_ngcontent-xxx]`,
+ * écrit dans un fichier *.component.scss est réécrit en `:root[_ngcontent-xxx]`,
  * qui ne correspond jamais à la vraie balise <html>. Les variables seraient
  * alors invalides -> `color: var(--text-0)` retomberait sur le noir par défaut
  * du navigateur, même si le fond (non hérité) reste sombre.
@@ -21,10 +23,35 @@
   --text-2: #6e7488;
   --amber: #e8a33d;
   --amber-dim: #8a662a;
+  --amber-ink: #1a1508; // texte sur fond ambré plein (ex. bouton "nouvelle note")
   --green: #6fbf8b;
   --blue: #6f9bd1;
   --red: #d1706f;
   --purple: #a98fd1;
+
+  // Variantes "triplet RGB" des couleurs ci-dessus, utilisées avec rgba()/rgb()
+  // partout où une teinte translucide est nécessaire (badges, surbrillances...),
+  // pour ne jamais dupliquer un hex derrière une opacité codée en dur.
+  --text-1-rgb: 170, 176, 192;
+  --amber-rgb: 232, 163, 61;
+  --green-rgb: 111, 191, 139;
+  --blue-rgb: 111, 155, 209;
+  --red-rgb: 209, 111, 111;
+  --purple-rgb: 169, 143, 209;
+  --black-rgb: 0, 0, 0;
+  --backdrop-rgb: 10, 11, 14;
+
+  // Couleurs "feu tricolore" de la titlebar (décoratif, hors palette sémantique).
+  --dot-red: #e5645c;
+  --dot-yellow: #e6b450;
+  --dot-green: #5fbf6f;
+
+  // Numéros de ligne du visualiseur de code : volontairement plus sourds que
+  // --text-2 pour rester lisibles sans attirer l'oeil.
+  --line-no: #3f4454;
+
+  --shadow-dropdown: 0 10px 30px rgba(var(--black-rgb), 0.35);
+  --shadow-overlay: 0 30px 60px rgba(var(--black-rgb), 0.5);
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

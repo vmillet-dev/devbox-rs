@@ -21,15 +21,15 @@
 }
 
 .dot.r {
-  background: #e5645c;
+  background: var(--dot-red);
 }
 
 .dot.y {
-  background: #e6b450;
+  background: var(--dot-yellow);
 }
 
 .dot.g {
-  background: #5fbf6f;
+  background: var(--dot-green);
 }
 
 .titlebar-title {

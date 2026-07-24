@@ -1,3 +1,5 @@
+@use 'mixins' as *;
+
 .canvas-section {
   margin-bottom: 28px;
 }
@@ -29,8 +31,7 @@
 }
 
 .card.ghost {
-  all: unset;
-  box-sizing: border-box;
+  @include unstyled-control;
   border: 1px dashed var(--line);
   border-radius: 10px;
   height: 150px;
@@ -46,8 +47,7 @@
 }
 
 .card.ghost:hover {
-  color: var(--amber);
-  border-color: var(--amber-dim);
+  @include accent-state;
 }
 
 .ghost-plus {

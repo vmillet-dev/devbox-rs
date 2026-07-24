@@ -6,7 +6,7 @@ import { NotesPageComponent } from '../../features/notes/notes-page/notes-page.c
   selector: 'app-shell',
   imports: [TitlebarComponent, NotesPageComponent],
   templateUrl: './app-shell.component.html',
-  styleUrl: './app-shell.component.css',
+  styleUrl: './app-shell.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppShellComponent {}
