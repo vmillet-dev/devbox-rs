@@ -1,71 +1,83 @@
 # DevBox
 
-Le couteau suisse du développeur — prise de notes et utilitaires (hashing, encodage, etc.)
-Front-end **Angular**, moteur natif **Rust / Tauri v2**.
+A developer's Swiss Army knife for the desktop: a notes/snippets manager, plus utilities
+(hashing, encoding, formatting) to come.
 
-## Prérequis
+**Angular 22** (standalone components, signals, zoneless change detection) on the front,
+**Rust / Tauri v2** as the native shell.
 
-- [Node.js](https://nodejs.org/) (v18+) et npm
+> **Status** — the notes UI is built and interactive, but runs on in-memory mock data:
+> nothing is persisted yet. The Rust side is still the Tauri scaffold plus a demo command.
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) 20+ and npm
 - [Rust](https://www.rust-lang.org/tools/install) (via `rustup`)
-- Les dépendances système Tauri pour votre OS : https://tauri.app/start/prerequisites/
-  (sur Linux : `webkit2gtk`, `librsvg2`, etc.)
+- Tauri's system dependencies for your OS — see the
+  [Tauri prerequisites](https://tauri.app/start/prerequisites/)
 
-## Installation
-
-```bash
-npm install
-```
-
-## Lancer en mode développement (hot-reload)
+## Getting started
 
 ```bash
-npm run tauri dev
+npm install          # also needed before the first Rust build: Tauri's build script reads the front-end config
+npm run tauri dev    # Angular dev server + Tauri window
 ```
 
-Cette commande démarre le serveur Angular (`ng serve`, avec hot-reload sur le
-code TypeScript/HTML/CSS) **et** compile/lance l'application Tauri, qui recharge
-automatiquement la fenêtre lorsqu'un fichier front-end change.
-Toute modification du code **Rust** nécessite en revanche une recompilation
-(automatique, mais plus longue que le hot-reload front-end).
+Front-end changes hot-reload; Rust changes trigger an automatic (slower) recompile.
 
-## Build de production
+To work on the UI alone, `npm start` serves the app on http://localhost:1420 — it runs fine
+in a plain browser, since nothing calls a Tauri API at runtime yet.
 
-```bash
-npm run tauri build
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm start` | Angular dev server only, port 1420 |
+| `npm run tauri dev` | Full dev loop: Angular dev server + Tauri window |
+| `npm run build` | Production Angular build → `dist/devbox/browser` |
+| `npm run tauri build` | Full production build → `src-tauri/target/release` |
+| `npm test` | Unit tests (Vitest, jsdom — no browser required) |
+| `npm run test:watch` | Tests, re-running on change |
+| `npm run test:coverage` | Tests with a v8 coverage report |
+
+For Rust-only iteration, `cargo check` from `src-tauri/` is much faster than a full
+`tauri build`.
+
+## Layout
+
+```
+src/          Angular front-end (core/ state & data, features/ screens, layout/, shared/)
+src-tauri/    Rust back-end: Tauri config, capabilities, commands/
+docs/         Architecture notes and UI mockup
 ```
 
-Génère l'exécutable / l'installeur natif dans `src-tauri/target/release`.
+## Documentation
 
-## Structure du projet
+- [Architecture](docs/architecture.md) — front-end structure, state and data-access
+  patterns, i18n, theming, the Angular ↔ Rust IPC boundary, and testing conventions.
+- [`docs/scratch-mockup-v2.html`](docs/scratch-mockup-v2.html) — static UI mockup used as
+  the visual reference. Not code to run or import.
 
-```
-devbox/
-├── src/                        # Front-end Angular
-│   └── app/
-│       ├── app.component.ts    # Démo "Hello World" (invoke -> saluer)
-│       ├── app.component.html
-│       └── app.component.css
-└── src-tauri/                  # Back-end Rust / Tauri
-    ├── Cargo.toml
-    ├── tauri.conf.json
-    └── src/
-        ├── main.rs
-        ├── lib.rs               # Builder Tauri + enregistrement des commandes
-        └── commands/
-            ├── mod.rs
-            ├── greetings.rs     # saluer() — commande de démo
-            ├── notes.rs         # squelette du futur module "notes"
-            ├── crypto.rs        # squelette du futur module "hashing/crypto"
-            └── formatters.rs    # squelette du futur module "encodage"
-```
+## Roadmap
 
-## Ajouter une nouvelle commande Rust
+- [x] Notes UI: spaces, search, filters, tag rail, pinned/today/week sections, editor
+      overlay with code viewer
+- [x] French/English localization with persisted locale
+- [ ] Persistence: real Rust notes backend behind the `NOTES_REPOSITORY` token
+- [ ] Editable note content (the overlay is read-only apart from title and pin)
+- [ ] Real spaces — currently a mock list that doesn't filter anything
+- [ ] `crypto` module: SHA-256, MD5, UUID generation
+- [ ] `formatters` module: base64 encode/decode, JSON formatting
+- [ ] Linting/formatting setup and Rust tests
 
-1. Écrire la fonction dans le fichier `commands/<domaine>.rs` concerné, avec
-   `#[tauri::command]`.
-2. L'enregistrer dans `tauri::generate_handler![...]` dans `src-tauri/src/lib.rs`.
-3. L'appeler côté Angular avec `invoke('nom_commande', { ...args })`.
+## Conventions
 
-## Recommended IDE Setup
+Code comments, docstrings and UI strings are written in **French**. Test descriptions and
+test comments are in **English**, matching Vitest/Angular community conventions.
 
-[VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) + [Angular Language Service](https://marketplace.visualstudio.com/items?itemName=Angular.ng-template).
+No linter or formatter is configured yet (no ESLint, Prettier, clippy or rustfmt hook).
+
+## Recommended IDE setup
+
+[VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) + [Angular Language Service](https://marketplace.visualstudio.com/items?itemName=Angular.ng-template),
+or JetBrains RustRover / WebStorm.
