@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createNote } from '../../../../../testing/note.fixture';
+import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
 import { LanguageBadgeComponent } from '../../../../shared/ui/language-badge/language-badge.component';
 import { NoteCardComponent } from './note-card.component';
 
@@ -13,7 +14,7 @@ describe('NoteCardComponent', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
 
-    TestBed.configureTestingModule({ imports: [NoteCardComponent] });
+    TestBed.configureTestingModule({ imports: [NoteCardComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(NoteCardComponent);
     fixture.componentRef.setInput('note', createNote());
     fixture.autoDetectChanges();

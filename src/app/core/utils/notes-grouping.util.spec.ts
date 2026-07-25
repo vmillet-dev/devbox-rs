@@ -52,7 +52,7 @@ describe('groupNotesIntoSections', () => {
     const sections = groupNotesIntoSections([], NOW);
 
     expect(sections).toEqual([
-      { key: 'week', title: 'Cette semaine', hint: undefined, notes: [], showCreateGhost: true },
+      { key: 'week', title: 'sections.week', hint: undefined, notes: [], showCreateGhost: true },
     ]);
   });
 
@@ -66,7 +66,7 @@ describe('groupNotesIntoSections', () => {
     const sections = groupNotesIntoSections([expiringNote], NOW);
     const weekSection = sections.find((section) => section.key === 'week');
 
-    expect(weekSection?.hint).toBe('à trier bientôt');
+    expect(weekSection?.hint).toBe('sections.weekHint');
   });
 
   it('orders sections as pinned, today, then week', () => {

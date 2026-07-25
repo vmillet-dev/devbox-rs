@@ -11,7 +11,10 @@
   <div class="card-title">{{ note().title }}</div>
   <div class="card-snippet">{{ snippet() }}</div>
   <div class="card-footer">
-    <span [class.stale]="footerStale()">{{ footerLabel() }}</span>
+    <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). -->
+    <span [class.stale]="footerStale()"
+      >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
+    >
     <div class="card-tags">
       @for (tag of displayedTags(); track tag) {
         <span>#{{ tag }}</span>

@@ -19,16 +19,16 @@ export function groupNotesIntoSections(notes: readonly Note[], now: Date = new D
   const sections: NoteSection[] = [];
 
   if (pinned.length > 0) {
-    sections.push({ key: 'pinned', title: 'Épinglées', notes: pinned });
+    sections.push({ key: 'pinned', title: 'sections.pinned', notes: pinned });
   }
   if (today.length > 0) {
-    sections.push({ key: 'today', title: "Aujourd'hui", notes: today });
+    sections.push({ key: 'today', title: 'sections.today', notes: today });
   }
 
   sections.push({
     key: 'week',
-    title: 'Cette semaine',
-    hint: thisWeek.some((note) => note.lifecycle.kind === 'expires') ? 'à trier bientôt' : undefined,
+    title: 'sections.week',
+    hint: thisWeek.some((note) => note.lifecycle.kind === 'expires') ? 'sections.weekHint' : undefined,
     notes: thisWeek,
     showCreateGhost: true,
   });

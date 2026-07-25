@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteSection } from '../../../../core/models/note.model';
 import { NoteCardComponent } from '../note-card/note-card.component';
 
 @Component({
   selector: 'app-note-section',
-  imports: [NoteCardComponent],
+  imports: [NoteCardComponent, TranslocoPipe],
   templateUrl: './note-section.component.html',
   styleUrl: './note-section.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

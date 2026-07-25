@@ -1,6 +1,6 @@
 @if (tags().length > 0) {
   <div class="tag-rail">
-    <span class="tag-rail-label">Tags</span>
+    <span class="tag-rail-label">{{ 'notes.tags' | transloco }}</span>
     @for (tag of tags(); track tag) {
       <app-tag-pill [label]="tag" [active]="activeTags().has(tag)" (toggled)="tagToggled.emit($event)" />
     }

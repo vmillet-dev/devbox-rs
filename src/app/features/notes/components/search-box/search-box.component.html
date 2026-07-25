@@ -3,7 +3,7 @@
   <input
     #searchInput
     type="text"
-    placeholder="Rechercher une note, un tag, du code..."
+    [placeholder]="'notes.searchPlaceholder' | transloco"
     [value]="query()"
     (input)="onInput(searchInput.value)"
   />

@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createNote } from '../../../../../testing/note.fixture';
+import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
 import { NoteCardComponent } from '../note-card/note-card.component';
 import { NoteSectionComponent } from './note-section.component';
 
@@ -9,7 +10,7 @@ describe('NoteSectionComponent', () => {
   let fixture: ComponentFixture<NoteSectionComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [NoteSectionComponent] });
+    TestBed.configureTestingModule({ imports: [NoteSectionComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(NoteSectionComponent);
     fixture.componentRef.setInput('section', { key: 'today', title: "Aujourd'hui", notes: [] });
     fixture.autoDetectChanges();

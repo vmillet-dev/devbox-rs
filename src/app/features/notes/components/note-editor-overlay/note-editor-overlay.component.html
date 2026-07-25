@@ -9,9 +9,9 @@
           (change)="titleChanged.emit(titleInput.value)"
         />
         <button type="button" class="toolbar-btn" [class.pinned]="note.pinned" (click)="pinToggled.emit()">
-          📌 {{ note.pinned ? 'Épinglée' : 'Épingler' }}
+          📌 {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
         </button>
-        <button type="button" class="toolbar-btn">📁 Déplacer</button>
+        <button type="button" class="toolbar-btn">📁 {{ 'editor.move' | transloco }}</button>
         <button type="button" class="toolbar-btn">⋯</button>
         <button type="button" class="close-btn" (click)="closed.emit()">✕</button>
       </div>
@@ -30,8 +30,10 @@
       <app-code-viewer class="overlay-body" [content]="note.content" [language]="note.language" />
 
       <div class="overlay-footer">
-        <span>{{ languageLabel() }} · {{ lineCount() }} lignes · {{ byteSize() }} octets</span>
-        <span>Modifiée {{ note.updatedAt | relativeTime }}</span>
+        <span>{{ languageLabel() }} · {{ 'editor.footerStats' | transloco: { lines: lineCount(), bytes: byteSize() } }}</span>
+        @if (modifiedRef(); as ref) {
+          <span>{{ 'editor.modifiedPrefix' | transloco }} {{ ref.key | transloco: ref.params }}</span>
+        }
       </div>
     </div>
   </div>

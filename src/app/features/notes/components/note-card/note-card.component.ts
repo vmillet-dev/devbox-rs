@@ -1,11 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Note } from '../../../../core/models/note.model';
-import { formatExpiry, formatRelativeTime, isExpiringSoon } from '../../../../core/utils/relative-time.util';
+import { TranslationRef, expiryRef, isExpiringSoon, relativeTimeRef } from '../../../../core/utils/relative-time.util';
 import { LanguageBadgeComponent } from '../../../../shared/ui/language-badge/language-badge.component';
+
+/** Le libellé du pied de carte est soit du texte brut (nom de source), soit une référence de traduction (temps). */
+type FooterLabel = { kind: 'text'; value: string } | { kind: 'ref'; ref: TranslationRef };
 
 @Component({
   selector: 'app-note-card',
-  imports: [LanguageBadgeComponent],
+  imports: [LanguageBadgeComponent, TranslocoPipe],
   templateUrl: './note-card.component.html',
   styleUrl: './note-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -20,12 +24,15 @@ export class NoteCardComponent {
 
   protected readonly displayedTags = computed(() => this.note().tags.slice(0, 2));
 
-  protected readonly footerLabel = computed(() => {
+  protected readonly footerLabel = computed<FooterLabel>(() => {
     const note = this.note();
     if (note.lifecycle.kind === 'expires') {
-      return formatExpiry(note.lifecycle.at);
+      return { kind: 'ref', ref: expiryRef(note.lifecycle.at) };
     }
-    return note.pinned ? note.source.split(' / ')[0] : formatRelativeTime(note.updatedAt);
+    if (note.pinned) {
+      return { kind: 'text', value: note.source.split(' / ')[0] };
+    }
+    return { kind: 'ref', ref: relativeTimeRef(note.updatedAt) };
   });
 
   protected readonly footerStale = computed(() => {

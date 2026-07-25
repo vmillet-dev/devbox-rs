@@ -1,1 +1,1 @@
-<span class="lifecycle-badge" [class.stale]="stale()">{{ icon() }} {{ label() }}</span>
+<span class="lifecycle-badge" [class.stale]="stale()">{{ icon() }} {{ label().key | transloco: label().params }}</span>

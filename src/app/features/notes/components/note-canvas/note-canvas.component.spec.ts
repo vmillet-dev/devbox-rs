@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
 import { NoteSectionComponent } from '../note-section/note-section.component';
 import { NoteCanvasComponent } from './note-canvas.component';
 
@@ -8,7 +9,7 @@ describe('NoteCanvasComponent', () => {
   let fixture: ComponentFixture<NoteCanvasComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [NoteCanvasComponent] });
+    TestBed.configureTestingModule({ imports: [NoteCanvasComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(NoteCanvasComponent);
     fixture.componentRef.setInput('sections', [
       { key: 'pinned', title: 'Épinglées', notes: [] },

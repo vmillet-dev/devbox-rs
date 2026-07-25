@@ -1,55 +1,55 @@
 import { describe, expect, it } from 'vitest';
-import { formatExpiry, formatRelativeTime, isExpiringSoon } from './relative-time.util';
+import { expiryRef, isExpiringSoon, relativeTimeRef } from './relative-time.util';
 
-describe('formatRelativeTime', () => {
-  it('returns "just now" label when under a minute has elapsed', () => {
+describe('relativeTimeRef', () => {
+  it('returns the "just now" key when under a minute has elapsed', () => {
     const now = new Date('2026-01-01T12:00:00Z');
     const date = new Date('2026-01-01T11:59:45Z');
 
-    expect(formatRelativeTime(date, now)).toBe("à l'instant");
+    expect(relativeTimeRef(date, now)).toEqual({ key: 'time.justNow' });
   });
 
-  it('returns minutes label when under an hour has elapsed', () => {
+  it('returns the minutes key when under an hour has elapsed', () => {
     const now = new Date('2026-01-01T12:00:00Z');
     const date = new Date('2026-01-01T11:45:00Z');
 
-    expect(formatRelativeTime(date, now)).toBe('il y a 15 min');
+    expect(relativeTimeRef(date, now)).toEqual({ key: 'time.minutesAgo', params: { count: 15 } });
   });
 
-  it('returns hours label when under a day has elapsed', () => {
+  it('returns the hours key when under a day has elapsed', () => {
     const now = new Date('2026-01-01T12:00:00Z');
     const date = new Date('2026-01-01T09:00:00Z');
 
-    expect(formatRelativeTime(date, now)).toBe('il y a 3h');
+    expect(relativeTimeRef(date, now)).toEqual({ key: 'time.hoursAgo', params: { count: 3 } });
   });
 
-  it('returns days label when a day or more has elapsed', () => {
+  it('returns the days key when a day or more has elapsed', () => {
     const now = new Date('2026-01-05T12:00:00Z');
     const date = new Date('2026-01-01T12:00:00Z');
 
-    expect(formatRelativeTime(date, now)).toBe('il y a 4j');
+    expect(relativeTimeRef(date, now)).toEqual({ key: 'time.daysAgo', params: { count: 4 } });
   });
 });
 
-describe('formatExpiry', () => {
-  it('returns the "expired" label when the expiry date is in the past', () => {
+describe('expiryRef', () => {
+  it('returns the "expired" key when the expiry date is in the past', () => {
     const now = new Date('2026-01-05T12:00:00Z');
     const at = new Date('2026-01-01T12:00:00Z');
 
-    expect(formatExpiry(at, now)).toBe('expirée');
+    expect(expiryRef(at, now)).toEqual({ key: 'time.expired' });
   });
 
-  it('returns the "expired" label when the expiry date is exactly now', () => {
+  it('returns the "expired" key when the expiry date is exactly now', () => {
     const now = new Date('2026-01-05T12:00:00Z');
 
-    expect(formatExpiry(now, now)).toBe('expirée');
+    expect(expiryRef(now, now)).toEqual({ key: 'time.expired' });
   });
 
-  it('returns the number of days remaining when the expiry date is in the future', () => {
+  it('returns the days-remaining key when the expiry date is in the future', () => {
     const now = new Date('2026-01-01T12:00:00Z');
     const at = new Date('2026-01-04T12:00:00Z');
 
-    expect(formatExpiry(at, now)).toBe('expire dans 3j');
+    expect(expiryRef(at, now)).toEqual({ key: 'time.expiresIn', params: { count: 3 } });
   });
 });
 

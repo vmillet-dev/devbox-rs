@@ -20,7 +20,9 @@ export type NoteSectionKey = 'pinned' | 'today' | 'week';
 
 export interface NoteSection {
   key: NoteSectionKey;
+  /** Clé de traduction Transloco (voir `src/assets/i18n/*.json`), traduite via le pipe `transloco` dans le template — pas le texte affiché. */
   title: string;
+  /** Idem : clé de traduction, optionnelle. */
   hint?: string;
   notes: Note[];
   showCreateGhost?: boolean;

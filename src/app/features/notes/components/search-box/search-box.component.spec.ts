@@ -1,12 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
 import { SearchBoxComponent } from './search-box.component';
 
 describe('SearchBoxComponent', () => {
   let fixture: ComponentFixture<SearchBoxComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [SearchBoxComponent] });
+    TestBed.configureTestingModule({ imports: [SearchBoxComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(SearchBoxComponent);
     fixture.autoDetectChanges();
   });

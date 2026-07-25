@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createNote } from '../../../../../testing/note.fixture';
+import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
 import { CodeViewerComponent } from '../code-viewer/code-viewer.component';
 import { TagPillComponent } from '../../../../shared/ui/tag-pill/tag-pill.component';
 import { LifecycleBadgeComponent } from '../../../../shared/ui/lifecycle-badge/lifecycle-badge.component';
@@ -15,7 +16,7 @@ describe('NoteEditorOverlayComponent', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
 
-    TestBed.configureTestingModule({ imports: [NoteEditorOverlayComponent] });
+    TestBed.configureTestingModule({ imports: [NoteEditorOverlayComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(NoteEditorOverlayComponent);
     fixture.autoDetectChanges();
   });

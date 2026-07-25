@@ -1,7 +1,8 @@
 <div class="canvas-section">
   <div class="canvas-section-title">
-    {{ section().title }}
-    <span class="n">· {{ section().notes.length }}{{ section().hint ? ' · ' + section().hint : '' }}</span>
+    {{ section().title | transloco }}
+    <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). -->
+    <span class="n">· {{ section().notes.length }}@if (section().hint) { · {{ section().hint! | transloco }}}</span>
   </div>
   <div class="card-grid">
     @for (note of section().notes; track note.id) {
@@ -10,7 +11,7 @@
     @if (section().showCreateGhost) {
       <button type="button" class="card ghost" (click)="createRequested.emit()">
         <span class="ghost-plus">+</span>
-        <span>Coller ou créer</span>
+        <span>{{ 'notes.createOrPaste' | transloco }}</span>
       </button>
     }
   </div>

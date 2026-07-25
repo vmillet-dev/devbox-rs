@@ -5,6 +5,7 @@ import { NOTES_REPOSITORY } from '../../../core/data/notes-repository.token';
 import { NotesStore } from '../../../core/stores/notes.store';
 import { MOCK_SPACES } from '../../../core/data/spaces.mock-data';
 import { FakeNotesRepository } from '../../../../testing/fake-notes-repository';
+import { provideTranslocoTesting } from '../../../../testing/provide-transloco-testing';
 import { NotesTopbarComponent } from '../components/notes-topbar/notes-topbar.component';
 import { TagRailComponent } from '../components/tag-rail/tag-rail.component';
 import { NoteCanvasComponent } from '../components/note-canvas/note-canvas.component';
@@ -18,7 +19,7 @@ describe('NotesPageComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [NotesPageComponent],
-      providers: [{ provide: NOTES_REPOSITORY, useValue: new FakeNotesRepository([]) }],
+      providers: [{ provide: NOTES_REPOSITORY, useValue: new FakeNotesRepository([]) }, provideTranslocoTesting()],
     });
     fixture = TestBed.createComponent(NotesPageComponent);
     store = TestBed.inject(NotesStore);

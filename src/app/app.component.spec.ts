@@ -3,6 +3,7 @@ import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { NOTES_REPOSITORY } from './core/data/notes-repository.token';
 import { FakeNotesRepository } from '../testing/fake-notes-repository';
+import { provideTranslocoTesting } from '../testing/provide-transloco-testing';
 import { AppShellComponent } from './layout/app-shell/app-shell.component';
 import { AppComponent } from './app.component';
 
@@ -12,7 +13,7 @@ describe('AppComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [{ provide: NOTES_REPOSITORY, useValue: new FakeNotesRepository([]) }],
+      providers: [{ provide: NOTES_REPOSITORY, useValue: new FakeNotesRepository([]) }, provideTranslocoTesting()],
     });
     fixture = TestBed.createComponent(AppComponent);
     fixture.autoDetectChanges();

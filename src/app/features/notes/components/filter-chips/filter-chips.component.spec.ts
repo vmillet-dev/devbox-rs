@@ -1,13 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
 import { FilterChipsComponent } from './filter-chips.component';
 
 describe('FilterChipsComponent', () => {
   let fixture: ComponentFixture<FilterChipsComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [FilterChipsComponent] });
+    TestBed.configureTestingModule({ imports: [FilterChipsComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(FilterChipsComponent);
     fixture.componentRef.setInput('active', 'all');
     fixture.autoDetectChanges();

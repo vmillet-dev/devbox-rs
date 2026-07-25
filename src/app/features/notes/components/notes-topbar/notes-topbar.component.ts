@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output, viewChild } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Space } from '../../../../core/models/space.model';
 import { NoteFilter } from '../../../../core/stores/notes.store';
 import { SpaceSwitcherComponent } from '../space-switcher/space-switcher.component';
@@ -7,7 +8,7 @@ import { FilterChipsComponent } from '../filter-chips/filter-chips.component';
 
 @Component({
   selector: 'app-notes-topbar',
-  imports: [SpaceSwitcherComponent, SearchBoxComponent, FilterChipsComponent],
+  imports: [SpaceSwitcherComponent, SearchBoxComponent, FilterChipsComponent, TranslocoPipe],
   templateUrl: './notes-topbar.component.html',
   styleUrl: './notes-topbar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

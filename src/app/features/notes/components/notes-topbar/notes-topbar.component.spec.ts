@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
 import { Space } from '../../../../core/models/space.model';
 import { SpaceSwitcherComponent } from '../space-switcher/space-switcher.component';
 import { SearchBoxComponent } from '../search-box/search-box.component';
@@ -13,7 +14,7 @@ describe('NotesTopbarComponent', () => {
   let fixture: ComponentFixture<NotesTopbarComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [NotesTopbarComponent] });
+    TestBed.configureTestingModule({ imports: [NotesTopbarComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(NotesTopbarComponent);
     fixture.componentRef.setInput('spaces', SPACES);
     fixture.componentRef.setInput('activeSpace', SPACES[0]);

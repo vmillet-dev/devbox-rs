@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, ElementRef, input, output, viewChild } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-search-box',
+  imports: [TranslocoPipe],
   templateUrl: './search-box.component.html',
   styleUrl: './search-box.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -1,0 +1,41 @@
+{
+  "notes": {
+    "newNote": "+ New note",
+    "searchPlaceholder": "Search a note, a tag, some code...",
+    "tags": "Tags",
+    "createOrPaste": "Paste or create"
+  },
+  "filters": {
+    "all": "All",
+    "pinned": "Pinned",
+    "untriaged": "Untriaged"
+  },
+  "sections": {
+    "pinned": "Pinned",
+    "today": "Today",
+    "week": "This week",
+    "weekHint": "to triage soon"
+  },
+  "editor": {
+    "pin": "Pin",
+    "pinned": "Pinned",
+    "move": "Move",
+    "footerStats": "{{lines}} lines · {{bytes}} bytes",
+    "modifiedPrefix": "Updated"
+  },
+  "lifecycle": {
+    "neverExpires": "Never expires"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "expiresIn": "expires in {{count}}d",
+    "expired": "expired"
+  },
+  "locale": {
+    "fr": "French",
+    "en": "English"
+  }
+}

@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { provideTranslocoTesting } from '../../../../testing/provide-transloco-testing';
 import { LifecycleBadgeComponent } from './lifecycle-badge.component';
 
 describe('LifecycleBadgeComponent', () => {
@@ -11,7 +12,7 @@ describe('LifecycleBadgeComponent', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
 
-    TestBed.configureTestingModule({ imports: [LifecycleBadgeComponent] });
+    TestBed.configureTestingModule({ imports: [LifecycleBadgeComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(LifecycleBadgeComponent);
     fixture.componentRef.setInput('lifecycle', { kind: 'permanent' });
     fixture.autoDetectChanges();

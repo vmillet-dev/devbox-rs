@@ -5,8 +5,7 @@
       class="chip"
       [class.active]="active() === filter.key"
       (click)="filterChanged.emit(filter.key)"
+      >{{ filter.icon ? filter.icon + ' ' : '' }}{{ filter.labelKey | transloco }}</button
     >
-      {{ filter.label }}
-    </button>
   }
 </div>
