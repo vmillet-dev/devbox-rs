@@ -1,27 +1,32 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { RouterOutlet, provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { NOTES_REPOSITORY } from '../../core/data/notes-repository.token';
-import { FakeNotesRepository } from '../../../testing/fake-notes-repository';
-import { provideTranslocoTesting } from '../../../testing/provide-transloco-testing';
+import { ErrorBannerComponent } from '@shared/ui/error-banner/error-banner.component';
+import { provideAppTesting } from '@testing/testing.providers';
 import { TitlebarComponent } from '../titlebar/titlebar.component';
-import { NotesPageComponent } from '../../features/notes/notes-page/notes-page.component';
 import { AppShellComponent } from './app-shell.component';
 
 describe('AppShellComponent', () => {
   let fixture: ComponentFixture<AppShellComponent>;
 
   beforeEach(() => {
+    TestBed.resetTestingModule();
+    localStorage.clear();
     TestBed.configureTestingModule({
       imports: [AppShellComponent],
-      providers: [{ provide: NOTES_REPOSITORY, useValue: new FakeNotesRepository([]) }, provideTranslocoTesting()],
+      providers: [provideAppTesting(), provideRouter([])],
     });
     fixture = TestBed.createComponent(AppShellComponent);
     fixture.autoDetectChanges();
   });
 
-  it('renders the titlebar and the notes page', () => {
+  it('renders the persistent chrome: titlebar and global error banner', () => {
     expect(fixture.debugElement.query(By.directive(TitlebarComponent))).not.toBeNull();
-    expect(fixture.debugElement.query(By.directive(NotesPageComponent))).not.toBeNull();
+    expect(fixture.debugElement.query(By.directive(ErrorBannerComponent))).not.toBeNull();
+  });
+
+  it('hosts features through the router outlet rather than importing them directly', () => {
+    expect(fixture.debugElement.query(By.directive(RouterOutlet))).not.toBeNull();
   });
 });

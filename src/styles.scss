@@ -53,6 +53,10 @@
   --shadow-dropdown: 0 10px 30px rgba(var(--black-rgb), 0.35);
   --shadow-overlay: 0 30px 60px rgba(var(--black-rgb), 0.5);
 
+  // Inter et JetBrains Mono sont embarquées via les paquets @fontsource, déclarés
+  // dans le tableau `styles` d'angular.json. Elles étaient auparavant tirées de
+  // Google Fonts : sur une application de bureau, cela signifiait une typographie
+  // dégradée hors ligne et une CSP impossible à verrouiller.
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
@@ -96,4 +100,31 @@ body {
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+// Contenu réservé aux technologies d'assistance : retiré du flux visuel sans
+// être retiré de l'arbre d'accessibilité (ce que feraient `display: none` ou
+// `visibility: hidden`). Sert à exposer une information que le design ne
+// transmet que graphiquement — l'état « épinglée » d'une carte, par exemple.
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+// L'app s'anime peu, mais ce qu'elle anime doit pouvoir être coupé.
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

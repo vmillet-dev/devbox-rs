@@ -1,18 +1,23 @@
-<div class="canvas-section">
-  <div class="canvas-section-title">
-    {{ section().title | transloco }}
-    <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). -->
-    <span class="n">· {{ section().notes.length }}@if (section().hint) { · {{ section().hint! | transloco }}}</span>
-  </div>
+<section class="canvas-section" [attr.aria-labelledby]="headingId()">
+  <h2 class="canvas-section-title" [id]="headingId()">
+    {{ titleKey() | transloco }}
+    <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). D'où le prettier-ignore, qui réintroduirait ces sauts de ligne. -->
+    <!-- prettier-ignore -->
+    <span class="n">· {{ section().notes.length }}@if (section().hasExpiringNotes) { · {{ 'sections.expiringHint' | transloco }}}</span>
+  </h2>
   <div class="card-grid">
     @for (note of section().notes; track note.id) {
-      <app-note-card [note]="note" [selected]="note.id === selectedNoteId()" (opened)="noteOpened.emit($event)" />
+      <app-note-card
+        [note]="note"
+        [selected]="note.id === selectedNoteId()"
+        (opened)="noteOpened.emit($event)"
+      />
     }
     @if (section().showCreateGhost) {
       <button type="button" class="card ghost" (click)="createRequested.emit()">
-        <span class="ghost-plus">+</span>
+        <span class="ghost-plus" aria-hidden="true">+</span>
         <span>{{ 'notes.createOrPaste' | transloco }}</span>
       </button>
     }
   </div>
-</div>
+</section>

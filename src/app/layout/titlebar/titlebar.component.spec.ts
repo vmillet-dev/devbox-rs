@@ -1,14 +1,19 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { provideTranslocoTesting } from '../../../testing/provide-transloco-testing';
-import { LocaleService } from '../../core/i18n/locale.service';
+import { LocaleService } from '@core/i18n/locale.service';
+import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { TitlebarComponent } from './titlebar.component';
 
 describe('TitlebarComponent', () => {
   let fixture: ComponentFixture<TitlebarComponent>;
 
+  function localeOptions(): HTMLButtonElement[] {
+    return [...fixture.nativeElement.querySelectorAll('.locale-option')];
+  }
+
   beforeEach(() => {
+    TestBed.resetTestingModule();
     localStorage.clear();
     TestBed.configureTestingModule({ imports: [TitlebarComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(TitlebarComponent);
@@ -26,27 +31,31 @@ describe('TitlebarComponent', () => {
     expect(fixture.nativeElement.querySelector('.titlebar-title').textContent.trim()).toBe('Custom title');
   });
 
-  it('renders the three window-control dots', () => {
+  it('renders the three window-control dots, hidden from assistive tech', () => {
     expect(fixture.debugElement.queryAll(By.css('.dot'))).toHaveLength(3);
+    expect(fixture.nativeElement.querySelector('.dots').getAttribute('aria-hidden')).toBe('true');
   });
 
   it('renders a locale option per available locale, marking French active by default', () => {
-    const options = fixture.debugElement.queryAll(By.css('.locale-option'));
+    expect(localeOptions().map((option) => option.textContent?.trim())).toEqual(['FR', 'EN']);
+    expect(localeOptions()[0].classList.contains('active')).toBe(true);
+    expect(localeOptions()[1].classList.contains('active')).toBe(false);
+  });
 
-    expect(options.map((option) => option.nativeElement.textContent.trim())).toEqual(['FR', 'EN']);
-    expect(options[0].classes['active']).toBe(true);
-    expect(options[1].classes['active']).toBeFalsy();
+  it('exposes the active locale as a pressed toggle with a spelled-out name', () => {
+    // "FR" alone is an abbreviation a screen reader spells out letter by letter.
+    expect(localeOptions().map((option) => option.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+    expect(localeOptions()[0].getAttribute('aria-label')).toBe('Français');
   });
 
   it('switches the active locale when a locale option is clicked', async () => {
     const localeService = TestBed.inject(LocaleService);
 
-    fixture.debugElement.queryAll(By.css('.locale-option'))[1].triggerEventHandler('click');
+    localeOptions()[1].click();
     await fixture.whenStable();
 
     expect(localeService.activeLocale()).toBe('en');
-    const options = fixture.debugElement.queryAll(By.css('.locale-option'));
-    expect(options[1].classes['active']).toBe(true);
-    expect(options[0].classes['active']).toBeFalsy();
+    expect(localeOptions()[1].classList.contains('active')).toBe(true);
+    expect(localeOptions()[0].classList.contains('active')).toBe(false);
   });
 });

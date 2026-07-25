@@ -1,6 +1,16 @@
 <div class="topbar">
-  <app-space-switcher [spaces]="spaces()" [activeSpace]="activeSpace()" (spaceChanged)="spaceChanged.emit($event)" />
-  <app-search-box [query]="searchQuery()" (queryChange)="searchQueryChanged.emit($event)" />
+  <app-space-switcher
+    [spaces]="spaces()"
+    [activeSpace]="activeSpace()"
+    (spaceChanged)="spaceChanged.emit($event)"
+  />
+  <app-search-box
+    [query]="searchQuery()"
+    [shortcutEnabled]="searchShortcutEnabled()"
+    (queryChange)="searchQueryChanged.emit($event)"
+  />
   <app-filter-chips [active]="activeFilter()" (filterChanged)="filterChanged.emit($event)" />
-  <button type="button" class="new-note-btn" (click)="newNoteRequested.emit()">{{ 'notes.newNote' | transloco }}</button>
+  <button type="button" class="new-note-btn" (click)="newNoteRequested.emit()">
+    {{ 'notes.newNote' | transloco }}
+  </button>
 </div>

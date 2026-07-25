@@ -1,0 +1,11 @@
+dist
+out-tsc
+node_modules
+.angular
+coverage
+src-tauri/target
+# Schémas générés par Tauri au build.
+src-tauri/gen
+package-lock.json
+# Maquette statique de référence : conservée telle quelle, hors périmètre du formatage.
+docs/scratch-mockup-v2.html

@@ -1,15 +1,16 @@
 <div class="titlebar">
-  <div class="dots">
+  <div class="dots" aria-hidden="true">
     <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
   </div>
   <div class="titlebar-title">{{ title() }}</div>
-  <div class="locale-switch">
+  <div class="locale-switch" role="group" [attr.aria-label]="'locale.groupLabel' | transloco">
     @for (locale of locales; track locale) {
       <button
         type="button"
         class="locale-option"
         [class.active]="locale === localeService.activeLocale()"
-        [title]="'locale.' + locale | transloco"
+        [attr.aria-pressed]="locale === localeService.activeLocale()"
+        [attr.aria-label]="'locale.' + locale | transloco"
         (click)="localeService.setLocale(locale)"
       >
         {{ locale.toUpperCase() }}

@@ -1,6 +1,8 @@
 @for (line of lines(); track $index) {
   <div class="code-line">
-    <span class="line-no">{{ $index + 1 }}</span>
+    <!-- Numérotation purement visuelle : la faire lire par un lecteur d'écran
+         reviendrait à annoncer « 1 2 3 … » entre chaque ligne de code. -->
+    <span class="line-no" aria-hidden="true">{{ $index + 1 }}</span>
     <span class="line-content">
       @for (token of line; track $index) {
         <span [class]="'tok-' + token.type">{{ token.text }}</span>

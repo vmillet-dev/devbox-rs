@@ -1,0 +1,62 @@
+{
+  "notes": {
+    "newNote": "+ Nouvelle note",
+    "searchLabel": "Rechercher dans les notes",
+    "searchPlaceholder": "Rechercher une note, un tag, du code...",
+    "spaceSwitcherLabel": "Changer d'espace",
+    "tags": "Tags",
+    "tagsGroupLabel": "Filtrer par tag",
+    "createOrPaste": "Coller ou créer",
+    "untitled": "Sans titre",
+    "pinnedState": "Note épinglée",
+    "loading": "Chargement des notes…",
+    "noResults": "Aucune note ne correspond à cette recherche."
+  },
+  "filters": {
+    "groupLabel": "Filtrer les notes",
+    "all": "Tout",
+    "pinned": "Épinglées",
+    "untriaged": "À trier"
+  },
+  "sections": {
+    "pinned": "Épinglées",
+    "today": "Aujourd'hui",
+    "week": "Cette semaine",
+    "older": "Plus anciennes",
+    "results": "Résultats",
+    "expiringHint": "à trier bientôt"
+  },
+  "editor": {
+    "titleLabel": "Titre de la note",
+    "close": "Fermer l'éditeur",
+    "pin": "Épingler",
+    "pinned": "Épinglée",
+    "footerStats": "{{lines}} lignes · {{bytes}} octets",
+    "modifiedPrefix": "Modifiée"
+  },
+  "lifecycle": {
+    "neverExpires": "N'expire jamais"
+  },
+  "time": {
+    "justNow": "à l'instant",
+    "minutesAgo": "il y a {{count}} min",
+    "hoursAgo": "il y a {{count}}h",
+    "daysAgo": "il y a {{count}}j",
+    "expiresIn": "expire dans {{count}}j",
+    "expired": "expirée"
+  },
+  "errors": {
+    "dismiss": "Masquer le message",
+    "retry": "Réessayer",
+    "unexpected": "Une erreur inattendue est survenue.",
+    "ipcFailed": "La communication avec le moteur natif a échoué ({{command}}).",
+    "notesLoadFailed": "Impossible de charger les notes.",
+    "noteSaveFailed": "Impossible d'enregistrer la note. La modification a été annulée.",
+    "noteCreateFailed": "Impossible de créer la note."
+  },
+  "locale": {
+    "groupLabel": "Langue de l'interface",
+    "fr": "Français",
+    "en": "Anglais"
+  }
+}

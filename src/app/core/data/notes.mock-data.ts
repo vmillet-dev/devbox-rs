@@ -12,7 +12,7 @@ function daysFromNow(days: number): Date {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 }
 
-export const MOCK_NOTES: Note[] = [
+export const MOCK_NOTES: readonly Note[] = [
   {
     id: 'note-stripe-webhook',
     title: 'Payload webhook Stripe',
@@ -114,6 +114,24 @@ ORDER BY COUNT(li.id) DESC;`,
     content: `- [ ] gérer refresh token expiré
 - [ ] logger tentatives échouées
 - [ ] rate limit /login`,
+  },
+  {
+    // Plus de 7 jours et non épinglée : alimente la section « Plus anciennes ».
+    // Avant l'ajout de cette section, une telle note n'apparaissait nulle part.
+    id: 'note-git-bisect',
+    title: 'Aide-mémoire git bisect',
+    language: 'txt',
+    source: 'Snippets perso',
+    tags: ['git'],
+    pinned: false,
+    createdAt: daysAgo(23),
+    updatedAt: daysAgo(23),
+    lifecycle: { kind: 'permanent' },
+    content: `git bisect start
+git bisect bad HEAD
+git bisect good v1.4.0
+# puis, à chaque étape : git bisect good | git bisect bad
+git bisect reset`,
   },
   {
     id: 'note-docker-compose',

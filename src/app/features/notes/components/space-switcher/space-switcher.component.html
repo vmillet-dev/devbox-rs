@@ -1,14 +1,31 @@
 <div class="space-switch-wrapper">
-  <button type="button" class="space-switch" (click)="toggle()">
-    <span class="space-dot"></span> {{ activeSpace().name }} <span class="chev">▾</span>
+  <button
+    #trigger
+    type="button"
+    class="space-switch"
+    aria-haspopup="menu"
+    [attr.aria-expanded]="open()"
+    [attr.aria-label]="'notes.spaceSwitcherLabel' | transloco"
+    (click)="toggle()"
+  >
+    <span class="space-dot" aria-hidden="true"></span>
+    {{ activeSpace()?.name ?? '—' }}
+    <span class="chev" aria-hidden="true">▾</span>
   </button>
   @if (open()) {
-    <div class="space-dropdown">
+    <!-- Écoute déléguée : le conteneur n'est jamais focusé, ce sont ses options
+         qui le sont, et l'événement remonte jusqu'ici. Le rendre focusable
+         ajouterait un arrêt de tabulation parasite dans le menu. -->
+    <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -->
+    <div class="space-dropdown" role="menu" (keydown)="onMenuKeydown($event)">
       @for (space of spaces(); track space.id) {
         <button
+          #option
           type="button"
+          role="menuitemradio"
           class="space-option"
-          [class.active]="space.id === activeSpace().id"
+          [class.active]="space.id === activeSpace()?.id"
+          [attr.aria-checked]="space.id === activeSpace()?.id"
           (click)="select(space)"
         >
           {{ space.name }}

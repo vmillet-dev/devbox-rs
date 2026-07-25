@@ -1,57 +1,75 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NOTES_REPOSITORY } from '../../../core/data/notes-repository.token';
-import { NotesStore } from '../../../core/stores/notes.store';
-import { MOCK_SPACES } from '../../../core/data/spaces.mock-data';
-import { FakeNotesRepository } from '../../../../testing/fake-notes-repository';
-import { provideTranslocoTesting } from '../../../../testing/provide-transloco-testing';
-import { NotesTopbarComponent } from '../components/notes-topbar/notes-topbar.component';
-import { TagRailComponent } from '../components/tag-rail/tag-rail.component';
+import { Space } from '@core/models/space.model';
+import { NotesStore } from '@core/stores/notes.store';
+import { SpacesStore } from '@core/stores/spaces.store';
+import { createNote } from '@testing/note.fixture';
+import { provideAppTesting } from '@testing/testing.providers';
 import { NoteCanvasComponent } from '../components/note-canvas/note-canvas.component';
 import { NoteEditorOverlayComponent } from '../components/note-editor-overlay/note-editor-overlay.component';
+import { NotesTopbarComponent } from '../components/notes-topbar/notes-topbar.component';
+import { TagRailComponent } from '../components/tag-rail/tag-rail.component';
 import { NotesPageComponent } from './notes-page.component';
+
+const SPACES: readonly Space[] = [
+  { id: 'all', name: 'All spaces' },
+  { id: 'work', name: 'Work' },
+];
 
 describe('NotesPageComponent', () => {
   let fixture: ComponentFixture<NotesPageComponent>;
   let store: NotesStore;
+  let spaces: SpacesStore;
 
-  beforeEach(() => {
+  function child<T>(type: new (...args: never[]) => T): T {
+    return fixture.debugElement.query(By.directive(type)).componentInstance as T;
+  }
+
+  beforeEach(async () => {
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [NotesPageComponent],
-      providers: [{ provide: NOTES_REPOSITORY, useValue: new FakeNotesRepository([]) }, provideTranslocoTesting()],
+      providers: [provideAppTesting({ notes: [createNote({ id: 'note-42' })], spaces: SPACES })],
     });
     fixture = TestBed.createComponent(NotesPageComponent);
     store = TestBed.inject(NotesStore);
+    spaces = TestBed.inject(SpacesStore);
     fixture.autoDetectChanges();
+    await vi.waitFor(() => expect(spaces.spaces()).toHaveLength(SPACES.length));
   });
 
-  it('renders the topbar with the default active space and the store search/filter state', async () => {
+  it('renders the topbar with the store search/filter state and the active space', async () => {
     store.setSearchQuery('hello');
     store.setFilter('pinned');
     await fixture.whenStable();
 
-    const topbar = fixture.debugElement.query(By.directive(NotesTopbarComponent)).componentInstance as NotesTopbarComponent;
-    expect(topbar.spaces()).toEqual(MOCK_SPACES);
-    expect(topbar.activeSpace()).toEqual(MOCK_SPACES[0]);
+    const topbar = child(NotesTopbarComponent);
+    expect(topbar.spaces()).toEqual(SPACES);
+    expect(topbar.activeSpace()).toEqual(SPACES[0]);
     expect(topbar.searchQuery()).toBe('hello');
     expect(topbar.activeFilter()).toBe('pinned');
   });
 
   it('updates the active space when the topbar reports a space change', async () => {
-    const topbar = fixture.debugElement.query(By.directive(NotesTopbarComponent)).componentInstance as NotesTopbarComponent;
-
-    topbar.spaceChanged.emit('work');
+    child(NotesTopbarComponent).spaceChanged.emit('work');
     await fixture.whenStable();
 
-    expect(topbar.activeSpace()).toEqual(MOCK_SPACES[1]);
+    expect(child(NotesTopbarComponent).activeSpace()).toEqual(SPACES[1]);
+  });
+
+  it('falls back to the first space when the topbar reports an unknown space id', async () => {
+    child(NotesTopbarComponent).spaceChanged.emit('does-not-exist');
+    await fixture.whenStable();
+
+    expect(child(NotesTopbarComponent).activeSpace()).toEqual(SPACES[0]);
   });
 
   it('delegates search, filter and new-note requests from the topbar to the store', () => {
     const setSearchQuery = vi.spyOn(store, 'setSearchQuery');
     const setFilter = vi.spyOn(store, 'setFilter');
-    const createDraftNote = vi.spyOn(store, 'createDraftNote');
-    const topbar = fixture.debugElement.query(By.directive(NotesTopbarComponent)).componentInstance as NotesTopbarComponent;
+    const createNoteSpy = vi.spyOn(store, 'createNote').mockResolvedValue();
+    const topbar = child(NotesTopbarComponent);
 
     topbar.searchQueryChanged.emit('term');
     topbar.filterChanged.emit('untriaged');
@@ -59,103 +77,89 @@ describe('NotesPageComponent', () => {
 
     expect(setSearchQuery).toHaveBeenCalledWith('term');
     expect(setFilter).toHaveBeenCalledWith('untriaged');
-    expect(createDraftNote).toHaveBeenCalled();
+    expect(createNoteSpy).toHaveBeenCalled();
+  });
+
+  it('disables the search shortcut while the editor overlay is open', async () => {
+    // Otherwise Ctrl+K focuses a field sitting behind the modal.
+    expect(child(NotesTopbarComponent).searchShortcutEnabled()).toBe(true);
+
+    store.openNote('note-42');
+    await fixture.whenStable();
+
+    expect(child(NotesTopbarComponent).searchShortcutEnabled()).toBe(false);
   });
 
   it('delegates tag toggling from the tag rail to the store', () => {
     const toggleTag = vi.spyOn(store, 'toggleTag');
-    const tagRail = fixture.debugElement.query(By.directive(TagRailComponent)).componentInstance as TagRailComponent;
 
-    tagRail.tagToggled.emit('urgent');
+    child(TagRailComponent).tagToggled.emit('urgent');
 
     expect(toggleTag).toHaveBeenCalledWith('urgent');
   });
 
-  it('delegates note opening and create requests from the canvas to the store', () => {
+  it('delegates note opening, create and reload requests from the canvas to the store', () => {
     const openNote = vi.spyOn(store, 'openNote');
-    const createDraftNote = vi.spyOn(store, 'createDraftNote');
-    const canvas = fixture.debugElement.query(By.directive(NoteCanvasComponent)).componentInstance as NoteCanvasComponent;
+    const createNoteSpy = vi.spyOn(store, 'createNote').mockResolvedValue();
+    const reload = vi.spyOn(store, 'reload').mockImplementation(() => undefined);
+    const canvas = child(NoteCanvasComponent);
 
     canvas.noteOpened.emit('note-1');
     canvas.createRequested.emit();
+    canvas.reloadRequested.emit();
 
     expect(openNote).toHaveBeenCalledWith('note-1');
-    expect(createDraftNote).toHaveBeenCalled();
+    expect(createNoteSpy).toHaveBeenCalled();
+    expect(reload).toHaveBeenCalled();
+  });
+
+  it('passes the store loading and empty-result state to the canvas', async () => {
+    store.setSearchQuery('nothing matches this');
+    await fixture.whenStable();
+
+    expect(child(NoteCanvasComponent).hasNoResults()).toBe(true);
+    expect(child(NoteCanvasComponent).isLoading()).toBe(false);
   });
 
   it('closes the overlay via the store when the editor overlay reports closed', () => {
     const closeOverlay = vi.spyOn(store, 'closeOverlay');
-    const overlay = fixture.debugElement.query(By.directive(NoteEditorOverlayComponent)).componentInstance as NoteEditorOverlayComponent;
 
-    overlay.closed.emit();
+    child(NoteEditorOverlayComponent).closed.emit();
 
     expect(closeOverlay).toHaveBeenCalled();
   });
 
   it('renames the selected note when the editor overlay reports a title change', () => {
     store.openNote('note-42');
-    const renameNote = vi.spyOn(store, 'renameNote');
-    const overlay = fixture.debugElement.query(By.directive(NoteEditorOverlayComponent)).componentInstance as NoteEditorOverlayComponent;
+    const renameNote = vi.spyOn(store, 'renameNote').mockResolvedValue();
 
-    overlay.titleChanged.emit('New title');
+    child(NoteEditorOverlayComponent).titleChanged.emit('New title');
 
     expect(renameNote).toHaveBeenCalledWith('note-42', 'New title');
   });
 
   it('does nothing on title change when no note is selected', () => {
-    const renameNote = vi.spyOn(store, 'renameNote');
-    const overlay = fixture.debugElement.query(By.directive(NoteEditorOverlayComponent)).componentInstance as NoteEditorOverlayComponent;
+    const renameNote = vi.spyOn(store, 'renameNote').mockResolvedValue();
 
-    overlay.titleChanged.emit('New title');
+    child(NoteEditorOverlayComponent).titleChanged.emit('New title');
 
     expect(renameNote).not.toHaveBeenCalled();
   });
 
   it('toggles the pin state of the selected note when the editor overlay reports pinToggled', () => {
     store.openNote('note-42');
-    const togglePinned = vi.spyOn(store, 'togglePinned');
-    const overlay = fixture.debugElement.query(By.directive(NoteEditorOverlayComponent)).componentInstance as NoteEditorOverlayComponent;
+    const togglePinned = vi.spyOn(store, 'togglePinned').mockResolvedValue();
 
-    overlay.pinToggled.emit();
+    child(NoteEditorOverlayComponent).pinToggled.emit();
 
     expect(togglePinned).toHaveBeenCalledWith('note-42');
   });
 
   it('does nothing on pinToggled when no note is selected', () => {
-    const togglePinned = vi.spyOn(store, 'togglePinned');
-    const overlay = fixture.debugElement.query(By.directive(NoteEditorOverlayComponent)).componentInstance as NoteEditorOverlayComponent;
+    const togglePinned = vi.spyOn(store, 'togglePinned').mockResolvedValue();
 
-    overlay.pinToggled.emit();
+    child(NoteEditorOverlayComponent).pinToggled.emit();
 
     expect(togglePinned).not.toHaveBeenCalled();
-  });
-
-  it('falls back to the first space when the topbar reports an unknown space id', async () => {
-    const topbar = fixture.debugElement.query(By.directive(NotesTopbarComponent)).componentInstance as NotesTopbarComponent;
-
-    topbar.spaceChanged.emit('does-not-exist');
-    await fixture.whenStable();
-
-    expect(topbar.activeSpace()).toEqual(MOCK_SPACES[0]);
-  });
-
-  it('focuses the topbar search box on Ctrl/Cmd+K and prevents the default browser behavior', () => {
-    const topbar = fixture.debugElement.query(By.directive(NotesTopbarComponent)).componentInstance as NotesTopbarComponent;
-    const focusSearch = vi.spyOn(topbar, 'focusSearch');
-
-    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, cancelable: true });
-    document.dispatchEvent(event);
-
-    expect(focusSearch).toHaveBeenCalled();
-    expect(event.defaultPrevented).toBe(true);
-  });
-
-  it('ignores keydown events that are not the search shortcut', () => {
-    const topbar = fixture.debugElement.query(By.directive(NotesTopbarComponent)).componentInstance as NotesTopbarComponent;
-    const focusSearch = vi.spyOn(topbar, 'focusSearch');
-
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' }));
-
-    expect(focusSearch).not.toHaveBeenCalled();
   });
 });

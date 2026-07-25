@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
-import { TagPillComponent } from '../../../../shared/ui/tag-pill/tag-pill.component';
+import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
+import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { TagRailComponent } from './tag-rail.component';
 
 describe('TagRailComponent', () => {
@@ -25,11 +25,21 @@ describe('TagRailComponent', () => {
     fixture.componentRef.setInput('activeTags', new Set(['beta']));
     await fixture.whenStable();
 
-    const pills = fixture.debugElement.queryAll(By.directive(TagPillComponent));
-    const pillInstances = pills.map((pill) => pill.componentInstance as TagPillComponent);
+    const pills = fixture.debugElement
+      .queryAll(By.directive(TagPillComponent))
+      .map((pill) => pill.componentInstance as TagPillComponent);
 
-    expect(pillInstances.map((pill) => pill.label())).toEqual(['alpha', 'beta']);
-    expect(pillInstances.map((pill) => pill.active())).toEqual([false, true]);
+    expect(pills.map((pill) => pill.label())).toEqual(['alpha', 'beta']);
+    expect(pills.map((pill) => pill.active())).toEqual([false, true]);
+  });
+
+  it('groups the pills under a single accessible name', async () => {
+    fixture.componentRef.setInput('tags', ['alpha']);
+    await fixture.whenStable();
+
+    const rail = fixture.nativeElement.querySelector('.tag-rail');
+    expect(rail.getAttribute('role')).toBe('group');
+    expect(rail.getAttribute('aria-label')).toBe('Filtrer par tag');
   });
 
   it('forwards the toggled event from a tag pill as tagToggled', async () => {
@@ -38,7 +48,8 @@ describe('TagRailComponent', () => {
     let emitted: string | undefined;
     fixture.componentInstance.tagToggled.subscribe((tag) => (emitted = tag));
 
-    const pill = fixture.debugElement.query(By.directive(TagPillComponent)).componentInstance as TagPillComponent;
+    const pill = fixture.debugElement.query(By.directive(TagPillComponent))
+      .componentInstance as TagPillComponent;
     pill.toggled.emit('alpha');
 
     expect(emitted).toBe('alpha');

@@ -1,21 +1,30 @@
 <app-notes-topbar
-  [spaces]="spaces"
-  [activeSpace]="activeSpace()"
+  [spaces]="spaces.spaces()"
+  [activeSpace]="spaces.activeSpace()"
   [searchQuery]="store.searchQuery()"
   [activeFilter]="store.activeFilter()"
-  (spaceChanged)="activeSpaceId.set($event)"
+  [searchShortcutEnabled]="searchShortcutEnabled()"
+  (spaceChanged)="spaces.selectSpace($event)"
   (searchQueryChanged)="store.setSearchQuery($event)"
   (filterChanged)="store.setFilter($event)"
-  (newNoteRequested)="store.createDraftNote()"
+  (newNoteRequested)="store.createNote()"
 />
 
-<app-tag-rail [tags]="store.allTags()" [activeTags]="store.selectedTags()" (tagToggled)="store.toggleTag($event)" />
+<app-tag-rail
+  [tags]="store.allTags()"
+  [activeTags]="store.selectedTags()"
+  (tagToggled)="store.toggleTag($event)"
+/>
 
 <app-note-canvas
   [sections]="store.sections()"
   [selectedNoteId]="store.selectedNoteId()"
+  [isLoading]="store.isLoading()"
+  [loadError]="store.loadError()"
+  [hasNoResults]="store.hasNoResults()"
   (noteOpened)="store.openNote($event)"
-  (createRequested)="store.createDraftNote()"
+  (createRequested)="store.createNote()"
+  (reloadRequested)="store.reload()"
 />
 
 <app-note-editor-overlay

@@ -1,10 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
-import { NotesStore } from '../../../core/stores/notes.store';
-import { MOCK_SPACES } from '../../../core/data/spaces.mock-data';
-import { NotesTopbarComponent } from '../components/notes-topbar/notes-topbar.component';
-import { TagRailComponent } from '../components/tag-rail/tag-rail.component';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { NotesStore } from '@core/stores/notes.store';
+import { SpacesStore } from '@core/stores/spaces.store';
 import { NoteCanvasComponent } from '../components/note-canvas/note-canvas.component';
 import { NoteEditorOverlayComponent } from '../components/note-editor-overlay/note-editor-overlay.component';
+import { NotesTopbarComponent } from '../components/notes-topbar/notes-topbar.component';
+import { TagRailComponent } from '../components/tag-rail/tag-rail.component';
 
 @Component({
   selector: 'app-notes-page',
@@ -12,40 +12,25 @@ import { NoteEditorOverlayComponent } from '../components/note-editor-overlay/no
   templateUrl: './notes-page.component.html',
   styleUrl: './notes-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown)': 'onKeydown($event)',
-  },
 })
 export class NotesPageComponent {
   protected readonly store = inject(NotesStore);
-  protected readonly spaces = MOCK_SPACES;
+  protected readonly spaces = inject(SpacesStore);
 
-  protected readonly activeSpaceId = signal(MOCK_SPACES[0].id);
-  protected readonly activeSpace = computed(
-    () => this.spaces.find((space) => space.id === this.activeSpaceId()) ?? this.spaces[0],
-  );
-
-  private readonly topbar = viewChild.required(NotesTopbarComponent);
-
-  protected onKeydown(event: KeyboardEvent): void {
-    const isSearchShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
-    if (isSearchShortcut) {
-      event.preventDefault();
-      this.topbar().focusSearch();
-    }
-  }
+  /** Le raccourci de recherche est neutralisé tant que la modale est ouverte. */
+  protected readonly searchShortcutEnabled = computed(() => this.store.selectedNote() === null);
 
   protected onTitleChanged(title: string): void {
     const id = this.store.selectedNoteId();
     if (id) {
-      this.store.renameNote(id, title);
+      void this.store.renameNote(id, title);
     }
   }
 
   protected onPinToggled(): void {
     const id = this.store.selectedNoteId();
     if (id) {
-      this.store.togglePinned(id);
+      void this.store.togglePinned(id);
     }
   }
 }

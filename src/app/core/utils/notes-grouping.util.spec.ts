@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createNote } from '../../../testing/note.fixture';
-import { groupNotesIntoSections } from './notes-grouping.util';
+import { createNote } from '@testing/note.fixture';
+import { groupNotesIntoSections, toSearchResultsSection } from './notes-grouping.util';
 
 const NOW = new Date('2026-01-10T12:00:00Z');
 
@@ -17,30 +17,44 @@ describe('groupNotesIntoSections', () => {
     const note = createNote({ id: 'today', createdAt: new Date('2026-01-10T08:00:00Z') });
 
     const sections = groupNotesIntoSections([note], NOW);
-    const todaySection = sections.find((section) => section.key === 'today');
 
-    expect(todaySection?.notes).toEqual([note]);
+    expect(sections.find((section) => section.key === 'today')?.notes).toEqual([note]);
   });
 
   it('puts notes created within the last 7 days (excluding today) into a "week" section', () => {
     const note = createNote({ id: 'this-week', createdAt: new Date('2026-01-06T08:00:00Z') });
 
     const sections = groupNotesIntoSections([note], NOW);
-    const weekSection = sections.find((section) => section.key === 'week');
 
-    expect(weekSection?.notes).toEqual([note]);
+    expect(sections.find((section) => section.key === 'week')?.notes).toEqual([note]);
   });
 
-  it('excludes unpinned notes older than 7 days from every section', () => {
-    const note = createNote({ id: 'too-old', createdAt: new Date('2025-12-01T08:00:00Z') });
+  it('puts unpinned notes older than 7 days into an "older" section', () => {
+    const note = createNote({ id: 'ancient', createdAt: new Date('2025-12-01T08:00:00Z') });
 
     const sections = groupNotesIntoSections([note], NOW);
-    const allGroupedNotes = sections.flatMap((section) => section.notes);
 
-    expect(allGroupedNotes).not.toContain(note);
+    expect(sections.find((section) => section.key === 'older')?.notes).toEqual([note]);
   });
 
-  it('omits the "pinned" and "today" sections when they have no notes', () => {
+  it('classifies every unpinned note into exactly one section, whatever its age', () => {
+    // The guarantee that matters: a note missing from every section would be
+    // unreachable in the UI, including through search.
+    const notes = [
+      createNote({ id: 'today', createdAt: new Date('2026-01-10T08:00:00Z') }),
+      createNote({ id: 'week', createdAt: new Date('2026-01-06T08:00:00Z') }),
+      createNote({ id: 'older', createdAt: new Date('2024-03-02T08:00:00Z') }),
+      createNote({ id: 'future', createdAt: new Date('2027-01-01T08:00:00Z') }),
+    ];
+
+    const groupedIds = groupNotesIntoSections(notes, NOW).flatMap((section) =>
+      section.notes.map((note) => note.id),
+    );
+
+    expect([...groupedIds].sort()).toEqual(['future', 'older', 'today', 'week']);
+  });
+
+  it('omits the "pinned", "today" and "older" sections when they have no notes', () => {
     const note = createNote({ id: 'this-week', createdAt: new Date('2026-01-06T08:00:00Z') });
 
     const sections = groupNotesIntoSections([note], NOW);
@@ -51,12 +65,10 @@ describe('groupNotesIntoSections', () => {
   it('always includes a "week" section with the create-ghost flag, even when empty', () => {
     const sections = groupNotesIntoSections([], NOW);
 
-    expect(sections).toEqual([
-      { key: 'week', title: 'sections.week', hint: undefined, notes: [], showCreateGhost: true },
-    ]);
+    expect(sections).toEqual([{ key: 'week', notes: [], hasExpiringNotes: false, showCreateGhost: true }]);
   });
 
-  it('sets a hint on the "week" section when one of its notes is expiring', () => {
+  it('flags a section containing an expiring note', () => {
     const expiringNote = createNote({
       id: 'expiring',
       createdAt: new Date('2026-01-06T08:00:00Z'),
@@ -64,18 +76,39 @@ describe('groupNotesIntoSections', () => {
     });
 
     const sections = groupNotesIntoSections([expiringNote], NOW);
-    const weekSection = sections.find((section) => section.key === 'week');
 
-    expect(weekSection?.hint).toBe('sections.weekHint');
+    expect(sections.find((section) => section.key === 'week')?.hasExpiringNotes).toBe(true);
   });
 
-  it('orders sections as pinned, today, then week', () => {
-    const pinned = createNote({ id: 'pinned', pinned: true, createdAt: new Date('2026-01-10T08:00:00Z') });
-    const today = createNote({ id: 'today', createdAt: new Date('2026-01-10T09:00:00Z') });
-    const thisWeek = createNote({ id: 'this-week', createdAt: new Date('2026-01-06T08:00:00Z') });
+  it('orders sections as pinned, today, week, then older', () => {
+    const notes = [
+      createNote({ id: 'older', createdAt: new Date('2025-01-01T08:00:00Z') }),
+      createNote({ id: 'today', createdAt: new Date('2026-01-10T09:00:00Z') }),
+      createNote({ id: 'pinned', pinned: true, createdAt: new Date('2026-01-10T08:00:00Z') }),
+      createNote({ id: 'this-week', createdAt: new Date('2026-01-06T08:00:00Z') }),
+    ];
 
-    const sections = groupNotesIntoSections([today, pinned, thisWeek], NOW);
+    const sections = groupNotesIntoSections(notes, NOW);
 
-    expect(sections.map((section) => section.key)).toEqual(['pinned', 'today', 'week']);
+    expect(sections.map((section) => section.key)).toEqual(['pinned', 'today', 'week', 'older']);
+  });
+});
+
+describe('toSearchResultsSection', () => {
+  it('returns a single flat section holding every note, with no create ghost', () => {
+    const notes = [createNote({ id: 'a' }), createNote({ id: 'b' })];
+
+    expect(toSearchResultsSection(notes)).toEqual({
+      key: 'results',
+      notes,
+      hasExpiringNotes: false,
+      showCreateGhost: false,
+    });
+  });
+
+  it('flags expiring notes like the chronological sections do', () => {
+    const notes = [createNote({ lifecycle: { kind: 'expires', at: new Date('2026-02-01') } })];
+
+    expect(toSearchResultsSection(notes).hasExpiringNotes).toBe(true);
   });
 });

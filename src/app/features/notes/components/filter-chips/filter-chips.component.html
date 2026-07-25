@@ -1,11 +1,18 @@
-<div class="filter-chips">
+<!-- Groupe de boutons bascule plutôt que radiogroup : `aria-pressed` transmet
+     l'état sans imposer la navigation aux flèches qu'un vrai groupe radio exige. -->
+<div class="filter-chips" role="group" [attr.aria-label]="'filters.groupLabel' | transloco">
   @for (filter of filters; track filter.key) {
     <button
       type="button"
       class="chip"
       [class.active]="active() === filter.key"
+      [attr.aria-pressed]="active() === filter.key"
       (click)="filterChanged.emit(filter.key)"
-      >{{ filter.icon ? filter.icon + ' ' : '' }}{{ filter.labelKey | transloco }}</button
     >
+      @if (filter.icon) {
+        <span aria-hidden="true">{{ filter.icon }}</span>
+      }
+      {{ filter.labelKey | transloco }}
+    </button>
   }
 </div>

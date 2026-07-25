@@ -1,20 +1,27 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
-import { Space } from '../../../../core/models/space.model';
-import { SpaceSwitcherComponent } from '../space-switcher/space-switcher.component';
-import { SearchBoxComponent } from '../search-box/search-box.component';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { Space } from '@core/models/space.model';
+import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { FilterChipsComponent } from '../filter-chips/filter-chips.component';
+import { SearchBoxComponent } from '../search-box/search-box.component';
+import { SpaceSwitcherComponent } from '../space-switcher/space-switcher.component';
 import { NotesTopbarComponent } from './notes-topbar.component';
 
-const SPACES: Space[] = [{ id: 'work', name: 'Work' }];
+const SPACES: readonly Space[] = [{ id: 'work', name: 'Work' }];
 
 describe('NotesTopbarComponent', () => {
   let fixture: ComponentFixture<NotesTopbarComponent>;
 
+  function child<T>(type: new (...args: never[]) => T): T {
+    return fixture.debugElement.query(By.directive(type)).componentInstance as T;
+  }
+
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [NotesTopbarComponent], providers: [provideTranslocoTesting()] });
+    TestBed.configureTestingModule({
+      imports: [NotesTopbarComponent],
+      providers: [provideTranslocoTesting()],
+    });
     fixture = TestBed.createComponent(NotesTopbarComponent);
     fixture.componentRef.setInput('spaces', SPACES);
     fixture.componentRef.setInput('activeSpace', SPACES[0]);
@@ -26,22 +33,28 @@ describe('NotesTopbarComponent', () => {
     fixture.componentRef.setInput('searchQuery', 'hello');
     await fixture.whenStable();
 
-    const spaceSwitcher = fixture.debugElement.query(By.directive(SpaceSwitcherComponent)).componentInstance as SpaceSwitcherComponent;
-    const searchBox = fixture.debugElement.query(By.directive(SearchBoxComponent)).componentInstance as SearchBoxComponent;
-    const filterChips = fixture.debugElement.query(By.directive(FilterChipsComponent)).componentInstance as FilterChipsComponent;
+    expect(child(SpaceSwitcherComponent).spaces()).toEqual(SPACES);
+    expect(child(SpaceSwitcherComponent).activeSpace()).toEqual(SPACES[0]);
+    expect(child(SearchBoxComponent).query()).toBe('hello');
+    expect(child(FilterChipsComponent).active()).toBe('all');
+  });
 
-    expect(spaceSwitcher.spaces()).toEqual(SPACES);
-    expect(spaceSwitcher.activeSpace()).toEqual(SPACES[0]);
-    expect(searchBox.query()).toBe('hello');
-    expect(filterChips.active()).toBe('all');
+  it('relays the shortcut-enabled flag to the search box', async () => {
+    fixture.componentRef.setInput('searchShortcutEnabled', false);
+    await fixture.whenStable();
+
+    expect(child(SearchBoxComponent).shortcutEnabled()).toBe(false);
+  });
+
+  it('enables the search shortcut by default', () => {
+    expect(child(SearchBoxComponent).shortcutEnabled()).toBe(true);
   });
 
   it('forwards spaceChanged from the space switcher', () => {
     let emitted: string | undefined;
     fixture.componentInstance.spaceChanged.subscribe((id) => (emitted = id));
 
-    const spaceSwitcher = fixture.debugElement.query(By.directive(SpaceSwitcherComponent)).componentInstance as SpaceSwitcherComponent;
-    spaceSwitcher.spaceChanged.emit('work');
+    child(SpaceSwitcherComponent).spaceChanged.emit('work');
 
     expect(emitted).toBe('work');
   });
@@ -50,8 +63,7 @@ describe('NotesTopbarComponent', () => {
     let emitted: string | undefined;
     fixture.componentInstance.searchQueryChanged.subscribe((query) => (emitted = query));
 
-    const searchBox = fixture.debugElement.query(By.directive(SearchBoxComponent)).componentInstance as SearchBoxComponent;
-    searchBox.queryChange.emit('term');
+    child(SearchBoxComponent).query.set('term');
 
     expect(emitted).toBe('term');
   });
@@ -60,8 +72,7 @@ describe('NotesTopbarComponent', () => {
     let emitted: string | undefined;
     fixture.componentInstance.filterChanged.subscribe((filter) => (emitted = filter));
 
-    const filterChips = fixture.debugElement.query(By.directive(FilterChipsComponent)).componentInstance as FilterChipsComponent;
-    filterChips.filterChanged.emit('pinned');
+    child(FilterChipsComponent).filterChanged.emit('pinned');
 
     expect(emitted).toBe('pinned');
   });
@@ -75,12 +86,10 @@ describe('NotesTopbarComponent', () => {
     expect(emitted).toBe(true);
   });
 
-  it('delegates focusSearch() to the search box', () => {
-    const searchBox = fixture.debugElement.query(By.directive(SearchBoxComponent)).componentInstance as SearchBoxComponent;
-    const focusSpy = vi.spyOn(searchBox, 'focus');
+  it('tolerates a not-yet-loaded active space', async () => {
+    fixture.componentRef.setInput('activeSpace', null);
+    await fixture.whenStable();
 
-    fixture.componentInstance.focusSearch();
-
-    expect(focusSpy).toHaveBeenCalled();
+    expect(child(SpaceSwitcherComponent).activeSpace()).toBeNull();
   });
 });

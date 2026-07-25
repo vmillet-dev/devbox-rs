@@ -4,6 +4,7 @@
   margin-bottom: 28px;
 }
 
+// <h2> : la taille par défaut du navigateur doit être écrasée explicitement.
 .canvas-section-title {
   font-size: 11px;
   text-transform: uppercase;
@@ -48,6 +49,11 @@
 
 .card.ghost:hover {
   @include accent-state;
+}
+
+.card.ghost:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
 .ghost-plus {

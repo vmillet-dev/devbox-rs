@@ -1,45 +1,85 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { provideTranslocoTesting } from '../../../../../testing/provide-transloco-testing';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { SearchBoxComponent } from './search-box.component';
 
 describe('SearchBoxComponent', () => {
   let fixture: ComponentFixture<SearchBoxComponent>;
 
+  function input(): HTMLInputElement {
+    return fixture.nativeElement.querySelector('input');
+  }
+
+  function pressShortcut(): KeyboardEvent {
+    const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, cancelable: true });
+    document.dispatchEvent(event);
+    return event;
+  }
+
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [SearchBoxComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(SearchBoxComponent);
+    // jsdom only tracks `document.activeElement` for attached elements.
+    document.body.appendChild(fixture.nativeElement);
     fixture.autoDetectChanges();
+  });
+
+  afterEach(() => {
+    fixture.nativeElement.remove();
   });
 
   it('renders the provided query in the input', async () => {
     fixture.componentRef.setInput('query', 'hello');
     await fixture.whenStable();
 
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('input');
-    expect(input.value).toBe('hello');
+    expect(input().value).toBe('hello');
   });
 
-  it('emits queryChange with the new value when the user types', () => {
+  it('emits the new value when the user types', () => {
+    // `model()` exposes its change output through the signal itself; there is
+    // no separate `queryChange` property on the instance.
     let emitted: string | undefined;
-    fixture.componentInstance.queryChange.subscribe((value) => (emitted = value));
+    fixture.componentInstance.query.subscribe((value: string) => (emitted = value));
 
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('input');
-    input.value = 'search term';
-    input.dispatchEvent(new Event('input'));
+    input().value = 'search term';
+    input().dispatchEvent(new Event('input'));
 
     expect(emitted).toBe('search term');
   });
 
-  it('focuses the native input when focus() is called', () => {
-    // The element must be attached to the document for jsdom to update `document.activeElement`.
-    document.body.appendChild(fixture.nativeElement);
+  it('gives the input an accessible name of its own', () => {
+    // The wrapping <label> also holds the magnifier and the shortcut hint;
+    // without an explicit label the field would be announced as "🔍 Ctrl+K".
+    expect(input().getAttribute('aria-label')).toBe('Rechercher dans les notes');
+  });
 
-    fixture.componentInstance.focus();
+  it('hides the decorative magnifier and shortcut hint from assistive tech', () => {
+    const decorations = [...fixture.nativeElement.querySelectorAll('label > span')];
 
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('input');
-    expect(document.activeElement).toBe(input);
+    expect(decorations.every((span: Element) => span.getAttribute('aria-hidden') === 'true')).toBe(true);
+  });
 
-    fixture.nativeElement.remove();
+  it('focuses the input on Ctrl/Cmd+K and prevents the browser default', () => {
+    const event = pressShortcut();
+
+    expect(document.activeElement).toBe(input());
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('ignores keydown events that are not the shortcut', () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' }));
+
+    expect(document.activeElement).not.toBe(input());
+  });
+
+  it('ignores the shortcut while it is disabled', async () => {
+    // Guards against stealing focus to a field hidden behind an open modal.
+    fixture.componentRef.setInput('shortcutEnabled', false);
+    await fixture.whenStable();
+
+    const event = pressShortcut();
+
+    expect(document.activeElement).not.toBe(input());
+    expect(event.defaultPrevented).toBe(false);
   });
 });

@@ -60,3 +60,9 @@
 .space-option.active {
   color: var(--amber);
 }
+
+.space-switch:focus-visible,
+.space-option:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}

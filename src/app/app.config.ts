@@ -1,38 +1,44 @@
 import {
   ApplicationConfig,
+  ErrorHandler,
   inject,
   provideAppInitializer,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
-} from "@angular/core";
-import { provideRouter } from "@angular/router";
-import { provideTransloco } from "@jsverse/transloco";
+} from '@angular/core';
+import { provideRouter, withHashLocation } from '@angular/router';
+import { provideTransloco } from '@jsverse/transloco';
 
-import { routes } from "./app.routes";
-import { NOTES_REPOSITORY } from "./core/data/notes-repository.token";
-import { MockNotesRepository } from "./core/data/mock-notes-repository";
-import { AppTranslocoLoader } from "./core/i18n/transloco-loader";
-import { APP_LOCALES, LocaleService } from "./core/i18n/locale.service";
+import { routes } from './app.routes';
+import { provideDataAccess } from './core/data/data.providers';
+import { AppErrorHandler } from './core/errors/app-error-handler';
+import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from './core/i18n/locale.service';
+import { AppTranslocoLoader } from './core/i18n/transloco-loader';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
-    provideRouter(routes),
+
+    // Routage par fragment : les fichiers sont servis depuis le protocole
+    // interne de Tauri, où une URL profonde rechargée n'a pas de serveur pour
+    // la réécrire vers index.html. Le fragment évite entièrement le problème.
+    provideRouter(routes, withHashLocation()),
+
     provideTransloco({
       config: {
         availableLangs: [...APP_LOCALES],
-        defaultLang: "fr",
+        defaultLang: DEFAULT_LOCALE,
+        fallbackLang: DEFAULT_LOCALE,
         reRenderOnLangChange: true,
       },
       loader: AppTranslocoLoader,
     }),
-    // Résout la langue persistée avant le premier rendu, pour éviter un flash en français.
-    provideAppInitializer(() => {
-      inject(LocaleService);
-    }),
-    // À remplacer par une implémentation basée sur `invoke()` (Tauri/Rust)
-    // une fois le backend des notes disponible : voir notes-repository.token.ts
-    { provide: NOTES_REPOSITORY, useClass: MockNotesRepository },
+    provideAppInitializer(() => inject(LocaleService).restore()),
+
+    // Choix mock / backend Rust : voir core/data/data.providers.ts.
+    ...provideDataAccess(),
+
+    { provide: ErrorHandler, useClass: AppErrorHandler },
   ],
 };

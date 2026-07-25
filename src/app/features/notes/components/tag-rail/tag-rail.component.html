@@ -1,5 +1,5 @@
 @if (tags().length > 0) {
-  <div class="tag-rail">
+  <div class="tag-rail" role="group" [attr.aria-label]="'notes.tagsGroupLabel' | transloco">
     <span class="tag-rail-label">{{ 'notes.tags' | transloco }}</span>
     @for (tag of tags(); track tag) {
       <app-tag-pill [label]="tag" [active]="activeTags().has(tag)" (toggled)="tagToggled.emit($event)" />

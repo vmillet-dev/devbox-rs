@@ -15,7 +15,16 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "target": "ES2022",
-    "module": "preserve"
+    "module": "preserve",
+    // Sans `baseUrl` (déprécié depuis TS 6) : les chemins sont résolus
+    // relativement à l'emplacement de ce fichier.
+    "paths": {
+      "@core/*": ["./src/app/core/*"],
+      "@shared/*": ["./src/app/shared/*"],
+      "@features/*": ["./src/app/features/*"],
+      "@layout/*": ["./src/app/layout/*"],
+      "@testing/*": ["./src/testing/*"]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

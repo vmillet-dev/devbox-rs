@@ -1,3 +1,6 @@
+<!-- Contenu en <span> et non en <div> : le modèle de contenu d'un <button>
+     n'admet que du contenu de phrasé. Un <div> imbriqué produit un HTML
+     invalide, au comportement d'accessibilité indéfini selon les navigateurs. -->
 <button
   type="button"
   class="card"
@@ -5,20 +8,32 @@
   [class.selected]="selected()"
   (click)="onOpen()"
 >
-  <div class="card-top">
+  @if (note().pinned) {
+    <!-- L'épinglage n'est signalé que par une pastille décorative : sans ce
+         doublon textuel, l'information n'existe pas pour un lecteur d'écran. -->
+    <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
+  }
+  <span class="card-top">
     <app-language-badge [language]="note().language" />
-  </div>
-  <div class="card-title">{{ note().title }}</div>
-  <div class="card-snippet">{{ snippet() }}</div>
-  <div class="card-footer">
-    <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). -->
+  </span>
+  <span class="card-title">
+    @if (note().title) {
+      {{ note().title }}
+    } @else {
+      {{ 'notes.untitled' | transloco }}
+    }
+  </span>
+  <span class="card-snippet">{{ snippet() }}</span>
+  <span class="card-footer">
+    <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). D'où le prettier-ignore, qui réintroduirait ces sauts de ligne. -->
+    <!-- prettier-ignore -->
     <span [class.stale]="footerStale()"
       >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
     >
-    <div class="card-tags">
+    <span class="card-tags">
       @for (tag of displayedTags(); track tag) {
         <span>#{{ tag }}</span>
       }
-    </div>
-  </div>
+    </span>
+  </span>
 </button>

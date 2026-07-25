@@ -1,37 +1,76 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NOTES_REPOSITORY } from '../data/notes-repository.token';
-import { Note } from '../models/note.model';
-import { createNote } from '../../../testing/note.fixture';
-import { FakeNotesRepository } from '../../../testing/fake-notes-repository';
+import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { Note } from '@core/models/note.model';
+import { FakeNotesRepository } from '@testing/fake-notes-repository';
+import { createNote } from '@testing/note.fixture';
+import { provideAppTesting } from '@testing/testing.providers';
 import { NotesStore } from './notes.store';
 
-/** Creates a `NotesStore` backed by a `FakeNotesRepository` and waits for the initial load to settle. */
-async function createStore(notes: Note[]): Promise<NotesStore> {
-  TestBed.configureTestingModule({
-    providers: [{ provide: NOTES_REPOSITORY, useValue: new FakeNotesRepository(notes) }],
-  });
+interface Harness {
+  readonly store: NotesStore;
+  readonly repository: FakeNotesRepository;
+}
+
+/** Creates a `NotesStore` backed by a fake repository and waits for the initial load to settle. */
+async function createStore(notes: Note[] = []): Promise<Harness> {
+  const repository = new FakeNotesRepository(notes);
+  TestBed.configureTestingModule({ providers: [provideAppTesting({ notesRepository: repository })] });
+
   const store = TestBed.inject(NotesStore);
-  await vi.waitFor(() => expect(store.filteredNotes().length).toBe(notes.length));
-  return store;
+  await vi.waitFor(() => expect(store.isLoading()).toBe(false));
+
+  return { store, repository };
 }
 
 describe('NotesStore', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
+    vi.restoreAllMocks();
+    // The store reports mutation failures through console.error on purpose;
+    // silence it so a deliberately failing test doesn't look like a crash.
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
   it('loads notes from the repository on creation', async () => {
-    const notes = [createNote({ id: 'a' }), createNote({ id: 'b' })];
-
-    const store = await createStore(notes);
+    const { store } = await createStore([createNote({ id: 'a' }), createNote({ id: 'b' })]);
 
     expect(store.filteredNotes().map((note) => note.id)).toEqual(['a', 'b']);
   });
 
+  describe('loading and error state', () => {
+    it('exposes the repository failure and holds an empty list', async () => {
+      const repository = new FakeNotesRepository([createNote()]);
+      repository.failNext = new Error('backend down');
+      TestBed.configureTestingModule({ providers: [provideAppTesting({ notesRepository: repository })] });
+
+      const store = TestBed.inject(NotesStore);
+      await vi.waitFor(() => expect(store.loadError()).toBeDefined());
+
+      expect(store.loadError()?.message).toBe('backend down');
+      expect(store.filteredNotes()).toEqual([]);
+    });
+
+    it('recovers the notes on reload after a failed load', async () => {
+      const note = createNote({ id: 'recovered' });
+      const repository = new FakeNotesRepository([note]);
+      repository.failNext = new Error('transient');
+      TestBed.configureTestingModule({ providers: [provideAppTesting({ notesRepository: repository })] });
+
+      const store = TestBed.inject(NotesStore);
+      await vi.waitFor(() => expect(store.loadError()).toBeDefined());
+
+      store.reload();
+      await vi.waitFor(() => expect(store.filteredNotes()).toHaveLength(1));
+
+      expect(store.loadError()).toBeUndefined();
+      expect(store.filteredNotes()[0].id).toBe('recovered');
+    });
+  });
+
   describe('allTags', () => {
     it('returns the sorted, de-duplicated set of tags across all notes', async () => {
-      const store = await createStore([
+      const { store } = await createStore([
         createNote({ id: 'a', tags: ['zeta', 'alpha'] }),
         createNote({ id: 'b', tags: ['alpha', 'beta'] }),
       ]);
@@ -44,7 +83,7 @@ describe('NotesStore', () => {
     it('matches the search query against the title, tags and content, case-insensitively', async () => {
       const target = createNote({ id: 'match', title: 'Deploy script', content: 'irrelevant', tags: [] });
       const other = createNote({ id: 'other', title: 'Something else', content: 'irrelevant', tags: [] });
-      const store = await createStore([target, other]);
+      const { store } = await createStore([target, other]);
 
       store.setSearchQuery('DEPLOY');
 
@@ -54,7 +93,7 @@ describe('NotesStore', () => {
     it('keeps only pinned notes when the "pinned" filter is active', async () => {
       const pinned = createNote({ id: 'pinned', pinned: true });
       const unpinned = createNote({ id: 'unpinned', pinned: false });
-      const store = await createStore([pinned, unpinned]);
+      const { store } = await createStore([pinned, unpinned]);
 
       store.setFilter('pinned');
 
@@ -62,9 +101,12 @@ describe('NotesStore', () => {
     });
 
     it('keeps only expiring notes when the "untriaged" filter is active', async () => {
-      const expiring = createNote({ id: 'expiring', lifecycle: { kind: 'expires', at: new Date('2026-02-01') } });
+      const expiring = createNote({
+        id: 'expiring',
+        lifecycle: { kind: 'expires', at: new Date('2026-02-01') },
+      });
       const permanent = createNote({ id: 'permanent', lifecycle: { kind: 'permanent' } });
-      const store = await createStore([expiring, permanent]);
+      const { store } = await createStore([expiring, permanent]);
 
       store.setFilter('untriaged');
 
@@ -74,7 +116,7 @@ describe('NotesStore', () => {
     it('keeps only notes matching at least one selected tag', async () => {
       const matching = createNote({ id: 'matching', tags: ['urgent'] });
       const other = createNote({ id: 'other', tags: ['later'] });
-      const store = await createStore([matching, other]);
+      const { store } = await createStore([matching, other]);
 
       store.toggleTag('urgent');
 
@@ -83,7 +125,7 @@ describe('NotesStore', () => {
 
     it('un-selects a tag when toggled twice', async () => {
       const notes = [createNote({ id: 'a', tags: ['urgent'] }), createNote({ id: 'b', tags: ['later'] })];
-      const store = await createStore(notes);
+      const { store } = await createStore(notes);
 
       store.toggleTag('urgent');
       store.toggleTag('urgent');
@@ -94,8 +136,13 @@ describe('NotesStore', () => {
     it('combines search, filter and tag criteria', async () => {
       const target = createNote({ id: 'target', title: 'Deploy notes', pinned: true, tags: ['urgent'] });
       const wrongTag = createNote({ id: 'wrong-tag', title: 'Deploy notes', pinned: true, tags: ['later'] });
-      const notPinned = createNote({ id: 'not-pinned', title: 'Deploy notes', pinned: false, tags: ['urgent'] });
-      const store = await createStore([target, wrongTag, notPinned]);
+      const notPinned = createNote({
+        id: 'not-pinned',
+        title: 'Deploy notes',
+        pinned: false,
+        tags: ['urgent'],
+      });
+      const { store } = await createStore([target, wrongTag, notPinned]);
 
       store.setSearchQuery('deploy');
       store.setFilter('pinned');
@@ -105,10 +152,64 @@ describe('NotesStore', () => {
     });
   });
 
+  describe('sections', () => {
+    it('groups notes chronologically when no search or tag filter is active', async () => {
+      const { store } = await createStore([createNote({ id: 'a' })]);
+
+      expect(store.isFiltering()).toBe(false);
+      expect(store.sections().map((section) => section.key)).toContain('week');
+    });
+
+    it('switches to a single flat results section while searching', async () => {
+      // Chronological grouping would bury an old match in a trailing section;
+      // search results are read as a list.
+      const old = createNote({ id: 'old', title: 'docker override', createdAt: new Date('2020-01-01') });
+      const { store } = await createStore([old]);
+
+      store.setSearchQuery('docker');
+
+      expect(store.sections().map((section) => section.key)).toEqual(['results']);
+      expect(store.sections()[0].notes).toEqual([old]);
+    });
+
+    it('surfaces a note far older than a week when it matches the search', async () => {
+      const ancient = createNote({ id: 'ancient', title: 'git bisect', createdAt: new Date('2019-05-05') });
+      const { store } = await createStore([ancient]);
+
+      store.setSearchQuery('bisect');
+
+      const visibleIds = store.sections().flatMap((section) => section.notes.map((note) => note.id));
+      expect(visibleIds).toEqual(['ancient']);
+    });
+
+    it('switches to results mode when only a tag is selected', async () => {
+      const { store } = await createStore([createNote({ id: 'a', tags: ['x'] })]);
+
+      store.toggleTag('x');
+
+      expect(store.isFiltering()).toBe(true);
+      expect(store.sections().map((section) => section.key)).toEqual(['results']);
+    });
+
+    it('reports no results when a search matches nothing', async () => {
+      const { store } = await createStore([createNote({ title: 'anything' })]);
+
+      store.setSearchQuery('nothing matches this');
+
+      expect(store.hasNoResults()).toBe(true);
+    });
+
+    it('does not report "no results" when nothing is being searched', async () => {
+      const { store } = await createStore([]);
+
+      expect(store.hasNoResults()).toBe(false);
+    });
+  });
+
   describe('selection', () => {
     it('exposes the selected note and clears it on close', async () => {
       const note = createNote({ id: 'selected' });
-      const store = await createStore([note]);
+      const { store } = await createStore([note]);
 
       store.openNote('selected');
       expect(store.selectedNote()).toEqual(note);
@@ -118,7 +219,7 @@ describe('NotesStore', () => {
     });
 
     it('returns null when the selected id does not match any note', async () => {
-      const store = await createStore([createNote({ id: 'a' })]);
+      const { store } = await createStore([createNote({ id: 'a' })]);
 
       store.openNote('does-not-exist');
 
@@ -127,24 +228,48 @@ describe('NotesStore', () => {
   });
 
   describe('togglePinned', () => {
-    it('flips the pinned flag of the matching note only', async () => {
-      const notes = [createNote({ id: 'a', pinned: false }), createNote({ id: 'b', pinned: false })];
-      const store = await createStore(notes);
+    it('persists the new pin state and adopts the stored note', async () => {
+      const { store, repository } = await createStore([
+        createNote({ id: 'a', pinned: false }),
+        createNote({ id: 'b', pinned: false }),
+      ]);
+      const update = vi.spyOn(repository, 'update');
 
-      store.togglePinned('a');
+      await store.togglePinned('a');
 
+      expect(update).toHaveBeenCalledWith('a', { pinned: true });
       expect(store.filteredNotes().find((note) => note.id === 'a')?.pinned).toBe(true);
       expect(store.filteredNotes().find((note) => note.id === 'b')?.pinned).toBe(false);
+    });
+
+    it('rolls the note back and notifies when persistence fails', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', pinned: false })]);
+      const notifier = TestBed.inject(ErrorNotifier);
+      repository.failNext = new Error('disk full');
+
+      await store.togglePinned('a');
+
+      expect(store.filteredNotes()[0].pinned).toBe(false);
+      expect(notifier.notice()?.ref.key).toBe('errors.noteSaveFailed');
+    });
+
+    it('does nothing for an unknown id', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a' })]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.togglePinned('missing');
+
+      expect(update).not.toHaveBeenCalled();
     });
   });
 
   describe('renameNote', () => {
-    it('updates the title and bumps updatedAt on the matching note only', async () => {
+    it('persists the new title and bumps updatedAt on the matching note only', async () => {
       const note = createNote({ id: 'a', title: 'Old title', updatedAt: new Date('2026-01-01') });
       const other = createNote({ id: 'b', title: 'Untouched' });
-      const store = await createStore([note, other]);
+      const { store } = await createStore([note, other]);
 
-      store.renameNote('a', 'New title');
+      await store.renameNote('a', 'New title');
 
       const notes = store.filteredNotes();
       const updated = notes.find((n) => n.id === 'a');
@@ -152,18 +277,59 @@ describe('NotesStore', () => {
       expect(updated?.updatedAt.getTime()).toBeGreaterThan(note.updatedAt.getTime());
       expect(notes.find((n) => n.id === 'b')?.title).toBe('Untouched');
     });
+
+    it('skips persistence when the title has not changed', async () => {
+      // The overlay emits on every keystroke; an unchanged value must not
+      // produce a write per character.
+      const { store, repository } = await createStore([createNote({ id: 'a', title: 'Same' })]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.renameNote('a', 'Same');
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('restores the previous title when persistence fails', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', title: 'Original' })]);
+      repository.failNext = new Error('nope');
+
+      await store.renameNote('a', 'Attempted');
+
+      expect(store.filteredNotes()[0].title).toBe('Original');
+    });
   });
 
-  describe('createDraftNote', () => {
-    it('prepends a new untitled note and selects it', async () => {
-      const store = await createStore([createNote({ id: 'existing' })]);
+  describe('createNote', () => {
+    it('prepends the note returned by the repository and selects it', async () => {
+      const { store } = await createStore([createNote({ id: 'existing' })]);
 
-      store.createDraftNote();
+      await store.createNote();
 
       const notes = store.filteredNotes();
       expect(notes).toHaveLength(2);
-      expect(notes[0]).toMatchObject({ title: 'Nouvelle note', content: '', pinned: false, tags: [] });
+      // Blank title and source: the UI renders translated placeholders rather
+      // than storing French strings in the data.
+      expect(notes[0]).toMatchObject({ title: '', source: '', content: '', pinned: false, tags: [] });
       expect(store.selectedNoteId()).toBe(notes[0].id);
+    });
+
+    it('takes its id from the repository rather than generating one locally', async () => {
+      const { store } = await createStore([]);
+
+      await store.createNote();
+
+      expect(store.filteredNotes()[0].id).toBe('fake-1');
+    });
+
+    it('notifies and adds nothing when creation fails', async () => {
+      const { store, repository } = await createStore([]);
+      const notifier = TestBed.inject(ErrorNotifier);
+      repository.failNext = new Error('read-only');
+
+      await store.createNote();
+
+      expect(store.filteredNotes()).toHaveLength(0);
+      expect(notifier.notice()?.ref.key).toBe('errors.noteCreateFailed');
     });
   });
 });

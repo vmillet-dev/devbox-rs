@@ -1,10 +1,28 @@
-<div class="canvas">
-  @for (section of sections(); track section.key) {
-    <app-note-section
-      [section]="section"
-      [selectedNoteId]="selectedNoteId()"
-      (noteOpened)="noteOpened.emit($event)"
-      (createRequested)="createRequested.emit()"
-    />
+@let error = loadError();
+
+<div class="canvas" [attr.aria-busy]="isLoading()">
+  @if (error) {
+    <!-- Le chargement est la seule opération dont l'échec vide entièrement
+         l'écran : elle mérite sa propre reprise, pas seulement le bandeau global. -->
+    <div class="canvas-state" role="alert">
+      <p class="canvas-state-text">{{ 'errors.notesLoadFailed' | transloco }}</p>
+      <p class="canvas-state-detail">{{ error.message }}</p>
+      <button type="button" class="canvas-retry" (click)="reloadRequested.emit()">
+        {{ 'errors.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (isLoading()) {
+    <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
+  } @else if (hasNoResults()) {
+    <p class="canvas-state-text">{{ 'notes.noResults' | transloco }}</p>
+  } @else {
+    @for (section of sections(); track section.key) {
+      <app-note-section
+        [section]="section"
+        [selectedNoteId]="selectedNoteId()"
+        (noteOpened)="noteOpened.emit($event)"
+        (createRequested)="createRequested.emit()"
+      />
+    }
   }
 </div>

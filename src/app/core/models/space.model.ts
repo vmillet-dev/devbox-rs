@@ -1,4 +1,4 @@
 export interface Space {
   readonly id: string;
-  name: string;
+  readonly name: string;
 }

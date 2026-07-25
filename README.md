@@ -30,15 +30,17 @@ in a plain browser, since nothing calls a Tauri API at runtime yet.
 
 ## Scripts
 
-| Command | What it does |
-| --- | --- |
-| `npm start` | Angular dev server only, port 1420 |
-| `npm run tauri dev` | Full dev loop: Angular dev server + Tauri window |
-| `npm run build` | Production Angular build → `dist/devbox/browser` |
-| `npm run tauri build` | Full production build → `src-tauri/target/release` |
-| `npm test` | Unit tests (Vitest, jsdom — no browser required) |
-| `npm run test:watch` | Tests, re-running on change |
-| `npm run test:coverage` | Tests with a v8 coverage report |
+| Command                 | What it does                                       |
+| ----------------------- | -------------------------------------------------- |
+| `npm start`             | Angular dev server only, port 1420                 |
+| `npm run tauri dev`     | Full dev loop: Angular dev server + Tauri window   |
+| `npm run build`         | Production Angular build → `dist/devbox/browser`   |
+| `npm run tauri build`   | Full production build → `src-tauri/target/release` |
+| `npm test`              | Unit tests (Vitest, jsdom — no browser required)   |
+| `npm run test:watch`    | Tests, re-running on change                        |
+| `npm run test:coverage` | Tests with a v8 coverage report (80% thresholds)   |
+| `npm run lint`          | ESLint + Prettier check                            |
+| `npm run lint:fix`      | ESLint `--fix` + Prettier write                    |
 
 For Rust-only iteration, `cargo check` from `src-tauri/` is much faster than a full
 `tauri build`.
@@ -63,19 +65,27 @@ docs/         Architecture notes and UI mockup
 - [x] Notes UI: spaces, search, filters, tag rail, pinned/today/week sections, editor
       overlay with code viewer
 - [x] French/English localization with persisted locale
-- [ ] Persistence: real Rust notes backend behind the `NOTES_REPOSITORY` token
+- [x] Front-end IPC seam: typed `invoke()` wrapper, DTOs/mappers and Tauri repositories,
+      ready to switch on in `core/data/data.providers.ts`
+- [x] ESLint + Prettier, with template accessibility rules
+- [ ] Persistence: real Rust notes backend behind the `NOTES_REPOSITORY` token — the
+      expected commands and serde contract are documented in `src-tauri/src/commands/notes.rs`
 - [ ] Editable note content (the overlay is read-only apart from title and pin)
-- [ ] Real spaces — currently a mock list that doesn't filter anything
+- [ ] Deleting notes (the repository contract supports it; no UI yet)
+- [ ] Real spaces — the switcher works but `spaceId` doesn't exist on notes yet, so it
+      filters nothing
 - [ ] `crypto` module: SHA-256, MD5, UUID generation
 - [ ] `formatters` module: base64 encode/decode, JSON formatting
-- [ ] Linting/formatting setup and Rust tests
+- [ ] Rust tests, clippy and rustfmt
 
 ## Conventions
 
 Code comments, docstrings and UI strings are written in **French**. Test descriptions and
 test comments are in **English**, matching Vitest/Angular community conventions.
 
-No linter or formatter is configured yet (no ESLint, Prettier, clippy or rustfmt hook).
+The front-end is linted with ESLint (`angular-eslint`, including its template accessibility
+rules) and formatted with Prettier — run `npm run lint` before pushing. The Rust side has no
+clippy or rustfmt hook yet.
 
 ## Recommended IDE setup
 

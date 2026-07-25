@@ -1,19 +1,20 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { NOTES_REPOSITORY } from './core/data/notes-repository.token';
-import { FakeNotesRepository } from '../testing/fake-notes-repository';
-import { provideTranslocoTesting } from '../testing/provide-transloco-testing';
-import { AppShellComponent } from './layout/app-shell/app-shell.component';
+import { provideAppTesting } from '@testing/testing.providers';
+import { AppShellComponent } from '@layout/app-shell/app-shell.component';
 import { AppComponent } from './app.component';
 
 describe('AppComponent', () => {
   let fixture: ComponentFixture<AppComponent>;
 
   beforeEach(() => {
+    TestBed.resetTestingModule();
+    localStorage.clear();
     TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [{ provide: NOTES_REPOSITORY, useValue: new FakeNotesRepository([]) }, provideTranslocoTesting()],
+      providers: [provideAppTesting(), provideRouter([])],
     });
     fixture = TestBed.createComponent(AppComponent);
     fixture.autoDetectChanges();

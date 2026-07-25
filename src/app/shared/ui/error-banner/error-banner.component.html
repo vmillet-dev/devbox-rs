@@ -1,0 +1,20 @@
+@if (notifier.notice(); as notice) {
+  <!-- role="alert" : le message est annoncé dès son apparition, sans déplacer le focus. -->
+  <div class="error-banner" role="alert">
+    <span class="error-icon" aria-hidden="true">⚠</span>
+    <span class="error-text">
+      {{ notice.ref.key | transloco: notice.ref.params }}
+      @if (notice.detail) {
+        <span class="error-detail">{{ notice.detail }}</span>
+      }
+    </span>
+    <button
+      type="button"
+      class="error-dismiss"
+      [attr.aria-label]="'errors.dismiss' | transloco"
+      (click)="notifier.dismiss()"
+    >
+      <span aria-hidden="true">✕</span>
+    </button>
+  </div>
+}

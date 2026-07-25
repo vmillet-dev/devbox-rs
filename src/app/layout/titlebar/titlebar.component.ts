@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { APP_LOCALES, LocaleService } from '../../core/i18n/locale.service';
+import { APP_LOCALES, LocaleService } from '@core/i18n/locale.service';
 
 @Component({
   selector: 'app-titlebar',

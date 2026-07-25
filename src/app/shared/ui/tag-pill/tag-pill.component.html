@@ -1,9 +1,15 @@
-<button
-  type="button"
-  class="tag-pill"
-  [class.on]="active()"
-  [class.static]="!interactive()"
-  (click)="onClick()"
->
-  #{{ label() }}
-</button>
+<!-- Un tag non interactif est un simple libellé : lui laisser un rôle de bouton
+     annoncerait une action inexistante et le rendrait atteignable au clavier. -->
+@if (interactive()) {
+  <button
+    type="button"
+    class="tag-pill"
+    [class.on]="active()"
+    [attr.aria-pressed]="active()"
+    (click)="onClick()"
+  >
+    #{{ label() }}
+  </button>
+} @else {
+  <span class="tag-pill static">#{{ label() }}</span>
+}

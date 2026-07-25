@@ -38,22 +38,11 @@ describe('CodeViewerComponent', () => {
 
     const tokens = fixture.debugElement.queryAll(By.css('.line-content span'));
     const tokenTexts = tokens.map((token) => token.nativeElement.textContent);
-    const tokenClasses = tokens.map((token) => Object.keys(token.classes).find((cls) => cls.startsWith('tok-')));
+    const tokenClasses = tokens.map((token) =>
+      Object.keys(token.classes).find((cls) => cls.startsWith('tok-')),
+    );
 
-    expect(tokenTexts).toEqual([
-      '{',
-      '"name"',
-      ':',
-      ' ',
-      '"value"',
-      ',',
-      ' ',
-      '"count"',
-      ':',
-      ' ',
-      '2',
-      '}',
-    ]);
+    expect(tokenTexts).toEqual(['{', '"name"', ':', ' ', '"value"', ',', ' ', '"count"', ':', ' ', '2', '}']);
     expect(tokenClasses).toEqual([
       'tok-punct',
       'tok-key',

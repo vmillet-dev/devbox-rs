@@ -1,8 +1,14 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { NoteFilter } from '../../../../core/stores/notes.store';
+import { NoteFilter } from '@core/stores/notes.store';
 
-const FILTERS: ReadonlyArray<{ key: NoteFilter; icon?: string; labelKey: string }> = [
+interface FilterChip {
+  readonly key: NoteFilter;
+  readonly icon?: string;
+  readonly labelKey: string;
+}
+
+const FILTERS: readonly FilterChip[] = [
   { key: 'all', labelKey: 'filters.all' },
   { key: 'pinned', icon: '📌', labelKey: 'filters.pinned' },
   { key: 'untriaged', icon: '⏳', labelKey: 'filters.untriaged' },

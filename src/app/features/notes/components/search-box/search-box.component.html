@@ -1,11 +1,15 @@
 <label class="search-bar">
-  🔍
+  <!-- Décorations masquées aux technologies d'assistance : un <label> agrège
+       tout son contenu textuel, le nom accessible du champ deviendrait
+       « 🔍 Ctrl+K ». -->
+  <span aria-hidden="true">🔍</span>
   <input
     #searchInput
-    type="text"
+    type="search"
+    [attr.aria-label]="'notes.searchLabel' | transloco"
     [placeholder]="'notes.searchPlaceholder' | transloco"
     [value]="query()"
     (input)="onInput(searchInput.value)"
   />
-  <span class="kbd">⌘K</span>
+  <span class="kbd" aria-hidden="true">{{ shortcutHint }}</span>
 </label>

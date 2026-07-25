@@ -9,6 +9,9 @@
     "test": "ng test",
     "test:watch": "ng test --watch",
     "test:coverage": "ng test --coverage",
+    "lint": "eslint . && prettier --check .",
+    "lint:fix": "eslint . --fix && prettier --write .",
+    "format": "prettier --write .",
     "tauri": "tauri",
     "tauri:dev": "tauri dev"
   },
@@ -20,6 +23,8 @@
     "@angular/forms": "^22.0.0",
     "@angular/platform-browser": "^22.0.0",
     "@angular/router": "^22.0.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@jsverse/transloco": "^8.4.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
@@ -30,10 +35,15 @@
     "@angular/build": "^22.0.0",
     "@angular/cli": "^22.0.0",
     "@angular/compiler-cli": "^22.0.0",
+    "@eslint/js": "9.39.5",
     "@tauri-apps/cli": "^2",
     "@vitest/coverage-v8": "^4.1.10",
+    "angular-eslint": "22.1.0",
+    "eslint": "9.39.5",
     "jsdom": "^29.1.1",
+    "prettier": "3.9.6",
     "typescript": "~6.0.3",
+    "typescript-eslint": "8.65.0",
     "vitest": "^4.1.10"
   }
 }

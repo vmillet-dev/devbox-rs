@@ -1,0 +1,62 @@
+{
+  "notes": {
+    "newNote": "+ New note",
+    "searchLabel": "Search notes",
+    "searchPlaceholder": "Search a note, a tag, some code...",
+    "spaceSwitcherLabel": "Switch space",
+    "tags": "Tags",
+    "tagsGroupLabel": "Filter by tag",
+    "createOrPaste": "Paste or create",
+    "untitled": "Untitled",
+    "pinnedState": "Pinned note",
+    "loading": "Loading notes…",
+    "noResults": "No note matches this search."
+  },
+  "filters": {
+    "groupLabel": "Filter notes",
+    "all": "All",
+    "pinned": "Pinned",
+    "untriaged": "Untriaged"
+  },
+  "sections": {
+    "pinned": "Pinned",
+    "today": "Today",
+    "week": "This week",
+    "older": "Older",
+    "results": "Results",
+    "expiringHint": "to triage soon"
+  },
+  "editor": {
+    "titleLabel": "Note title",
+    "close": "Close editor",
+    "pin": "Pin",
+    "pinned": "Pinned",
+    "footerStats": "{{lines}} lines · {{bytes}} bytes",
+    "modifiedPrefix": "Updated"
+  },
+  "lifecycle": {
+    "neverExpires": "Never expires"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "expiresIn": "expires in {{count}}d",
+    "expired": "expired"
+  },
+  "errors": {
+    "dismiss": "Dismiss message",
+    "retry": "Retry",
+    "unexpected": "An unexpected error occurred.",
+    "ipcFailed": "Communication with the native engine failed ({{command}}).",
+    "notesLoadFailed": "Could not load notes.",
+    "noteSaveFailed": "Could not save the note. The change was reverted.",
+    "noteCreateFailed": "Could not create the note."
+  },
+  "locale": {
+    "groupLabel": "Interface language",
+    "fr": "French",
+    "en": "English"
+  }
+}

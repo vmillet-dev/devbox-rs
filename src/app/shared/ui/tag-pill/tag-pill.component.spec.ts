@@ -20,22 +20,26 @@ describe('TagPillComponent', () => {
   it('is not marked active by default', () => {
     const button = fixture.debugElement.query(By.css('button'));
     expect(button.classes['on']).toBeFalsy();
+    expect(button.nativeElement.getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('applies the "on" class when active', async () => {
+  it('exposes the active state as a pressed toggle', async () => {
     fixture.componentRef.setInput('active', true);
     await fixture.whenStable();
 
     const button = fixture.debugElement.query(By.css('button'));
     expect(button.classes['on']).toBe(true);
+    expect(button.nativeElement.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('applies the "static" class when not interactive', async () => {
+  it('renders a plain label rather than a button when not interactive', async () => {
+    // A non-interactive pill announced as a button would advertise an action
+    // that does not exist, and would be keyboard-reachable for nothing.
     fixture.componentRef.setInput('interactive', false);
     await fixture.whenStable();
 
-    const button = fixture.debugElement.query(By.css('button'));
-    expect(button.classes['static']).toBe(true);
+    expect(fixture.debugElement.query(By.css('button'))).toBeNull();
+    expect(fixture.nativeElement.querySelector('span.tag-pill.static').textContent.trim()).toBe('#urgent');
   });
 
   it('emits the label when clicked while interactive', () => {
@@ -45,16 +49,5 @@ describe('TagPillComponent', () => {
     fixture.debugElement.query(By.css('button')).triggerEventHandler('click');
 
     expect(emitted).toBe('urgent');
-  });
-
-  it('does not emit when clicked while not interactive', async () => {
-    fixture.componentRef.setInput('interactive', false);
-    await fixture.whenStable();
-    let emitted = false;
-    fixture.componentInstance.toggled.subscribe(() => (emitted = true));
-
-    fixture.debugElement.query(By.css('button')).triggerEventHandler('click');
-
-    expect(emitted).toBe(false);
   });
 });

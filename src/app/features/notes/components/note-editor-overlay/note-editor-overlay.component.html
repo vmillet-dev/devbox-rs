@@ -1,24 +1,54 @@
 @if (note(); as note) {
+  <!-- Le clic sur le fond est un confort souris ; l'équivalent clavier est
+       Échap, géré au niveau du composant. Rendre le fond focusable ajouterait
+       un arrêt de tabulation sans contenu juste devant la modale. -->
+  <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
   <div class="overlay-backdrop" (click)="onBackdropClick($event)">
-    <div class="overlay-panel">
+    <div
+      appFocusTrap
+      class="overlay-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="overlay-title-input"
+    >
       <div class="overlay-toolbar">
+        <!-- (input) et non (change) : (change) n'émet qu'au blur, or la modale
+             se ferme par Échap ou clic sur le fond — deux chemins sans blur,
+             qui perdaient donc la saisie en cours. -->
         <input
           #titleInput
+          id="overlay-title-input"
           class="overlay-title-input"
+          [attr.aria-label]="'editor.titleLabel' | transloco"
+          [placeholder]="'notes.untitled' | transloco"
           [value]="note.title"
-          (change)="titleChanged.emit(titleInput.value)"
+          (input)="titleChanged.emit(titleInput.value)"
         />
-        <button type="button" class="toolbar-btn" [class.pinned]="note.pinned" (click)="pinToggled.emit()">
-          📌 {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
+        <button
+          type="button"
+          class="toolbar-btn"
+          [class.pinned]="note.pinned"
+          [attr.aria-pressed]="note.pinned"
+          (click)="pinToggled.emit()"
+        >
+          <span aria-hidden="true">📌</span>
+          {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
         </button>
-        <button type="button" class="toolbar-btn">📁 {{ 'editor.move' | transloco }}</button>
-        <button type="button" class="toolbar-btn">⋯</button>
-        <button type="button" class="close-btn" (click)="closed.emit()">✕</button>
+        <button
+          type="button"
+          class="close-btn"
+          [attr.aria-label]="'editor.close' | transloco"
+          (click)="closed.emit()"
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
       </div>
 
       <div class="overlay-meta-row">
-        <span>{{ note.source }}</span>
-        <span>·</span>
+        @if (note.source) {
+          <span>{{ note.source }}</span>
+          <span aria-hidden="true">·</span>
+        }
         <div class="overlay-tags">
           @for (tag of note.tags; track tag) {
             <app-tag-pill [label]="tag" [active]="true" [interactive]="false" />
@@ -30,7 +60,10 @@
       <app-code-viewer class="overlay-body" [content]="note.content" [language]="note.language" />
 
       <div class="overlay-footer">
-        <span>{{ languageLabel() }} · {{ 'editor.footerStats' | transloco: { lines: lineCount(), bytes: byteSize() } }}</span>
+        <span>
+          {{ languageLabel() }} ·
+          {{ 'editor.footerStats' | transloco: { lines: lineCount(), bytes: byteSize() } }}
+        </span>
         @if (modifiedRef(); as ref) {
           <span>{{ 'editor.modifiedPrefix' | transloco }} {{ ref.key | transloco: ref.params }}</span>
         }

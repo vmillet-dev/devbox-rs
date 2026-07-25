@@ -12,12 +12,16 @@
   position: relative;
   text-align: left;
   font-family: inherit;
-  transition: transform 0.05s;
 }
 
 .card:hover {
   border-color: var(--line);
   background: var(--bg-2);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
 .card.selected {
@@ -33,6 +37,8 @@
   font-size: 11px;
 }
 
+// Les enfants sont des <span> (contrainte de contenu du <button> parent) :
+// il faut donc leur rendre explicitement le comportement de bloc.
 .card-top {
   display: flex;
   align-items: center;
@@ -41,6 +47,7 @@
 }
 
 .card-title {
+  display: block;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-0);
@@ -49,6 +56,7 @@
 }
 
 .card-snippet {
+  display: block;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-2);
