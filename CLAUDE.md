@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 DevBox — a desktop "Swiss Army knife" utility app for developers (notes-taking, hashing, encoding). Front-end is **Angular 22** (standalone components, signals, zoneless change detection), native engine is **Rust / Tauri v2**.
 
-The two halves are at very different stages: the **notes feature is complete on the front-end** (spaces with creation and filtering, search, filters, tag rail, sections, full note editing — content, format, tags, pin, deletion) and it is **wired to the Rust backend**: there is no mock data left, `Tauri*Repository` is the only data source and every read/write goes through `IpcService`. The **Rust side is a registered skeleton**: `list_notes`, `create_note`, `update_note`, `delete_note`, `list_spaces` and `create_space` exist, are registered in `generate_handler!`, carry the full serde structs — and return `Err("non implémentée")` until their bodies are written. The app therefore starts on its error/retry screen; that is expected, not a bug. Each function carries the TODO describing what it owes the front-end (`src-tauri/src/commands/notes.rs`, `spaces.rs`).
+The **notes feature is complete end to end**: front-end (spaces with creation and filtering, search, filters, tag rail, sections, full note editing — content, format, tags, pin, deletion), IPC (no mock data left, `Tauri*Repository` is the only data source, every read/write goes through `IpcService`), and Rust (`list_notes`, `create_note`, `update_note`, `delete_note`, `list_spaces`, `create_space` persist to an embedded SQLite database). `crypto` and `formatters` are still unregistered stubs.
+
+Persistence lives in `src-tauri/src/storage/` — `rusqlite` with the `bundled` feature, database file in `app_data_dir()`. The commands in `src-tauri/src/commands/` are thin adapters over it. `docs/architecture.md` has the details (layering, concurrency, migrations, schema rationale).
 
 Primary language for code comments, docstrings, and UI strings in this repo is **French**. Match that convention when editing existing files. Test descriptions and test comments are the deliberate exception: they're written in **English**.
 
@@ -25,7 +27,9 @@ Run all commands from the repo root (`package.json` there wraps both Angular and
 - `npm test` — Angular unit tests via the `@angular/build:unit-test` builder with **Vitest** (jsdom, no browser required). `npm run test:watch` re-runs on change; `npm run test:coverage` adds a v8 coverage report with 80% thresholds.
 - `npm run lint` — ESLint (with `angular-eslint`, including its template accessibility rules) plus a Prettier format check. `npm run lint:fix` fixes what it can; `npm run format` runs Prettier alone.
 
-The Rust side has no linter, formatter, tests or test runner configured (no clippy or rustfmt hook).
+- `cargo test` from `src-tauri/` — persistence and serialisation tests (no extra setup; they run against an in-memory SQLite database).
+
+The Rust side has no linter or formatter configured (no clippy or rustfmt hook).
 
 ## Things that will bite you
 
@@ -44,7 +48,9 @@ These are the non-obvious constraints; the rest of the architecture is in `docs/
 - **Fake timers in tests.** Use `vi.useFakeTimers({ toFake: ['Date'] })` for date-dependent components. Plain `vi.useFakeTimers()` also fakes `requestAnimationFrame`, which Angular's zoneless scheduler needs, and `await fixture.whenStable()` then hangs forever.
 - **Time comes from `ClockService`.** Pure time utils take `now: Date` as a parameter and callers pass `clock.now()`. Reading `new Date()` inside a `computed()` freezes the value: the computed depends on no signal representing time, so a card shows "4 min ago" forever.
 - **CSP is on.** `src-tauri/tauri.conf.json` locks the WebView down; `ipc:` and `http://ipc.localhost` must stay in `connect-src` or `invoke()` is blocked. Anything remote (fonts, images, APIs) needs a deliberate widening — fonts are self-hosted via `@fontsource` for exactly this reason.
-- **Rust: notes/spaces vs. crypto/formatters.** `notes.rs` and `spaces.rs` are a _contract_ — signatures, serde structs and registration are final, only the bodies are missing; don't change their shape without changing the DTOs on the front. `crypto.rs` and `formatters.rs` are still `#[allow(dead_code)]` stubs unregistered in `lib.rs` — replace those rather than building on top of them.
+- **Rust: notes/spaces vs. crypto/formatters.** `notes.rs` and `spaces.rs` are a _contract_ — don't change the shape of their structs without changing the DTOs on the front; the serde tests in `notes.rs` will fail if you do. `crypto.rs` and `formatters.rs` are still `#[allow(dead_code)]` stubs unregistered in `lib.rs` — replace those rather than building on top of them.
+- **Migrations are append-only.** The SQLite schema is versioned by `PRAGMA user_version` in `src-tauri/src/storage/mod.rs`. Changing the model means a new `MIGRATION_N` and a new branch in `migrate` — never editing `MIGRATION_1`, which has already run on existing installs. Deleting the database file is a legitimate reset during development (`app_data_dir()/devbox.sqlite3`).
+- **`PRAGMA foreign_keys` is per connection, not per database.** It's set in `storage::configure`; without it the `ON DELETE CASCADE` clauses in the schema are inert and deleting a note leaves its tags behind.
 - **Zoneless.** Every component is `OnPush` and state is signal-based; derived state is `computed()`, never a manually maintained signal.
 
 ## Design reference

@@ -1,0 +1,244 @@
+//! Couche de persistance : SQLite embarqué via `rusqlite`.
+//!
+//! Le fichier de base vit dans `app_data_dir()` (voir `lib.rs`), la feature
+//! `bundled` de `rusqlite` compile SQLite depuis les sources et le lie en
+//! statique : rien à installer ni à distribuer à côté de l'exécutable.
+//!
+//! # Organisation
+//!
+//! Ce module ne contient que l'ouverture, la configuration et les migrations.
+//! Les lectures et écritures métier sont dans `storage::notes` et
+//! `storage::spaces`, sous forme de fonctions ordinaires prenant une
+//! `&Connection`. Les `#[tauri::command]` de `commands/` ne sont que des
+//! adaptateurs par-dessus : c'est ce qui permet de tester la persistance sur une
+//! base en mémoire, sans lancer Tauri.
+//!
+//! # Concurrence
+//!
+//! Une `Connection` rusqlite n'est pas `Sync`. L'unique connexion est donc
+//! partagée via `tauri::State<Db>` (`Db = Mutex<Connection>`), enregistrée avec
+//! `.manage(...)` dans `lib.rs` — jamais par une variable globale. Deux commandes
+//! qui se chevauchent se sérialisent sur ce mutex.
+//!
+//! # Migrations
+//!
+//! Le schéma est versionné par `PRAGMA user_version`. Faire évoluer le modèle =
+//! ajouter une constante `MIGRATION_N` et une branche dans [`migrate`] ; ne
+//! jamais modifier une migration déjà livrée, elle a déjà tourné chez
+//! l'utilisateur. Chaque migration est atomique (DDL transactionnel).
+
+pub mod notes;
+pub mod spaces;
+
+use std::fmt;
+use std::path::Path;
+use std::sync::Mutex;
+
+use chrono::{SecondsFormat, Utc};
+use rusqlite::Connection;
+
+/// Horodatage courant dans le format attendu de l'autre côté du pont : ISO 8601
+/// / RFC 3339 UTC, ex. `2026-07-25T09:12:00.000Z`.
+///
+/// La milliseconde n'est pas décorative : deux notes modifiées dans la même
+/// seconde deviendraient impossibles à départager par le tri de [`notes::list`].
+pub fn now_iso() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
+/// État partagé enregistré dans Tauri. Voir la section « Concurrence ».
+pub type Db = Mutex<Connection>;
+
+/// Nom du fichier de base, créé dans le répertoire de données de l'application.
+pub const DB_FILE_NAME: &str = "devbox.sqlite3";
+
+/// Version de schéma attendue par ce binaire.
+const SCHEMA_VERSION: i32 = 1;
+
+/// Schéma initial.
+///
+/// Deux choix structurants, pris pour que le filtrage puisse descendre côté
+/// Rust sans re-migration :
+/// - `lifecycle` est éclaté en deux colonnes plutôt que stocké en JSON, sinon
+///   « ce qui expire avant telle date » ne serait pas requêtable ;
+/// - les tags sont dans leur propre table plutôt qu'en colonne sérialisée, sinon
+///   le filtre par tag imposerait de relire tout le corpus.
+const MIGRATION_1: &str = r"
+BEGIN;
+
+CREATE TABLE spaces (
+    id   TEXT PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+-- Le front refuse déjà les homonymes à la création ; l'index est le garde-fou
+-- côté stockage. NOCASE ne couvre que l'ASCII, il est donc plus permissif que
+-- la comparaison du front — c'est le bon sens de l'écart.
+CREATE UNIQUE INDEX spaces_name_unique ON spaces (name COLLATE NOCASE);
+
+CREATE TABLE notes (
+    id                   TEXT PRIMARY KEY,
+    space_id             TEXT NOT NULL REFERENCES spaces (id) ON DELETE CASCADE,
+    title                TEXT NOT NULL,
+    language             TEXT NOT NULL,
+    content              TEXT NOT NULL,
+    source               TEXT NOT NULL,
+    pinned               INTEGER NOT NULL CHECK (pinned IN (0, 1)),
+    created_at           TEXT NOT NULL,
+    updated_at           TEXT NOT NULL,
+    lifecycle_kind       TEXT NOT NULL CHECK (lifecycle_kind IN ('permanent', 'expires')),
+    lifecycle_expires_at TEXT,
+    -- Une note « expires » a forcément une date, une note permanente n'en a
+    -- jamais : la lecture peut donc reconstruire l'enum sans cas ambigu.
+    CHECK ((lifecycle_kind = 'expires') = (lifecycle_expires_at IS NOT NULL))
+);
+
+CREATE INDEX notes_space_id ON notes (space_id);
+CREATE INDEX notes_updated_at ON notes (updated_at DESC);
+
+CREATE TABLE note_tags (
+    note_id TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
+    tag     TEXT NOT NULL,
+    PRIMARY KEY (note_id, tag)
+);
+
+CREATE INDEX note_tags_tag ON note_tags (tag);
+
+PRAGMA user_version = 1;
+
+COMMIT;
+";
+
+/// Échecs de la couche de persistance.
+///
+/// Le `Display` de cette enum ressort **tel quel dans l'interface** (les
+/// commandes le convertissent en `String`, que le front affiche via `IpcError`) :
+/// les messages sont donc rédigés pour un lecteur humain, en français.
+#[derive(Debug)]
+pub enum StorageError {
+    /// Note introuvable. Le front s'en sert pour annuler sa mise à jour optimiste.
+    NoteNotFound(String),
+    /// Espace visé par une note inexistant : la note n'aurait nulle part où être rangée.
+    SpaceNotFound(String),
+    /// Un espace porte déjà ce nom (comparaison insensible à la casse).
+    DuplicateSpaceName(String),
+    /// La base a été écrite par une version plus récente de l'application.
+    SchemaTooRecent(i32),
+    /// Panne de lecture ou d'écriture.
+    Sqlite(rusqlite::Error),
+}
+
+impl fmt::Display for StorageError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NoteNotFound(id) => write!(f, "Note introuvable : {id}"),
+            Self::SpaceNotFound(id) => write!(f, "Espace introuvable : {id}"),
+            Self::DuplicateSpaceName(name) => {
+                write!(f, "Un espace nommé « {name} » existe déjà")
+            }
+            Self::SchemaTooRecent(version) => write!(
+                f,
+                "Base de données en version {version}, plus récente que cette version de DevBox (schéma {SCHEMA_VERSION})",
+            ),
+            Self::Sqlite(error) => write!(f, "Erreur de stockage : {error}"),
+        }
+    }
+}
+
+impl std::error::Error for StorageError {}
+
+impl From<rusqlite::Error> for StorageError {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::Sqlite(error)
+    }
+}
+
+/// Ouvre la base au chemin donné (en la créant au besoin), la configure et
+/// applique les migrations manquantes.
+pub fn open(path: &Path) -> Result<Connection, StorageError> {
+    let connection = Connection::open(path)?;
+    configure(&connection)?;
+    migrate(&connection)?;
+    Ok(connection)
+}
+
+/// Base éphémère, pour les tests.
+#[cfg(test)]
+pub fn open_in_memory() -> Result<Connection, StorageError> {
+    let connection = Connection::open_in_memory()?;
+    configure(&connection)?;
+    migrate(&connection)?;
+    Ok(connection)
+}
+
+fn configure(connection: &Connection) -> Result<(), StorageError> {
+    // `foreign_keys` est désactivé par défaut dans SQLite et se règle **par
+    // connexion** : sans lui, les `ON DELETE CASCADE` du schéma ne s'appliquent
+    // pas et les tags d'une note supprimée resteraient orphelins.
+    // WAL : un lecteur ne bloque plus un écrivain (sans effet sur une base en mémoire).
+    connection.execute_batch(
+        "PRAGMA foreign_keys = ON;
+         PRAGMA journal_mode = WAL;",
+    )?;
+    Ok(())
+}
+
+fn migrate(connection: &Connection) -> Result<(), StorageError> {
+    let version: i32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+
+    // Base écrite par une version plus récente de l'application : ses tables ne
+    // sont pas celles que ce binaire sait lire. Refuser franchement vaut mieux
+    // que lire de travers et écraser des données.
+    if version > SCHEMA_VERSION {
+        return Err(StorageError::SchemaTooRecent(version));
+    }
+
+    if version < 1 {
+        connection.execute_batch(MIGRATION_1)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opening_twice_is_idempotent() {
+        let directory = std::env::temp_dir().join(format!("devbox-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join(DB_FILE_NAME);
+
+        open(&path).unwrap();
+        // A second open must find the schema already at the expected version and
+        // not attempt to re-create the tables.
+        let connection = open(&path).unwrap();
+
+        let version: i32 = connection
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn a_fresh_database_is_empty() {
+        let connection = open_in_memory().unwrap();
+
+        assert!(notes::list(&connection).unwrap().is_empty());
+        assert!(spaces::list(&connection).unwrap().is_empty());
+    }
+
+    #[test]
+    fn foreign_keys_are_enforced() {
+        let connection = open_in_memory().unwrap();
+
+        let enabled: bool = connection
+            .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+            .unwrap();
+
+        assert!(enabled);
+    }
+}

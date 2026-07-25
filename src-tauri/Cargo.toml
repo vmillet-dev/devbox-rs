@@ -22,7 +22,16 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 # Sérialisation des structures échangées avec le front (voir commands/notes.rs).
 serde = { version = "1", features = ["derive"] }
-# TODO(persistance) : les dépendances du stockage restent à choisir.
-# Les plus probables : `serde_json` (stockage fichier), `uuid` (identifiants),
-# `chrono` (horodatages ISO 8601), ou `rusqlite` pour une base SQLite.
+# Stockage : SQLite embarqué (voir storage/mod.rs). La feature `bundled` compile
+# SQLite depuis les sources et le lie en statique — aucune DLL à distribuer.
+rusqlite = { version = "0.40.1", features = ["bundled"] }
+# Identifiants des notes et des espaces : le front n'en fabrique jamais.
+uuid = { version = "1.24.0", features = ["v4"] }
+# Horodatages ISO 8601 / RFC 3339 UTC, le format attendu par le pont Tauri.
+chrono = "0.4.45"
+
+[dev-dependencies]
+# Uniquement pour verrouiller par test la forme JSON traversant le pont Tauri
+# (voir les tests de commands/notes.rs). Tauri sérialise lui-même en production.
+serde_json = "1.0.151"
 

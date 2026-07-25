@@ -1,30 +1,9 @@
 //! Module « Prise de notes ».
 //!
-//! Les structures et les signatures sont **figées et déjà branchées** : le
-//! front-end appelle ces commandes (`src/app/core/data/tauri-notes-repository.ts`)
-//! et elles sont enregistrées dans `lib.rs`. Il ne reste qu'à écrire les corps
-//! de fonction — chacun porte un `TODO` décrivant ce qu'il doit faire. Tant
-//! qu'ils renvoient `Err(NOT_IMPLEMENTED)`, l'application affiche l'écran de
-//! reprise du canevas et le bandeau d'erreur : c'est le comportement attendu,
-//! pas un bug.
-//!
-//! # Ce qui reste à décider (côté implémentation)
-//!
-//! 1. **Le support de stockage.** Un fichier JSON dans
-//!    `app_handle.path().app_data_dir()` suffit pour démarrer ; SQLite (via
-//!    `rusqlite` ou `tauri-plugin-sql`) devient intéressant quand le nombre de
-//!    notes rend la relecture intégrale coûteuse.
-//! 2. **La génération des identifiants et des dates.** Le front n'en fabrique
-//!    jamais : il lit ce que ces commandes renvoient. Les crates habituelles
-//!    sont `uuid` (`Uuid::new_v4()`) et `chrono` (`Utc::now().to_rfc3339()`).
-//!    Aucune n'est encore déclarée dans `Cargo.toml`.
-//! 3. **L'accès concurrent.** Deux commandes peuvent se chevaucher ; l'état
-//!    partagé passe par `tauri::State<Mutex<...>>` (enregistré avec
-//!    `.manage(...)` dans `lib.rs`), pas par une variable globale.
-//!
-//! Garder la logique métier (lecture/écriture disque, requêtes SQL) dans des
-//! fonctions Rust ordinaires et faire de ces `#[tauri::command]` de simples
-//! adaptateurs rend le tout testable sans lancer Tauri.
+//! Ces commandes sont de simples **adaptateurs** : elles verrouillent la
+//! connexion partagée, délèguent à `storage::notes` et convertissent l'erreur en
+//! `String` pour le pont Tauri. Toute la logique de persistance est dans
+//! `storage/` — et donc testable sans lancer Tauri.
 //!
 //! # Contrat de sérialisation — à ne pas casser
 //!
@@ -39,10 +18,9 @@
 //!   `kind` — il attend `{"kind":"expires","at":"…"}`.
 //!
 //! Les dates transitent en **chaîne ISO 8601 / RFC 3339 UTC** (JSON n'a pas de
-//! type date) ; `chrono::DateTime<Utc>` sérialise déjà dans ce format, ce qui
-//! permettra de remplacer les `String` de dates ci-dessous sans toucher au front.
+//! type date) ; elles sont produites par `storage::now_iso`.
 //!
-//! Règles que le front tient pour acquises :
+//! Règles que le front tient pour acquises, et que `storage::notes` honore :
 //! - `create_note` et `update_note` **renvoient la note telle que persistée**
 //!   (identifiant définitif, `updated_at` rafraîchi) : le store remplace sa
 //!   copie locale par cette valeur de retour.
@@ -51,13 +29,12 @@
 //!   optimiste et remettre la note dans son état précédent.
 //! - Dans un `NotePatch`, un champ **absent** signifie « ne pas toucher ». Le
 //!   front n'envoie jamais `null` pour cela (voir `toNotePatchDto`), donc un
-//!   `Option::None` ne doit jamais écraser la valeur stockée.
+//!   `Option::None` n'écrase jamais la valeur stockée.
 
 use serde::{Deserialize, Serialize};
+use tauri::State;
 
-/// Réponse temporaire tant que les corps de fonction ne sont pas écrits.
-/// Le message ressort tel quel dans l'interface, via `IpcError`.
-const NOT_IMPLEMENTED: &str = "Commande non implémentée : voir les TODO de src-tauri/src/commands/notes.rs";
+use crate::storage::{self, Db};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -65,6 +42,7 @@ pub struct Note {
     pub id: String,
     /// Espace de rangement. Le front filtre dessus : une note dont le `space_id`
     /// ne correspond à aucun espace renvoyé par `list_spaces` est invisible.
+    /// Le stockage refuse d'ailleurs d'en créer une dans un espace inconnu.
     pub space_id: String,
     /// Peut être vide : une note fraîchement créée n'a pas encore de titre,
     /// l'interface affiche un libellé traduit à la place.
@@ -77,7 +55,7 @@ pub struct Note {
     pub source: String,
     pub tags: Vec<String>,
     pub pinned: bool,
-    /// ISO 8601, ex. "2026-07-25T09:12:00Z".
+    /// ISO 8601, ex. "2026-07-25T09:12:00.000Z".
     pub created_at: String,
     pub updated_at: String,
     pub lifecycle: NoteLifecycle,
@@ -93,7 +71,6 @@ pub enum NoteLifecycle {
 }
 
 /// Création : ni identifiant ni horodatages — c'est cette couche qui les attribue.
-#[allow(dead_code)] // TODO: à retirer une fois `create_note` écrite (elle lira ces champs).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteDraft {
@@ -107,8 +84,7 @@ pub struct NoteDraft {
     pub lifecycle: NoteLifecycle,
 }
 
-/// Modification partielle : un champ à `None` doit rester **inchangé** en base.
-#[allow(dead_code)] // TODO: à retirer une fois `update_note` écrite (elle lira ces champs).
+/// Modification partielle : un champ à `None` reste **inchangé** en base.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NotePatch {
@@ -123,39 +99,136 @@ pub struct NotePatch {
     pub lifecycle: Option<NoteLifecycle>,
 }
 
+/// Le mutex n'est empoisonné que si une commande a paniqué en le tenant : la
+/// base peut alors être dans un état incohérent, autant le dire au lieu de
+/// paniquer une seconde fois.
+fn lock(db: &Db) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, String> {
+    db.lock()
+        .map_err(|_| "Stockage indisponible : une opération précédente a échoué".to_string())
+}
+
 /// Toutes les notes, tous espaces confondus — le filtrage par espace est fait
 /// côté front, qui doit aussi pouvoir afficher « tous les espaces ».
-///
-/// TODO: lire le stockage et renvoyer les notes. Une liste vide est une réponse
-/// valide (premier lancement) ; réserver `Err` aux vraies pannes de lecture.
 #[tauri::command]
-pub fn list_notes() -> Result<Vec<Note>, String> {
-    Err(NOT_IMPLEMENTED.to_string())
+pub fn list_notes(db: State<'_, Db>) -> Result<Vec<Note>, String> {
+    let connection = lock(&db)?;
+    storage::notes::list(&connection).map_err(|error| error.to_string())
 }
 
-/// TODO: attribuer un identifiant unique, poser `created_at` = `updated_at` =
-/// maintenant (ISO 8601 UTC), persister, puis renvoyer la note complète.
-/// Le front remplace sa copie locale par cette valeur : ce qui est renvoyé ici
-/// est ce que l'utilisateur voit.
 #[tauri::command]
-#[allow(unused_variables)] // TODO: à retirer une fois le corps écrit.
-pub fn create_note(draft: NoteDraft) -> Result<Note, String> {
-    Err(NOT_IMPLEMENTED.to_string())
+pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<Note, String> {
+    let mut connection = lock(&db)?;
+    storage::notes::create(&mut connection, &draft, &storage::now_iso())
+        .map_err(|error| error.to_string())
 }
 
-/// TODO: retrouver la note, appliquer **uniquement** les champs `Some(...)` du
-/// patch, rafraîchir `updated_at`, persister, renvoyer la note mise à jour.
-/// Identifiant inconnu ⇒ `Err` (le front annule alors sa mise à jour optimiste).
 #[tauri::command]
-#[allow(unused_variables)] // TODO: à retirer une fois le corps écrit.
-pub fn update_note(id: String, patch: NotePatch) -> Result<Note, String> {
-    Err(NOT_IMPLEMENTED.to_string())
+pub fn update_note(id: String, patch: NotePatch, db: State<'_, Db>) -> Result<Note, String> {
+    let mut connection = lock(&db)?;
+    storage::notes::update(&mut connection, &id, &patch, &storage::now_iso())
+        .map_err(|error| error.to_string())
 }
 
-/// TODO: supprimer la note et persister. Identifiant inconnu ⇒ `Err` : le front
-/// remet alors la note à sa place d'origine dans la liste.
 #[tauri::command]
-#[allow(unused_variables)] // TODO: à retirer une fois le corps écrit.
-pub fn delete_note(id: String) -> Result<(), String> {
-    Err(NOT_IMPLEMENTED.to_string())
+pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), String> {
+    let connection = lock(&db)?;
+    storage::notes::delete(&connection, &id).map_err(|error| error.to_string())
+}
+
+/// Ces tests ne vérifient pas du code métier : ils figent la **forme JSON**
+/// traversant le pont, la seule chose que le compilateur ne peut pas contrôler
+/// et qui casse silencieusement le front (voir `src/app/core/data/note.dto.ts`).
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample() -> Note {
+        Note {
+            id: "n-1".to_string(),
+            space_id: "s-1".to_string(),
+            title: "Titre".to_string(),
+            language: "txt".to_string(),
+            content: "Contenu".to_string(),
+            source: String::new(),
+            tags: vec!["auth".to_string()],
+            pinned: false,
+            created_at: "2026-07-25T09:00:00.000Z".to_string(),
+            updated_at: "2026-07-25T09:00:00.000Z".to_string(),
+            lifecycle: NoteLifecycle::Permanent,
+        }
+    }
+
+    #[test]
+    fn a_note_serialises_with_camel_case_keys() {
+        let json = serde_json::to_value(sample()).unwrap();
+
+        // The TypeScript DTO reads `spaceId` / `createdAt` / `updatedAt`; serde's
+        // default would emit the snake_case field names and the front would see
+        // `undefined` where it expects an ISO date.
+        assert!(json.get("spaceId").is_some());
+        assert!(json.get("createdAt").is_some());
+        assert!(json.get("updatedAt").is_some());
+        assert!(json.get("space_id").is_none());
+        assert!(json.get("created_at").is_none());
+    }
+
+    #[test]
+    fn a_permanent_lifecycle_serialises_as_a_tagged_object() {
+        let json = serde_json::to_value(sample()).unwrap();
+
+        // Not serde's default `"Permanent"` — the front discriminates on `kind`.
+        assert_eq!(json["lifecycle"], serde_json::json!({ "kind": "permanent" }));
+    }
+
+    #[test]
+    fn an_expiring_lifecycle_serialises_flat_with_its_date() {
+        let note = Note {
+            lifecycle: NoteLifecycle::Expires {
+                at: "2026-08-01T00:00:00.000Z".to_string(),
+            },
+            ..sample()
+        };
+
+        let json = serde_json::to_value(note).unwrap();
+
+        // Not `{"Expires":{"at":…}}`, which the TS discriminated union rejects.
+        assert_eq!(
+            json["lifecycle"],
+            serde_json::json!({ "kind": "expires", "at": "2026-08-01T00:00:00.000Z" })
+        );
+    }
+
+    #[test]
+    fn a_patch_omitting_a_field_deserialises_to_none() {
+        // `toNotePatchDto` copies field by field precisely so that untouched
+        // fields are absent rather than null; absent must mean "leave alone".
+        let patch: NotePatch = serde_json::from_value(serde_json::json!({
+            "title": "Nouveau titre"
+        }))
+        .unwrap();
+
+        assert_eq!(patch.title.as_deref(), Some("Nouveau titre"));
+        assert!(patch.content.is_none());
+        assert!(patch.tags.is_none());
+        assert!(patch.lifecycle.is_none());
+    }
+
+    #[test]
+    fn a_draft_is_read_from_the_camel_case_payload_the_front_sends() {
+        let draft: NoteDraft = serde_json::from_value(serde_json::json!({
+            "spaceId": "s-1",
+            "title": "",
+            "language": "sql",
+            "content": "SELECT 1",
+            "source": "",
+            "tags": ["db"],
+            "pinned": true,
+            "lifecycle": { "kind": "expires", "at": "2026-08-01T00:00:00.000Z" }
+        }))
+        .unwrap();
+
+        assert_eq!(draft.space_id, "s-1");
+        assert!(draft.pinned);
+        assert!(matches!(draft.lifecycle, NoteLifecycle::Expires { .. }));
+    }
 }

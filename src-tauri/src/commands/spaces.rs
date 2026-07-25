@@ -1,7 +1,7 @@
 //! Module « Espaces » : les classeurs dans lesquels les notes sont rangées.
 //!
-//! Même statut que `notes` : structures et signatures figées, corps à écrire.
-//! Le front appelle ces commandes via `src/app/core/data/tauri-spaces-repository.ts`.
+//! Même statut que `notes` : de simples adaptateurs au-dessus de
+//! `storage::spaces`.
 //!
 //! Un espace est intentionnellement minimal (un identifiant, un nom) : c'est le
 //! `space_id` de chaque note qui porte la relation. Le front n'a **aucune**
@@ -10,47 +10,52 @@
 //!
 //! # Ce qui reste à décider
 //!
-//! - **Un espace par défaut au premier lancement.** Sans espace, l'application
-//!   refuse de créer une note (il n'y a nulle part où la ranger) et affiche
+//! - **Un espace par défaut au premier lancement.** `list_spaces` renvoie
+//!   aujourd'hui une liste vide au premier démarrage : l'application refuse
+//!   alors de créer une note (il n'y a nulle part où la ranger) et affiche
 //!   « Créez d'abord un espace ». Créer un espace initial (« Perso », par ex.)
-//!   au premier `list_spaces` évite cet écran vide ; c'est un choix produit.
-//! - **La suppression et le renommage.** Aucune commande n'existe encore :
-//!   supprimer un espace demande d'abord de trancher le sort de ses notes
-//!   (suppression en cascade, ou déplacement vers un espace par défaut).
-//!   Le champ `spaceId` d'une note est déjà modifiable via `NotePatch`, donc le
-//!   déplacement ne demanderait qu'une commande et une entrée de menu.
+//!   éviterait cet écran ; c'est un choix produit, pas une contrainte technique.
+//! - **La suppression et le renommage.** Aucune commande n'existe encore. Le
+//!   schéma tranche déjà le sort des notes en cas de suppression
+//!   (`ON DELETE CASCADE` : elles partent avec l'espace) ; si le produit préfère
+//!   les déplacer vers un espace par défaut, il faudra le faire *avant* le
+//!   `DELETE`. Le champ `spaceId` d'une note est déjà modifiable via
+//!   `NotePatch`, donc le déplacement ne demande qu'une commande et une entrée
+//!   de menu.
 
 use serde::{Deserialize, Serialize};
+use tauri::State;
 
-const NOT_IMPLEMENTED: &str =
-    "Commande non implémentée : voir les TODO de src-tauri/src/commands/spaces.rs";
+use crate::storage::{self, Db};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Space {
     pub id: String,
     /// Nom affiché dans le sélecteur. Le front refuse déjà les homonymes à la
-    /// création ; à vous de décider si la persistance impose la même contrainte.
+    /// création ; le stockage impose la même contrainte, insensible à la casse.
     pub name: String,
 }
 
 /// Création : pas d'identifiant, il est attribué ici.
-#[allow(dead_code)] // TODO: à retirer une fois `create_space` écrite (elle lira `name`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct SpaceDraft {
     pub name: String,
 }
 
-/// TODO: lire les espaces persistés. Voir la note ci-dessus sur l'espace créé
-/// d'office au premier lancement.
-#[tauri::command]
-pub fn list_spaces() -> Result<Vec<Space>, String> {
-    Err(NOT_IMPLEMENTED.to_string())
+fn lock(db: &Db) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, String> {
+    db.lock()
+        .map_err(|_| "Stockage indisponible : une opération précédente a échoué".to_string())
 }
 
-/// TODO: attribuer un identifiant unique, persister, renvoyer l'espace créé.
-/// Le front le sélectionne aussitôt à partir de la valeur renvoyée.
 #[tauri::command]
-#[allow(unused_variables)] // TODO: à retirer une fois le corps écrit.
-pub fn create_space(draft: SpaceDraft) -> Result<Space, String> {
-    Err(NOT_IMPLEMENTED.to_string())
+pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, String> {
+    let connection = lock(&db)?;
+    storage::spaces::list(&connection).map_err(|error| error.to_string())
+}
+
+/// Le front sélectionne aussitôt l'espace à partir de la valeur renvoyée.
+#[tauri::command]
+pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, String> {
+    let connection = lock(&db)?;
+    storage::spaces::create(&connection, &draft).map_err(|error| error.to_string())
 }

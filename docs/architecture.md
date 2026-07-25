@@ -6,15 +6,12 @@ For build/run instructions see the [README](../README.md).
 ## Overview
 
 DevBox is a Tauri v2 desktop app: an Angular single-page front-end rendered in a WebView,
-and a Rust process that will own everything native (storage, hashing, filesystem). The two
-halves talk only through Tauri's `invoke()` bridge.
+and a Rust process that owns everything native (storage, and later hashing and filesystem).
+The two halves talk only through Tauri's `invoke()` bridge.
 
-That bridge is wired end to end: the front-end has no in-memory dataset left, every read and
-write goes through `invoke()`, and the notes and spaces commands are declared and registered
-on the Rust side. What is missing is the **bodies** of those commands — they currently return
-an explicit "not implemented" error, which the UI surfaces through the canvas retry screen and
-the error banner. Filling them in (see the TODOs in `src-tauri/src/commands/`) is the only
-remaining step; nothing in the Angular layer has to move.
+Notes and spaces are complete end to end: the front-end has no in-memory dataset left, every
+read and write goes through `invoke()`, and the Rust commands persist to an embedded SQLite
+database. The remaining domains (`crypto`, `formatters`) are still unregistered stubs.
 
 ```
 src/                Angular front-end
@@ -27,8 +24,9 @@ src/                Angular front-end
 ├── styles.scss     global theme
 └── testing/        test doubles, fixtures and shared providers
 src-tauri/          Rust back-end
-├── src/commands/   one file per functional domain
-├── src/lib.rs      Tauri builder + command registration
+├── src/commands/   one file per functional domain — thin adapters over storage
+├── src/storage/    SQLite persistence: schema, migrations, notes and spaces access
+├── src/lib.rs      Tauri builder, database setup + command registration
 └── capabilities/   Tauri v2 permission manifests
 ```
 
@@ -189,10 +187,46 @@ serialise to `null` and overwrite the stored value instead of leaving it untouch
   `src-tauri/src/lib.rs`, or the call fails at runtime even though the Rust compiles fine.
 
 The commands the front-end calls — `list_notes`, `create_note`, `update_note`, `delete_note`,
-`list_spaces`, `create_space` — are declared, registered and documented in
-`src-tauri/src/commands/notes.rs` and `spaces.rs`, where each body carries the TODO describing
-what it owes the front-end (returned value, error on unknown id, "absent field means
-unchanged" for patches).
+`list_spaces`, `create_space` — live in `src-tauri/src/commands/notes.rs` and `spaces.rs`.
+They are **adapters only**: lock the shared connection, delegate to `storage::`, map the error
+to a `String`. The guarantees the front-end relies on (persisted value returned, `Err` on an
+unknown id, "absent field means unchanged" for patches) are implemented and tested in
+`src-tauri/src/storage/`.
+
+The serialisation contract is pinned by tests in `commands/notes.rs` rather than left to
+review: they assert the emitted JSON keys are camelCase and that a lifecycle serialises to
+`{"kind":"expires","at":…}`. A serde attribute deleted by accident fails `cargo test` instead
+of silently breaking the UI.
+
+## Persistence (Rust)
+
+Storage is **SQLite**, embedded through `rusqlite` with the `bundled` feature — SQLite is
+compiled from source and statically linked, so nothing has to be installed or shipped
+alongside the executable. The database file lives in Tauri's `app_data_dir()`.
+
+- **Layering.** `storage::notes` and `storage::spaces` are plain functions taking a
+  `&Connection`; the `#[tauri::command]`s sit on top. That is what makes persistence testable
+  against `Connection::open_in_memory()` without launching Tauri.
+- **Concurrency.** A rusqlite `Connection` is not `Sync`. A single connection is shared as
+  `tauri::State<Db>` (`Db = Mutex<Connection>`), registered with `.manage()` in `lib.rs` —
+  never a global. Overlapping commands serialise on that mutex.
+- **Migrations.** The schema is versioned by `PRAGMA user_version`. Evolving the model means
+  adding a `MIGRATION_N` constant and a branch in `migrate` — never editing a shipped
+  migration, it has already run on user machines. Each migration is atomic. A database written
+  by a newer build is refused rather than misread.
+- **Schema choices that keep filtering movable to the back-end.** `lifecycle` is split into
+  `lifecycle_kind` + `lifecycle_expires_at` columns rather than stored as JSON, and tags live
+  in their own `note_tags` table rather than in a serialised column. Both exist so that
+  filtering by tag, or querying what expires before a date, becomes a `WHERE` clause instead
+  of a full re-read. `PRAGMA foreign_keys` is set per connection, which is what makes the
+  `ON DELETE CASCADE` on notes and tags actually fire.
+- **Ordering is the back-end's call.** `list_notes` returns everything ordered by
+  `updated_at DESC`; the front-end preserves the order it receives when grouping into
+  sections, so this query decides what the user sees first.
+- **Timestamps are injected, not read.** `storage::notes` takes `now` as a parameter and the
+  command passes `storage::now_iso()` — the same reason `ClockService` exists on the front.
+  Millisecond precision is deliberate: two notes saved within one second would otherwise be
+  impossible to order.
 
 ## Cross-cutting services
 
@@ -334,4 +368,13 @@ Component specs follow one consistent pattern:
 - For anything that transitively needs a store, use `provideAppTesting()` and spy on the real
   store's methods rather than re-implementing a fake store — stores have their own specs.
 
-The Rust side has no tests or test runner configured yet.
+### Rust
+
+`cargo test` from `src-tauri/` runs the persistence and serialisation tests. There is still no
+linter or formatter configured (no clippy or rustfmt hook).
+
+Persistence tests run against `storage::open_in_memory()`, which applies the real migrations —
+so they exercise the actual schema, constraints and cascades, not a simplified stand-in. They
+pass timestamps explicitly instead of reading the clock, which is what makes assertions on
+`created_at` / `updated_at` deterministic. Test names and comments are in English, like the
+front-end specs.
