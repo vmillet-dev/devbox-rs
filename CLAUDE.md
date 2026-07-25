@@ -20,8 +20,9 @@ Run all commands from the repo root (`package.json` there wraps both Angular and
 - `npm run build` — production Angular build, output to `dist/devbox/browser` (path referenced by `frontendDist` in `tauri.conf.json`).
 - `npm run tauri build` — full production build; native executable/installer lands in `src-tauri/target/release`.
 - Rust-only iteration: `cargo build` / `cargo check` from `src-tauri/` (faster than a full `tauri build` when just checking Rust compile errors).
+- `npm test` — runs the Angular unit test suite via the `@angular/build:unit-test` builder with **Vitest** as the runner (jsdom environment, no browser required). `npm run test:watch` re-runs on change; `npm run test:coverage` adds a v8 coverage report.
 
-No test runner, linter, or formatter is currently configured for either the Angular or Rust side (no `.spec.ts` files, no clippy/rustfmt CI hook, no `test` script in `package.json`).
+No linter or formatter is currently configured for either the Angular or Rust side (no clippy/rustfmt CI hook). The Rust side still has no test runner configured.
 
 ## Architecture
 
@@ -56,6 +57,22 @@ To add a new command: write the `pub fn` with `#[tauri::command]` in the relevan
 ### Front-end
 
 Angular app is a minimal standalone-component bootstrap (`src/main.ts` → `bootstrapApplication`), no NgModules. `src/app/app.routes.ts` is currently empty — routing is not yet in use. `AppComponent` is presently just the `saluer` IPC demo; it is expected to be replaced as real features (notes, crypto, formatters UI) are built.
+
+### Testing
+
+Unit tests live next to the file they cover (`*.component.spec.ts`, `*.util.spec.ts`, ...) and run under Vitest via `@angular/build:unit-test` (configured in `angular.json`'s `test` target and `vitest-base.config.ts`). Test descriptions and comments are written in **English** (the one place in this repo that deliberately departs from the French-first convention above), to match Vitest/Angular community conventions.
+
+Shared test helpers live in `src/testing/` (not matched by the default `**/*.spec.ts` include, so they're never picked up as tests themselves):
+- `note.fixture.ts` — `createNote(overrides)` builds a fully-populated `Note` for tests.
+- `fake-notes-repository.ts` — `FakeNotesRepository` is an in-memory `NotesRepository` test double for `NotesStore`/component tests that need controlled data instead of the real mock dataset.
+
+Component tests are isolated at the component level using a consistent pattern, rather than mocking Angular's DI or stubbing out child components:
+- Render the component under test with `TestBed` using its **real** child components (they're standalone and declared in the component's own `imports`, so no extra wiring is needed).
+- Assert against a child's public contract only — read its input signals (e.g. `child.language()`) and call/subscribe to its output emitters directly (e.g. `child.opened.emit(id)`, `component.opened.subscribe(...)`) — instead of relying on the child's rendered DOM. This keeps the test isolated to the component's own template-wiring and class logic; the child's own behavior is covered by its own spec file.
+- `TestBed.createComponent(...)` + fixture assignment happens in a `beforeEach`, not a per-test helper function, so every spec shares one setup path. Default/required inputs are set there too.
+- Change detection follows Angular's own guidance for zoneless tests: call `fixture.autoDetectChanges()` once in `beforeEach` (it also performs the initial render) instead of manually calling `fixture.detectChanges()`. After a test triggers a state change (`setInput`, an emitted child output, a dispatched DOM event), `await fixture.whenStable()` before asserting on the DOM — this lets Angular's own scheduler decide when to re-render, the same as it would in production, rather than forcing a synchronous check.
+- For components with date-dependent formatting (relative time, expiry), use `vi.useFakeTimers({ toFake: ['Date'] })` / `vi.setSystemTime(...)` for determinism. **Don't** call `vi.useFakeTimers()` with no `toFake` list here — it also fakes `requestAnimationFrame`, which Angular's zoneless scheduler uses internally, so `await fixture.whenStable()` will hang forever waiting for a frame that fake timers never deliver.
+- `NotesPageComponent` (and anything that transitively needs `NotesStore`) provides `NOTES_REPOSITORY` with `FakeNotesRepository` and spies on the real `NotesStore`'s methods (`vi.spyOn(store, '...')`) rather than re-implementing a fake store — `NotesStore` itself is unit-tested separately in `notes.store.spec.ts`.
 
 ### Design reference
 
