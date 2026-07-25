@@ -9,6 +9,8 @@ export type NoteLifecycle = { readonly kind: 'permanent' } | { readonly kind: 'e
  */
 export interface Note {
   readonly id: string;
+  /** Espace auquel la note appartient — jamais vide : une note vit forcément dans un espace. */
+  readonly spaceId: string;
   /** Peut être vide (note tout juste créée) : l'UI affiche alors `notes.untitled`. */
   readonly title: string;
   readonly language: LanguageTag;

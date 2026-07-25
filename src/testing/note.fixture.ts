@@ -4,6 +4,7 @@ import { Note } from '@core/models/note.model';
 export function createNote(overrides: Partial<Note> = {}): Note {
   return {
     id: 'note-1',
+    spaceId: 'space-1',
     title: 'Test note',
     language: 'txt',
     content: 'line one\nline two',

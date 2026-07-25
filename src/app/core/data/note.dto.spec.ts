@@ -4,6 +4,7 @@ import { NoteContractError, NoteDto, toNote, toNoteDraftDto, toNotePatchDto } fr
 
 const BASE_DTO: NoteDto = {
   id: 'note-1',
+  spaceId: 'space-1',
   title: 'Payload',
   language: 'json',
   content: '{}',
@@ -37,6 +38,7 @@ describe('toNote', () => {
 
     expect(note).toMatchObject({
       id: 'note-1',
+      spaceId: 'space-1',
       title: 'Payload',
       language: 'json',
       content: '{}',
@@ -68,6 +70,7 @@ describe('toNote', () => {
 describe('toNoteDraftDto', () => {
   it('serialises dates and omits the fields the backend owns', () => {
     const draft: NoteDraft = {
+      spaceId: 'space-1',
       title: 'New',
       language: 'txt',
       content: '',
@@ -80,6 +83,7 @@ describe('toNoteDraftDto', () => {
     const dto = toNoteDraftDto(draft);
 
     expect(dto).toEqual({
+      spaceId: 'space-1',
       title: 'New',
       language: 'txt',
       content: '',
@@ -107,6 +111,10 @@ describe('toNotePatchDto', () => {
     const dto = toNotePatchDto({ title: '', pinned: false });
 
     expect(dto).toEqual({ title: '', pinned: false });
+  });
+
+  it('carries a space change, which is how a note is moved between spaces', () => {
+    expect(toNotePatchDto({ spaceId: 'space-2' })).toEqual({ spaceId: 'space-2' });
   });
 
   it('serialises a lifecycle change', () => {

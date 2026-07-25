@@ -13,7 +13,7 @@ import { TagRailComponent } from '../components/tag-rail/tag-rail.component';
 import { NotesPageComponent } from './notes-page.component';
 
 const SPACES: readonly Space[] = [
-  { id: 'all', name: 'All spaces' },
+  { id: 'space-1', name: 'Space one' },
   { id: 'work', name: 'Work' },
 ];
 
@@ -42,13 +42,20 @@ describe('NotesPageComponent', () => {
   it('renders the topbar with the store search/filter state and the active space', async () => {
     store.setSearchQuery('hello');
     store.setFilter('pinned');
+    spaces.selectSpace('work');
     await fixture.whenStable();
 
     const topbar = child(NotesTopbarComponent);
     expect(topbar.spaces()).toEqual(SPACES);
-    expect(topbar.activeSpace()).toEqual(SPACES[0]);
+    expect(topbar.activeSpace()).toEqual(SPACES[1]);
     expect(topbar.searchQuery()).toBe('hello');
     expect(topbar.activeFilter()).toBe('pinned');
+  });
+
+  it('starts on "all spaces"', async () => {
+    await fixture.whenStable();
+
+    expect(child(NotesTopbarComponent).activeSpace()).toBeNull();
   });
 
   it('updates the active space when the topbar reports a space change', async () => {
@@ -58,11 +65,22 @@ describe('NotesPageComponent', () => {
     expect(child(NotesTopbarComponent).activeSpace()).toEqual(SPACES[1]);
   });
 
-  it('falls back to the first space when the topbar reports an unknown space id', async () => {
-    child(NotesTopbarComponent).spaceChanged.emit('does-not-exist');
+  it('goes back to "all spaces" when the topbar reports a null space', async () => {
+    child(NotesTopbarComponent).spaceChanged.emit('work');
     await fixture.whenStable();
 
-    expect(child(NotesTopbarComponent).activeSpace()).toEqual(SPACES[0]);
+    child(NotesTopbarComponent).spaceChanged.emit(null);
+    await fixture.whenStable();
+
+    expect(child(NotesTopbarComponent).activeSpace()).toBeNull();
+  });
+
+  it('creates a space when the topbar reports one', () => {
+    const createSpace = vi.spyOn(spaces, 'createSpace').mockResolvedValue(null);
+
+    child(NotesTopbarComponent).spaceCreated.emit('Side project');
+
+    expect(createSpace).toHaveBeenCalledWith('Side project');
   });
 
   it('delegates search, filter and new-note requests from the topbar to the store', () => {
@@ -161,5 +179,41 @@ describe('NotesPageComponent', () => {
     child(NoteEditorOverlayComponent).pinToggled.emit();
 
     expect(togglePinned).not.toHaveBeenCalled();
+  });
+
+  it('applies the remaining editor changes to the selected note', () => {
+    store.openNote('note-42');
+    const updateContent = vi.spyOn(store, 'updateContent').mockResolvedValue();
+    const setLanguage = vi.spyOn(store, 'setLanguage').mockResolvedValue();
+    const addTag = vi.spyOn(store, 'addTag').mockResolvedValue();
+    const removeTag = vi.spyOn(store, 'removeTag').mockResolvedValue();
+    const deleteNote = vi.spyOn(store, 'deleteNote').mockResolvedValue();
+    const overlay = child(NoteEditorOverlayComponent);
+
+    overlay.contentChanged.emit('new body');
+    overlay.languageChanged.emit('json');
+    overlay.tagAdded.emit('urgent');
+    overlay.tagRemoved.emit('later');
+    overlay.deleteRequested.emit();
+
+    expect(updateContent).toHaveBeenCalledWith('note-42', 'new body');
+    expect(setLanguage).toHaveBeenCalledWith('note-42', 'json');
+    expect(addTag).toHaveBeenCalledWith('note-42', 'urgent');
+    expect(removeTag).toHaveBeenCalledWith('note-42', 'later');
+    expect(deleteNote).toHaveBeenCalledWith('note-42');
+  });
+
+  it('ignores editor changes when no note is selected', () => {
+    // The overlay never reports which note it holds — the store owns that — so
+    // a stray event must not be applied to whatever note happens to be around.
+    const updateContent = vi.spyOn(store, 'updateContent').mockResolvedValue();
+    const deleteNote = vi.spyOn(store, 'deleteNote').mockResolvedValue();
+    const overlay = child(NoteEditorOverlayComponent);
+
+    overlay.contentChanged.emit('new body');
+    overlay.deleteRequested.emit();
+
+    expect(updateContent).not.toHaveBeenCalled();
+    expect(deleteNote).not.toHaveBeenCalled();
   });
 });

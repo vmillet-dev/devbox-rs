@@ -6,8 +6,11 @@ A developer's Swiss Army knife for the desktop: a notes/snippets manager, plus u
 **Angular 22** (standalone components, signals, zoneless change detection) on the front,
 **Rust / Tauri v2** as the native shell.
 
-> **Status** — the notes UI is built and interactive, but runs on in-memory mock data:
-> nothing is persisted yet. The Rust side is still the Tauri scaffold plus a demo command.
+> **Status** — the notes UI is complete and fully wired to the Rust backend: there is no
+> mock data left, every read and write goes through `invoke()`. The Rust commands are
+> declared and registered but **their bodies are still to be written** — they return a
+> "not implemented" error, so the app currently starts on its error/retry screen. See the
+> TODOs in `src-tauri/src/commands/notes.rs` and `spaces.rs`.
 
 ## Prerequisites
 
@@ -25,8 +28,9 @@ npm run tauri dev    # Angular dev server + Tauri window
 
 Front-end changes hot-reload; Rust changes trigger an automatic (slower) recompile.
 
-To work on the UI alone, `npm start` serves the app on http://localhost:1420 — it runs fine
-in a plain browser, since nothing calls a Tauri API at runtime yet.
+`npm start` serves the front-end alone on http://localhost:1420, but data loading needs the
+Tauri runtime: outside the app window every `invoke()` fails and the notes canvas shows its
+retry screen. Use it for pure styling work, `npm run tauri dev` for anything else.
 
 ## Scripts
 
@@ -66,14 +70,15 @@ docs/         Architecture notes and UI mockup
       overlay with code viewer
 - [x] French/English localization with persisted locale
 - [x] Front-end IPC seam: typed `invoke()` wrapper, DTOs/mappers and Tauri repositories,
-      ready to switch on in `core/data/data.providers.ts`
+      wired as the app's only data source in `core/data/data.providers.ts`
+- [x] Full note editing: content, format, tags, pin, deletion
+- [x] Spaces: notes carry a `spaceId`, the switcher filters on it and can create a space
 - [x] ESLint + Prettier, with template accessibility rules
-- [ ] Persistence: real Rust notes backend behind the `NOTES_REPOSITORY` token — the
-      expected commands and serde contract are documented in `src-tauri/src/commands/notes.rs`
-- [ ] Editable note content (the overlay is read-only apart from title and pin)
-- [ ] Deleting notes (the repository contract supports it; no UI yet)
-- [ ] Real spaces — the switcher works but `spaceId` doesn't exist on notes yet, so it
-      filters nothing
+- [ ] **Persistence: the bodies of the Rust commands** (`list_notes`, `create_note`,
+      `update_note`, `delete_note`, `list_spaces`, `create_space`). Signatures, serde
+      contract and per-function TODOs are in `src-tauri/src/commands/`
+- [ ] Renaming and deleting a space — needs a decision on what happens to its notes
+- [ ] Moving a note between spaces (already expressible: `spaceId` is part of `NotePatch`)
 - [ ] `crypto` module: SHA-256, MD5, UUID generation
 - [ ] `formatters` module: base64 encode/decode, JSON formatting
 - [ ] Rust tests, clippy and rustfmt

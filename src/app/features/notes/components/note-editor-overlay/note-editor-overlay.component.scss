@@ -91,9 +91,100 @@
   margin-left: auto;
 }
 
+.overlay-language-select {
+  @include unstyled-control;
+  @include surface($radius: 7px);
+  color: var(--text-1);
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.delete-btn:hover,
+.delete-btn.confirming {
+  @include accent-state(var(--red), var(--red));
+}
+
+.editable-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tag-remove {
+  @include unstyled-control;
+  color: var(--text-2);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px;
+  cursor: pointer;
+}
+
+.tag-remove:hover {
+  color: var(--red);
+}
+
+.tag-add-form {
+  display: inline-flex;
+}
+
+.tag-add-input {
+  @include unstyled-control;
+  width: 90px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px dashed var(--line);
+  font-size: 11px;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+}
+
 .overlay-body {
   flex: 1;
   min-height: 0;
+}
+
+// L'aperçu est un <button> : il faut lui rendre le rendu d'un bloc de texte,
+// alignement à gauche et défilement compris.
+.overlay-body-preview {
+  @include unstyled-control;
+  display: block;
+  width: 100%;
+  overflow-y: auto;
+  text-align: left;
+  cursor: text;
+}
+
+.body-placeholder {
+  display: block;
+  padding: 20px 24px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.overlay-body-editor {
+  @include unstyled-control;
+  display: block;
+  width: 100%;
+  resize: none;
+  overflow-y: auto;
+  padding: 20px 24px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-0);
+  white-space: pre-wrap;
+}
+
+.overlay-body-preview:focus-visible,
+.overlay-body-editor:focus-visible,
+.overlay-language-select:focus-visible,
+.tag-add-input:focus-visible,
+.tag-remove:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: -2px;
 }
 
 .overlay-footer {

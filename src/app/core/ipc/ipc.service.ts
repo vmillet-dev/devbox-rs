@@ -8,7 +8,7 @@ import { InvokeArgs, invoke } from '@tauri-apps/api/core';
  * « command not found ».
  */
 export type IpcCommand =
-  'saluer' | 'list_notes' | 'create_note' | 'update_note' | 'delete_note' | 'list_spaces';
+  'saluer' | 'list_notes' | 'create_note' | 'update_note' | 'delete_note' | 'list_spaces' | 'create_space';
 
 /**
  * Échec d'un appel `invoke()`. Tauri rejette avec la valeur du `Err` Rust

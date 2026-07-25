@@ -43,6 +43,12 @@
   box-shadow: var(--shadow-dropdown);
 }
 
+.space-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .space-option {
   @include unstyled-control;
   padding: 7px 10px;
@@ -50,6 +56,49 @@
   font-size: 13px;
   color: var(--text-1);
   cursor: pointer;
+}
+
+.space-create-trigger {
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0 0 6px 6px;
+  margin-top: 2px;
+  color: var(--text-2);
+}
+
+.space-create-form {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+}
+
+.space-create-input {
+  @include unstyled-control;
+  @include surface(var(--bg-1), 6px);
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--text-0);
+  font-family: var(--font-sans);
+}
+
+.space-create-submit {
+  @include unstyled-control;
+  @include surface($radius: 6px);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.space-create-submit:hover {
+  @include accent-state;
+}
+
+.space-create-input:focus-visible,
+.space-create-submit:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
 .space-option:hover {

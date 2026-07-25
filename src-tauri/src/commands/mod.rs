@@ -2,7 +2,8 @@
 //!
 //! Chaque domaine fonctionnel de DevBox possède son propre fichier :
 //! - `greetings`  : commande de démonstration ("Hello World")
-//! - `notes`      : prise de notes                 (à implémenter)
+//! - `notes`      : prise de notes                  (signatures figées, corps à écrire)
+//! - `spaces`     : espaces de rangement des notes  (signatures figées, corps à écrire)
 //! - `crypto`     : hashing / chiffrement           (à implémenter)
 //! - `formatters` : encodage, décodage, formatage   (à implémenter)
 //!
@@ -13,5 +14,6 @@
 
 pub mod greetings;
 pub mod notes;
+pub mod spaces;
 pub mod crypto;
 pub mod formatters;

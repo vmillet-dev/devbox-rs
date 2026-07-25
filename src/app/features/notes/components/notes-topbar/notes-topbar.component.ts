@@ -21,7 +21,8 @@ export class NotesTopbarComponent {
   /** Simplement relayé : le raccourci appartient désormais au champ de recherche. */
   readonly searchShortcutEnabled = input(true);
 
-  readonly spaceChanged = output<string>();
+  readonly spaceChanged = output<string | null>();
+  readonly spaceCreated = output<string>();
   readonly searchQueryChanged = output<string>();
   readonly filterChanged = output<NoteFilter>();
   readonly newNoteRequested = output<void>();

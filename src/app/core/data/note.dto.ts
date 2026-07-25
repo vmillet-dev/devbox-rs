@@ -14,6 +14,7 @@ import { Note, NoteDraft, NoteLifecycle, NotePatch } from '../models/note.model'
  */
 export interface NoteDto {
   readonly id: string;
+  readonly spaceId: string;
   readonly title: string;
   readonly language: string;
   readonly content: string;
@@ -64,6 +65,7 @@ function toLifecycleDto(lifecycle: NoteLifecycle): NoteLifecycleDto {
 export function toNote(dto: NoteDto): Note {
   return {
     id: dto.id,
+    spaceId: dto.spaceId,
     title: dto.title,
     // Un langage inconnu dégrade l'affichage, il ne casse pas le chargement.
     language: isLanguageTag(dto.language) ? dto.language : FALLBACK_LANGUAGE,
@@ -79,6 +81,7 @@ export function toNote(dto: NoteDto): Note {
 
 export function toNoteDraftDto(draft: NoteDraft): NoteDraftDto {
   return {
+    spaceId: draft.spaceId,
     title: draft.title,
     language: draft.language,
     content: draft.content,
@@ -93,6 +96,7 @@ export function toNotePatchDto(patch: NotePatch): NotePatchDto {
   const dto: Record<string, unknown> = {};
   // Recopie champ par champ : un `undefined` sérialisé deviendrait `null` côté
   // serde et écraserait la valeur existante au lieu de la laisser intacte.
+  if (patch.spaceId !== undefined) dto['spaceId'] = patch.spaceId;
   if (patch.title !== undefined) dto['title'] = patch.title;
   if (patch.language !== undefined) dto['language'] = patch.language;
   if (patch.content !== undefined) dto['content'] = patch.content;

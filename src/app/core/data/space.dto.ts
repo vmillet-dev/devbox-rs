@@ -1,4 +1,4 @@
-import { Space } from '../models/space.model';
+import { Space, SpaceDraft } from '../models/space.model';
 
 /**
  * Un espace n'a aucun champ nécessitant une conversion (pas de date), mais il
@@ -10,6 +10,12 @@ export interface SpaceDto {
   readonly name: string;
 }
 
+export type SpaceDraftDto = Omit<SpaceDto, 'id'>;
+
 export function toSpace(dto: SpaceDto): Space {
   return { id: dto.id, name: dto.name };
+}
+
+export function toSpaceDraftDto(draft: SpaceDraft): SpaceDraftDto {
+  return { name: draft.name };
 }

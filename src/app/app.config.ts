@@ -10,10 +10,10 @@ import { provideRouter, withHashLocation } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 
 import { routes } from './app.routes';
-import { provideDataAccess } from './core/data/data.providers';
-import { AppErrorHandler } from './core/errors/app-error-handler';
-import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from './core/i18n/locale.service';
-import { AppTranslocoLoader } from './core/i18n/transloco-loader';
+import { provideDataAccess } from '@core/data/data.providers';
+import { AppErrorHandler } from '@core/errors/app-error-handler';
+import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from '@core/i18n/locale.service';
+import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
 
 export const appConfig: ApplicationConfig = {
   providers: [

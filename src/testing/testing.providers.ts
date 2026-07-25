@@ -12,6 +12,7 @@ interface DataDoubles {
   readonly spaces?: readonly Space[];
   /** Pass an existing fake to keep a handle on it (e.g. to set `failNext`). */
   readonly notesRepository?: FakeNotesRepository;
+  readonly spacesRepository?: FakeSpacesRepository;
 }
 
 /**
@@ -25,7 +26,10 @@ export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
       provide: NOTES_REPOSITORY,
       useValue: doubles.notesRepository ?? new FakeNotesRepository(doubles.notes ?? []),
     },
-    { provide: SPACES_REPOSITORY, useValue: new FakeSpacesRepository(doubles.spaces ?? []) },
+    {
+      provide: SPACES_REPOSITORY,
+      useValue: doubles.spacesRepository ?? new FakeSpacesRepository(doubles.spaces ?? []),
+    },
     provideTranslocoTesting(),
   ];
 }

@@ -1,11 +1,12 @@
 import { Injectable, Signal, computed, inject, resource, signal } from '@angular/core';
 import { NOTES_REPOSITORY } from '../data/notes-repository.token';
 import { ErrorNotifier } from '../errors/error-notifier.service';
-import { FALLBACK_LANGUAGE } from '../models/language.model';
+import { FALLBACK_LANGUAGE, LanguageTag } from '../models/language.model';
 import { NoteSection } from '../models/note-section.model';
 import { Note, NoteDraft } from '../models/note.model';
 import { ClockService } from '../time/clock.service';
 import { groupNotesIntoSections, toSearchResultsSection } from '../utils/notes-grouping.util';
+import { SpacesStore } from './spaces.store';
 
 /**
  * `untriaged` = notes portant une date d'expiration. Dans le modèle du produit,
@@ -32,6 +33,7 @@ export class NotesStore {
   private readonly repository = inject(NOTES_REPOSITORY);
   private readonly clock = inject(ClockService);
   private readonly notifier = inject(ErrorNotifier);
+  private readonly spaces = inject(SpacesStore);
 
   /**
    * Chargement initial. `resource()` fournit `isLoading` / `error` / `reload()`
@@ -64,9 +66,19 @@ export class NotesStore {
   readonly selectedTags = this._selectedTags.asReadonly();
   readonly selectedNoteId = this._selectedNoteId.asReadonly();
 
+  /**
+   * Notes de l'espace actif — la base de tout le reste. Un espace actif à `null`
+   * signifie « tous les espaces » (voir `SpacesStore`).
+   */
+  private readonly spaceNotes = computed<readonly Note[]>(() => {
+    const spaceId = this.spaces.activeSpaceId();
+    return spaceId === null ? this.notes() : this.notes().filter((note) => note.spaceId === spaceId);
+  });
+
+  /** Tags de l'espace actif : proposer un tag qui n'y filtre rien n'aurait pas de sens. */
   readonly allTags = computed<readonly string[]>(() => {
     const tags = new Set<string>();
-    for (const note of this.notes()) {
+    for (const note of this.spaceNotes()) {
       for (const tag of note.tags) tags.add(tag);
     }
     return [...tags].sort();
@@ -82,7 +94,7 @@ export class NotesStore {
     const filter = this._activeFilter();
     const tags = this._selectedTags();
 
-    return this.notes().filter((note) => {
+    return this.spaceNotes().filter((note) => {
       if (filter === 'pinned' && !note.pinned) return false;
       if (filter === 'untriaged' && note.lifecycle.kind !== 'expires') return false;
       if (tags.size > 0 && !note.tags.some((tag) => tags.has(tag))) return false;
@@ -146,20 +158,70 @@ export class NotesStore {
 
   async renameNote(id: string, title: string): Promise<void> {
     const target = this.notes().find((note) => note.id === id);
-    // Un `(input)` émet à chaque frappe : ne rien persister si le titre n'a pas bougé.
+    // L'éditeur peut confirmer un titre inchangé (fermeture sans modification) :
+    // ne rien persister dans ce cas.
     if (!target || target.title === title) return;
 
     await this.persist(target, { title });
   }
 
+  async updateContent(id: string, content: string): Promise<void> {
+    const target = this.notes().find((note) => note.id === id);
+    if (!target || target.content === content) return;
+
+    await this.persist(target, { content });
+  }
+
+  async setLanguage(id: string, language: LanguageTag): Promise<void> {
+    const target = this.notes().find((note) => note.id === id);
+    if (!target || target.language === language) return;
+
+    await this.persist(target, { language });
+  }
+
   /**
-   * Crée une note vide et l'ouvre. Contrairement aux autres mutations, celle-ci
-   * n'est pas optimiste : l'identifiant est attribué par la persistance, et
-   * afficher une note sous un identifiant provisoire obligerait à le corriger
-   * après coup — y compris dans la sélection en cours.
+   * Ajoute un tag. La normalisation (espaces, `#` de tête, doublons) est faite
+   * ici et non dans le composant : c'est la seule façon de garantir que le
+   * même tag saisi de deux manières ne produise pas deux entrées dans le rail.
+   */
+  async addTag(id: string, tag: string): Promise<void> {
+    const target = this.notes().find((note) => note.id === id);
+    if (!target) return;
+
+    const normalized = tag.trim().replace(/^#+/, '').trim();
+    if (!normalized) return;
+    if (target.tags.some((existing) => existing.toLowerCase() === normalized.toLowerCase())) return;
+
+    await this.persist(target, { tags: [...target.tags, normalized] });
+  }
+
+  async removeTag(id: string, tag: string): Promise<void> {
+    const target = this.notes().find((note) => note.id === id);
+    if (!target || !target.tags.includes(tag)) return;
+
+    await this.persist(target, { tags: target.tags.filter((existing) => existing !== tag) });
+  }
+
+  /**
+   * Crée une note vide dans l'espace actif et l'ouvre. Contrairement aux autres
+   * mutations, celle-ci n'est pas optimiste : l'identifiant est attribué par la
+   * persistance, et afficher une note sous un identifiant provisoire obligerait
+   * à le corriger après coup — y compris dans la sélection en cours.
+   *
+   * Sans espace actif (mode « tous les espaces »), la note part dans le premier
+   * espace : il faut bien en choisir un, et le premier est celui que le
+   * sélecteur montre en tête. S'il n'existe aucun espace, la création échoue —
+   * une note sans espace serait invisible dès qu'un filtre d'espace est posé.
    */
   async createNote(): Promise<void> {
+    const spaceId = this.spaces.activeSpaceId() ?? this.spaces.spaces()[0]?.id;
+    if (!spaceId) {
+      this.notifier.notify({ ref: { key: 'errors.spaceRequired' } });
+      return;
+    }
+
     const draft: NoteDraft = {
+      spaceId,
       // Titre et source vides : l'UI affiche des libellés de remplacement
       // traduits. Stocker « Nouvelle note » en dur figerait du français
       // dans les données.
@@ -178,6 +240,32 @@ export class NotesStore {
       this.openNote(created.id);
     } catch (error) {
       this.reportFailure('errors.noteCreateFailed', error);
+    }
+  }
+
+  /**
+   * Supprime une note. Retrait optimiste, puis réinsertion **à sa place
+   * d'origine** en cas d'échec : la remettre en tête de liste donnerait
+   * l'impression que la suppression a réussi et qu'une autre note est apparue.
+   */
+  async deleteNote(id: string): Promise<void> {
+    const notes = this.notes();
+    const index = notes.findIndex((note) => note.id === id);
+    if (index === -1) return;
+
+    const target = notes[index];
+    this.setNotes(notes.filter((note) => note.id !== id));
+    if (this._selectedNoteId() === id) {
+      this.closeOverlay();
+    }
+
+    try {
+      await this.repository.delete(id);
+    } catch (error) {
+      const restored = [...this.notes()];
+      restored.splice(index, 0, target);
+      this.setNotes(restored);
+      this.reportFailure('errors.noteDeleteFailed', error);
     }
   }
 

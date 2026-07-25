@@ -12,18 +12,34 @@
       aria-labelledby="overlay-title-input"
     >
       <div class="overlay-toolbar">
-        <!-- (input) et non (change) : (change) n'émet qu'au blur, or la modale
-             se ferme par Échap ou clic sur le fond — deux chemins sans blur,
-             qui perdaient donc la saisie en cours. -->
+        <!-- Le titre est confirmé au blur et à la fermeture, pas à chaque
+             frappe : une note enregistrée par caractère, c'est un aller-retour
+             IPC par caractère. -->
         <input
           #titleInput
           id="overlay-title-input"
           class="overlay-title-input"
           [attr.aria-label]="'editor.titleLabel' | transloco"
           [placeholder]="'notes.untitled' | transloco"
-          [value]="note.title"
-          (input)="titleChanged.emit(titleInput.value)"
+          [value]="draftTitle()"
+          (input)="draftTitle.set(titleInput.value)"
+          (blur)="commitTitle()"
         />
+
+        <select
+          #languageSelect
+          class="overlay-language-select"
+          [attr.aria-label]="'editor.languageLabel' | transloco"
+          [value]="note.language"
+          (change)="onLanguageChange(languageSelect.value)"
+        >
+          @for (option of languageOptions; track option.value) {
+            <option [value]="option.value" [selected]="option.value === note.language">
+              {{ option.label }}
+            </option>
+          }
+        </select>
+
         <button
           type="button"
           class="toolbar-btn"
@@ -36,9 +52,18 @@
         </button>
         <button
           type="button"
+          class="toolbar-btn delete-btn"
+          [class.confirming]="confirmingDelete()"
+          (click)="onDeleteClick()"
+        >
+          <span aria-hidden="true">🗑</span>
+          {{ (confirmingDelete() ? 'editor.deleteConfirm' : 'editor.delete') | transloco }}
+        </button>
+        <button
+          type="button"
           class="close-btn"
           [attr.aria-label]="'editor.close' | transloco"
-          (click)="closed.emit()"
+          (click)="requestClose()"
         >
           <span aria-hidden="true">✕</span>
         </button>
@@ -51,13 +76,59 @@
         }
         <div class="overlay-tags">
           @for (tag of note.tags; track tag) {
-            <app-tag-pill [label]="tag" [active]="true" [interactive]="false" />
+            <span class="editable-tag">
+              <app-tag-pill [label]="tag" [active]="true" [interactive]="false" />
+              <button
+                type="button"
+                class="tag-remove"
+                [attr.aria-label]="'editor.removeTag' | transloco: { tag: tag }"
+                (click)="tagRemoved.emit(tag)"
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
+            </span>
           }
+          <form class="tag-add-form" (submit)="submitTag($event)">
+            <input
+              #tagInput
+              type="text"
+              class="tag-add-input"
+              [attr.aria-label]="'editor.addTagLabel' | transloco"
+              [placeholder]="'editor.addTagPlaceholder' | transloco"
+              [value]="tagInputValue()"
+              (input)="tagInputValue.set(tagInput.value)"
+            />
+          </form>
         </div>
         <app-lifecycle-badge [lifecycle]="note.lifecycle" />
       </div>
 
-      <app-code-viewer class="overlay-body" [content]="note.content" [language]="note.language" />
+      @if (editingBody()) {
+        <textarea
+          #bodyEditor
+          class="overlay-body overlay-body-editor"
+          spellcheck="false"
+          [attr.aria-label]="'editor.contentLabel' | transloco"
+          [value]="draftContent()"
+          (input)="draftContent.set(bodyEditor.value)"
+          (blur)="commitContent()"
+        ></textarea>
+      } @else {
+        <!-- Un <button> plutôt qu'un <div> cliquable : l'aperçu devient éditable
+             aussi bien à la souris qu'au clavier, sans piège de focus à écrire. -->
+        <button
+          type="button"
+          class="overlay-body overlay-body-preview"
+          [attr.aria-label]="'editor.contentLabel' | transloco"
+          (click)="startEditingBody()"
+        >
+          @if (draftContent()) {
+            <app-code-viewer [content]="draftContent()" [language]="note.language" />
+          } @else {
+            <span class="body-placeholder">{{ 'editor.emptyBody' | transloco }}</span>
+          }
+        </button>
+      }
 
       <div class="overlay-footer">
         <span>

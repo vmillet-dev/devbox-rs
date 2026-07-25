@@ -3,6 +3,7 @@
     [spaces]="spaces()"
     [activeSpace]="activeSpace()"
     (spaceChanged)="spaceChanged.emit($event)"
+    (spaceCreated)="spaceCreated.emit($event)"
   />
   <app-search-box
     [query]="searchQuery()"

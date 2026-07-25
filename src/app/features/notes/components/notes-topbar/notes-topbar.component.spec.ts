@@ -51,12 +51,30 @@ describe('NotesTopbarComponent', () => {
   });
 
   it('forwards spaceChanged from the space switcher', () => {
-    let emitted: string | undefined;
+    let emitted: string | null | undefined;
     fixture.componentInstance.spaceChanged.subscribe((id) => (emitted = id));
 
     child(SpaceSwitcherComponent).spaceChanged.emit('work');
 
     expect(emitted).toBe('work');
+  });
+
+  it('forwards the "all spaces" selection as null', () => {
+    let emitted: string | null | undefined;
+    fixture.componentInstance.spaceChanged.subscribe((id) => (emitted = id));
+
+    child(SpaceSwitcherComponent).spaceChanged.emit(null);
+
+    expect(emitted).toBeNull();
+  });
+
+  it('forwards spaceCreated from the space switcher', () => {
+    let emitted: string | undefined;
+    fixture.componentInstance.spaceCreated.subscribe((name) => (emitted = name));
+
+    child(SpaceSwitcherComponent).spaceCreated.emit('Side project');
+
+    expect(emitted).toBe('Side project');
   });
 
   it('forwards searchQueryChanged from the search box', () => {
@@ -86,7 +104,7 @@ describe('NotesTopbarComponent', () => {
     expect(emitted).toBe(true);
   });
 
-  it('tolerates a not-yet-loaded active space', async () => {
+  it('relays the "all spaces" mode down to the switcher', async () => {
     fixture.componentRef.setInput('activeSpace', null);
     await fixture.whenStable();
 

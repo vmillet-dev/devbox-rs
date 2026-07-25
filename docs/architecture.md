@@ -9,10 +9,12 @@ DevBox is a Tauri v2 desktop app: an Angular single-page front-end rendered in a
 and a Rust process that will own everything native (storage, hashing, filesystem). The two
 halves talk only through Tauri's `invoke()` bridge.
 
-That bridge is not live yet: the front-end reads its data from in-memory mock repositories,
-and the Rust side exposes a single demo command. But the **whole seam is already built** —
-DTOs, mappers, a typed `invoke()` wrapper and ready-to-use Tauri repositories — so plugging
-in the real backend changes one provider file, not the application.
+That bridge is wired end to end: the front-end has no in-memory dataset left, every read and
+write goes through `invoke()`, and the notes and spaces commands are declared and registered
+on the Rust side. What is missing is the **bodies** of those commands — they currently return
+an explicit "not implemented" error, which the UI surfaces through the canvas retry screen and
+the error banner. Filling them in (see the TODOs in `src-tauri/src/commands/`) is the only
+remaining step; nothing in the Angular layer has to move.
 
 ```
 src/                Angular front-end
@@ -70,7 +72,22 @@ which also renders the hint, rather than travelling down a chain of `viewChild` 
 
 `NotesStore` (`providedIn: 'root'`) holds the notes plus the UI query state — search text,
 active filter, selected tags, selected note — and derives the rest as `computed()`:
-filtered notes → display sections → selected note. `SpacesStore` does the same for spaces.
+notes of the active space → filtered notes → display sections → selected note.
+
+`SpacesStore` owns the spaces and the active one. Two decisions matter there:
+
+- **The active space is a filter, not a label.** `NotesStore` injects `SpacesStore` (never the
+  other way round) and reads `activeSpaceId()` at the head of its derivation chain, so the
+  space also scopes the tag rail — a tag that filters nothing in the current space has no
+  reason to be offered.
+- **`null` means "all spaces", and is a choice, not a loading state.** There is deliberately
+  no "All" row in the data: it would be a phantom space that notes could be filed into by
+  mistake. The label lives in the translations, and an active id matching no known space
+  degrades back to `null` rather than hiding every note.
+
+Creating a note files it in the active space, falling back to the first one in "all spaces"
+mode; with no space at all, creation is refused with a translated message, because a note
+with no `spaceId` would vanish as soon as a space filter is applied.
 
 Rules of the house:
 
@@ -105,18 +122,38 @@ dilutes them and hides matches at the bottom of the page.
 A section's key **is** its translation key (`'sections.' + key`), so no label is kept in
 sync by hand.
 
+### Editing a note
+
+The editor overlay is where every note mutation starts (title, body, language, tags, pin,
+deletion). It stays presentational — it emits, the store persists — but it holds **local
+drafts** for the title and the body, because persisting on every keystroke means one IPC
+round-trip per character. Drafts are confirmed on blur, and, crucially, on every closing path:
+Escape, the backdrop and the close button all skip `blur`, so closing goes through a single
+`requestClose()` that commits first.
+
+Those drafts are `linkedSignal`s keyed on the note **id**, not on the note object: every save
+refreshes `updatedAt` and produces a new object, which would otherwise wipe the in-flight
+edit.
+
+The body toggles between the read-only `CodeViewerComponent` and a textarea. The preview is a
+`<button>`, so entering edit mode works with the mouse and the keyboard without a hand-written
+focus dance. Deletion is a two-step confirm in the toolbar rather than a native `confirm()`,
+which would freeze the whole WebView.
+
 ### Data access
 
 Stores never talk to a data source directly. They inject `NOTES_REPOSITORY` /
-`SPACES_REPOSITORY`, and `core/data/data.providers.ts` binds those tokens — **that file is
-the only thing to change to switch from mocks to the Rust backend**.
+`SPACES_REPOSITORY`, and `core/data/data.providers.ts` binds those tokens — **the single
+place where the application's data source is chosen**. Both are bound to the `Tauri*`
+repositories; the only remaining doubles are the test ones in `src/testing/`, injected by
+`provideAppTesting()`.
 
-The notes contract is complete (`loadAll` / `create` / `update` / `delete`) even though the
-active implementation is in-memory. Declaring only what the mock needs today would have
-forced the store to become asynchronous later; `MockNotesRepository` therefore plays the
-role of real persistence, owning the list and assigning ids and timestamps.
+The notes contract is complete (`loadAll` / `create` / `update` / `delete`); spaces expose
+`loadAll` / `create`. Renaming and deleting a space are not implemented on either side: the
+open question is what happens to the notes of a deleted space (cascade, or move to a default
+space). Moving a note is already expressible — `spaceId` is part of `NotePatch`.
 
-Keep this seam intact: no component should import a mock dataset or call `invoke()`.
+Keep this seam intact: no component calls `invoke()`, and `IpcService` is its only caller.
 
 ## IPC boundary (Angular ↔ Rust)
 
@@ -133,7 +170,8 @@ domain model. Two traps it exists to handle:
   parses it back and throws a `NoteContractError` on an unparseable value, rather than
   letting an `Invalid Date` propagate and resurface as `NaN` in a relative-time label.
 - **Serde's defaults do not match the TypeScript shape.** The Rust `Note` struct needs
-  `#[serde(rename_all = "camelCase")]` (otherwise the front receives `created_at`), and the
+  `#[serde(rename_all = "camelCase")]` (otherwise the front receives `space_id` /
+  `created_at` where it expects `spaceId` / `createdAt`), and the
   lifecycle enum needs `#[serde(tag = "kind", rename_all = "camelCase")]` (otherwise serde
   emits `{"Expires":{…}}`, which the discriminated union does not recognise).
 
@@ -150,8 +188,11 @@ serialise to `null` and overwrite the stored value instead of leaving it untouch
 - **Every** command must be registered in `tauri::generate_handler![...]` in
   `src-tauri/src/lib.rs`, or the call fails at runtime even though the Rust compiles fine.
 
-The commands the front-end already expects are specified in the module doc of
-`src-tauri/src/commands/notes.rs`.
+The commands the front-end calls — `list_notes`, `create_note`, `update_note`, `delete_note`,
+`list_spaces`, `create_space` — are declared, registered and documented in
+`src-tauri/src/commands/notes.rs` and `spaces.rs`, where each body carries the TODO describing
+what it owes the front-end (returned value, error on unknown id, "absent field means
+unchanged" for patches).
 
 ## Cross-cutting services
 
@@ -202,7 +243,10 @@ Treated as part of the definition of done, and partly enforced by
   plus `appFocusTrap` (`shared/a11y/`), which confines Tab and restores focus on close.
   Written by hand rather than pulling in `@angular/cdk` for a single directive.
 - **The space switcher is a real menu**: `aria-expanded`, `aria-haspopup`, focus moved into
-  the menu on open, arrow/Home/End navigation, Escape closing and restoring focus.
+  the menu on open, arrow/Home/End navigation, Escape closing and restoring focus. Creating a
+  space _replaces_ the menu with a form instead of nesting a text field inside `role="menu"`,
+  which is neither valid ARIA nor navigable the same way; Escape then steps back to the menu
+  before closing the dropdown.
 - **Controls that wrap decorations get an explicit `aria-label`.** The search input sits
   inside a `<label>` that also holds the magnifier and the shortcut hint; without one, the
   field would be announced as "🔍 Ctrl+K".
@@ -258,9 +302,9 @@ never collected as tests: `Note` and `NoteSection` fixture builders, in-memory r
 doubles, and `provideAppTesting()` — one call providing both repositories and Transloco, so
 a new data seam does not have to be added to a dozen spec files by hand.
 
-`FakeNotesRepository` behaves like real persistence (owns the list, assigns ids and
-timestamps) and exposes `failNext`, which is what makes the store's rollback path testable
-at all.
+`FakeNotesRepository` and `FakeSpacesRepository` behave like real persistence (they own the
+list and assign ids and timestamps) and expose `failNext`, which is what makes the stores'
+rollback paths testable at all.
 
 Component specs follow one consistent pattern:
 

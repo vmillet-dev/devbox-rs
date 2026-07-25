@@ -5,6 +5,7 @@
   [activeFilter]="store.activeFilter()"
   [searchShortcutEnabled]="searchShortcutEnabled()"
   (spaceChanged)="spaces.selectSpace($event)"
+  (spaceCreated)="spaces.createSpace($event)"
   (searchQueryChanged)="store.setSearchQuery($event)"
   (filterChanged)="store.setFilter($event)"
   (newNoteRequested)="store.createNote()"
@@ -31,5 +32,10 @@
   [note]="store.selectedNote()"
   (closed)="store.closeOverlay()"
   (titleChanged)="onTitleChanged($event)"
+  (contentChanged)="onContentChanged($event)"
+  (languageChanged)="onLanguageChanged($event)"
+  (tagAdded)="onTagAdded($event)"
+  (tagRemoved)="onTagRemoved($event)"
   (pinToggled)="onPinToggled()"
+  (deleteRequested)="onDeleteRequested()"
 />

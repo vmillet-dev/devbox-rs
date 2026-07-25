@@ -20,4 +20,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+# Sérialisation des structures échangées avec le front (voir commands/notes.rs).
+serde = { version = "1", features = ["derive"] }
+# TODO(persistance) : les dépendances du stockage restent à choisir.
+# Les plus probables : `serde_json` (stockage fichier), `uuid` (identifiants),
+# `chrono` (horodatages ISO 8601), ou `rusqlite` pour une base SQLite.
 

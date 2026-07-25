@@ -5,11 +5,13 @@ import { NoteDto, toNote, toNoteDraftDto, toNotePatchDto } from './note.dto';
 import { NotesRepository } from './notes-repository.token';
 
 /**
- * Implémentation réelle du dépôt de notes, adossée aux commandes Rust.
+ * Dépôt de notes adossé aux commandes Rust — c'est la source de données active
+ * de l'application (voir `data.providers.ts`).
  *
- * ⚠️ Pas encore activée : les commandes correspondantes n'existent pas dans
- * `src-tauri/src/commands/notes.rs`. Pour basculer une fois le backend prêt,
- * un seul endroit à changer — `data.providers.ts`.
+ * ⚠️ Les commandes existent et sont enregistrées côté Rust, mais leur corps
+ * reste à écrire : tant que c'est le cas, chaque appel remonte une erreur
+ * « non implémentée » que l'UI affiche telle quelle. Voir les TODO de
+ * `src-tauri/src/commands/notes.rs`.
  *
  * Les noms d'arguments (`draft`, `id`, `patch`) doivent correspondre
  * **exactement** aux paramètres des fonctions Rust : Tauri apparie par nom, pas

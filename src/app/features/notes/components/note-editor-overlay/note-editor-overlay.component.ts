@@ -1,6 +1,19 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  linkedSignal,
+  output,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { FALLBACK_LANGUAGE, LANGUAGE_LABELS } from '@core/models/language.model';
+import { FALLBACK_LANGUAGE, LANGUAGE_LABELS, LanguageTag, isLanguageTag } from '@core/models/language.model';
 import { Note } from '@core/models/note.model';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/utils/relative-time.util';
@@ -12,6 +25,27 @@ import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
 /** Instancié une seule fois : `TextEncoder` est sans état, en recréer un à chaque recalcul est gratuit mais inutile. */
 const TEXT_ENCODER = new TextEncoder();
 
+/** Options du sélecteur de langage, dérivées de la table des libellés pour ne pas la dupliquer. */
+const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({
+  value: value as LanguageTag,
+  label,
+}));
+
+/**
+ * Éditeur plein écran d'une note.
+ *
+ * Le composant ne mute rien : il émet ce que l'utilisateur a demandé et c'est
+ * `NotesStore` qui persiste. Il tient en revanche des **brouillons locaux** pour
+ * le titre et le corps, parce que persister à chaque frappe signifierait un
+ * aller-retour IPC par caractère. Ces brouillons sont confirmés au moment où
+ * l'utilisateur quitte le champ, et — c'est le point délicat — avant chaque
+ * chemin de fermeture (croix, Échap, clic sur le fond), aucun de ces trois ne
+ * produisant de `blur`.
+ *
+ * Les brouillons sont réinitialisés sur l'`id` de la note et non sur la note
+ * elle-même : chaque enregistrement rafraîchit `updatedAt` et produit donc un
+ * nouvel objet, qui écraserait la saisie en cours.
+ */
 @Component({
   selector: 'app-note-editor-overlay',
   imports: [
@@ -35,27 +69,132 @@ export class NoteEditorOverlayComponent {
 
   readonly closed = output<void>();
   readonly titleChanged = output<string>();
+  readonly contentChanged = output<string>();
+  readonly languageChanged = output<LanguageTag>();
+  readonly tagAdded = output<string>();
+  readonly tagRemoved = output<string>();
   readonly pinToggled = output<void>();
+  readonly deleteRequested = output<void>();
+
+  protected readonly languageOptions = LANGUAGE_OPTIONS;
+
+  private readonly noteId = computed(() => this.note()?.id ?? null);
+
+  protected readonly draftTitle = linkedSignal({
+    source: this.noteId,
+    computation: () => untracked(() => this.note()?.title ?? ''),
+  });
+
+  protected readonly draftContent = linkedSignal({
+    source: this.noteId,
+    computation: () => untracked(() => this.note()?.content ?? ''),
+  });
+
+  /** Le corps s'ouvre en aperçu ; l'édition démarre au clic (ou à Entrée) dessus. */
+  protected readonly editingBody = linkedSignal({ source: this.noteId, computation: () => false });
+
+  /**
+   * Suppression en deux temps plutôt qu'un `confirm()` natif : la WebView
+   * bloque tout pendant une boîte de dialogue système, et ce bouton doit rester
+   * dans le flux clavier de la modale.
+   */
+  protected readonly confirmingDelete = linkedSignal({ source: this.noteId, computation: () => false });
+
+  protected readonly tagInputValue = signal('');
+
+  private readonly bodyEditor = viewChild<ElementRef<HTMLTextAreaElement>>('bodyEditor');
 
   protected readonly languageLabel = computed(
     () => LANGUAGE_LABELS[this.note()?.language ?? FALLBACK_LANGUAGE],
   );
-  protected readonly lineCount = computed(() => this.note()?.content.split('\n').length ?? 0);
-  protected readonly byteSize = computed(() => TEXT_ENCODER.encode(this.note()?.content ?? '').length);
+  // Statistiques calculées sur le brouillon : elles suivent la frappe au lieu
+  // d'attendre l'enregistrement.
+  protected readonly lineCount = computed(() => (this.note() ? this.draftContent().split('\n').length : 0));
+  protected readonly byteSize = computed(() => TEXT_ENCODER.encode(this.draftContent()).length);
   protected readonly modifiedRef = computed(() => {
     const note = this.note();
     return note ? relativeTimeRef(note.updatedAt, this.clock.now()) : null;
   });
 
-  protected onEscape(): void {
-    if (this.note()) {
-      this.closed.emit();
+  constructor() {
+    // Passer en édition sans y amener le focus obligerait à cliquer une seconde
+    // fois dans le champ qu'on vient d'ouvrir.
+    effect(() => {
+      if (this.editingBody()) {
+        this.bodyEditor()?.nativeElement.focus();
+      }
+    });
+  }
+
+  protected startEditingBody(): void {
+    this.editingBody.set(true);
+  }
+
+  /** Sort de l'édition et n'émet que si le corps a réellement changé. */
+  protected commitContent(): void {
+    this.editingBody.set(false);
+    const note = this.note();
+    if (note && this.draftContent() !== note.content) {
+      this.contentChanged.emit(this.draftContent());
     }
+  }
+
+  protected commitTitle(): void {
+    const note = this.note();
+    if (note && this.draftTitle() !== note.title) {
+      this.titleChanged.emit(this.draftTitle());
+    }
+  }
+
+  protected onLanguageChange(value: string): void {
+    // Le <select> ne propose que des langages connus ; la garde protège du cas
+    // où la table des options et le type divergeraient.
+    if (isLanguageTag(value)) {
+      this.languageChanged.emit(value);
+    }
+  }
+
+  protected submitTag(event: Event): void {
+    event.preventDefault();
+    const value = this.tagInputValue();
+    this.tagInputValue.set('');
+    if (value.trim()) {
+      this.tagAdded.emit(value);
+    }
+  }
+
+  protected onDeleteClick(): void {
+    if (this.confirmingDelete()) {
+      this.deleteRequested.emit();
+      return;
+    }
+    this.confirmingDelete.set(true);
+  }
+
+  /**
+   * Échap sort d'abord de l'édition du corps, puis ferme la modale : sinon une
+   * frappe destinée au champ referait disparaître l'éditeur entier.
+   */
+  protected onEscape(): void {
+    if (!this.note()) return;
+
+    if (this.editingBody()) {
+      this.commitContent();
+      return;
+    }
+    this.requestClose();
   }
 
   protected onBackdropClick(event: MouseEvent): void {
     if (event.target === event.currentTarget) {
-      this.closed.emit();
+      this.requestClose();
     }
+  }
+
+  /** Seul chemin de fermeture : il confirme les brouillons avant de sortir. */
+  protected requestClose(): void {
+    this.commitTitle();
+    this.commitContent();
+    this.closed.emit();
   }
 }

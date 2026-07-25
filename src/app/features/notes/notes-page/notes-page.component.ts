@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { LanguageTag } from '@core/models/language.model';
 import { NotesStore } from '@core/stores/notes.store';
 import { SpacesStore } from '@core/stores/spaces.store';
 import { NoteCanvasComponent } from '../components/note-canvas/note-canvas.component';
@@ -21,16 +22,42 @@ export class NotesPageComponent {
   protected readonly searchShortcutEnabled = computed(() => this.store.selectedNote() === null);
 
   protected onTitleChanged(title: string): void {
-    const id = this.store.selectedNoteId();
-    if (id) {
-      void this.store.renameNote(id, title);
-    }
+    this.withSelectedNote((id) => this.store.renameNote(id, title));
+  }
+
+  protected onContentChanged(content: string): void {
+    this.withSelectedNote((id) => this.store.updateContent(id, content));
+  }
+
+  protected onLanguageChanged(language: LanguageTag): void {
+    this.withSelectedNote((id) => this.store.setLanguage(id, language));
+  }
+
+  protected onTagAdded(tag: string): void {
+    this.withSelectedNote((id) => this.store.addTag(id, tag));
+  }
+
+  protected onTagRemoved(tag: string): void {
+    this.withSelectedNote((id) => this.store.removeTag(id, tag));
   }
 
   protected onPinToggled(): void {
+    this.withSelectedNote((id) => this.store.togglePinned(id));
+  }
+
+  protected onDeleteRequested(): void {
+    this.withSelectedNote((id) => this.store.deleteNote(id));
+  }
+
+  /**
+   * L'éditeur n'émet jamais l'identifiant de la note qu'il affiche : c'est le
+   * store qui décide de la note ouverte, et le lui faire renvoyer ouvrirait la
+   * porte à une modification appliquée à une note qui n'est plus la bonne.
+   */
+  private withSelectedNote(action: (id: string) => Promise<void>): void {
     const id = this.store.selectedNoteId();
     if (id) {
-      void this.store.togglePinned(id);
+      void action(id);
     }
   }
 }

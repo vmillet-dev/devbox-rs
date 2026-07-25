@@ -18,7 +18,6 @@ export default defineConfig({
         '**/*.spec.ts',
         // Fixtures and doubles: measuring them would only inflate the numbers.
         'src/testing/**',
-        '**/*.mock-data.ts',
         // Bootstrap and wiring, exercised by running the app rather than by units.
         'src/main.ts',
         '**/app.config.ts',

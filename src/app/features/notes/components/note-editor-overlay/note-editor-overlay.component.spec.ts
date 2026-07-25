@@ -15,8 +15,32 @@ describe('NoteEditorOverlayComponent', () => {
     return fixture.nativeElement.querySelector('.overlay-title-input');
   }
 
+  function bodyPreview(): HTMLButtonElement | null {
+    return fixture.nativeElement.querySelector('.overlay-body-preview');
+  }
+
+  function bodyEditor(): HTMLTextAreaElement | null {
+    return fixture.nativeElement.querySelector('.overlay-body-editor');
+  }
+
+  function toolbarButton(selector: string): HTMLButtonElement {
+    return fixture.nativeElement.querySelector(selector);
+  }
+
   function text(selector: string): string {
     return fixture.nativeElement.querySelector(selector).textContent.replace(/\s+/g, ' ').trim();
+  }
+
+  async function type(element: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> {
+    element.value = value;
+    element.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+  }
+
+  async function openBodyEditor(): Promise<HTMLTextAreaElement> {
+    bodyPreview()?.click();
+    await fixture.whenStable();
+    return bodyEditor() as HTMLTextAreaElement;
   }
 
   beforeEach(() => {
@@ -83,6 +107,15 @@ describe('NoteEditorOverlayComponent', () => {
     expect(viewer.language()).toBe('json');
   });
 
+  it('invites the user to write when the note is empty', async () => {
+    // An empty code viewer looks like a rendering bug rather than an empty note.
+    fixture.componentRef.setInput('note', createNote({ content: '' }));
+    await fixture.whenStable();
+
+    expect(fixture.debugElement.query(By.directive(CodeViewerComponent))).toBeNull();
+    expect(text('.body-placeholder')).toBe('Cliquer ici pour écrire…');
+  });
+
   it('computes the language label, line count and byte size in the footer', async () => {
     fixture.componentRef.setInput('note', createNote({ content: 'line one\nline two', language: 'js' }));
     await fixture.whenStable();
@@ -112,109 +145,336 @@ describe('NoteEditorOverlayComponent', () => {
       );
     });
 
-    it('labels the title field and the close button', () => {
+    it('labels the title field, the body and the close button', () => {
       expect(titleInput().getAttribute('aria-label')).toBe('Titre de la note');
+      expect(bodyPreview()?.getAttribute('aria-label')).toBe('Contenu de la note');
       expect(fixture.nativeElement.querySelector('.close-btn').getAttribute('aria-label')).toBe(
         "Fermer l'éditeur",
       );
     });
 
     it('exposes the pin button as a toggle', () => {
-      expect(fixture.nativeElement.querySelector('.toolbar-btn').getAttribute('aria-pressed')).toBe('false');
+      expect(toolbarButton('.toolbar-btn').getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('names the tag removal buttons after the tag they remove', async () => {
+      fixture.componentRef.setInput('note', createNote({ tags: ['urgent'] }));
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.querySelector('.tag-remove').getAttribute('aria-label')).toBe(
+        'Retirer le tag urgent',
+      );
     });
   });
 
-  it('emits titleChanged on every keystroke, not only on blur', async () => {
-    // The overlay closes on Escape and on backdrop click — neither blurs the
-    // field, so a (change)-only binding silently dropped the edit.
-    fixture.componentRef.setInput('note', createNote());
-    await fixture.whenStable();
-    const emitted: string[] = [];
-    fixture.componentInstance.titleChanged.subscribe((title) => emitted.push(title));
+  describe('title editing', () => {
+    it('emits the new title on blur rather than on every keystroke', async () => {
+      // Persisting per keystroke means one IPC round-trip per character.
+      fixture.componentRef.setInput('note', createNote({ title: 'Before' }));
+      await fixture.whenStable();
+      const emitted: string[] = [];
+      fixture.componentInstance.titleChanged.subscribe((title) => emitted.push(title));
 
-    titleInput().value = 'Renamed';
-    titleInput().dispatchEvent(new Event('input'));
+      await type(titleInput(), 'After');
+      expect(emitted).toEqual([]);
 
-    expect(emitted).toEqual(['Renamed']);
+      titleInput().dispatchEvent(new Event('blur'));
+
+      expect(emitted).toEqual(['After']);
+    });
+
+    it('stays silent when the title comes back to its original value', async () => {
+      fixture.componentRef.setInput('note', createNote({ title: 'Same' }));
+      await fixture.whenStable();
+      let emitted = false;
+      fixture.componentInstance.titleChanged.subscribe(() => (emitted = true));
+
+      titleInput().dispatchEvent(new Event('blur'));
+
+      expect(emitted).toBe(false);
+    });
+
+    it('resets the draft when another note is opened', async () => {
+      fixture.componentRef.setInput('note', createNote({ id: 'a', title: 'First' }));
+      await fixture.whenStable();
+      await type(titleInput(), 'Typed but not confirmed');
+
+      fixture.componentRef.setInput('note', createNote({ id: 'b', title: 'Second' }));
+      await fixture.whenStable();
+
+      expect(titleInput().value).toBe('Second');
+    });
   });
 
-  it('emits pinToggled when the pin button is clicked, and reflects the pinned state', async () => {
-    fixture.componentRef.setInput('note', createNote({ pinned: false }));
-    await fixture.whenStable();
-    let emitted = false;
-    fixture.componentInstance.pinToggled.subscribe(() => (emitted = true));
+  describe('body editing', () => {
+    it('turns the preview into a text area on click, focused and ready to type', async () => {
+      fixture.componentRef.setInput('note', createNote({ content: 'before' }));
+      await fixture.whenStable();
 
-    const pinButton = fixture.debugElement.query(By.css('.toolbar-btn'));
-    expect(text('.toolbar-btn')).toBe('📌 Épingler');
-    expect(pinButton.classes['pinned']).toBeFalsy();
+      const editor = await openBodyEditor();
 
-    pinButton.triggerEventHandler('click');
+      expect(editor).not.toBeNull();
+      expect(editor.value).toBe('before');
+      expect(document.activeElement).toBe(editor);
+      expect(bodyPreview()).toBeNull();
+    });
 
-    expect(emitted).toBe(true);
+    it('emits the new content on blur and returns to the preview', async () => {
+      fixture.componentRef.setInput('note', createNote({ content: 'before' }));
+      await fixture.whenStable();
+      const emitted: string[] = [];
+      fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
+
+      const editor = await openBodyEditor();
+      await type(editor, 'after');
+      expect(emitted).toEqual([]);
+
+      editor.dispatchEvent(new Event('blur'));
+      await fixture.whenStable();
+
+      expect(emitted).toEqual(['after']);
+      expect(bodyPreview()).not.toBeNull();
+    });
+
+    it('updates the footer stats as the user types, before anything is saved', async () => {
+      fixture.componentRef.setInput('note', createNote({ content: 'a', language: 'txt' }));
+      await fixture.whenStable();
+
+      await type(await openBodyEditor(), 'one\ntwo');
+
+      expect(text('.overlay-footer span')).toBe('TXT · 2 lignes · 7 octets');
+    });
+
+    it('leaves the editor on Escape instead of closing the whole overlay', async () => {
+      fixture.componentRef.setInput('note', createNote({ content: 'before' }));
+      await fixture.whenStable();
+      let closed = false;
+      const emitted: string[] = [];
+      fixture.componentInstance.closed.subscribe(() => (closed = true));
+      fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
+
+      await type(await openBodyEditor(), 'after');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await fixture.whenStable();
+
+      expect(emitted).toEqual(['after']);
+      expect(closed).toBe(false);
+      expect(bodyPreview()).not.toBeNull();
+    });
   });
 
-  it('shows the pinned label and class when the note is pinned', async () => {
-    fixture.componentRef.setInput('note', createNote({ pinned: true }));
-    await fixture.whenStable();
+  describe('closing', () => {
+    it('confirms the pending title before closing', async () => {
+      // Escape, the backdrop and the close button all skip `blur`: without this
+      // the last edit would be silently dropped.
+      fixture.componentRef.setInput('note', createNote({ title: 'Before' }));
+      await fixture.whenStable();
+      const titles: string[] = [];
+      fixture.componentInstance.titleChanged.subscribe((title) => titles.push(title));
 
-    expect(text('.toolbar-btn')).toBe('📌 Épinglée');
-    expect(fixture.debugElement.query(By.css('.toolbar-btn')).classes['pinned']).toBe(true);
+      await type(titleInput(), 'After');
+      fixture.debugElement.query(By.css('.close-btn')).triggerEventHandler('click');
+
+      expect(titles).toEqual(['After']);
+    });
+
+    it('confirms the pending body before closing', async () => {
+      fixture.componentRef.setInput('note', createNote({ content: 'before' }));
+      await fixture.whenStable();
+      const contents: string[] = [];
+      fixture.componentInstance.contentChanged.subscribe((content) => contents.push(content));
+
+      await type(await openBodyEditor(), 'after');
+      fixture.debugElement.query(By.css('.close-btn')).triggerEventHandler('click');
+
+      expect(contents).toEqual(['after']);
+    });
+
+    it('emits closed when the close button is clicked', async () => {
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+      let emitted = false;
+      fixture.componentInstance.closed.subscribe(() => (emitted = true));
+
+      fixture.debugElement.query(By.css('.close-btn')).triggerEventHandler('click');
+
+      expect(emitted).toBe(true);
+    });
+
+    it('emits closed when Escape is pressed while a note is open', async () => {
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+      let emitted = false;
+      fixture.componentInstance.closed.subscribe(() => (emitted = true));
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+      expect(emitted).toBe(true);
+    });
+
+    it('does not emit closed on Escape when there is no note open', () => {
+      let emitted = false;
+      fixture.componentInstance.closed.subscribe(() => (emitted = true));
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+      expect(emitted).toBe(false);
+    });
+
+    it('emits closed when clicking directly on the backdrop', async () => {
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+      let emitted = false;
+      fixture.componentInstance.closed.subscribe(() => (emitted = true));
+
+      fixture.nativeElement
+        .querySelector('.overlay-backdrop')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      expect(emitted).toBe(true);
+    });
+
+    it('does not emit closed when clicking inside the panel', async () => {
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+      let emitted = false;
+      fixture.componentInstance.closed.subscribe(() => (emitted = true));
+
+      fixture.nativeElement
+        .querySelector('.overlay-panel')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      expect(emitted).toBe(false);
+    });
   });
 
-  it('emits closed when the close button is clicked', async () => {
-    fixture.componentRef.setInput('note', createNote());
-    await fixture.whenStable();
-    let emitted = false;
-    fixture.componentInstance.closed.subscribe(() => (emitted = true));
+  describe('language', () => {
+    it('lists every known language and selects the note one', async () => {
+      fixture.componentRef.setInput('note', createNote({ language: 'sql' }));
+      await fixture.whenStable();
 
-    fixture.debugElement.query(By.css('.close-btn')).triggerEventHandler('click');
+      const select = fixture.nativeElement.querySelector('.overlay-language-select') as HTMLSelectElement;
+      expect([...select.options].map((option) => option.value)).toEqual([
+        'json',
+        'js',
+        'py',
+        'sql',
+        'yml',
+        'txt',
+      ]);
+      expect(select.value).toBe('sql');
+    });
 
-    expect(emitted).toBe(true);
+    it('emits the picked language', async () => {
+      fixture.componentRef.setInput('note', createNote({ language: 'txt' }));
+      await fixture.whenStable();
+      let emitted: string | undefined;
+      fixture.componentInstance.languageChanged.subscribe((language) => (emitted = language));
+
+      const select = fixture.nativeElement.querySelector('.overlay-language-select') as HTMLSelectElement;
+      select.value = 'json';
+      select.dispatchEvent(new Event('change'));
+
+      expect(emitted).toBe('json');
+    });
   });
 
-  it('emits closed when Escape is pressed while a note is open', async () => {
-    fixture.componentRef.setInput('note', createNote());
-    await fixture.whenStable();
-    let emitted = false;
-    fixture.componentInstance.closed.subscribe(() => (emitted = true));
+  describe('tags', () => {
+    it('emits the tag to remove', async () => {
+      fixture.componentRef.setInput('note', createNote({ tags: ['keep', 'drop'] }));
+      await fixture.whenStable();
+      let emitted: string | undefined;
+      fixture.componentInstance.tagRemoved.subscribe((tag) => (emitted = tag));
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      const removeButtons = fixture.nativeElement.querySelectorAll('.tag-remove');
+      (removeButtons[1] as HTMLButtonElement).click();
 
-    expect(emitted).toBe(true);
+      expect(emitted).toBe('drop');
+    });
+
+    it('emits the typed tag on submit and clears the field', async () => {
+      fixture.componentRef.setInput('note', createNote({ tags: [] }));
+      await fixture.whenStable();
+      let emitted: string | undefined;
+      fixture.componentInstance.tagAdded.subscribe((tag) => (emitted = tag));
+
+      const input = fixture.nativeElement.querySelector('.tag-add-input') as HTMLInputElement;
+      await type(input, 'urgent');
+      input.form?.dispatchEvent(new Event('submit', { cancelable: true }));
+      await fixture.whenStable();
+
+      expect(emitted).toBe('urgent');
+      expect(input.value).toBe('');
+    });
+
+    it('ignores a blank tag submission', async () => {
+      fixture.componentRef.setInput('note', createNote({ tags: [] }));
+      await fixture.whenStable();
+      let emitted = false;
+      fixture.componentInstance.tagAdded.subscribe(() => (emitted = true));
+
+      const input = fixture.nativeElement.querySelector('.tag-add-input') as HTMLInputElement;
+      await type(input, '   ');
+      input.form?.dispatchEvent(new Event('submit', { cancelable: true }));
+      await fixture.whenStable();
+
+      expect(emitted).toBe(false);
+    });
   });
 
-  it('does not emit closed on Escape when there is no note open', () => {
-    let emitted = false;
-    fixture.componentInstance.closed.subscribe(() => (emitted = true));
+  describe('pinning and deletion', () => {
+    it('emits pinToggled when the pin button is clicked, and reflects the pinned state', async () => {
+      fixture.componentRef.setInput('note', createNote({ pinned: false }));
+      await fixture.whenStable();
+      let emitted = false;
+      fixture.componentInstance.pinToggled.subscribe(() => (emitted = true));
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      const pinButton = fixture.debugElement.query(By.css('.toolbar-btn'));
+      expect(text('.toolbar-btn')).toBe('📌 Épingler');
+      expect(pinButton.classes['pinned']).toBeFalsy();
 
-    expect(emitted).toBe(false);
-  });
+      pinButton.triggerEventHandler('click');
 
-  it('emits closed when clicking directly on the backdrop', async () => {
-    fixture.componentRef.setInput('note', createNote());
-    await fixture.whenStable();
-    let emitted = false;
-    fixture.componentInstance.closed.subscribe(() => (emitted = true));
+      expect(emitted).toBe(true);
+    });
 
-    fixture.nativeElement
-      .querySelector('.overlay-backdrop')
-      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    it('shows the pinned label and class when the note is pinned', async () => {
+      fixture.componentRef.setInput('note', createNote({ pinned: true }));
+      await fixture.whenStable();
 
-    expect(emitted).toBe(true);
-  });
+      expect(text('.toolbar-btn')).toBe('📌 Épinglée');
+      expect(fixture.debugElement.query(By.css('.toolbar-btn')).classes['pinned']).toBe(true);
+    });
 
-  it('does not emit closed when clicking inside the panel', async () => {
-    fixture.componentRef.setInput('note', createNote());
-    await fixture.whenStable();
-    let emitted = false;
-    fixture.componentInstance.closed.subscribe(() => (emitted = true));
+    it('asks for confirmation before emitting a deletion', async () => {
+      // A single click on a destructive action is too easy to hit by accident,
+      // and a native confirm() would freeze the whole WebView.
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+      let emitted = false;
+      fixture.componentInstance.deleteRequested.subscribe(() => (emitted = true));
 
-    fixture.nativeElement
-      .querySelector('.overlay-panel')
-      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      toolbarButton('.delete-btn').click();
+      await fixture.whenStable();
 
-    expect(emitted).toBe(false);
+      expect(emitted).toBe(false);
+      expect(text('.delete-btn')).toBe('🗑 Confirmer ?');
+
+      toolbarButton('.delete-btn').click();
+
+      expect(emitted).toBe(true);
+    });
+
+    it('drops the pending confirmation when another note is opened', async () => {
+      fixture.componentRef.setInput('note', createNote({ id: 'a' }));
+      await fixture.whenStable();
+      toolbarButton('.delete-btn').click();
+      await fixture.whenStable();
+
+      fixture.componentRef.setInput('note', createNote({ id: 'b' }));
+      await fixture.whenStable();
+
+      expect(text('.delete-btn')).toBe('🗑 Supprimer');
+    });
   });
 });
