@@ -2,8 +2,15 @@
 //!
 //! Ces commandes sont de simples **adaptateurs** : elles verrouillent la
 //! connexion partagée, délèguent à `storage::notes` et convertissent l'erreur en
-//! `String` pour le pont Tauri. Toute la logique de persistance est dans
-//! `storage/` — et donc testable sans lancer Tauri.
+//! [`AppError`] pour le pont Tauri. Toute la logique est dans `storage/` — et
+//! donc testable sans lancer Tauri.
+//!
+//! # Le back décide de ce qui est affiché
+//!
+//! `query_notes` ne renvoie pas une liste mais une **vue** ([`NotesView`]) :
+//! notes filtrées, déjà réparties en sections, accompagnées des tags proposables
+//! et du drapeau « une recherche est en cours ». Le front ne refiltre, ne
+//! regroupe et ne trie rien — il affiche ce qu'il reçoit.
 //!
 //! # Contrat de sérialisation — à ne pas casser
 //!
@@ -22,11 +29,10 @@
 //!
 //! Règles que le front tient pour acquises, et que `storage::notes` honore :
 //! - `create_note` et `update_note` **renvoient la note telle que persistée**
-//!   (identifiant définitif, `updated_at` rafraîchi) : le store remplace sa
-//!   copie locale par cette valeur de retour.
+//!   (identifiant définitif, `updated_at` rafraîchi) : c'est cette valeur que
+//!   l'éditeur affiche, et elle fait autorité.
 //! - `update_note` / `delete_note` sur un identifiant inconnu renvoient `Err`,
-//!   jamais un `Ok` silencieux : le store s'en sert pour annuler sa mise à jour
-//!   optimiste et remettre la note dans son état précédent.
+//!   jamais un `Ok` silencieux : sans ça le front croirait avoir enregistré.
 //! - Dans un `NotePatch`, un champ **absent** signifie « ne pas toucher ». Le
 //!   front n'envoie jamais `null` pour cela (voir `toNotePatchDto`), donc un
 //!   `Option::None` n'écrase jamais la valeur stockée.
@@ -34,15 +40,15 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use super::error::AppError;
 use crate::storage::{self, Db};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
     pub id: String,
-    /// Espace de rangement. Le front filtre dessus : une note dont le `space_id`
-    /// ne correspond à aucun espace renvoyé par `list_spaces` est invisible.
-    /// Le stockage refuse d'ailleurs d'en créer une dans un espace inconnu.
+    /// Espace de rangement. C'est `query_notes` qui filtre dessus ; le stockage
+    /// refuse de créer une note dans un espace inconnu.
     pub space_id: String,
     /// Peut être vide : une note fraîchement créée n'a pas encore de titre,
     /// l'interface affiche un libellé traduit à la place.
@@ -99,40 +105,118 @@ pub struct NotePatch {
     pub lifecycle: Option<NoteLifecycle>,
 }
 
-/// Le mutex n'est empoisonné que si une commande a paniqué en le tenant : la
-/// base peut alors être dans un état incohérent, autant le dire au lieu de
-/// paniquer une seconde fois.
-fn lock(db: &Db) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, String> {
-    db.lock()
-        .map_err(|_| "Stockage indisponible : une opération précédente a échoué".to_string())
+/// Ce que l'utilisateur a demandé à voir. Tout y est explicite : la commande ne
+/// lit ni horloge ni fuseau, ce qui la rend reproductible en test.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotesQuery {
+    /// `None` = « tous les espaces ». Ce n'est pas une absence de choix mais un
+    /// choix : il n'existe aucun espace « Tous » côté données.
+    pub space_id: Option<String>,
+    /// Texte recherché dans le titre, les tags et le contenu. Vide = pas de recherche.
+    pub search: String,
+    pub filter: NoteFilter,
+    /// Tags sélectionnés dans le rail. Une note passe si elle en porte **au
+    /// moins un** (et non tous) : c'est le comportement d'un rail de facettes.
+    pub tags: Vec<String>,
+    /// Instant de référence, ISO 8601 UTC — fourni par `ClockService` côté front.
+    pub now: String,
+    /// `Date#getTimezoneOffset()` du front. Nécessaire parce que les sections
+    /// raisonnent en **jours locaux** : à 23 h à Paris, `now` en UTC est déjà
+    /// demain, et une note d'aujourd'hui tomberait dans « cette semaine ».
+    ///
+    /// ⚠️ Convention JavaScript : la valeur est l'opposé du décalage. UTC+2
+    /// donne −120, d'où le `-` dans la conversion en `FixedOffset`.
+    pub tz_offset_minutes: i32,
 }
 
-/// Toutes les notes, tous espaces confondus — le filtrage par espace est fait
-/// côté front, qui doit aussi pouvoir afficher « tous les espaces ».
+/// Filtre rapide de la barre d'outils. `Untriaged` = notes portant une date
+/// d'expiration : une note éphémère est précisément celle dont on n'a pas encore
+/// décidé du sort.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NoteFilter {
+    All,
+    Pinned,
+    Untriaged,
+}
+
+/// Ce que le canevas affiche, tel quel.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotesView {
+    pub sections: Vec<NoteSection>,
+    /// Tags proposés par le rail. Portée à l'**espace**, pas au filtre courant :
+    /// n'afficher que les tags des notes déjà filtrées rendrait le rail
+    /// inutilisable dès la première sélection.
+    pub available_tags: Vec<String>,
+    /// Une recherche ou une sélection de tags est active. Le front s'en sert
+    /// pour distinguer « aucun résultat » d'« espace vide ».
+    pub is_filtering: bool,
+    /// Nombre de notes retenues, toutes sections confondues.
+    pub matched: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteSection {
+    pub key: NoteSectionKey,
+    pub notes: Vec<Note>,
+    /// Au moins une note de la section expire : le front en dérive un indice visuel.
+    pub has_expiring_notes: bool,
+    /// Affiche la carte fantôme « coller ou créer » à la fin de la section.
+    pub show_create_ghost: bool,
+}
+
+/// Sert de **clé de traduction** côté front (`sections.<key>`) : c'est pourquoi
+/// aucun libellé lisible ne traverse le pont.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NoteSectionKey {
+    Pinned,
+    Today,
+    Week,
+    Older,
+    Results,
+}
+
+fn lock(db: &Db) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, AppError> {
+    db.lock().map_err(|_| AppError::storage_unavailable())
+}
+
+/// Notes filtrées **et** regroupées, prêtes à afficher. Il n'existe pas de
+/// commande renvoyant la liste brute : elle inviterait à refiltrer côté front.
 #[tauri::command]
-pub fn list_notes(db: State<'_, Db>) -> Result<Vec<Note>, String> {
+pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, AppError> {
     let connection = lock(&db)?;
-    storage::notes::list(&connection).map_err(|error| error.to_string())
+    Ok(storage::notes::query(&connection, &query)?)
 }
 
 #[tauri::command]
-pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<Note, String> {
+pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<Note, AppError> {
     let mut connection = lock(&db)?;
-    storage::notes::create(&mut connection, &draft, &storage::now_iso())
-        .map_err(|error| error.to_string())
+    Ok(storage::notes::create(
+        &mut connection,
+        &draft,
+        &storage::now_iso(),
+    )?)
 }
 
 #[tauri::command]
-pub fn update_note(id: String, patch: NotePatch, db: State<'_, Db>) -> Result<Note, String> {
+pub fn update_note(id: String, patch: NotePatch, db: State<'_, Db>) -> Result<Note, AppError> {
     let mut connection = lock(&db)?;
-    storage::notes::update(&mut connection, &id, &patch, &storage::now_iso())
-        .map_err(|error| error.to_string())
+    Ok(storage::notes::update(
+        &mut connection,
+        &id,
+        &patch,
+        &storage::now_iso(),
+    )?)
 }
 
 #[tauri::command]
-pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), String> {
+pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
     let connection = lock(&db)?;
-    storage::notes::delete(&connection, &id).map_err(|error| error.to_string())
+    Ok(storage::notes::delete(&connection, &id)?)
 }
 
 /// Ces tests ne vérifient pas du code métier : ils figent la **forme JSON**
@@ -211,6 +295,79 @@ mod tests {
         assert!(patch.content.is_none());
         assert!(patch.tags.is_none());
         assert!(patch.lifecycle.is_none());
+    }
+
+    #[test]
+    fn a_view_serialises_with_camel_case_keys() {
+        let view = NotesView {
+            sections: vec![NoteSection {
+                key: NoteSectionKey::Week,
+                notes: vec![sample()],
+                has_expiring_notes: false,
+                show_create_ghost: true,
+            }],
+            available_tags: vec!["auth".to_string()],
+            is_filtering: false,
+            matched: 1,
+        };
+
+        let json = serde_json::to_value(view).unwrap();
+
+        assert!(json.get("availableTags").is_some());
+        assert!(json.get("isFiltering").is_some());
+        assert!(json.get("available_tags").is_none());
+        assert!(json["sections"][0].get("hasExpiringNotes").is_some());
+        assert!(json["sections"][0].get("showCreateGhost").is_some());
+    }
+
+    #[test]
+    fn a_section_key_serialises_as_the_translation_key_the_front_expects() {
+        let section = NoteSection {
+            key: NoteSectionKey::Older,
+            notes: Vec::new(),
+            has_expiring_notes: false,
+            show_create_ghost: false,
+        };
+
+        let json = serde_json::to_value(section).unwrap();
+
+        // The front builds `sections.older` from this; serde's default would
+        // emit "Older" and the lookup would miss.
+        assert_eq!(json["key"], "older");
+    }
+
+    #[test]
+    fn a_query_is_read_from_the_camel_case_payload_the_front_sends() {
+        let query: NotesQuery = serde_json::from_value(serde_json::json!({
+            "spaceId": "s-1",
+            "search": "deploy",
+            "filter": "untriaged",
+            "tags": ["urgent"],
+            "now": "2026-07-25T09:00:00.000Z",
+            "tzOffsetMinutes": -120
+        }))
+        .unwrap();
+
+        assert_eq!(query.space_id.as_deref(), Some("s-1"));
+        assert_eq!(query.filter, NoteFilter::Untriaged);
+        assert_eq!(query.tz_offset_minutes, -120);
+    }
+
+    #[test]
+    fn a_null_space_is_read_as_every_space() {
+        // The front sends null, not an omitted key, when the user picks
+        // "all spaces" — that is a choice, not a missing value.
+        let query: NotesQuery = serde_json::from_value(serde_json::json!({
+            "spaceId": null,
+            "search": "",
+            "filter": "all",
+            "tags": [],
+            "now": "2026-07-25T09:00:00.000Z",
+            "tzOffsetMinutes": 0
+        }))
+        .unwrap();
+
+        assert!(query.space_id.is_none());
     }
 
     #[test]

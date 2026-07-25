@@ -35,10 +35,10 @@ describe('ErrorBannerComponent', () => {
   });
 
   it('interpolates the notice parameters', async () => {
-    notifier.notify({ ref: { key: 'errors.ipcFailed', params: { command: 'list_notes' } } });
+    notifier.notify({ ref: { key: 'errors.ipcFailed', params: { command: 'query_notes' } } });
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.querySelector('.error-text').textContent).toContain('list_notes');
+    expect(fixture.nativeElement.querySelector('.error-text').textContent).toContain('query_notes');
   });
 
   it('announces itself as an alert so it is read without stealing focus', async () => {

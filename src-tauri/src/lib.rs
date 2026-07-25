@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use commands::greetings::saluer;
-use commands::notes::{create_note, delete_note, list_notes, update_note};
+use commands::notes::{create_note, delete_note, query_notes, update_note};
 use commands::spaces::{create_space, list_spaces};
 
 /// Point d'entrée de l'application Tauri.
@@ -36,7 +36,7 @@ pub fn run() {
         // accessible depuis Angular via invoke("nom_de_la_commande", ...).
         .invoke_handler(tauri::generate_handler![
             saluer,
-            list_notes,
+            query_notes,
             create_note,
             update_note,
             delete_note,

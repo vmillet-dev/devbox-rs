@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { IpcError } from '@core/ipc/ipc.service';
 import { Space } from '@core/models/space.model';
 import { FakeSpacesRepository } from '@testing/fake-spaces-repository';
 import { provideAppTesting } from '@testing/testing.providers';
@@ -128,17 +129,39 @@ describe('SpacesStore', () => {
       expect(create).not.toHaveBeenCalled();
     });
 
-    it('refuses a name already taken, whatever the casing', async () => {
-      // Two identically named spaces are indistinguishable in the switcher.
+    it('translates the backend refusal of an already-taken name', async () => {
+      // Two identically named spaces are indistinguishable in the switcher, but
+      // only the storage layer can see the real state of the database. It
+      // answers with a code, which is what makes a translated message possible
+      // — the Rust message itself is French and would leak into the English UI.
       const { store, repository } = await createStore();
       const notifier = TestBed.inject(ErrorNotifier);
-      const create = vi.spyOn(repository, 'create');
+      repository.failNext = new IpcError('create_space', {
+        code: 'duplicateSpaceName',
+        params: { name: 'Work' },
+        detail: 'Un espace nommé « Work » existe déjà',
+      });
 
       const created = await store.createSpace('  wORK ');
 
       expect(created).toBeNull();
-      expect(create).not.toHaveBeenCalled();
       expect(notifier.notice()?.ref.key).toBe('errors.spaceNameTaken');
+      expect(notifier.notice()?.ref.params).toEqual({ name: 'Work' });
+    });
+
+    it('falls back to a generic message for any other backend failure', async () => {
+      const { store, repository } = await createStore();
+      const notifier = TestBed.inject(ErrorNotifier);
+      repository.failNext = new IpcError('create_space', {
+        code: 'storage',
+        params: {},
+        detail: 'Erreur de stockage : disk I/O error',
+      });
+
+      await store.createSpace('Work');
+
+      expect(notifier.notice()?.ref.key).toBe('errors.spaceCreateFailed');
+      expect(notifier.notice()?.detail).toContain('disk I/O error');
     });
 
     it('notifies and adds nothing when creation fails', async () => {

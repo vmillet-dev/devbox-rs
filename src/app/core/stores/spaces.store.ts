@@ -1,6 +1,7 @@
 import { Injectable, Signal, computed, effect, inject, resource, signal } from '@angular/core';
 import { SPACES_REPOSITORY } from '../data/spaces-repository.token';
-import { ErrorNotifier } from '../errors/error-notifier.service';
+import { AppNotice, ErrorNotifier } from '../errors/error-notifier.service';
+import { IpcError } from '../ipc/ipc.service';
 import { Space } from '../models/space.model';
 
 /**
@@ -68,22 +69,19 @@ export class SpacesStore {
   }
 
   /**
-   * Crée un espace et le rend actif. Comme pour les notes, l'écriture n'est pas
-   * optimiste : c'est la persistance qui attribue l'identifiant, et le
-   * sélectionner avant de le connaître obligerait à le corriger après coup.
+   * Crée un espace et le rend actif. C'est la persistance qui attribue
+   * l'identifiant, et le sélectionner avant de le connaître obligerait à le
+   * corriger après coup.
    *
    * Un nom vide est ignoré silencieusement (l'utilisateur a validé un champ
-   * vide) ; un nom déjà pris est refusé, deux espaces homonymes n'étant pas
-   * distinguables dans le sélecteur.
+   * vide). L'unicité, elle, n'est **pas** vérifiée ici : elle est tranchée par
+   * le stockage, qui seul voit l'état réel de la base. Le refus revient sous la
+   * forme d'un code (`duplicateSpaceName`), traduit ci-dessous — un message
+   * rédigé en Rust s'afficherait en français dans l'interface anglaise.
    */
   async createSpace(name: string): Promise<Space | null> {
     const trimmed = name.trim();
     if (!trimmed) return null;
-
-    if (this.spaces().some((space) => space.name.toLowerCase() === trimmed.toLowerCase())) {
-      this.notifier.notify({ ref: { key: 'errors.spaceNameTaken', params: { name: trimmed } } });
-      return null;
-    }
 
     try {
       const created = await this.repository.create({ name: trimmed });
@@ -92,11 +90,22 @@ export class SpacesStore {
       return created;
     } catch (error) {
       console.error(error);
-      this.notifier.notify({
-        ref: { key: 'errors.spaceCreateFailed' },
-        detail: error instanceof Error ? error.message : String(error),
-      });
+      this.notifier.notify(this.describeCreateFailure(error, trimmed));
       return null;
     }
+  }
+
+  private describeCreateFailure(error: unknown, name: string): AppNotice {
+    if (error instanceof IpcError && error.code === 'duplicateSpaceName') {
+      // Deux espaces homonymes ne seraient pas distinguables dans le sélecteur.
+      return {
+        ref: { key: 'errors.spaceNameTaken', params: { name: error.params['name'] ?? name } },
+      };
+    }
+
+    return {
+      ref: { key: 'errors.spaceCreateFailed' },
+      detail: error instanceof Error ? error.message : String(error),
+    };
   }
 }

@@ -26,13 +26,15 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use super::error::AppError;
 use crate::storage::{self, Db};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Space {
     pub id: String,
-    /// Nom affiché dans le sélecteur. Le front refuse déjà les homonymes à la
-    /// création ; le stockage impose la même contrainte, insensible à la casse.
+    /// Nom affiché dans le sélecteur. L'unicité, insensible à la casse, est
+    /// tranchée **ici seulement** : un doublon ressort en
+    /// `ErrorCode::DuplicateSpaceName`, que le front traduit.
     pub name: String,
 }
 
@@ -42,20 +44,19 @@ pub struct SpaceDraft {
     pub name: String,
 }
 
-fn lock(db: &Db) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, String> {
-    db.lock()
-        .map_err(|_| "Stockage indisponible : une opération précédente a échoué".to_string())
+fn lock(db: &Db) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, AppError> {
+    db.lock().map_err(|_| AppError::storage_unavailable())
 }
 
 #[tauri::command]
-pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, String> {
+pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, AppError> {
     let connection = lock(&db)?;
-    storage::spaces::list(&connection).map_err(|error| error.to_string())
+    Ok(storage::spaces::list(&connection)?)
 }
 
 /// Le front sélectionne aussitôt l'espace à partir de la valeur renvoyée.
 #[tauri::command]
-pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, String> {
+pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppError> {
     let connection = lock(&db)?;
-    storage::spaces::create(&connection, &draft).map_err(|error| error.to_string())
+    Ok(storage::spaces::create(&connection, &draft)?)
 }

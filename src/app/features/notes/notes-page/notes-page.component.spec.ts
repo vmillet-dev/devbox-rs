@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Space } from '@core/models/space.model';
 import { NotesStore } from '@core/stores/notes.store';
 import { SpacesStore } from '@core/stores/spaces.store';
+import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
 import { NoteCanvasComponent } from '../components/note-canvas/note-canvas.component';
@@ -21,6 +22,7 @@ describe('NotesPageComponent', () => {
   let fixture: ComponentFixture<NotesPageComponent>;
   let store: NotesStore;
   let spaces: SpacesStore;
+  let repository: FakeNotesRepository;
 
   function child<T>(type: new (...args: never[]) => T): T {
     return fixture.debugElement.query(By.directive(type)).componentInstance as T;
@@ -28,9 +30,10 @@ describe('NotesPageComponent', () => {
 
   beforeEach(async () => {
     TestBed.resetTestingModule();
+    repository = new FakeNotesRepository([createNote({ id: 'note-42' })]);
     TestBed.configureTestingModule({
       imports: [NotesPageComponent],
-      providers: [provideAppTesting({ notes: [createNote({ id: 'note-42' })], spaces: SPACES })],
+      providers: [provideAppTesting({ notesRepository: repository, spaces: SPACES })],
     });
     fixture = TestBed.createComponent(NotesPageComponent);
     store = TestBed.inject(NotesStore);
@@ -132,10 +135,13 @@ describe('NotesPageComponent', () => {
   });
 
   it('passes the store loading and empty-result state to the canvas', async () => {
-    store.setSearchQuery('nothing matches this');
-    await fixture.whenStable();
+    // "No results" is the backend's verdict, not something the page recomputes:
+    // it reports a filtered view that matched nothing.
+    repository.setView({ sections: [], isFiltering: true, matched: 0 });
 
-    expect(child(NoteCanvasComponent).hasNoResults()).toBe(true);
+    store.setFilter('pinned');
+    await vi.waitFor(() => expect(child(NoteCanvasComponent).hasNoResults()).toBe(true));
+
     expect(child(NoteCanvasComponent).isLoading()).toBe(false);
   });
 

@@ -8,11 +8,14 @@
 
 use std::collections::HashMap;
 
-use rusqlite::{Connection, Row};
+use chrono::{DateTime, Utc};
+use rusqlite::{Connection, Row, ToSql};
 use uuid::Uuid;
 
-use super::{spaces, StorageError};
-use crate::commands::notes::{Note, NoteDraft, NoteLifecycle, NotePatch};
+use super::{sections, spaces, StorageError};
+use crate::commands::notes::{
+    Note, NoteDraft, NoteFilter, NoteLifecycle, NotePatch, NotesQuery, NotesView,
+};
 
 const NOTE_COLUMNS: &str = "id, space_id, title, language, content, source, pinned, \
                             created_at, updated_at, lifecycle_kind, lifecycle_expires_at";
@@ -79,42 +82,212 @@ fn tags_of(connection: &Connection, note_id: &str) -> Result<Vec<String>, Storag
     Ok(tags)
 }
 
+/// Nettoie les tags avant écriture : espaces, `#` de tête, vides et doublons.
+///
+/// La déduplication est **insensible à la casse** et garde la première graphie
+/// rencontrée. Sans elle, `urgent` et `URGENT` produiraient deux entrées dans le
+/// rail alors qu'ils désignent la même chose pour l'utilisateur.
+///
+/// C'est le seul endroit où cette règle vit : le front envoie ce que
+/// l'utilisateur a tapé, tel quel.
+pub fn normalize_tags(tags: &[String]) -> Vec<String> {
+    let mut seen: Vec<String> = Vec::new();
+    let mut normalized: Vec<String> = Vec::new();
+
+    for tag in tags {
+        let cleaned = tag.trim().trim_start_matches('#').trim();
+        if cleaned.is_empty() {
+            continue;
+        }
+
+        let folded = cleaned.to_lowercase();
+        if seen.contains(&folded) {
+            continue;
+        }
+
+        seen.push(folded);
+        normalized.push(cleaned.to_string());
+    }
+
+    normalized
+}
+
 /// Remplace intégralement les tags d'une note. Appelée uniquement quand le patch
 /// porte un `tags` : un patch sans ce champ ne doit rien toucher.
-fn replace_tags(connection: &Connection, note_id: &str, tags: &[String]) -> Result<(), StorageError> {
+///
+/// Renvoie les tags réellement écrits, qui peuvent différer de ceux reçus
+/// (cf. [`normalize_tags`]) : l'appelant doit adopter cette valeur, sinon il
+/// renverrait au front une note qui ne correspond pas à la base.
+///
+/// Le tri final aligne l'écriture sur la lecture (`ORDER BY tag`) : sans lui,
+/// une note fraîchement enregistrée afficherait ses tags dans un ordre, puis
+/// dans un autre au rechargement suivant.
+fn replace_tags(
+    connection: &Connection,
+    note_id: &str,
+    tags: &[String],
+) -> Result<Vec<String>, StorageError> {
+    let mut normalized = normalize_tags(tags);
+
     connection.execute("DELETE FROM note_tags WHERE note_id = ?1", [note_id])?;
 
     let mut statement =
         connection.prepare("INSERT OR IGNORE INTO note_tags (note_id, tag) VALUES (?1, ?2)")?;
-    for tag in tags {
+    for tag in &normalized {
         statement.execute((note_id, tag))?;
     }
 
-    Ok(())
+    normalized.sort();
+
+    Ok(normalized)
 }
 
-/// Toutes les notes, tous espaces confondus.
-///
-/// Le filtrage par espace, la recherche et les tags sont aujourd'hui appliqués
-/// côté front, qui doit aussi pouvoir afficher « tous les espaces ». Le tri
-/// décidé ici est donc celui que l'utilisateur voit à l'intérieur de chaque
-/// section : le front conserve l'ordre reçu.
-///
-/// Une liste vide est une réponse valide (premier lancement).
+/// Toutes les notes, tous espaces confondus. **Réservée aux tests** : en
+/// production tout passe par [`query`], qui filtre et regroupe. Exposer une
+/// liste brute au front l'inviterait à refiltrer lui-même.
+#[cfg(test)]
 pub fn list(connection: &Connection) -> Result<Vec<Note>, StorageError> {
-    let mut tags = all_tags(connection)?;
+    query(
+        connection,
+        &NotesQuery {
+            space_id: None,
+            search: String::new(),
+            filter: NoteFilter::All,
+            tags: Vec::new(),
+            now: "2026-07-25T09:00:00.000Z".to_string(),
+            tz_offset_minutes: 0,
+        },
+    )
+    .map(|view| view.sections.into_iter().flat_map(|s| s.notes).collect())
+}
 
-    let mut statement = connection
-        .prepare(&format!("SELECT {NOTE_COLUMNS} FROM notes ORDER BY updated_at DESC, id"))?;
+/// Une note correspond-elle au texte cherché ?
+///
+/// Le repliage de casse est fait **en Rust** et non en SQL : le `LOWER()` de
+/// SQLite ne traite que l'ASCII (sans extension ICU), donc `Étape` ne
+/// correspondrait pas à `étape`. `to_lowercase` est Unicode.
+fn matches_search(note: &Note, needle: &str) -> bool {
+    note.title.to_lowercase().contains(needle)
+        || note.tags.iter().any(|tag| tag.to_lowercase().contains(needle))
+        || note.content.to_lowercase().contains(needle)
+}
+
+/// Tags proposables par le rail, portés à l'espace et non au filtre courant :
+/// ne proposer que les tags des notes déjà filtrées viderait le rail dès la
+/// première sélection, rendant impossible d'en choisir un second.
+fn available_tags(
+    connection: &Connection,
+    space_id: Option<&str>,
+) -> Result<Vec<String>, StorageError> {
+    let tags = match space_id {
+        Some(id) => {
+            let mut statement = connection.prepare(
+                "SELECT DISTINCT tag FROM note_tags \
+                 JOIN notes ON notes.id = note_tags.note_id \
+                 WHERE notes.space_id = ?1 ORDER BY tag",
+            )?;
+            statement
+                .query_map([id], |row| row.get(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        }
+        None => {
+            let mut statement =
+                connection.prepare("SELECT DISTINCT tag FROM note_tags ORDER BY tag")?;
+            statement
+                .query_map([], |row| row.get(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        }
+    };
+
+    Ok(tags)
+}
+
+/// Vue complète : notes filtrées, réparties en sections, plus les tags du rail.
+///
+/// Le partage des tâches est délibéré :
+/// - **SQL** pour ce qu'il indexe bien — espace, épinglage, cycle de vie, et
+///   l'appartenance à un tag via `note_tags` ;
+/// - **Rust** pour la recherche texte, qui demande un repliage de casse
+///   Unicode (cf. [`matches_search`]) ;
+/// - [`sections`] pour le regroupement, qui ne touche pas à la base.
+///
+/// Une vue sans aucune note est une réponse valide (premier lancement, ou
+/// recherche infructueuse — `is_filtering` permet de distinguer les deux).
+pub fn query(connection: &Connection, request: &NotesQuery) -> Result<NotesView, StorageError> {
+    let mut conditions: Vec<String> = Vec::new();
+    let mut params: Vec<Box<dyn ToSql>> = Vec::new();
+
+    if let Some(space_id) = &request.space_id {
+        params.push(Box::new(space_id.clone()));
+        conditions.push(format!("space_id = ?{}", params.len()));
+    }
+
+    match request.filter {
+        NoteFilter::All => {}
+        NoteFilter::Pinned => conditions.push("pinned = 1".to_string()),
+        NoteFilter::Untriaged => conditions.push("lifecycle_kind = 'expires'".to_string()),
+    }
+
+    // Les tags reçus passent par la même normalisation que ceux écrits, sinon
+    // un `#urgent` saisi au clavier ne retrouverait pas le tag `urgent` stocké.
+    let selected_tags = normalize_tags(&request.tags);
+    if !selected_tags.is_empty() {
+        let placeholders: Vec<String> = selected_tags
+            .iter()
+            .map(|tag| {
+                params.push(Box::new(tag.clone()));
+                format!("?{}", params.len())
+            })
+            .collect();
+        // « au moins un tag », pas « tous » : c'est le comportement d'un rail de facettes.
+        conditions.push(format!(
+            "EXISTS (SELECT 1 FROM note_tags WHERE note_id = notes.id AND tag IN ({}))",
+            placeholders.join(", ")
+        ));
+    }
+
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", conditions.join(" AND "))
+    };
+
+    // Le tri est décidé ici, une fois : le front conserve l'ordre reçu.
+    let mut statement = connection.prepare(&format!(
+        "SELECT {NOTE_COLUMNS} FROM notes{where_clause} ORDER BY updated_at DESC, id"
+    ))?;
+    let bound: Vec<&dyn ToSql> = params.iter().map(|param| param.as_ref()).collect();
     let mut notes = statement
-        .query_map([], row_to_note)?
+        .query_map(bound.as_slice(), row_to_note)?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
+    let mut tags = all_tags(connection)?;
     for note in &mut notes {
         note.tags = tags.remove(&note.id).unwrap_or_default();
     }
 
-    Ok(notes)
+    // Après le rattachement des tags : la recherche porte aussi sur eux.
+    let needle = request.search.trim().to_lowercase();
+    if !needle.is_empty() {
+        notes.retain(|note| matches_search(note, &needle));
+    }
+
+    // Le filtre rapide (épinglées / à trier) ne bascule pas en mode résultats :
+    // il restreint une vue qui reste chronologique.
+    let is_filtering = !needle.is_empty() || !selected_tags.is_empty();
+    let matched = notes.len();
+
+    let offset = sections::offset_from_minutes(request.tz_offset_minutes);
+    let now = DateTime::parse_from_rfc3339(&request.now)
+        .map(|instant| instant.with_timezone(&offset))
+        .unwrap_or_else(|_| Utc::now().with_timezone(&offset));
+
+    Ok(NotesView {
+        sections: sections::build(notes, is_filtering, &now, &offset),
+        available_tags: available_tags(connection, request.space_id.as_deref())?,
+        is_filtering,
+        matched,
+    })
 }
 
 fn find(connection: &Connection, id: &str) -> Result<Option<Note>, StorageError> {
@@ -147,7 +320,7 @@ pub fn create(
         return Err(StorageError::SpaceNotFound(draft.space_id.clone()));
     }
 
-    let note = Note {
+    let mut note = Note {
         id: Uuid::new_v4().to_string(),
         space_id: draft.space_id.clone(),
         title: draft.title.clone(),
@@ -181,7 +354,9 @@ pub fn create(
             expires_at,
         ],
     )?;
-    replace_tags(&transaction, &note.id, &note.tags)?;
+    // La note renvoyée doit refléter ce qui est réellement en base : les tags
+    // écrits sont normalisés, pas ceux du brouillon.
+    note.tags = replace_tags(&transaction, &note.id, &draft.tags)?;
 
     transaction.commit()?;
 
@@ -255,8 +430,7 @@ pub fn update(
     )?;
 
     if let Some(tags) = &patch.tags {
-        note.tags = tags.clone();
-        replace_tags(&transaction, &note.id, &note.tags)?;
+        note.tags = replace_tags(&transaction, &note.id, tags)?;
     }
 
     transaction.commit()?;
@@ -514,6 +688,501 @@ mod tests {
         let error = delete(&connection, "inconnu").unwrap_err();
 
         assert!(matches!(error, StorageError::NoteNotFound(_)));
+    }
+
+    /// Neutral query: everything, no search, no tags. Tests override one field
+    /// at a time so each one states exactly what it exercises.
+    fn all_notes() -> NotesQuery {
+        NotesQuery {
+            space_id: None,
+            search: String::new(),
+            filter: NoteFilter::All,
+            tags: Vec::new(),
+            now: T1.to_string(),
+            tz_offset_minutes: 0,
+        }
+    }
+
+    fn matched_ids(view: &NotesView) -> Vec<String> {
+        view.sections
+            .iter()
+            .flat_map(|section| section.notes.iter().map(|note| note.id.clone()))
+            .collect()
+    }
+
+    fn tagged(space_id: &str, tags: &[&str]) -> NoteDraft {
+        NoteDraft {
+            tags: tags.iter().map(|tag| tag.to_string()).collect(),
+            ..draft(space_id)
+        }
+    }
+
+    #[test]
+    fn a_query_without_criteria_returns_every_note() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &draft(&space_id), T0).unwrap();
+
+        let view = query(&connection, &all_notes()).unwrap();
+
+        assert_eq!(view.matched, 1);
+        assert!(!view.is_filtering);
+    }
+
+    #[test]
+    fn the_space_filter_excludes_the_other_spaces() {
+        let mut connection = open_in_memory().unwrap();
+        let here = space(&connection, "Perso");
+        let elsewhere = space(&connection, "Boulot");
+        let kept = create(&mut connection, &draft(&here), T0).unwrap();
+        create(&mut connection, &draft(&elsewhere), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                space_id: Some(here),
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(matched_ids(&view), [kept.id]);
+    }
+
+    #[test]
+    fn no_space_means_every_space_rather_than_none() {
+        let mut connection = open_in_memory().unwrap();
+        let here = space(&connection, "Perso");
+        let elsewhere = space(&connection, "Boulot");
+        create(&mut connection, &draft(&here), T0).unwrap();
+        create(&mut connection, &draft(&elsewhere), T0).unwrap();
+
+        let view = query(&connection, &all_notes()).unwrap();
+
+        assert_eq!(view.matched, 2);
+    }
+
+    #[test]
+    fn the_pinned_filter_keeps_only_pinned_notes() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        let pinned = create(
+            &mut connection,
+            &NoteDraft {
+                pinned: true,
+                ..draft(&space_id)
+            },
+            T0,
+        )
+        .unwrap();
+        create(&mut connection, &draft(&space_id), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                filter: NoteFilter::Pinned,
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(matched_ids(&view), [pinned.id]);
+    }
+
+    #[test]
+    fn the_untriaged_filter_keeps_only_expiring_notes() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        let expiring = create(
+            &mut connection,
+            &NoteDraft {
+                lifecycle: NoteLifecycle::Expires {
+                    at: "2026-08-01T00:00:00.000Z".to_string(),
+                },
+                ..draft(&space_id)
+            },
+            T0,
+        )
+        .unwrap();
+        create(&mut connection, &draft(&space_id), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                filter: NoteFilter::Untriaged,
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(matched_ids(&view), [expiring.id]);
+    }
+
+    #[test]
+    fn a_quick_filter_alone_does_not_switch_to_results_mode() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &draft(&space_id), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                filter: NoteFilter::Pinned,
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        // Pinned/untriaged narrow a view that stays chronological; only a search
+        // or a tag selection collapses it into a flat result list.
+        assert!(!view.is_filtering);
+    }
+
+    #[test]
+    fn the_search_matches_the_title_the_content_and_the_tags() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        let by_title = create(
+            &mut connection,
+            &NoteDraft {
+                title: "Script de deploiement".to_string(),
+                content: String::new(),
+                tags: Vec::new(),
+                ..draft(&space_id)
+            },
+            T0,
+        )
+        .unwrap();
+        let by_content = create(
+            &mut connection,
+            &NoteDraft {
+                title: String::new(),
+                content: "kubectl rollout".to_string(),
+                tags: Vec::new(),
+                ..draft(&space_id)
+            },
+            T0,
+        )
+        .unwrap();
+        let by_tag = create(&mut connection, &tagged(&space_id, &["urgent"]), T0).unwrap();
+
+        for (needle, expected) in [
+            ("deploiement", &by_title),
+            ("rollout", &by_content),
+            ("urgent", &by_tag),
+        ] {
+            let view = query(
+                &connection,
+                &NotesQuery {
+                    search: needle.to_string(),
+                    ..all_notes()
+                },
+            )
+            .unwrap();
+            assert_eq!(matched_ids(&view), [expected.id.clone()], "needle: {needle}");
+        }
+    }
+
+    #[test]
+    fn the_search_ignores_case_beyond_ascii() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(
+            &mut connection,
+            &NoteDraft {
+                title: "Étape de migration".to_string(),
+                ..draft(&space_id)
+            },
+            T0,
+        )
+        .unwrap();
+
+        // SQLite's LOWER() only folds ASCII, so "É" would never match "é" if the
+        // search were pushed into SQL. This is why it is done in Rust.
+        let view = query(
+            &connection,
+            &NotesQuery {
+                search: "étape".to_string(),
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(view.matched, 1);
+    }
+
+    #[test]
+    fn a_blank_search_is_not_a_search() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &draft(&space_id), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                search: "   ".to_string(),
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        assert!(!view.is_filtering);
+        assert_eq!(view.matched, 1);
+    }
+
+    #[test]
+    fn a_note_matches_when_it_carries_at_least_one_selected_tag() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        let one = create(&mut connection, &tagged(&space_id, &["urgent"]), T0).unwrap();
+        let two = create(&mut connection, &tagged(&space_id, &["later"]), T0).unwrap();
+        create(&mut connection, &tagged(&space_id, &["neither"]), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                tags: vec!["urgent".to_string(), "later".to_string()],
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        // A facet rail is a union, not an intersection: requiring every tag
+        // would make a second selection almost always empty.
+        let ids = matched_ids(&view);
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&one.id) && ids.contains(&two.id));
+        assert!(view.is_filtering);
+    }
+
+    #[test]
+    fn a_selected_tag_is_normalised_like_a_stored_one() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &tagged(&space_id, &["urgent"]), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                tags: vec![" #urgent ".to_string()],
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(view.matched, 1);
+    }
+
+    #[test]
+    fn criteria_combine_rather_than_replace_each_other() {
+        let mut connection = open_in_memory().unwrap();
+        let here = space(&connection, "Perso");
+        let elsewhere = space(&connection, "Boulot");
+
+        let target = create(
+            &mut connection,
+            &NoteDraft {
+                title: "deploy".to_string(),
+                pinned: true,
+                tags: vec!["urgent".to_string()],
+                ..draft(&here)
+            },
+            T0,
+        )
+        .unwrap();
+        // Each of these fails exactly one criterion.
+        create(
+            &mut connection,
+            &NoteDraft {
+                title: "deploy".to_string(),
+                pinned: true,
+                tags: vec!["later".to_string()],
+                ..draft(&here)
+            },
+            T0,
+        )
+        .unwrap();
+        create(
+            &mut connection,
+            &NoteDraft {
+                title: "deploy".to_string(),
+                pinned: false,
+                tags: vec!["urgent".to_string()],
+                ..draft(&here)
+            },
+            T0,
+        )
+        .unwrap();
+        create(
+            &mut connection,
+            &NoteDraft {
+                title: "autre".to_string(),
+                pinned: true,
+                tags: vec!["urgent".to_string()],
+                ..draft(&here)
+            },
+            T0,
+        )
+        .unwrap();
+        create(
+            &mut connection,
+            &NoteDraft {
+                title: "deploy".to_string(),
+                pinned: true,
+                tags: vec!["urgent".to_string()],
+                ..draft(&elsewhere)
+            },
+            T0,
+        )
+        .unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                space_id: Some(here),
+                search: "deploy".to_string(),
+                filter: NoteFilter::Pinned,
+                tags: vec!["urgent".to_string()],
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(matched_ids(&view), [target.id]);
+    }
+
+    #[test]
+    fn available_tags_are_sorted_and_de_duplicated() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &tagged(&space_id, &["zeta", "alpha"]), T0).unwrap();
+        create(&mut connection, &tagged(&space_id, &["alpha", "beta"]), T0).unwrap();
+
+        let view = query(&connection, &all_notes()).unwrap();
+
+        assert_eq!(view.available_tags, ["alpha", "beta", "zeta"]);
+    }
+
+    #[test]
+    fn available_tags_are_scoped_to_the_active_space() {
+        let mut connection = open_in_memory().unwrap();
+        let here = space(&connection, "Perso");
+        let elsewhere = space(&connection, "Boulot");
+        create(&mut connection, &tagged(&here, &["here-tag"]), T0).unwrap();
+        create(&mut connection, &tagged(&elsewhere, &["elsewhere-tag"]), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                space_id: Some(here),
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        // Offering a tag that filters nothing in the current space is noise.
+        assert_eq!(view.available_tags, ["here-tag"]);
+    }
+
+    #[test]
+    fn available_tags_ignore_the_current_search_and_selection() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &tagged(&space_id, &["urgent"]), T0).unwrap();
+        create(&mut connection, &tagged(&space_id, &["later"]), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                tags: vec!["urgent".to_string()],
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        // Narrowing the rail to the current results would empty it after the
+        // first click and make a second selection impossible.
+        assert_eq!(view.available_tags, ["later", "urgent"]);
+        assert_eq!(view.matched, 1);
+    }
+
+    #[test]
+    fn a_search_matching_nothing_reports_filtering_with_zero_matches() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &draft(&space_id), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                search: "introuvable".to_string(),
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        // The pair (is_filtering, matched) is what lets the UI say "no results"
+        // rather than "this space is empty".
+        assert!(view.is_filtering);
+        assert_eq!(view.matched, 0);
+    }
+
+    #[test]
+    fn the_view_orders_notes_most_recently_updated_first() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        let older = create(&mut connection, &draft(&space_id), T0).unwrap();
+        let newer = create(&mut connection, &draft(&space_id), T1).unwrap();
+
+        let view = query(&connection, &all_notes()).unwrap();
+
+        assert_eq!(matched_ids(&view), [newer.id, older.id]);
+    }
+
+    #[test]
+    fn tags_are_normalised_on_write() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+
+        let created = create(
+            &mut connection,
+            &tagged(&space_id, &["  #urgent ", "URGENT", "", " # ", "later"]),
+            T0,
+        )
+        .unwrap();
+
+        // Padding and leading hashes are stripped, blanks dropped, and the
+        // case-insensitive duplicate collapses onto the first spelling.
+        assert_eq!(created.tags, ["later", "urgent"]);
+        assert_eq!(list(&connection).unwrap()[0].tags, ["later", "urgent"]);
+    }
+
+    #[test]
+    fn a_normalised_write_returns_what_a_read_would_return() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+
+        let created = create(&mut connection, &tagged(&space_id, &["zeta", "alpha"]), T0).unwrap();
+
+        // The front adopts the returned note; a different order here would make
+        // the tags jump around on the next reload.
+        assert_eq!(created.tags, list(&connection).unwrap()[0].tags);
+    }
+
+    #[test]
+    fn normalisation_keeps_the_first_spelling_of_a_duplicate() {
+        assert_eq!(
+            normalize_tags(&["Urgent".to_string(), "urgent".to_string()]),
+            ["Urgent"]
+        );
+    }
+
+    #[test]
+    fn normalisation_strips_only_leading_hashes() {
+        assert_eq!(
+            normalize_tags(&["##c++".to_string(), "a#b".to_string()]),
+            ["c++", "a#b"]
+        );
     }
 
     #[test]

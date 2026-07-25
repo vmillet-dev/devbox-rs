@@ -10,9 +10,9 @@ describe('IpcError', () => {
   });
 
   it('builds a readable message from a string cause, which is what Rust Err values usually are', () => {
-    const error = new IpcError('list_notes', 'no such table: notes');
+    const error = new IpcError('query_notes', 'no such table: notes');
 
-    expect(error.message).toContain('list_notes');
+    expect(error.message).toContain('query_notes');
     expect(error.message).toContain('no such table: notes');
   });
 
@@ -31,5 +31,45 @@ describe('IpcError', () => {
   it('is an Error, so it survives being thrown and caught', () => {
     expect(new IpcError('saluer', 'x')).toBeInstanceOf(Error);
     expect(new IpcError('saluer', 'x').name).toBe('IpcError');
+  });
+
+  describe('structured causes', () => {
+    it('exposes the code and params of an AppError so callers can branch on the cause', () => {
+      // Discriminating on the code is what lets the UI show a translated
+      // message instead of the French string Rust produced.
+      const error = new IpcError('create_space', {
+        code: 'duplicateSpaceName',
+        params: { name: 'Perso' },
+        detail: 'Un espace nommé « Perso » existe déjà',
+      });
+
+      expect(error.code).toBe('duplicateSpaceName');
+      expect(error.params['name']).toBe('Perso');
+    });
+
+    it('uses the detail as the readable message', () => {
+      const error = new IpcError('delete_note', {
+        code: 'noteNotFound',
+        params: { id: 'n-1' },
+        detail: 'Note introuvable : n-1',
+      });
+
+      expect(error.message).toContain('Note introuvable : n-1');
+    });
+
+    it('reports no code when Tauri itself rejects with a string', () => {
+      // An unknown command or an argument that fails to deserialise never
+      // reaches our AppError, so the code has to stay optional.
+      const error = new IpcError('query_notes', 'command not found');
+
+      expect(error.code).toBeNull();
+      expect(error.params).toEqual({});
+    });
+
+    it('reports no code for an object that is not an AppError', () => {
+      const error = new IpcError('update_note', { unexpected: true });
+
+      expect(error.code).toBeNull();
+    });
   });
 });

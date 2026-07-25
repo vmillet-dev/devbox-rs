@@ -28,6 +28,7 @@
 //! l'utilisateur. Chaque migration est atomique (DDL transactionnel).
 
 pub mod notes;
+pub mod sections;
 pub mod spaces;
 
 use std::fmt;
@@ -57,8 +58,8 @@ const SCHEMA_VERSION: i32 = 1;
 
 /// Schéma initial.
 ///
-/// Deux choix structurants, pris pour que le filtrage puisse descendre côté
-/// Rust sans re-migration :
+/// Deux choix structurants, qui ont permis au filtrage de descendre côté Rust
+/// sans re-migration (cf. `storage::notes::query`) :
 /// - `lifecycle` est éclaté en deux colonnes plutôt que stocké en JSON, sinon
 ///   « ce qui expire avant telle date » ne serait pas requêtable ;
 /// - les tags sont dans leur propre table plutôt qu'en colonne sérialisée, sinon
@@ -71,9 +72,9 @@ CREATE TABLE spaces (
     name TEXT NOT NULL
 );
 
--- Le front refuse déjà les homonymes à la création ; l'index est le garde-fou
--- côté stockage. NOCASE ne couvre que l'ASCII, il est donc plus permissif que
--- la comparaison du front — c'est le bon sens de l'écart.
+-- L'unicité des noms est tranchée ici et nulle part ailleurs : `spaces::create`
+-- la vérifie pour produire une erreur lisible, cet index la garantit même si
+-- une écriture passait à côté. NOCASE ne replie que l'ASCII.
 CREATE UNIQUE INDEX spaces_name_unique ON spaces (name COLLATE NOCASE);
 
 CREATE TABLE notes (
@@ -111,12 +112,14 @@ COMMIT;
 
 /// Échecs de la couche de persistance.
 ///
-/// Le `Display` de cette enum ressort **tel quel dans l'interface** (les
-/// commandes le convertissent en `String`, que le front affiche via `IpcError`) :
-/// les messages sont donc rédigés pour un lecteur humain, en français.
+/// Les commandes convertissent ces variantes en `AppError` (voir
+/// `commands/error.rs`) : la variante devient un **code** que le front traduit,
+/// et le `Display` ci-dessous n'est plus que le détail technique affiché en
+/// second plan. C'est pourquoi il peut rester en français.
 #[derive(Debug)]
 pub enum StorageError {
-    /// Note introuvable. Le front s'en sert pour annuler sa mise à jour optimiste.
+    /// Note introuvable — jamais un `Ok` silencieux, sinon le front croirait
+    /// avoir enregistré.
     NoteNotFound(String),
     /// Espace visé par une note inexistant : la note n'aurait nulle part où être rangée.
     SpaceNotFound(String),

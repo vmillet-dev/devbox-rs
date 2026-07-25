@@ -13,6 +13,14 @@ Notes and spaces are complete end to end: the front-end has no in-memory dataset
 read and write goes through `invoke()`, and the Rust commands persist to an embedded SQLite
 database. The remaining domains (`crypto`, `formatters`) are still unregistered stubs.
 
+**Where the work happens.** Data processing belongs to Rust. Filtering (space, full-text,
+tags, quick filters), grouping into display sections, tag aggregation and tag normalisation
+all run in `src-tauri/src/storage/`. The front-end describes what the user asked for and
+renders the view it gets back — it does not filter, sort or group. The deliberate exceptions
+are relative-time labels (they must age on their own, without a round trip), the ISO ↔ `Date`
+conversion at the serialisation boundary, and plain UI concerns like keyboard shortcuts and
+editor drafts.
+
 ```
 src/                Angular front-end
 ├── app/
@@ -68,16 +76,28 @@ which also renders the hint, rather than travelling down a chain of `viewChild` 
 
 ### State
 
-`NotesStore` (`providedIn: 'root'`) holds the notes plus the UI query state — search text,
-active filter, selected tags, selected note — and derives the rest as `computed()`:
-notes of the active space → filtered notes → display sections → selected note.
+`NotesStore` (`providedIn: 'root'`) holds the **query state** — search text, active filter,
+selected tags, selected note — and the view the back-end returned for it. It does no
+filtering, sorting or grouping of its own: those criteria are sent to `query_notes`, and
+`sections`, `allTags`, `isFiltering` and `hasNoResults` are all reads of the resulting
+`NotesView`.
+
+Two consequences worth knowing:
+
+- **The search is debounced (`SEARCH_DEBOUNCE_MS`, 150 ms).** The field updates on every
+  keystroke so typing never lags, but the query crosses the IPC bridge, and one round trip
+  per character would be wasted work.
+- **The last view is kept during a reload** (a `linkedSignal` over the resource). Otherwise
+  each debounced keystroke would blank the canvas and the list would flicker between
+  "Loading…" and the results. `isLoading` is therefore true only until the _first_ view
+  arrives. That `linkedSignal` only retains what it has been read through, so everything the
+  store exposes reads it, and `isLoading` does so without short-circuiting.
 
 `SpacesStore` owns the spaces and the active one. Two decisions matter there:
 
 - **The active space is a filter, not a label.** `NotesStore` injects `SpacesStore` (never the
-  other way round) and reads `activeSpaceId()` at the head of its derivation chain, so the
-  space also scopes the tag rail — a tag that filters nothing in the current space has no
-  reason to be offered.
+  other way round) and sends `activeSpaceId()` with every query, so the space also scopes the
+  tag rail — a tag that filters nothing in the current space has no reason to be offered.
 - **`null` means "all spaces", and is a choice, not a loading state.** There is deliberately
   no "All" row in the data: it would be a phantom space that notes could be filed into by
   mistake. The label lives in the translations, and an active id matching no known space
@@ -93,32 +113,44 @@ Rules of the house:
   `private readonly _x = signal(...)` plus `readonly x = this._x.asReadonly()`. Every
   mutation therefore goes through a method, which stays the single entry point the day a
   write becomes more than a `set()`.
-- **Loading is a `resource()`.** It provides `isLoading`, `error` and `reload()` for free,
-  and its value is writable, so local mutations apply to it without duplicating the list in
-  a second signal. Note that `resource.value()` **throws** while the resource is in error;
-  read it through a `hasValue()` guard.
-- **Writes are optimistic.** The UI updates immediately, then persistence either confirms
-  (the returned note is adopted, it is authoritative) or fails — in which case only the
-  affected note is rolled back and an `ErrorNotifier` message is raised. Rolling the whole
-  list back would clobber concurrent edits.
-- **Ids and timestamps come from persistence**, never from the front-end.
+- **The view is a parameterised `resource()`.** Its params are the query criteria plus the
+  current **local day** — not `clock.now()`, which would fire a query on every 30 s tick
+  while only the day affects section boundaries. The exact instant is read `untracked` in
+  the loader. `resource.value()` **throws** while the resource is in error; read it through
+  a `hasValue()` guard.
+- **The back-end is authoritative; writes are not optimistic.** A mutation persists, adopts
+  the returned note, then reloads the view. Nothing is applied locally first, so there is
+  nothing to roll back on failure — an `ErrorNotifier` message is raised and the screen still
+  shows what is actually stored. A write can move a note between sections, which is precisely
+  why the view is recomputed rather than patched.
+- **Ids, timestamps and normalisation come from persistence**, never from the front-end.
 - Derived state is `computed()`, never a manually maintained signal.
-- Grouping and formatting logic that needs no injection lives in `core/utils/` as pure
-  functions taking `now: Date` as a parameter.
+- Formatting logic that needs no injection lives in `core/utils/` as pure functions taking
+  `now: Date` as a parameter.
 
 ### Display sections
 
-`groupNotesIntoSections` classifies notes into `pinned`, `today`, `week` and `older`. The
-classification is **exhaustive**: apart from pinned notes, each note falls into exactly one
-section. This is a guarantee, not an implementation detail — a note belonging to no section
-is unreachable in the UI, search included.
+Sections are built in Rust (`src-tauri/src/storage/sections.rs`) and arrive ready to render.
+The front-end preserves the order it receives and never drops or merges a section.
 
-As soon as a search query or a tag filter is active, the view switches to a single flat
-`results` section (`toSearchResultsSection`). Spreading search results across date sections
-dilutes them and hides matches at the bottom of the page.
+The classification into `pinned`, `today`, `week` and `older` is **exhaustive**: apart from
+pinned notes, each note falls into exactly one section — a note belonging to no section is
+unreachable in the UI, search included. An unparseable `created_at` lands in `older` rather
+than disappearing. The `week` section is always present because it hosts the "paste or
+create" ghost card.
 
-A section's key **is** its translation key (`'sections.' + key`), so no label is kept in
-sync by hand.
+As soon as a search query or a tag selection is active, the view collapses into a single flat
+`results` section. Spreading search results across date sections dilutes them and hides
+matches at the bottom of the page. A quick filter (`pinned` / `untriaged`) does **not**
+trigger this: it narrows a view that stays chronological.
+
+Day boundaries are **local**, so the query carries `tzOffsetMinutes` alongside `now`. Without
+it a note created at 23:00 would be filed under the wrong day. Beware the sign: JavaScript's
+`getTimezoneOffset()` returns −120 for UTC+2, the opposite of what chrono's `FixedOffset`
+expects.
+
+A section's key **is** its translation key (`'sections.' + key`), which is why the Rust enum
+serialises to `"pinned"` / `"today"` / … and no user-visible label ever crosses the bridge.
 
 ### Editing a note
 
@@ -146,8 +178,10 @@ place where the application's data source is chosen**. Both are bound to the `Ta
 repositories; the only remaining doubles are the test ones in `src/testing/`, injected by
 `provideAppTesting()`.
 
-The notes contract is complete (`loadAll` / `create` / `update` / `delete`); spaces expose
-`loadAll` / `create`. Renaming and deleting a space are not implemented on either side: the
+The notes contract is `query` / `create` / `update` / `delete`; spaces expose `loadAll` /
+`create`. There is deliberately **no method returning the raw list of notes** — offering one
+would invite a caller to filter it again. Renaming and deleting a space are not implemented
+on either side: the
 open question is what happens to the notes of a deleted space (cascade, or move to a default
 space). Moving a note is already expressible — `spaceId` is part of `NotePatch`.
 
@@ -157,7 +191,28 @@ Keep this seam intact: no component calls `invoke()`, and `IpcService` is its on
 
 All calls go through `IpcService` (`core/ipc/`), which types command names as a literal
 union — a typo would otherwise only surface at runtime as "command not found" — and wraps
-every failure in `IpcError`, carrying the failing command and the raw Rust `Err` value.
+every failure in `IpcError`.
+
+### Error contract
+
+Commands return `Result<T, AppError>`, never `Result<T, String>`. An `AppError`
+(`src-tauri/src/commands/error.rs`) carries a stable **code**, its interpolation **params**
+and a technical **detail**:
+
+```json
+{ "code": "duplicateSpaceName", "params": { "name": "Perso" }, "detail": "Un espace nommé …" }
+```
+
+This exists because business rules live in Rust. A message written there would be French in
+an English UI, and branching on a cause would mean parsing a sentence that breaks at the
+first rewording. Instead the front maps the code to a translation key —
+`duplicateSpaceName` → `errors.spaceNameTaken` with `{{name}}` — and shows `detail` as
+secondary text. `IpcErrorCode` mirrors the Rust `ErrorCode`; adding a variant on one side
+means adding it on the other.
+
+`IpcError.code` is `null` when the rejection is not one of ours: Tauri itself rejects with a
+plain string for an unknown command or an argument that fails to deserialise, and that case
+must stay readable.
 
 ### Serialisation contract
 
@@ -186,17 +241,23 @@ serialise to `null` and overwrite the stored value instead of leaving it untouch
 - **Every** command must be registered in `tauri::generate_handler![...]` in
   `src-tauri/src/lib.rs`, or the call fails at runtime even though the Rust compiles fine.
 
-The commands the front-end calls — `list_notes`, `create_note`, `update_note`, `delete_note`,
+The commands the front-end calls — `query_notes`, `create_note`, `update_note`, `delete_note`,
 `list_spaces`, `create_space` — live in `src-tauri/src/commands/notes.rs` and `spaces.rs`.
-They are **adapters only**: lock the shared connection, delegate to `storage::`, map the error
-to a `String`. The guarantees the front-end relies on (persisted value returned, `Err` on an
-unknown id, "absent field means unchanged" for patches) are implemented and tested in
-`src-tauri/src/storage/`.
+They are **adapters only**: lock the shared connection, delegate to `storage::`, convert the
+error to an `AppError`. The guarantees the front-end relies on (persisted value returned,
+`Err` on an unknown id, "absent field means unchanged" for patches) are implemented and tested
+in `src-tauri/src/storage/`.
+
+`query_notes` takes a `NotesQuery` (space, search, quick filter, tags, `now`,
+`tzOffsetMinutes`) and returns a `NotesView` (sections, `availableTags`, `isFiltering`,
+`matched`). The pair `isFiltering` + `matched` is what lets the UI distinguish "no results"
+from "this space is empty" without recomputing anything.
 
 The serialisation contract is pinned by tests in `commands/notes.rs` rather than left to
-review: they assert the emitted JSON keys are camelCase and that a lifecycle serialises to
-`{"kind":"expires","at":…}`. A serde attribute deleted by accident fails `cargo test` instead
-of silently breaking the UI.
+review: they assert the emitted JSON keys are camelCase, that a lifecycle serialises to
+`{"kind":"expires","at":…}`, that a section key serialises to `"older"` and that an error code
+serialises to `"noteNotFound"`. A serde attribute deleted by accident fails `cargo test`
+instead of silently breaking the UI.
 
 ## Persistence (Rust)
 
@@ -214,15 +275,25 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
   adding a `MIGRATION_N` constant and a branch in `migrate` — never editing a shipped
   migration, it has already run on user machines. Each migration is atomic. A database written
   by a newer build is refused rather than misread.
-- **Schema choices that keep filtering movable to the back-end.** `lifecycle` is split into
+- **Schema choices that made filtering movable to the back-end.** `lifecycle` is split into
   `lifecycle_kind` + `lifecycle_expires_at` columns rather than stored as JSON, and tags live
   in their own `note_tags` table rather than in a serialised column. Both exist so that
-  filtering by tag, or querying what expires before a date, becomes a `WHERE` clause instead
-  of a full re-read. `PRAGMA foreign_keys` is set per connection, which is what makes the
-  `ON DELETE CASCADE` on notes and tags actually fire.
-- **Ordering is the back-end's call.** `list_notes` returns everything ordered by
-  `updated_at DESC`; the front-end preserves the order it receives when grouping into
-  sections, so this query decides what the user sees first.
+  filtering by tag, or querying what expires before a date, is a `WHERE` clause instead of a
+  full re-read — which is why `query_notes` needed no migration. `PRAGMA foreign_keys` is set
+  per connection, which is what makes the `ON DELETE CASCADE` on notes and tags actually fire.
+- **Ordering is the back-end's call.** `storage::notes::query` orders by `updated_at DESC, id`;
+  the front-end preserves the order it receives, so this one query decides what the user sees
+  first.
+- **Querying splits the work by what each tool does well.** SQL handles what it indexes —
+  space, pin state, lifecycle, and tag membership through `EXISTS` on `note_tags`. Full-text
+  matching is done **in Rust**, because SQLite's `LOWER()` only folds ASCII without ICU, so
+  `Étape` would not match `étape`. Grouping is delegated to `storage::sections`, which touches
+  no connection at all and is therefore testable without a database.
+- **Tag normalisation lives in `replace_tags`, and only there.** Trimming, stripping leading
+  `#`, dropping blanks and collapsing case-insensitive duplicates (first spelling wins) all
+  happen on write, so the front sends what the user typed. The returned tags are sorted to
+  match what a read gives back — otherwise a note's tags would reorder themselves on the next
+  reload.
 - **Timestamps are injected, not read.** `storage::notes` takes `now` as a parameter and the
   command passes `storage::now_iso()` — the same reason `ClockService` exists on the front.
   Millisecond precision is deliberate: two notes saved within one second would otherwise be
@@ -338,7 +409,18 @@ a new data seam does not have to be added to a dozen spec files by hand.
 
 `FakeNotesRepository` and `FakeSpacesRepository` behave like real persistence (they own the
 list and assign ids and timestamps) and expose `failNext`, which is what makes the stores'
-rollback paths testable at all.
+failure paths testable at all.
+
+`FakeNotesRepository` deliberately **does not** reimplement filtering, grouping or tag
+normalisation: those live in Rust and are tested there. Duplicating them in the double would
+let a front-end spec pass against rules the real back-end does not apply. It wraps its notes
+in a trivial single-section view, and a spec needing a specific shape (search results, empty
+results, several sections) pins one with `setView`. `lastQuery` and `queryCount` expose what
+the store asked for — which is the part of querying the front-end still owns.
+
+That split also decides where a test belongs: assertions about _what is shown_ (which notes
+match, which section they land in, how tags are cleaned) go in `src-tauri/`, while the
+front-end specs cover assembling the query, pacing it, and reacting to what comes back.
 
 Component specs follow one consistent pattern:
 
@@ -356,9 +438,10 @@ Component specs follow one consistent pattern:
   DOM. This lets Angular's own scheduler decide when to re-render, as it would in
   production, instead of forcing synchronous checks.
 - For date-dependent output (relative time, expiry), use
-  `vi.useFakeTimers({ toFake: ['Date'] })` with `vi.setSystemTime(...)`. **Never** call
-  `vi.useFakeTimers()` without a `toFake` list here: it also fakes `requestAnimationFrame`,
-  which the zoneless scheduler relies on, and `await fixture.whenStable()` will hang forever.
+  `vi.useFakeTimers({ toFake: ['Date'] })` with `vi.setSystemTime(...)`; for the search
+  debounce, `toFake: ['setTimeout', 'clearTimeout']`. **Never** call `vi.useFakeTimers()`
+  without a `toFake` list here: it also fakes `requestAnimationFrame`, which the zoneless
+  scheduler relies on, and `await fixture.whenStable()` will hang forever.
   `clock.service.spec.ts` is the one exception — it asserts on the interval itself.
 - Anything asserting on `document.activeElement` must attach `fixture.nativeElement` to the
   document; jsdom does not track focus for detached elements.
@@ -378,3 +461,9 @@ so they exercise the actual schema, constraints and cascades, not a simplified s
 pass timestamps explicitly instead of reading the clock, which is what makes assertions on
 `created_at` / `updated_at` deterministic. Test names and comments are in English, like the
 front-end specs.
+
+Now that the display rules live here, so do their tests: `storage::sections` covers grouping,
+exhaustiveness and the local-midnight boundary as pure functions, and `storage::notes` covers
+each filter alone and combined, accent-insensitive search, the scoping of `available_tags`,
+and tag normalisation. `storage::notes::list` survives only as a `#[cfg(test)]` helper — no
+command returns a raw list.

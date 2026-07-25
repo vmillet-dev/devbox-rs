@@ -2,12 +2,20 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { Note } from '@core/models/note.model';
+import { NotesView } from '@core/models/notes-query.model';
 import { Space } from '@core/models/space.model';
 import { SpacesStore } from '@core/stores/spaces.store';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
-import { NotesStore } from './notes.store';
+import { NotesStore, SEARCH_DEBOUNCE_MS } from './notes.store';
+
+/**
+ * Filtering, grouping and tag normalisation are the backend's job now and are
+ * tested in `src-tauri/src/storage/`. What is left here is what the front still
+ * owns: assembling the query, pacing it, adopting what comes back, and
+ * surviving a failure.
+ */
 
 /** `space-1` is the space the note fixture belongs to. */
 const SPACES: readonly Space[] = [
@@ -21,7 +29,6 @@ interface Harness {
   readonly spaces: SpacesStore;
 }
 
-/** Creates a `NotesStore` backed by a fake repository and waits for the initial load to settle. */
 async function createStore(notes: Note[] = [], spaces: readonly Space[] = SPACES): Promise<Harness> {
   const repository = new FakeNotesRepository(notes);
   TestBed.configureTestingModule({
@@ -36,6 +43,16 @@ async function createStore(notes: Note[] = [], spaces: readonly Space[] = SPACES
   return { store, repository, spaces: spacesStore };
 }
 
+/** Notes as the store currently displays them, across every section. */
+function visibleIds(store: NotesStore): string[] {
+  return store.sections().flatMap((section) => section.notes.map((note) => note.id));
+}
+
+/** Waits for the repository to have been asked a further question. */
+async function awaitQuery(repository: FakeNotesRepository, previous: number): Promise<void> {
+  await vi.waitFor(() => expect(repository.queryCount).toBeGreaterThan(previous));
+}
+
 describe('NotesStore', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -45,219 +62,199 @@ describe('NotesStore', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('loads notes from the repository on creation', async () => {
+  it('shows the view the backend returned', async () => {
     const { store } = await createStore([createNote({ id: 'a' }), createNote({ id: 'b' })]);
 
-    expect(store.filteredNotes().map((note) => note.id)).toEqual(['a', 'b']);
+    expect(visibleIds(store)).toEqual(['a', 'b']);
+  });
+
+  describe('query parameters', () => {
+    it('sends no space while all spaces are shown', async () => {
+      const { repository } = await createStore([createNote()]);
+
+      // null is a deliberate choice ("every space"), not a missing value.
+      expect(repository.lastQuery?.spaceId).toBeNull();
+    });
+
+    it('sends the active space once one is selected', async () => {
+      const { repository, spaces } = await createStore([createNote()]);
+      const before = repository.queryCount;
+
+      spaces.selectSpace('space-2');
+      await awaitQuery(repository, before);
+
+      expect(repository.lastQuery?.spaceId).toBe('space-2');
+    });
+
+    it('sends the active quick filter', async () => {
+      const { store, repository } = await createStore([createNote()]);
+      const before = repository.queryCount;
+
+      store.setFilter('untriaged');
+      await awaitQuery(repository, before);
+
+      expect(repository.lastQuery?.filter).toBe('untriaged');
+    });
+
+    it('sends the selected tags', async () => {
+      const { store, repository } = await createStore([createNote()]);
+      const before = repository.queryCount;
+
+      store.toggleTag('urgent');
+      await awaitQuery(repository, before);
+
+      expect(repository.lastQuery?.tags).toEqual(['urgent']);
+    });
+
+    it('drops a tag that is toggled twice', async () => {
+      const { store, repository } = await createStore([createNote()]);
+
+      store.toggleTag('urgent');
+      const before = repository.queryCount;
+      store.toggleTag('urgent');
+      await awaitQuery(repository, before);
+
+      expect(repository.lastQuery?.tags).toEqual([]);
+    });
+
+    it('sends the timezone offset, without which sections straddle local midnight', async () => {
+      const { repository } = await createStore([createNote()]);
+
+      expect(repository.lastQuery?.tzOffsetMinutes).toBe(repository.lastQuery?.now.getTimezoneOffset());
+    });
+
+    it('sends the raw tag as typed, leaving normalisation to the backend', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', tags: [] })]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.addTag('a', '  #urgent ');
+
+      // Trimming here would mean two places deciding what a tag looks like.
+      expect(update).toHaveBeenCalledWith('a', { tags: ['  #urgent '] });
+    });
+  });
+
+  describe('search debounce', () => {
+    beforeEach(() => {
+      // Only Date and timers: faking requestAnimationFrame would hang the
+      // zoneless scheduler in whenStable().
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    });
+
+    it('updates the field immediately so typing never lags', async () => {
+      const { store } = await createStore([createNote()]);
+
+      store.setSearchQuery('dep');
+
+      expect(store.searchQuery()).toBe('dep');
+    });
+
+    it('does not query the backend before the debounce elapses', async () => {
+      const { store, repository } = await createStore([createNote()]);
+      const before = repository.queryCount;
+
+      store.setSearchQuery('dep');
+
+      expect(repository.queryCount).toBe(before);
+    });
+
+    it('sends a single query for a burst of keystrokes', async () => {
+      const { store, repository } = await createStore([createNote()]);
+      const before = repository.queryCount;
+
+      store.setSearchQuery('d');
+      store.setSearchQuery('de');
+      store.setSearchQuery('dep');
+      vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      await vi.waitFor(() => expect(repository.queryCount).toBe(before + 1));
+
+      // One round trip per character is exactly what the debounce exists to avoid.
+      expect(repository.lastQuery?.search).toBe('dep');
+    });
+
+    it('trims the query it sends', async () => {
+      const { store, repository } = await createStore([createNote()]);
+      const before = repository.queryCount;
+
+      store.setSearchQuery('  dep  ');
+      vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      await awaitQuery(repository, before);
+
+      expect(repository.lastQuery?.search).toBe('dep');
+    });
   });
 
   describe('loading and error state', () => {
-    it('exposes the repository failure and holds an empty list', async () => {
+    it('exposes the repository failure and shows nothing', async () => {
       const repository = new FakeNotesRepository([createNote()]);
       repository.failNext = new Error('backend down');
-      TestBed.configureTestingModule({ providers: [provideAppTesting({ notesRepository: repository })] });
+      TestBed.configureTestingModule({
+        providers: [provideAppTesting({ notesRepository: repository })],
+      });
 
       const store = TestBed.inject(NotesStore);
       await vi.waitFor(() => expect(store.loadError()).toBeDefined());
 
       expect(store.loadError()?.message).toBe('backend down');
-      expect(store.filteredNotes()).toEqual([]);
+      expect(store.sections()).toEqual([]);
     });
 
-    it('recovers the notes on reload after a failed load', async () => {
-      const note = createNote({ id: 'recovered' });
-      const repository = new FakeNotesRepository([note]);
+    it('recovers the view on reload after a failed load', async () => {
+      const repository = new FakeNotesRepository([createNote({ id: 'recovered' })]);
       repository.failNext = new Error('transient');
-      TestBed.configureTestingModule({ providers: [provideAppTesting({ notesRepository: repository })] });
+      TestBed.configureTestingModule({
+        providers: [provideAppTesting({ notesRepository: repository })],
+      });
 
       const store = TestBed.inject(NotesStore);
       await vi.waitFor(() => expect(store.loadError()).toBeDefined());
 
       store.reload();
-      await vi.waitFor(() => expect(store.filteredNotes()).toHaveLength(1));
+      await vi.waitFor(() => expect(visibleIds(store)).toHaveLength(1));
 
       expect(store.loadError()).toBeUndefined();
-      expect(store.filteredNotes()[0].id).toBe('recovered');
-    });
-  });
-
-  describe('allTags', () => {
-    it('returns the sorted, de-duplicated set of tags across all notes', async () => {
-      const { store } = await createStore([
-        createNote({ id: 'a', tags: ['zeta', 'alpha'] }),
-        createNote({ id: 'b', tags: ['alpha', 'beta'] }),
-      ]);
-
-      expect(store.allTags()).toEqual(['alpha', 'beta', 'zeta']);
-    });
-  });
-
-  describe('filteredNotes', () => {
-    it('matches the search query against the title, tags and content, case-insensitively', async () => {
-      const target = createNote({ id: 'match', title: 'Deploy script', content: 'irrelevant', tags: [] });
-      const other = createNote({ id: 'other', title: 'Something else', content: 'irrelevant', tags: [] });
-      const { store } = await createStore([target, other]);
-
-      store.setSearchQuery('DEPLOY');
-
-      expect(store.filteredNotes()).toEqual([target]);
+      expect(visibleIds(store)).toEqual(['recovered']);
     });
 
-    it('keeps only pinned notes when the "pinned" filter is active', async () => {
-      const pinned = createNote({ id: 'pinned', pinned: true });
-      const unpinned = createNote({ id: 'unpinned', pinned: false });
-      const { store } = await createStore([pinned, unpinned]);
-
-      store.setFilter('pinned');
-
-      expect(store.filteredNotes()).toEqual([pinned]);
-    });
-
-    it('keeps only expiring notes when the "untriaged" filter is active', async () => {
-      const expiring = createNote({
-        id: 'expiring',
-        lifecycle: { kind: 'expires', at: new Date('2026-02-01') },
-      });
-      const permanent = createNote({ id: 'permanent', lifecycle: { kind: 'permanent' } });
-      const { store } = await createStore([expiring, permanent]);
-
-      store.setFilter('untriaged');
-
-      expect(store.filteredNotes()).toEqual([expiring]);
-    });
-
-    it('keeps only notes matching at least one selected tag', async () => {
-      const matching = createNote({ id: 'matching', tags: ['urgent'] });
-      const other = createNote({ id: 'other', tags: ['later'] });
-      const { store } = await createStore([matching, other]);
-
-      store.toggleTag('urgent');
-
-      expect(store.filteredNotes()).toEqual([matching]);
-    });
-
-    it('un-selects a tag when toggled twice', async () => {
-      const notes = [createNote({ id: 'a', tags: ['urgent'] }), createNote({ id: 'b', tags: ['later'] })];
-      const { store } = await createStore(notes);
-
-      store.toggleTag('urgent');
-      store.toggleTag('urgent');
-
-      expect(store.filteredNotes()).toEqual(notes);
-    });
-
-    it('combines search, filter and tag criteria', async () => {
-      const target = createNote({ id: 'target', title: 'Deploy notes', pinned: true, tags: ['urgent'] });
-      const wrongTag = createNote({ id: 'wrong-tag', title: 'Deploy notes', pinned: true, tags: ['later'] });
-      const notPinned = createNote({
-        id: 'not-pinned',
-        title: 'Deploy notes',
-        pinned: false,
-        tags: ['urgent'],
-      });
-      const { store } = await createStore([target, wrongTag, notPinned]);
-
-      store.setSearchQuery('deploy');
-      store.setFilter('pinned');
-      store.toggleTag('urgent');
-
-      expect(store.filteredNotes()).toEqual([target]);
-    });
-  });
-
-  describe('active space', () => {
-    const notesAcrossSpaces = (): Note[] => [
-      createNote({ id: 'here', spaceId: 'space-1', tags: ['here-tag'] }),
-      createNote({ id: 'elsewhere', spaceId: 'space-2', tags: ['elsewhere-tag'] }),
-    ];
-
-    it('shows every note while no space is selected', async () => {
-      const { store } = await createStore(notesAcrossSpaces());
-
-      expect(store.filteredNotes().map((note) => note.id)).toEqual(['here', 'elsewhere']);
-    });
-
-    it('keeps only the notes of the selected space', async () => {
-      const { store, spaces } = await createStore(notesAcrossSpaces());
+    it('keeps the previous results on screen while a new query runs', async () => {
+      // Blanking the canvas on every debounced keystroke would make the list
+      // flicker between "Loading…" and the results.
+      const { store, spaces } = await createStore([createNote({ id: 'a' })]);
 
       spaces.selectSpace('space-2');
 
-      expect(store.filteredNotes().map((note) => note.id)).toEqual(['elsewhere']);
-    });
-
-    it('scopes the tag rail to the selected space', async () => {
-      // A tag that filters nothing in the current space has no reason to be offered.
-      const { store, spaces } = await createStore(notesAcrossSpaces());
-
-      spaces.selectSpace('space-1');
-
-      expect(store.allTags()).toEqual(['here-tag']);
-    });
-
-    it('combines the space with the search query', async () => {
-      const { store, spaces } = await createStore([
-        createNote({ id: 'here', spaceId: 'space-1', title: 'deploy' }),
-        createNote({ id: 'elsewhere', spaceId: 'space-2', title: 'deploy' }),
-      ]);
-
-      spaces.selectSpace('space-1');
-      store.setSearchQuery('deploy');
-
-      expect(store.filteredNotes().map((note) => note.id)).toEqual(['here']);
+      expect(store.isLoading()).toBe(false);
+      expect(visibleIds(store)).toEqual(['a']);
     });
   });
 
-  describe('sections', () => {
-    it('groups notes chronologically when no search or tag filter is active', async () => {
-      const { store } = await createStore([createNote({ id: 'a' })]);
+  describe('view-derived state', () => {
+    it('reports no results only when a search is actually active', async () => {
+      const { store, repository } = await createStore([]);
+      const before = repository.queryCount;
+      repository.setView({ isFiltering: true, matched: 0, sections: [] });
 
-      expect(store.isFiltering()).toBe(false);
-      expect(store.sections().map((section) => section.key)).toContain('week');
-    });
-
-    it('switches to a single flat results section while searching', async () => {
-      // Chronological grouping would bury an old match in a trailing section;
-      // search results are read as a list.
-      const old = createNote({ id: 'old', title: 'docker override', createdAt: new Date('2020-01-01') });
-      const { store } = await createStore([old]);
-
-      store.setSearchQuery('docker');
-
-      expect(store.sections().map((section) => section.key)).toEqual(['results']);
-      expect(store.sections()[0].notes).toEqual([old]);
-    });
-
-    it('surfaces a note far older than a week when it matches the search', async () => {
-      const ancient = createNote({ id: 'ancient', title: 'git bisect', createdAt: new Date('2019-05-05') });
-      const { store } = await createStore([ancient]);
-
-      store.setSearchQuery('bisect');
-
-      const visibleIds = store.sections().flatMap((section) => section.notes.map((note) => note.id));
-      expect(visibleIds).toEqual(['ancient']);
-    });
-
-    it('switches to results mode when only a tag is selected', async () => {
-      const { store } = await createStore([createNote({ id: 'a', tags: ['x'] })]);
-
-      store.toggleTag('x');
-
-      expect(store.isFiltering()).toBe(true);
-      expect(store.sections().map((section) => section.key)).toEqual(['results']);
-    });
-
-    it('reports no results when a search matches nothing', async () => {
-      const { store } = await createStore([createNote({ title: 'anything' })]);
-
-      store.setSearchQuery('nothing matches this');
+      store.setFilter('pinned');
+      await awaitQuery(repository, before);
 
       expect(store.hasNoResults()).toBe(true);
     });
 
-    it('does not report "no results" when nothing is being searched', async () => {
+    it('does not report "no results" for an empty space', async () => {
       const { store } = await createStore([]);
 
+      // An empty space and a fruitless search read very differently to a user.
+      expect(store.isFiltering()).toBe(false);
       expect(store.hasNoResults()).toBe(false);
+    });
+
+    it('exposes the tags the backend offers for the rail', async () => {
+      const { store } = await createStore([
+        createNote({ id: 'a', tags: ['zeta', 'alpha'] }),
+        createNote({ id: 'b', tags: ['alpha'] }),
+      ]);
+
+      expect(store.allTags()).toEqual(['alpha', 'zeta']);
     });
   });
 
@@ -280,169 +277,92 @@ describe('NotesStore', () => {
 
       expect(store.selectedNote()).toBeNull();
     });
+
+    it('keeps the open note editable after it drops out of the filtered view', async () => {
+      // Removing a note's last matching tag must not yank the editor shut.
+      const { store, repository } = await createStore([createNote({ id: 'a', tags: ['urgent'] })]);
+      store.openNote('a');
+      const before = repository.queryCount;
+
+      repository.setView({ sections: [], matched: 0, isFiltering: true });
+      store.toggleTag('other');
+      await awaitQuery(repository, before);
+
+      expect(visibleIds(store)).toEqual([]);
+      expect(store.selectedNoteId()).toBe('a');
+    });
   });
 
-  describe('togglePinned', () => {
-    it('persists the new pin state and adopts the stored note', async () => {
-      const { store, repository } = await createStore([
-        createNote({ id: 'a', pinned: false }),
-        createNote({ id: 'b', pinned: false }),
-      ]);
+  describe('mutations', () => {
+    it('persists a pin toggle and adopts the stored note', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', pinned: false })]);
       const update = vi.spyOn(repository, 'update');
+      store.openNote('a');
 
       await store.togglePinned('a');
 
       expect(update).toHaveBeenCalledWith('a', { pinned: true });
-      expect(store.filteredNotes().find((note) => note.id === 'a')?.pinned).toBe(true);
-      expect(store.filteredNotes().find((note) => note.id === 'b')?.pinned).toBe(false);
+      expect(store.selectedNote()?.pinned).toBe(true);
     });
 
-    it('rolls the note back and notifies when persistence fails', async () => {
-      const { store, repository } = await createStore([createNote({ id: 'a', pinned: false })]);
-      const notifier = TestBed.inject(ErrorNotifier);
-      repository.failNext = new Error('disk full');
+    it('re-queries the backend after a successful write', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', title: 'Old' })]);
+      const before = repository.queryCount;
 
-      await store.togglePinned('a');
+      await store.renameNote('a', 'New');
+      await awaitQuery(repository, before);
 
-      expect(store.filteredNotes()[0].pinned).toBe(false);
-      expect(notifier.notice()?.ref.key).toBe('errors.noteSaveFailed');
+      // The view is the backend's to compute: a write can move a note between
+      // sections, so it has to be recomputed rather than patched locally.
+      expect(repository.queryCount).toBeGreaterThan(before);
     });
 
-    it('does nothing for an unknown id', async () => {
-      const { store, repository } = await createStore([createNote({ id: 'a' })]);
-      const update = vi.spyOn(repository, 'update');
-
-      await store.togglePinned('missing');
-
-      expect(update).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('renameNote', () => {
-    it('persists the new title and bumps updatedAt on the matching note only', async () => {
-      const note = createNote({ id: 'a', title: 'Old title', updatedAt: new Date('2026-01-01') });
-      const other = createNote({ id: 'b', title: 'Untouched' });
-      const { store } = await createStore([note, other]);
-
-      await store.renameNote('a', 'New title');
-
-      const notes = store.filteredNotes();
-      const updated = notes.find((n) => n.id === 'a');
-      expect(updated?.title).toBe('New title');
-      expect(updated?.updatedAt.getTime()).toBeGreaterThan(note.updatedAt.getTime());
-      expect(notes.find((n) => n.id === 'b')?.title).toBe('Untouched');
-    });
-
-    it('skips persistence when the title has not changed', async () => {
+    it('skips persistence when the value has not changed', async () => {
       // The overlay emits on every keystroke; an unchanged value must not
       // produce a write per character.
       const { store, repository } = await createStore([createNote({ id: 'a', title: 'Same' })]);
       const update = vi.spyOn(repository, 'update');
 
       await store.renameNote('a', 'Same');
+      await store.updateContent('a', 'line one\nline two');
+      await store.setLanguage('a', 'txt');
 
       expect(update).not.toHaveBeenCalled();
     });
 
-    it('restores the previous title when persistence fails', async () => {
+    it('notifies and leaves the view alone when a write fails', async () => {
       const { store, repository } = await createStore([createNote({ id: 'a', title: 'Original' })]);
-      repository.failNext = new Error('nope');
+      const notifier = TestBed.inject(ErrorNotifier);
+      repository.failNext = new Error('disk full');
 
       await store.renameNote('a', 'Attempted');
 
-      expect(store.filteredNotes()[0].title).toBe('Original');
-    });
-  });
-
-  describe('updateContent', () => {
-    it('persists the new content', async () => {
-      const { store } = await createStore([createNote({ id: 'a', content: 'before' })]);
-
-      await store.updateContent('a', 'after');
-
-      expect(store.filteredNotes()[0].content).toBe('after');
+      // Nothing was applied locally in the first place, so there is nothing to
+      // roll back — the displayed note is still the stored one.
+      expect(visibleIds(store)).toEqual(['a']);
+      expect(store.sections()[0].notes[0].title).toBe('Original');
+      expect(notifier.notice()?.ref.key).toBe('errors.noteSaveFailed');
     });
 
-    it('skips persistence when the content has not changed', async () => {
-      const { store, repository } = await createStore([createNote({ id: 'a', content: 'same' })]);
+    it('does nothing for an unknown id', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a' })]);
       const update = vi.spyOn(repository, 'update');
+      const remove = vi.spyOn(repository, 'delete');
 
-      await store.updateContent('a', 'same');
+      await store.togglePinned('missing');
+      await store.deleteNote('missing');
 
       expect(update).not.toHaveBeenCalled();
+      expect(remove).not.toHaveBeenCalled();
     });
 
-    it('restores the previous content when persistence fails', async () => {
-      const { store, repository } = await createStore([createNote({ id: 'a', content: 'before' })]);
-      repository.failNext = new Error('nope');
-
-      await store.updateContent('a', 'after');
-
-      expect(store.filteredNotes()[0].content).toBe('before');
-    });
-  });
-
-  describe('setLanguage', () => {
-    it('persists the new language', async () => {
-      const { store } = await createStore([createNote({ id: 'a', language: 'txt' })]);
-
-      await store.setLanguage('a', 'json');
-
-      expect(store.filteredNotes()[0].language).toBe('json');
-    });
-
-    it('skips persistence when the language has not changed', async () => {
-      const { store, repository } = await createStore([createNote({ id: 'a', language: 'json' })]);
+    it('removes a tag the note carries', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', tags: ['keep', 'drop'] })]);
       const update = vi.spyOn(repository, 'update');
-
-      await store.setLanguage('a', 'json');
-
-      expect(update).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('tags', () => {
-    it('appends a tag', async () => {
-      const { store } = await createStore([createNote({ id: 'a', tags: ['first'] })]);
-
-      await store.addTag('a', 'second');
-
-      expect(store.filteredNotes()[0].tags).toEqual(['first', 'second']);
-    });
-
-    it('normalises the submitted tag, hash and padding included', async () => {
-      const { store } = await createStore([createNote({ id: 'a', tags: [] })]);
-
-      await store.addTag('a', '  #urgent ');
-
-      expect(store.filteredNotes()[0].tags).toEqual(['urgent']);
-    });
-
-    it('ignores a tag already present, whatever the casing', async () => {
-      // Two spellings of the same tag would show up as two entries in the rail.
-      const { store, repository } = await createStore([createNote({ id: 'a', tags: ['urgent'] })]);
-      const update = vi.spyOn(repository, 'update');
-
-      await store.addTag('a', 'URGENT');
-
-      expect(update).not.toHaveBeenCalled();
-    });
-
-    it('ignores a tag that normalises to nothing', async () => {
-      const { store, repository } = await createStore([createNote({ id: 'a', tags: [] })]);
-      const update = vi.spyOn(repository, 'update');
-
-      await store.addTag('a', ' # ');
-
-      expect(update).not.toHaveBeenCalled();
-    });
-
-    it('removes a tag', async () => {
-      const { store } = await createStore([createNote({ id: 'a', tags: ['keep', 'drop'] })]);
 
       await store.removeTag('a', 'drop');
 
-      expect(store.filteredNotes()[0].tags).toEqual(['keep']);
+      expect(update).toHaveBeenCalledWith('a', { tags: ['keep'] });
     });
 
     it('does nothing when removing a tag the note does not carry', async () => {
@@ -453,29 +373,24 @@ describe('NotesStore', () => {
 
       expect(update).not.toHaveBeenCalled();
     });
-
-    it('restores the tags when persistence fails', async () => {
-      const { store, repository } = await createStore([createNote({ id: 'a', tags: ['keep'] })]);
-      repository.failNext = new Error('nope');
-
-      await store.addTag('a', 'added');
-
-      expect(store.filteredNotes()[0].tags).toEqual(['keep']);
-    });
   });
 
   describe('createNote', () => {
-    it('prepends the note returned by the repository and selects it', async () => {
+    it('opens the note returned by the repository', async () => {
       const { store } = await createStore([createNote({ id: 'existing' })]);
 
       await store.createNote();
 
-      const notes = store.filteredNotes();
-      expect(notes).toHaveLength(2);
       // Blank title and source: the UI renders translated placeholders rather
       // than storing French strings in the data.
-      expect(notes[0]).toMatchObject({ title: '', source: '', content: '', pinned: false, tags: [] });
-      expect(store.selectedNoteId()).toBe(notes[0].id);
+      expect(store.selectedNote()).toMatchObject({
+        id: 'fake-1',
+        title: '',
+        source: '',
+        content: '',
+        pinned: false,
+        tags: [],
+      });
     });
 
     it('takes its id from the repository rather than generating one locally', async () => {
@@ -483,7 +398,7 @@ describe('NotesStore', () => {
 
       await store.createNote();
 
-      expect(store.filteredNotes()[0].id).toBe('fake-1');
+      expect(store.selectedNoteId()).toBe('fake-1');
     });
 
     it('files the note in the selected space', async () => {
@@ -492,7 +407,7 @@ describe('NotesStore', () => {
       spaces.selectSpace('space-2');
       await store.createNote();
 
-      expect(store.filteredNotes()[0].spaceId).toBe('space-2');
+      expect(store.selectedNote()?.spaceId).toBe('space-2');
     });
 
     it('files the note in the first space while showing all spaces', async () => {
@@ -517,27 +432,27 @@ describe('NotesStore', () => {
       expect(notifier.notice()?.ref.key).toBe('errors.spaceRequired');
     });
 
-    it('notifies and adds nothing when creation fails', async () => {
+    it('notifies and selects nothing when creation fails', async () => {
       const { store, repository } = await createStore([]);
       const notifier = TestBed.inject(ErrorNotifier);
       repository.failNext = new Error('read-only');
 
       await store.createNote();
 
-      expect(store.filteredNotes()).toHaveLength(0);
+      expect(store.selectedNote()).toBeNull();
       expect(notifier.notice()?.ref.key).toBe('errors.noteCreateFailed');
     });
   });
 
   describe('deleteNote', () => {
-    it('removes the note and closes the overlay when it was the open one', async () => {
+    it('closes the overlay when the deleted note was the open one', async () => {
       const { store } = await createStore([createNote({ id: 'a' }), createNote({ id: 'b' })]);
       store.openNote('a');
 
       await store.deleteNote('a');
 
-      expect(store.filteredNotes().map((note) => note.id)).toEqual(['b']);
       expect(store.selectedNoteId()).toBeNull();
+      await vi.waitFor(() => expect(visibleIds(store)).toEqual(['b']));
     });
 
     it('leaves the open note alone when another one is deleted', async () => {
@@ -549,27 +464,38 @@ describe('NotesStore', () => {
       expect(store.selectedNoteId()).toBe('a');
     });
 
-    it('puts the note back where it was and notifies when deletion fails', async () => {
-      // Restoring it at the top of the list would read as "deleted, and some
-      // other note appeared".
-      const notes = [createNote({ id: 'a' }), createNote({ id: 'b' }), createNote({ id: 'c' })];
-      const { store, repository } = await createStore(notes);
+    it('keeps the note and notifies when deletion fails', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a' })]);
       const notifier = TestBed.inject(ErrorNotifier);
       repository.failNext = new Error('locked');
+      store.openNote('a');
 
-      await store.deleteNote('b');
+      await store.deleteNote('a');
 
-      expect(store.filteredNotes().map((note) => note.id)).toEqual(['a', 'b', 'c']);
+      expect(visibleIds(store)).toEqual(['a']);
+      expect(store.selectedNoteId()).toBe('a');
       expect(notifier.notice()?.ref.key).toBe('errors.noteDeleteFailed');
     });
+  });
 
-    it('does nothing for an unknown id', async () => {
+  describe('backend-shaped view', () => {
+    it('renders whatever sections the backend sends, in order', async () => {
       const { store, repository } = await createStore([createNote({ id: 'a' })]);
-      const remove = vi.spyOn(repository, 'delete');
+      const before = repository.queryCount;
+      const view: Partial<NotesView> = {
+        sections: [
+          { key: 'pinned', notes: [], hasExpiringNotes: false, showCreateGhost: false },
+          { key: 'today', notes: [], hasExpiringNotes: true, showCreateGhost: false },
+          { key: 'week', notes: [], hasExpiringNotes: false, showCreateGhost: true },
+        ],
+      };
+      repository.setView(view);
 
-      await store.deleteNote('missing');
+      store.setFilter('pinned');
+      await awaitQuery(repository, before);
 
-      expect(remove).not.toHaveBeenCalled();
+      // The store must not re-sort, re-group or drop empty sections.
+      expect(store.sections().map((section) => section.key)).toEqual(['pinned', 'today', 'week']);
     });
   });
 });
