@@ -1,12 +1,16 @@
 @for (line of lines(); track $index) {
-  <div class="code-line">
-    <!-- Numérotation purement visuelle : la faire lire par un lecteur d'écran
-         reviendrait à annoncer « 1 2 3 … » entre chaque ligne de code. -->
-    <span class="line-no" aria-hidden="true">{{ $index + 1 }}</span>
-    <span class="line-content">
-      @for (token of line; track $index) {
-        <span [class]="'tok-' + token.type">{{ token.text }}</span>
-      }
-    </span>
-  </div>
+  <!-- Des <span> et non des <div> : le visualiseur est inséré dans le <button>
+       d'une carte de note, dont le modèle de contenu n'admet que du contenu de
+       phrasé. Le `display: flex` du SCSS rend le résultat identique. -->
+  <span class="code-line">
+    @if (showLineNumbers()) {
+      <!-- Numérotation purement visuelle : la faire lire par un lecteur d'écran
+           reviendrait à annoncer « 1 2 3 … » entre chaque ligne de code. -->
+      <span class="line-no" aria-hidden="true">{{ $index + 1 }}</span>
+    }
+    <!-- [innerHTML] et non une interpolation : la coloration est du balisage.
+         Le HTML vient de highlight.js, qui échappe le texte source, et passe
+         ensuite par le sanitizer d'Angular — surtout ne pas le contourner. -->
+    <span class="line-content" [innerHTML]="line"></span>
+  </span>
 }

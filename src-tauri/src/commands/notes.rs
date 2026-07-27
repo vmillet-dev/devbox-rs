@@ -37,9 +37,9 @@ use crate::storage::{self, Db};
 #[tauri::command]
 pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, AppError> {
     let connection = lock(&db)?;
-    let (notes, available_tags) = storage::notes::fetch(&connection, &query)?;
+    let (notes, facets) = storage::notes::fetch(&connection, &query)?;
 
-    Ok(view::build(notes, available_tags, &query)?)
+    Ok(view::build(notes, facets, &query)?)
 }
 
 #[tauri::command]

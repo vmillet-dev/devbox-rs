@@ -22,6 +22,9 @@ pub struct NotesQuery {
     /// Tags sélectionnés dans le rail. Une note passe si elle en porte **au
     /// moins un** (et non tous) : c'est le comportement d'un rail de facettes.
     pub tags: Vec<String>,
+    /// Langages sélectionnés dans le rail, même sémantique d'union que `tags` :
+    /// une note passe si elle est écrite dans **l'un** d'eux. Vide = tous.
+    pub languages: Vec<String>,
     /// Instant de référence, ISO 8601 UTC — fourni par `ClockService` côté front.
     pub now: String,
     /// `Date#getTimezoneOffset()` du front. Nécessaire parce que les sections
@@ -44,6 +47,20 @@ pub enum NoteFilter {
     Untriaged,
 }
 
+/// Ce que les rails de facettes ont à proposer, dans l'espace courant.
+///
+/// Regroupées plutôt que passées côte à côte : ce sont deux `Vec<String>` que
+/// rien ne distinguerait à l'appel de [`super::view::build`], et la persistance
+/// les calcule ensemble (cf. `storage::notes::fetch`).
+///
+/// Ne traverse pas le pont : le front lit les deux champs correspondants de
+/// [`NotesView`].
+#[derive(Debug, Clone, Default)]
+pub struct Facets {
+    pub tags: Vec<String>,
+    pub languages: Vec<String>,
+}
+
 /// Ce que le canevas affiche, tel quel.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -53,8 +70,11 @@ pub struct NotesView {
     /// n'afficher que les tags des notes déjà filtrées rendrait le rail
     /// inutilisable dès la première sélection.
     pub available_tags: Vec<String>,
-    /// Une recherche ou une sélection de tags est active. Le front s'en sert
-    /// pour distinguer « aucun résultat » d'« espace vide ».
+    /// Langages proposés par le rail, portés à l'espace pour la même raison que
+    /// `available_tags`.
+    pub available_languages: Vec<String>,
+    /// Une recherche ou une sélection de facettes (tag, langage) est active. Le
+    /// front s'en sert pour distinguer « aucun résultat » d'« espace vide ».
     pub is_filtering: bool,
     /// Nombre de notes retenues, toutes sections confondues.
     pub matched: usize,
@@ -105,6 +125,7 @@ mod tests {
                 show_create_ghost: true,
             }],
             available_tags: vec!["auth".to_string()],
+            available_languages: vec!["json".to_string()],
             is_filtering: false,
             matched: 1,
         };
@@ -112,8 +133,10 @@ mod tests {
         let json = serde_json::to_value(view).unwrap();
 
         assert!(json.get("availableTags").is_some());
+        assert!(json.get("availableLanguages").is_some());
         assert!(json.get("isFiltering").is_some());
         assert!(json.get("available_tags").is_none());
+        assert!(json.get("available_languages").is_none());
         assert!(json["sections"][0].get("hasExpiringNotes").is_some());
         assert!(json["sections"][0].get("showCreateGhost").is_some());
     }
@@ -141,6 +164,7 @@ mod tests {
             "search": "deploy",
             "filter": "untriaged",
             "tags": ["urgent"],
+            "languages": ["json", "yml"],
             "now": "2026-07-25T09:00:00.000Z",
             "tzOffsetMinutes": -120
         }))
@@ -148,6 +172,7 @@ mod tests {
 
         assert_eq!(query.space_id.as_deref(), Some("s-1"));
         assert_eq!(query.filter, NoteFilter::Untriaged);
+        assert_eq!(query.languages, ["json", "yml"]);
         assert_eq!(query.tz_offset_minutes, -120);
     }
 
@@ -160,6 +185,7 @@ mod tests {
             "search": "",
             "filter": "all",
             "tags": [],
+            "languages": [],
             "now": "2026-07-25T09:00:00.000Z",
             "tzOffsetMinutes": 0
         }))

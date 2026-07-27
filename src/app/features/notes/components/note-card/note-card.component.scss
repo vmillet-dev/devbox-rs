@@ -55,15 +55,14 @@
   line-height: 1.3;
 }
 
+// `app-code-viewer` en mode compact : il n'apporte que la coloration, la
+// typographie de l'extrait reste décidée ici.
 .card-snippet {
-  display: block;
-  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-2);
   line-height: 1.55;
   flex: 1;
   overflow: hidden;
-  white-space: pre-wrap;
 }
 
 .card-footer {

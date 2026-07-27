@@ -8,7 +8,9 @@
 
 use super::validation::ValidationError;
 
-pub const LANGUAGES: [&str; 6] = ["json", "js", "py", "sql", "yml", "txt"];
+pub const LANGUAGES: [&str; 13] = [
+    "json", "js", "ts", "py", "sql", "yml", "toml", "xml", "html", "css", "sh", "md", "txt",
+];
 
 pub fn validate(language: &str) -> Result<(), ValidationError> {
     if LANGUAGES.contains(&language) {

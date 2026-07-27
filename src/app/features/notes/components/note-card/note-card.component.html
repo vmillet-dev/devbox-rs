@@ -23,7 +23,13 @@
       {{ 'notes.untitled' | transloco }}
     }
   </span>
-  <span class="card-snippet">{{ snippet() }}</span>
+  <app-code-viewer
+    class="card-snippet"
+    [content]="snippet()"
+    [language]="note().language"
+    [showLineNumbers]="false"
+    [compact]="true"
+  />
   <span class="card-footer">
     <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). D'où le prettier-ignore, qui réintroduirait ces sauts de ligne. -->
     <!-- prettier-ignore -->

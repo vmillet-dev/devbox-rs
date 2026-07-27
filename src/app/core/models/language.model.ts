@@ -1,12 +1,24 @@
 /** Langages reconnus pour la coloration des badges et du corps des notes. */
-export type LanguageTag = 'json' | 'js' | 'py' | 'sql' | 'yml' | 'txt';
+export type LanguageTag =
+  'json' | 'js' | 'ts' | 'py' | 'sql' | 'yml' | 'toml' | 'xml' | 'html' | 'css' | 'sh' | 'md' | 'txt';
 
+/**
+ * L'ordre des clés est celui du sélecteur de l'éditeur (cf. `LANGUAGE_OPTIONS`) :
+ * formats de données d'abord, puis langages, puis balisage, puis texte.
+ */
 export const LANGUAGE_LABELS: Record<LanguageTag, string> = {
   json: 'JSON',
   js: 'JS',
+  ts: 'TS',
   py: 'PY',
   sql: 'SQL',
   yml: 'YML',
+  toml: 'TOML',
+  xml: 'XML',
+  html: 'HTML',
+  css: 'CSS',
+  sh: 'SH',
+  md: 'MD',
   txt: 'TXT',
 };
 

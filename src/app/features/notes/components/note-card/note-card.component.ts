@@ -4,6 +4,7 @@ import { Note } from '@core/models/note.model';
 import { TranslationRef } from '@core/models/translation-ref.model';
 import { ClockService } from '@core/time/clock.service';
 import { expiryRef, relativeTimeRef } from '@core/utils/relative-time.util';
+import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
 import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
 
 /** Le libellé du pied de carte est soit du texte brut (nom de source), soit une référence de traduction (temps). */
@@ -14,7 +15,7 @@ const MAX_VISIBLE_TAGS = 2;
 
 @Component({
   selector: 'app-note-card',
-  imports: [LanguageBadgeComponent, TranslocoPipe],
+  imports: [CodeViewerComponent, LanguageBadgeComponent, TranslocoPipe],
   templateUrl: './note-card.component.html',
   styleUrl: './note-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

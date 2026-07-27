@@ -7,7 +7,7 @@
 //! recherche, ce qui vaut « une recherche est en cours », la répartition en
 //! sections et la normalisation des tags sont des règles métier et vivent dans
 //! `crate::domain`. Ici, seulement les critères que SQLite indexe : espace,
-//! épinglage, cycle de vie, appartenance à un tag.
+//! épinglage, cycle de vie, langage, appartenance à un tag.
 //!
 //! L'horodatage n'est jamais lu ici depuis l'horloge système : il est passé en
 //! paramètre (`now`), ce qui rend les écritures reproductibles en test.
@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use super::{StorageError, spaces};
 use crate::domain::note::{Note, NoteDraft, NoteLifecycle, NotePatch};
-use crate::domain::query::{NoteFilter, NotesQuery};
+use crate::domain::query::{Facets, NoteFilter, NotesQuery};
 use crate::domain::tags;
 
 const NOTE_COLUMNS: &str = "id, space_id, title, language, content, source, pinned, \
@@ -132,6 +132,7 @@ pub fn list(connection: &Connection) -> Result<Vec<Note>, StorageError> {
             search: String::new(),
             filter: NoteFilter::All,
             tags: Vec::new(),
+            languages: Vec::new(),
             now: "2026-07-25T09:00:00.000Z".to_string(),
             tz_offset_minutes: 0,
         },
@@ -139,46 +140,66 @@ pub fn list(connection: &Connection) -> Result<Vec<Note>, StorageError> {
     .map(|(notes, _)| notes)
 }
 
-/// Tags proposables par le rail, portés à l'espace et non au filtre courant :
-/// ne proposer que les tags des notes déjà filtrées viderait le rail dès la
-/// première sélection, rendant impossible d'en choisir un second.
-fn available_tags(
+/// Valeurs distinctes d'une colonne, portées à un espace. Sert les deux rails de
+/// facettes, qui posent la même question à deux colonnes près.
+fn distinct(
     connection: &Connection,
+    unscoped: &str,
+    scoped: &str,
     space_id: Option<&str>,
 ) -> Result<Vec<String>, StorageError> {
-    let tags = match space_id {
+    let values = match space_id {
         Some(id) => {
-            let mut statement = connection.prepare(
-                "SELECT DISTINCT tag FROM note_tags \
-                 JOIN notes ON notes.id = note_tags.note_id \
-                 WHERE notes.space_id = ?1 ORDER BY tag",
-            )?;
+            let mut statement = connection.prepare(scoped)?;
             statement
                 .query_map([id], |row| row.get(0))?
                 .collect::<rusqlite::Result<Vec<_>>>()?
         }
         None => {
-            let mut statement =
-                connection.prepare("SELECT DISTINCT tag FROM note_tags ORDER BY tag")?;
+            let mut statement = connection.prepare(unscoped)?;
             statement
                 .query_map([], |row| row.get(0))?
                 .collect::<rusqlite::Result<Vec<_>>>()?
         }
     };
 
-    Ok(tags)
+    Ok(values)
 }
 
-/// Notes retenues par les critères **grossiers**, et tags proposables par le rail.
+/// Facettes proposables par les rails, portées à l'espace et non au filtre
+/// courant : ne proposer que celles des notes déjà filtrées viderait les rails
+/// dès la première sélection, rendant impossible d'en choisir une seconde.
+fn facets(connection: &Connection, space_id: Option<&str>) -> Result<Facets, StorageError> {
+    Ok(Facets {
+        tags: distinct(
+            connection,
+            "SELECT DISTINCT tag FROM note_tags ORDER BY tag",
+            "SELECT DISTINCT tag FROM note_tags \
+             JOIN notes ON notes.id = note_tags.note_id \
+             WHERE notes.space_id = ?1 ORDER BY tag",
+            space_id,
+        )?,
+        languages: distinct(
+            connection,
+            "SELECT DISTINCT language FROM notes ORDER BY language",
+            "SELECT DISTINCT language FROM notes WHERE space_id = ?1 ORDER BY language",
+            space_id,
+        )?,
+    })
+}
+
+/// Notes retenues par les critères **grossiers**, et facettes proposables par
+/// les rails.
 ///
 /// Ne descendent dans le `WHERE` que les critères que SQLite indexe : espace,
-/// épinglage, cycle de vie, appartenance à un tag. La recherche texte reste au
-/// domaine (repliage de casse Unicode), tout comme le regroupement en sections.
-/// `domain::view::build` prend le relais sur ce que renvoie cette fonction.
+/// épinglage, cycle de vie, langage, appartenance à un tag. La recherche texte
+/// reste au domaine (repliage de casse Unicode), tout comme le regroupement en
+/// sections. `domain::view::build` prend le relais sur ce que renvoie cette
+/// fonction.
 pub fn fetch(
     connection: &Connection,
     request: &NotesQuery,
-) -> Result<(Vec<Note>, Vec<String>), StorageError> {
+) -> Result<(Vec<Note>, Facets), StorageError> {
     let mut conditions: Vec<String> = Vec::new();
     let mut params: Vec<Box<dyn ToSql>> = Vec::new();
 
@@ -191,6 +212,23 @@ pub fn fetch(
         NoteFilter::All => {}
         NoteFilter::Pinned => conditions.push("pinned = 1".to_string()),
         NoteFilter::Untriaged => conditions.push("lifecycle_kind = 'expires'".to_string()),
+    }
+
+    // Pas de normalisation ici, contrairement aux tags : un langage n'est pas
+    // saisi au clavier mais choisi dans une liste fermée, et `domain::language`
+    // le compare à l'identique. Une valeur inconnue ne correspondra à rien, ce
+    // qui est exactement le résultat attendu.
+    if !request.languages.is_empty() {
+        let placeholders: Vec<String> = request
+            .languages
+            .iter()
+            .map(|language| {
+                params.push(Box::new(language.clone()));
+                format!("?{}", params.len())
+            })
+            .collect();
+        // Union, comme les tags : sélectionner JSON puis YAML montre les deux.
+        conditions.push(format!("language IN ({})", placeholders.join(", ")));
     }
 
     // Les tags reçus passent par la même normalisation que ceux écrits, sinon
@@ -239,10 +277,7 @@ pub fn fetch(
         note.tags = grouped.remove(&note.id).unwrap_or_default();
     }
 
-    Ok((
-        notes,
-        available_tags(connection, request.space_id.as_deref())?,
-    ))
+    Ok((notes, facets(connection, request.space_id.as_deref())?))
 }
 
 fn find(connection: &Connection, id: &str) -> Result<Option<Note>, StorageError> {
@@ -421,8 +456,8 @@ mod tests {
     /// l'assemble. Les règles ont leurs propres tests dans `domain/` ; ici on
     /// vérifie qu'elles s'appliquent bien à ce que la base a réellement rendu.
     fn query(connection: &Connection, request: &NotesQuery) -> Result<NotesView, StorageError> {
-        let (notes, tags) = fetch(connection, request)?;
-        Ok(view::build(notes, tags, request).expect("les tests fournissent un instant valide"))
+        let (notes, facets) = fetch(connection, request)?;
+        Ok(view::build(notes, facets, request).expect("les tests fournissent un instant valide"))
     }
 
     fn space(connection: &Connection, name: &str) -> String {
@@ -659,6 +694,7 @@ mod tests {
             search: String::new(),
             filter: NoteFilter::All,
             tags: Vec::new(),
+            languages: Vec::new(),
             now: T1.to_string(),
             tz_offset_minutes: 0,
         }
@@ -674,6 +710,13 @@ mod tests {
     fn tagged(space_id: &str, tags: &[&str]) -> NoteDraft {
         NoteDraft {
             tags: tags.iter().map(|tag| tag.to_string()).collect(),
+            ..draft(space_id)
+        }
+    }
+
+    fn written_in(space_id: &str, language: &str) -> NoteDraft {
+        NoteDraft {
+            language: language.to_string(),
             ..draft(space_id)
         }
     }
@@ -1048,6 +1091,143 @@ mod tests {
         .unwrap();
 
         assert_eq!(matched_ids(&view), [target.id]);
+    }
+
+    #[test]
+    fn a_note_matches_when_it_is_written_in_one_of_the_selected_languages() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        let json = create(&mut connection, &written_in(&space_id, "json"), T0).unwrap();
+        let yml = create(&mut connection, &written_in(&space_id, "yml"), T0).unwrap();
+        create(&mut connection, &written_in(&space_id, "py"), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                languages: vec!["json".to_string(), "yml".to_string()],
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        // A union like the tag rail, not an intersection: a note has exactly one
+        // language, so requiring all of them would always match nothing.
+        let ids = matched_ids(&view);
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&json.id) && ids.contains(&yml.id));
+        assert!(view.is_filtering);
+    }
+
+    #[test]
+    fn the_language_filter_combines_with_the_other_criteria() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        let target = create(
+            &mut connection,
+            &NoteDraft {
+                title: "deploy".to_string(),
+                ..written_in(&space_id, "yml")
+            },
+            T0,
+        )
+        .unwrap();
+        // Same language, wrong search; and same search, wrong language.
+        create(&mut connection, &written_in(&space_id, "yml"), T0).unwrap();
+        create(
+            &mut connection,
+            &NoteDraft {
+                title: "deploy".to_string(),
+                ..written_in(&space_id, "json")
+            },
+            T0,
+        )
+        .unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                search: "deploy".to_string(),
+                languages: vec!["yml".to_string()],
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(matched_ids(&view), [target.id]);
+    }
+
+    #[test]
+    fn an_unknown_selected_language_matches_nothing_rather_than_everything() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &written_in(&space_id, "json"), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                languages: vec!["cobol".to_string()],
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(view.matched, 0);
+    }
+
+    #[test]
+    fn available_languages_are_sorted_and_de_duplicated() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &written_in(&space_id, "yml"), T0).unwrap();
+        create(&mut connection, &written_in(&space_id, "json"), T0).unwrap();
+        create(&mut connection, &written_in(&space_id, "json"), T1).unwrap();
+
+        let view = query(&connection, &all_notes()).unwrap();
+
+        assert_eq!(view.available_languages, ["json", "yml"]);
+    }
+
+    #[test]
+    fn available_languages_are_scoped_to_the_active_space() {
+        let mut connection = open_in_memory().unwrap();
+        let here = space(&connection, "Perso");
+        let elsewhere = space(&connection, "Boulot");
+        create(&mut connection, &written_in(&here, "json"), T0).unwrap();
+        create(&mut connection, &written_in(&elsewhere, "sql"), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                space_id: Some(here),
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        // Offering a language that filters nothing in the current space is noise.
+        assert_eq!(view.available_languages, ["json"]);
+    }
+
+    #[test]
+    fn available_languages_ignore_the_current_selection() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &written_in(&space_id, "json"), T0).unwrap();
+        create(&mut connection, &written_in(&space_id, "yml"), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                languages: vec!["json".to_string()],
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        // Narrowing the rail to the current results would leave a single facet
+        // on screen and make a second selection impossible.
+        assert_eq!(view.available_languages, ["json", "yml"]);
+        assert_eq!(view.matched, 1);
     }
 
     #[test]

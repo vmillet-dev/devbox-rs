@@ -2,6 +2,10 @@
 // couleurs et polices vivent ici en variables CSS, et les composants ne font
 // que les consommer via var(--xxx).
 
+// Coloration syntaxique. Globale et non scopée au visualiseur de code : voir
+// l'explication en tête du fichier.
+@use 'code-theme';
+
 /*
  * IMPORTANT : ces variables doivent vivre ICI (fichier global, non scopé),
  * et non dans un *.component.scss. Angular applique une "encapsulation" aux

@@ -357,9 +357,16 @@ describe('NoteEditorOverlayComponent', () => {
       expect([...select.options].map((option) => option.value)).toEqual([
         'json',
         'js',
+        'ts',
         'py',
         'sql',
         'yml',
+        'toml',
+        'xml',
+        'html',
+        'css',
+        'sh',
+        'md',
         'txt',
       ]);
       expect(select.value).toBe('sql');

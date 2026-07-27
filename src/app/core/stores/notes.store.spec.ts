@@ -125,6 +125,33 @@ describe('NotesStore', () => {
       expect(repository.lastQuery?.tags).toEqual([]);
     });
 
+    it('sends the selected languages', async () => {
+      const { store, repository } = await createStore([createNote()]);
+      const before = repository.queryCount;
+
+      // This is the test that catches a `sameQueryParams` missing its languages
+      // clause: the resource would compare the params equal and never refetch.
+      store.toggleLanguage('json');
+      await awaitQuery(repository, before);
+
+      expect(repository.lastQuery?.languages).toEqual(['json']);
+    });
+
+    it('drops a language that is toggled twice', async () => {
+      const { store, repository } = await createStore([createNote()]);
+
+      const beforeAdd = repository.queryCount;
+      store.toggleLanguage('json');
+      await awaitQuery(repository, beforeAdd);
+      expect(repository.lastQuery?.languages).toEqual(['json']);
+
+      const beforeRemove = repository.queryCount;
+      store.toggleLanguage('json');
+      await awaitQuery(repository, beforeRemove);
+
+      expect(repository.lastQuery?.languages).toEqual([]);
+    });
+
     it('sends the timezone offset, without which sections straddle local midnight', async () => {
       const { repository } = await createStore([createNote()]);
 
@@ -309,6 +336,16 @@ describe('NotesStore', () => {
       ]);
 
       expect(store.allTags()).toEqual(['alpha', 'zeta']);
+    });
+
+    it('exposes the languages the backend offers for the rail', async () => {
+      const { store } = await createStore([
+        createNote({ id: 'a', language: 'yml' }),
+        createNote({ id: 'b', language: 'json' }),
+        createNote({ id: 'c', language: 'json' }),
+      ]);
+
+      expect(store.allLanguages()).toEqual(['json', 'yml']);
     });
   });
 

@@ -1,3 +1,4 @@
+import { LanguageTag, isLanguageTag } from '../models/language.model';
 import { NoteSection, NoteSectionKey } from '../models/note-section.model';
 import { NoteFilter, NotesQuery, NotesView } from '../models/notes-query.model';
 import { NoteDto, toIsoString, toNote } from './note.dto';
@@ -15,6 +16,7 @@ export interface NotesQueryDto {
   readonly search: string;
   readonly filter: NoteFilter;
   readonly tags: readonly string[];
+  readonly languages: readonly string[];
   readonly now: string;
   readonly tzOffsetMinutes: number;
 }
@@ -22,6 +24,7 @@ export interface NotesQueryDto {
 export interface NotesViewDto {
   readonly sections: readonly NoteSectionDto[];
   readonly availableTags: readonly string[];
+  readonly availableLanguages: readonly string[];
   readonly isFiltering: boolean;
   readonly matched: number;
 }
@@ -53,6 +56,7 @@ export function toNotesQueryDto(query: NotesQuery): NotesQueryDto {
     search: query.search,
     filter: query.filter,
     tags: [...query.tags],
+    languages: [...query.languages],
     now: toIsoString(query.now, 'now'),
     tzOffsetMinutes: query.tzOffsetMinutes,
   };
@@ -77,6 +81,13 @@ export function toNotesView(dto: NotesViewDto): NotesView {
   return {
     sections: dto.sections.map(toSection),
     availableTags: [...dto.availableTags],
+    // Une facette inconnue est écartée, là où une section inconnue fait échouer :
+    // un rail auquel il manque un choix reste utilisable, un canevas dont une
+    // section est illisible ne l'est pas. Même tolérance que `toNote`, qui replie
+    // le langage d'une note sur `txt`.
+    availableLanguages: dto.availableLanguages.filter((language): language is LanguageTag =>
+      isLanguageTag(language),
+    ),
     isFiltering: dto.isFiltering,
     matched: dto.matched,
   };

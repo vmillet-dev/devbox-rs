@@ -1,3 +1,4 @@
+import { LanguageTag } from './language.model';
 import { NoteSection } from './note-section.model';
 
 /**
@@ -17,6 +18,8 @@ export interface NotesQuery {
   readonly search: string;
   readonly filter: NoteFilter;
   readonly tags: readonly string[];
+  /** Même sémantique d'union que `tags` : au moins l'un d'eux. Vide = tous. */
+  readonly languages: readonly LanguageTag[];
   /** Instant de référence, lu via `ClockService` pour rester testable. */
   readonly now: Date;
   /**
@@ -35,7 +38,9 @@ export interface NotesView {
   readonly sections: readonly NoteSection[];
   /** Tags du rail, portés à l'espace actif et non au filtre courant. */
   readonly availableTags: readonly string[];
-  /** Une recherche ou une sélection de tags est active. */
+  /** Langages du rail, de même portée que `availableTags`. */
+  readonly availableLanguages: readonly LanguageTag[];
+  /** Une recherche ou une sélection de facettes (tag, langage) est active. */
   readonly isFiltering: boolean;
   /** Nombre de notes retenues, toutes sections confondues. */
   readonly matched: number;

@@ -7,8 +7,9 @@
 //!
 //! # Le partage des tâches
 //!
-//! - **SQL** pour ce qu'il indexe bien : espace, épinglage, cycle de vie, et
-//!   l'appartenance à un tag via `note_tags` (voir `storage::notes::fetch`) ;
+//! - **SQL** pour ce qu'il indexe bien : espace, épinglage, cycle de vie,
+//!   langage, et l'appartenance à un tag via `note_tags` (voir
+//!   `storage::notes::fetch`) ;
 //! - **ici** pour la recherche texte, qui demande un repliage de casse Unicode
 //!   (voir [`super::search`]) ;
 //! - [`super::sections`] pour le regroupement.
@@ -16,7 +17,7 @@
 use chrono::DateTime;
 
 use super::note::Note;
-use super::query::{NotesQuery, NotesView};
+use super::query::{Facets, NotesQuery, NotesView};
 use super::validation::ValidationError;
 use super::{search, sections, tags};
 
@@ -30,7 +31,7 @@ use super::{search, sections, tags};
 /// instant, et les notes changeraient de jour sans que rien ne le signale.
 pub fn build(
     notes: Vec<Note>,
-    available_tags: Vec<String>,
+    facets: Facets,
     request: &NotesQuery,
 ) -> Result<NotesView, ValidationError> {
     let mut notes = notes;
@@ -43,8 +44,10 @@ pub fn build(
 
     // Le filtre rapide (épinglées / à trier) ne bascule pas en mode résultats :
     // il restreint une vue qui reste chronologique. Une recherche ou une
-    // sélection de tags, si.
-    let is_filtering = !needle.is_empty() || !tags::normalize(&request.tags).is_empty();
+    // sélection de facettes — tag ou langage —, si.
+    let is_filtering = !needle.is_empty()
+        || !tags::normalize(&request.tags).is_empty()
+        || !request.languages.is_empty();
     let matched = notes.len();
 
     let offset = sections::offset_from_minutes(request.tz_offset_minutes);
@@ -59,7 +62,8 @@ pub fn build(
 
     Ok(NotesView {
         sections: sections::build(notes, is_filtering, &now, &offset),
-        available_tags,
+        available_tags: facets.tags,
+        available_languages: facets.languages,
         is_filtering,
         matched,
     })
@@ -76,8 +80,8 @@ mod tests {
 
     /// Les cas nominaux fournissent tous un instant valide ; seul le test dédié
     /// s'intéresse au refus.
-    fn build(notes: Vec<Note>, available_tags: Vec<String>, request: &NotesQuery) -> NotesView {
-        try_build(notes, available_tags, request).unwrap()
+    fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesView {
+        try_build(notes, facets, request).unwrap()
     }
 
     fn request() -> NotesQuery {
@@ -86,6 +90,7 @@ mod tests {
             search: String::new(),
             filter: NoteFilter::All,
             tags: Vec::new(),
+            languages: Vec::new(),
             now: NOW.to_string(),
             tz_offset_minutes: 0,
         }
@@ -108,7 +113,7 @@ mod tests {
     fn an_empty_search_keeps_every_note_and_reports_no_filtering() {
         let view = build(
             vec![note("a", "Un"), note("b", "Deux")],
-            Vec::new(),
+            Facets::default(),
             &request(),
         );
 
@@ -123,7 +128,7 @@ mod tests {
 
         let view = build(
             notes,
-            Vec::new(),
+            Facets::default(),
             &NotesQuery {
                 search: "  DÉPLOI  ".to_string(),
                 ..request()
@@ -141,7 +146,7 @@ mod tests {
     fn a_selected_tag_counts_as_filtering_even_with_no_search() {
         let view = build(
             vec![note("a", "Un")],
-            Vec::new(),
+            Facets::default(),
             &NotesQuery {
                 tags: vec!["urgent".to_string()],
                 ..request()
@@ -158,7 +163,7 @@ mod tests {
         // and tell the user a search is running when none is.
         let view = build(
             vec![note("a", "Un")],
-            Vec::new(),
+            Facets::default(),
             &NotesQuery {
                 tags: vec![" # ".to_string()],
                 ..request()
@@ -173,7 +178,7 @@ mod tests {
         // The front tells "no result" from "empty space" on exactly this pair.
         let view = build(
             vec![note("a", "Un")],
-            Vec::new(),
+            Facets::default(),
             &NotesQuery {
                 search: "introuvable".to_string(),
                 ..request()
@@ -185,12 +190,15 @@ mod tests {
     }
 
     #[test]
-    fn the_rail_tags_are_passed_through_untouched() {
+    fn the_rail_facets_are_passed_through_untouched() {
         // They are scoped to the space by the query, not to the current search:
-        // narrowing them would empty the rail on the first selection.
+        // narrowing them would empty the rails on the first selection.
         let view = build(
             vec![note("a", "Un")],
-            vec!["api".to_string(), "auth".to_string()],
+            Facets {
+                tags: vec!["api".to_string(), "auth".to_string()],
+                languages: vec!["json".to_string(), "txt".to_string()],
+            },
             &NotesQuery {
                 search: "introuvable".to_string(),
                 ..request()
@@ -198,6 +206,24 @@ mod tests {
         );
 
         assert_eq!(view.available_tags, ["api", "auth"]);
+        assert_eq!(view.available_languages, ["json", "txt"]);
+    }
+
+    #[test]
+    fn a_selected_language_counts_as_filtering_like_a_selected_tag() {
+        // Both rails are facet rails: selecting in either one turns the canvas
+        // into a flat result list. Only the quick filters keep the date buckets.
+        let view = build(
+            vec![note("a", "Un")],
+            Facets::default(),
+            &NotesQuery {
+                languages: vec!["json".to_string()],
+                ..request()
+            },
+        );
+
+        assert!(view.is_filtering);
+        assert_eq!(keys(&view), [NoteSectionKey::Results]);
     }
 
     #[test]
@@ -206,7 +232,7 @@ mod tests {
         // on another instant: notes would change day with nothing to show for it.
         let error = try_build(
             vec![note("a", "Un")],
-            Vec::new(),
+            Facets::default(),
             &NotesQuery {
                 now: "hier".to_string(),
                 ..request()

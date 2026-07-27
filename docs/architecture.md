@@ -16,12 +16,13 @@ intended contract as documentation and no code — a placeholder implementation 
 in the binary and be thrown away anyway.
 
 **Where the work happens.** Data processing belongs to Rust. Filtering (space, full-text,
-tags, quick filters), grouping into display sections, tag aggregation and normalisation, and
-the choice of what a card's footer shows all run in `src-tauri/src/domain/`. The front-end
-describes what the user asked for and renders the view it gets back — it does not filter,
-sort or group. The deliberate exceptions are relative-time **formatting** (labels must age on
-their own, without a round trip), the ISO ↔ `Date` conversion at the serialisation boundary,
-and plain UI concerns like keyboard shortcuts and editor drafts.
+tags, languages, quick filters), grouping into display sections, facet aggregation and tag
+normalisation, and the choice of what a card's footer shows all run in `src-tauri/src/domain/`.
+The front-end describes what the user asked for and renders the view it gets back — it does
+not filter, sort or group. The deliberate exceptions are relative-time **formatting** (labels
+must age on their own, without a round trip), the ISO ↔ `Date` conversion at the serialisation
+boundary, syntax highlighting (it colours the in-flight editor draft, which is not persisted
+yet — a round trip per keystroke), and plain UI concerns like keyboard shortcuts and drafts.
 
 ```
 src/                Angular front-end
@@ -99,13 +100,47 @@ Components never reach into each other imperatively. A keyboard shortcut belongs
 component that owns the affected element: `Ctrl/⌘+K` is handled inside `SearchBoxComponent`,
 which also renders the hint, rather than travelling down a chain of `viewChild` calls.
 
+### Syntax highlighting
+
+`CodeViewerComponent` renders a read-only, coloured preview. It delegates to
+`shared/ui/code-viewer/highlighter.ts`, the **only** module that imports highlight.js.
+
+- **Grammars are imported one by one** from `highlight.js/lib/`, never the default bundle,
+  which carries close to 200 languages. `GRAMMARS` maps a `LanguageTag` onto the grammar that
+  describes it; three do not share a name (`toml` is `ini`, `html` is `xml`, `yml` is `yaml`),
+  and `txt` deliberately has none — free text has nothing to colour, so it is only escaped.
+- **`ignoreIllegals` is on.** A note is free text, often a fragment that does not parse end to
+  end; without it a truncated JSON snippet would throw instead of rendering.
+- **Output is re-split into lines** by `splitHighlightedLines`. highlight.js colours the whole
+  block — that is exactly what lets it handle a comment or string spanning several lines — but
+  the viewer renders one element per line for its gutter. A plain `split('\n')` would cut
+  through `<span>`s straddling a line break, so the splitter tracks the open tag stack, closes
+  it at end of line and reopens it on the next.
+- **The theme is global**, in `src/styles/_code-theme.scss`. The coloured HTML arrives through
+  `[innerHTML]`, and Angular does not stamp `_ngcontent-*` on DOM created that way: a
+  `.hljs-keyword` rule written in `code-viewer.component.scss` would be rewritten into
+  `.hljs-keyword[_ngcontent-xxx]` and never match. No highlight.js stylesheet is imported —
+  they hard-code hex values, where the rest of the app only reads theme variables.
+- **The markup is never trusted.** highlight.js escapes the source text and the result still
+  goes through Angular's sanitizer; nothing calls `bypassSecurityTrust*`, and nothing should —
+  the content is typed by the user.
+- Two inputs let a card reuse it: `showLineNumbers` (a gutter on a three-line excerpt is
+  noise) and `compact` (no padding, no scroll, no font size of its own — the card decides).
+  The viewer renders `<span>`s rather than `<div>`s for the same reason: a card is a
+  `<button>`, whose content model only admits phrasing content.
+
 ### State
 
 `NotesStore` (`providedIn: 'root'`) holds the **query state** — search text, active filter,
-selected tags, selected note — and the view the back-end returned for it. It does no
-filtering, sorting or grouping of its own: those criteria are sent to `query_notes`, and
-`sections`, `allTags`, `isFiltering` and `hasNoResults` are all reads of the resulting
-`NotesView`.
+selected tags, selected languages, selected note — and the view the back-end returned for it.
+It does no filtering, sorting or grouping of its own: those criteria are sent to
+`query_notes`, and `sections`, `allTags`, `allLanguages`, `isFiltering` and `hasNoResults` are
+all reads of the resulting `NotesView`.
+
+⚠️ Any new query criterion needs three edits in lockstep: a field in `QueryParams`, its clause
+in `sameQueryParams`, and the copy into the `NotesQuery` the loader builds. `resource` compares
+its params by identity, so a criterion missing from the comparator changes nothing on screen —
+the rail looks wired and simply never refetches.
 
 Two consequences worth knowing:
 
@@ -121,8 +156,9 @@ Two consequences worth knowing:
 `SpacesStore` owns the spaces and the active one. Two decisions matter there:
 
 - **The active space is a filter, not a label.** `NotesStore` injects `SpacesStore` (never the
-  other way round) and sends `activeSpaceId()` with every query, so the space also scopes the
-  tag rail — a tag that filters nothing in the current space has no reason to be offered.
+  other way round) and sends `activeSpaceId()` with every query, so the space also scopes both
+  facet rails — a tag or a language that filters nothing in the current space has no reason to
+  be offered.
 - **`null` means "all spaces", and is a choice, not a loading state.** There is deliberately
   no "All" row in the data: it would be a phantom space that notes could be filed into by
   mistake. The label lives in the translations, and an active id matching no known space
@@ -295,8 +331,15 @@ domain model. Two traps it exists to handle:
   lifecycle enum needs `#[serde(tag = "kind", rename_all = "camelCase")]` (otherwise serde
   emits `{"Expires":{…}}`, which the discriminated union does not recognise).
 
-An unknown `language` value degrades to `txt` instead of failing the load: a newer backend
-may know a language this front-end build does not.
+An unknown `language` value degrades to `txt` instead of failing the load, and an unknown
+entry in `availableLanguages` is dropped from the rail: a newer backend may know a language
+this front-end build does not. Contrast with an unknown section key, which does throw — a rail
+missing one facet stays usable, a canvas with an unreadable section does not.
+
+The known list is `domain/language.rs` (`LANGUAGES`), mirrored by `core/models/language.model.ts`
+(`LanguageTag` + `LANGUAGE_LABELS`). Adding a language means editing both, plus a `.lang-*`
+rule in `language-badge.component.scss` and, if it should be coloured, an entry in `GRAMMARS`.
+Nothing compares the two lists, so a drift only surfaces at runtime as a fallback to `txt`.
 
 Patches are serialised field by field, omitting absent keys — an explicit `undefined` would
 serialise to `null` and overwrite the stored value instead of leaving it untouched.
@@ -318,12 +361,22 @@ The six commands are `query_notes`, `create_note`, `update_note`, `delete_note`,
 returned, `Err` on an unknown id, "absent field means unchanged" for patches) are implemented
 in `storage/` and `domain/`, and tested there.
 
-`query_notes` takes a `NotesQuery` (space, search, quick filter, tags, `now`,
-`tzOffsetMinutes`) and returns a `NotesView` (sections, `availableTags`, `isFiltering`,
-`matched`). The pair `isFiltering` + `matched` is what lets the UI distinguish "no results"
-from "this space is empty" without recomputing anything. Its two steps are visible in the
-command body: `storage::notes::fetch` runs the indexed SQL, `domain::view::build` applies the
-rules to what came back.
+`query_notes` takes a `NotesQuery` (space, search, quick filter, tags, languages, `now`,
+`tzOffsetMinutes`) and returns a `NotesView` (sections, `availableTags`, `availableLanguages`,
+`isFiltering`, `matched`). The pair `isFiltering` + `matched` is what lets the UI distinguish
+"no results" from "this space is empty" without recomputing anything. Its two steps are
+visible in the command body: `storage::notes::fetch` runs the indexed SQL, `domain::view::build`
+applies the rules to what came back. `fetch` returns the notes plus a `Facets { tags,
+languages }` — the two rails ask the same question of two columns, and passing two bare
+`Vec<String>` side by side would be indistinguishable at the call site.
+
+**Tags and languages are both facet rails**, and behave identically: union semantics (a note
+passes if it carries _at least one_ of the selected values), facets scoped to the space rather
+than to the current filter, and a selection counts as `is_filtering` — which collapses the
+canvas into a single flat `results` section. The quick filters (pinned / untriaged) do not:
+they narrow a view that stays chronological. One asymmetry: selected tags go through
+`domain::tags::normalize` before hitting SQL, selected languages do not — a language is picked
+from a closed list, not typed, and `domain::language` compares it exactly.
 
 The serialisation contract is pinned by tests in `domain/note.rs`, `domain/query.rs`,
 `domain/display.rs` and `domain/space.rs` rather than left to review: they assert the emitted
@@ -374,7 +427,8 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
   `created_at`. The section answers "when was this note born", the order within it answers
   "which did I touch last", so an old note reopened today tops the "older" section.
 - **Querying splits the work by what each tool does well.** SQL handles what it indexes —
-  space, pin state, lifecycle, and tag membership through `EXISTS` on `note_tags`. Full-text
+  space, pin state, lifecycle, language, and tag membership through `EXISTS` on `note_tags`.
+  Full-text
   matching is done **in Rust** (`domain::search`), because SQLite's `LOWER()` only folds ASCII
   without ICU, so `Étape` would not match `étape`. Grouping is `domain::sections`, which
   touches no connection and is therefore testable without a database.
@@ -388,6 +442,11 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
   `urgent` carried by two different notes produced two facets in the rail, of which
   `tag IN (…)` — running in BINARY — matched only one, while the text search confused them.
   Three behaviours for one concept.
+- **`notes.language` is indexed** (migration 3), since it became a filtering facet: both
+  `language IN (…)` and the `SELECT DISTINCT language` that feeds the rail would otherwise
+  scan the table on every query. No `CHECK` constraint on the column, though — the list of
+  known languages lives in `domain::language` and moves between versions; freezing it in the
+  schema would mean a migration per addition.
 - **Timestamps are injected, not read.** `storage::notes` takes `now` as a parameter and the
   command passes `storage::now_iso()` — the same reason `ClockService` exists on the front.
   Millisecond precision is deliberate: two notes saved within one second would otherwise be

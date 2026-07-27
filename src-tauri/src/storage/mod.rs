@@ -56,7 +56,7 @@ pub type Db = Mutex<Connection>;
 pub const DB_FILE_NAME: &str = "devbox.sqlite3";
 
 /// Version de schéma attendue par ce binaire.
-const SCHEMA_VERSION: i32 = 2;
+const SCHEMA_VERSION: i32 = 3;
 
 /// Schéma initial.
 ///
@@ -139,6 +139,24 @@ ALTER TABLE note_tags_v2 RENAME TO note_tags;
 CREATE INDEX note_tags_tag ON note_tags (tag);
 
 PRAGMA user_version = 2;
+
+COMMIT;
+";
+
+/// Index sur le langage, devenu une facette de filtrage à part entière (rail
+/// « Format »). Sans lui, `language IN (…)` impose un balayage complet, et
+/// `SELECT DISTINCT language` — recalculé à chaque requête pour alimenter le
+/// rail — aussi.
+///
+/// Pas de contrainte `CHECK` sur la colonne : la liste des langages reconnus
+/// vit dans `domain::language` et bouge d'une version à l'autre. La figer dans
+/// le schéma obligerait à une migration pour chaque ajout.
+const MIGRATION_3: &str = r"
+BEGIN;
+
+CREATE INDEX notes_language ON notes (language);
+
+PRAGMA user_version = 3;
 
 COMMIT;
 ";
@@ -237,6 +255,9 @@ fn migrate(connection: &Connection) -> Result<(), StorageError> {
     if version < 2 {
         connection.execute_batch(MIGRATION_2)?;
     }
+    if version < 3 {
+        connection.execute_batch(MIGRATION_3)?;
+    }
 
     Ok(())
 }
@@ -303,6 +324,47 @@ mod tests {
             )
             .unwrap();
         assert_eq!(facets, 1);
+    }
+
+    #[test]
+    fn a_v2_database_gains_the_language_index_without_touching_its_notes() {
+        let connection = Connection::open_in_memory().unwrap();
+        configure(&connection).unwrap();
+        connection.execute_batch(MIGRATION_1).unwrap();
+        connection.execute_batch(MIGRATION_2).unwrap();
+        connection
+            .execute_batch(
+                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Perso');
+                 INSERT INTO notes VALUES
+                   ('n-1', 's-1', 'A', 'json', '', '', 0, '2026-07-25T09:00:00.000Z',
+                    '2026-07-25T09:00:00.000Z', 'permanent', NULL);",
+            )
+            .unwrap();
+
+        migrate(&connection).unwrap();
+
+        let version: i32 = connection
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+
+        let indexes: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master \
+                 WHERE type = 'index' AND name = 'notes_language'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(indexes, 1);
+
+        // The migration is an index, not a rewrite: the note is untouched.
+        let language: String = connection
+            .query_row("SELECT language FROM notes WHERE id = 'n-1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(language, "json");
     }
 
     #[test]

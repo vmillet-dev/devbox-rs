@@ -17,6 +17,12 @@
   (tagToggled)="store.toggleTag($event)"
 />
 
+<app-language-rail
+  [languages]="store.allLanguages()"
+  [activeLanguages]="store.selectedLanguages()"
+  (languageToggled)="store.toggleLanguage($event)"
+/>
+
 <app-note-canvas
   [sections]="store.sections()"
   [selectedNoteId]="store.selectedNoteId()"

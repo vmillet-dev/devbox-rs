@@ -9,26 +9,38 @@
   letter-spacing: 0.4px;
 }
 
-.lang-json {
+// La palette du thème n'offre que six teintes, pour treize langages : elles sont
+// donc partagées par familles. Ce n'est pas une perte d'information — le libellé
+// du badge nomme le langage ; la couleur ne fait que le regrouper à l'oeil.
+
+// Formats de données.
+.lang-json,
+.lang-ts,
+.lang-xml {
   @include tint-badge('--blue-rgb');
 }
 
-.lang-py {
-  @include tint-badge('--green-rgb');
-}
-
-.lang-sql {
-  @include tint-badge('--purple-rgb');
-}
-
-.lang-txt {
-  @include tint-badge('--text-1-rgb');
-}
-
-.lang-js {
+.lang-js,
+.lang-html {
   @include tint-badge('--amber-rgb');
 }
 
-.lang-yml {
+.lang-py,
+.lang-sh {
+  @include tint-badge('--green-rgb');
+}
+
+.lang-sql,
+.lang-css {
+  @include tint-badge('--purple-rgb');
+}
+
+.lang-yml,
+.lang-toml {
   @include tint-badge('--red-rgb');
+}
+
+.lang-txt,
+.lang-md {
+  @include tint-badge('--text-1-rgb');
 }

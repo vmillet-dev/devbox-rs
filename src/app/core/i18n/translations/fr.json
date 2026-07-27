@@ -11,6 +11,8 @@
     "newSpaceSubmit": "Créer",
     "tags": "Tags",
     "tagsGroupLabel": "Filtrer par tag",
+    "languages": "Format",
+    "languagesGroupLabel": "Filtrer par format",
     "createOrPaste": "Coller ou créer",
     "untitled": "Sans titre",
     "pinnedState": "Note épinglée",

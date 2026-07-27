@@ -1,8 +1,13 @@
 :host {
   display: block;
+  font-family: var(--font-mono);
+}
+
+// Variante plein écran (aperçu de l'éditeur). Le mode compact n'hérite d'aucune
+// de ces propriétés : dans une carte, c'est la typographie de la carte qui prime.
+:host(:not(.compact)) {
   overflow-y: auto;
   padding: 20px 24px;
-  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -25,23 +30,5 @@
   word-break: break-word;
 }
 
-.tok-key {
-  color: var(--blue);
-}
-
-.tok-string {
-  color: var(--green);
-}
-
-.tok-punct {
-  color: var(--text-2);
-}
-
-.tok-number {
-  color: var(--amber);
-}
-
-.tok-comment {
-  color: var(--text-2);
-  font-style: italic;
-}
+// Les couleurs des jetons (`.hljs-*`) vivent dans `src/styles/_code-theme.scss` :
+// injectées par [innerHTML], elles échappent à l'encapsulation du composant.

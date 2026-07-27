@@ -1,0 +1,89 @@
+// Thème de coloration syntaxique : traduction des classes `.hljs-*` émises par
+// highlight.js en couleurs du thème DevBox. Les feuilles livrées avec
+// highlight.js codent leurs couleurs en hexadécimal ; celle-ci ne consomme que
+// des variables CSS, comme le reste de l'application.
+//
+/*
+ * IMPORTANT : ces règles doivent rester GLOBALES.
+ *
+ * Le HTML colorié est injecté par [innerHTML] dans `CodeViewerComponent`, et
+ * Angular n'appose pas d'attribut `_ngcontent-*` sur du DOM créé de cette
+ * façon. Une règle `.hljs-keyword` écrite dans `code-viewer.component.scss`
+ * serait réécrite en `.hljs-keyword[_ngcontent-xxx]` et ne correspondrait
+ * jamais : la coloration serait silencieusement absente.
+ */
+
+// Mots-clés, types, opérateurs : la structure du langage.
+.hljs-keyword,
+.hljs-type,
+.hljs-built_in,
+.hljs-operator,
+.hljs-selector-tag,
+.hljs-tag,
+.hljs-doctag {
+  color: var(--blue);
+}
+
+// Chaînes et tout ce qui se lit comme une valeur textuelle.
+.hljs-string,
+.hljs-regexp,
+.hljs-char.escape_,
+.hljs-quote,
+.hljs-link,
+.hljs-addition {
+  color: var(--green);
+}
+
+// Littéraux : nombres, booléens, constantes.
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-variable.constant_ {
+  color: var(--amber);
+}
+
+// Noms définis par le code : fonctions, classes, sections.
+.hljs-title,
+.hljs-section,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-selector-pseudo {
+  color: var(--purple);
+}
+
+// Noms de clés et d'attributs — la « colonne de gauche » d'un JSON ou d'un YAML.
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params {
+  color: var(--text-0);
+}
+
+// Directives et métadonnées : présentes sans être le propos.
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-meta .hljs-string {
+  color: var(--text-1);
+}
+
+.hljs-comment {
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.hljs-deletion {
+  color: var(--red);
+}
+
+// Markdown : le balisage doit rester visible à travers l'emphase.
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}

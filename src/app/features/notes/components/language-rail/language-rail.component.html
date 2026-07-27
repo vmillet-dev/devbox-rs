@@ -1,0 +1,18 @@
+@if (languages().length > 0) {
+  <div class="language-rail" role="group" [attr.aria-label]="'notes.languagesGroupLabel' | transloco">
+    <span class="language-rail-label">{{ 'notes.languages' | transloco }}</span>
+    @for (language of languages(); track language) {
+      <!-- Le badge porte la teinte du langage, le bouton porte l'interaction :
+           on garde ainsi une seule table couleur ↔ langage, celle du badge. -->
+      <button
+        type="button"
+        class="language-chip"
+        [class.on]="activeLanguages().has(language)"
+        [attr.aria-pressed]="activeLanguages().has(language)"
+        (click)="languageToggled.emit(language)"
+      >
+        <app-language-badge [language]="language" />
+      </button>
+    }
+  </div>
+}

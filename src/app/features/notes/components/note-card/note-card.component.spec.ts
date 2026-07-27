@@ -51,7 +51,25 @@ describe('NoteCardComponent', () => {
     fixture.componentRef.setInput('note', createNote({ content: 'one\ntwo\nthree\nfour' }));
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.querySelector('.card-snippet').textContent).toBe('one\ntwo\nthree');
+    // The snippet goes through the code viewer, which renders one element per
+    // line rather than a single text node.
+    const lines = fixture.debugElement.queryAll(By.css('.card-snippet .line-content'));
+    expect(lines.map((line) => line.nativeElement.textContent)).toEqual(['one', 'two', 'three']);
+  });
+
+  it('colours the snippet according to the note language', async () => {
+    fixture.componentRef.setInput('note', createNote({ language: 'json', content: '{"a": 1}' }));
+    await fixture.whenStable();
+
+    expect(fixture.debugElement.query(By.css('.card-snippet .hljs-attr'))).not.toBeNull();
+  });
+
+  it('numbers no line in the snippet', async () => {
+    fixture.componentRef.setInput('note', createNote({ content: 'one\ntwo' }));
+    await fixture.whenStable();
+
+    // A gutter on a three-line excerpt is noise, and it would eat into the width.
+    expect(fixture.debugElement.queryAll(By.css('.card-snippet .line-no'))).toHaveLength(0);
   });
 
   it('shows at most 2 tags', async () => {

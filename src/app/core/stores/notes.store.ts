@@ -38,7 +38,21 @@ interface QueryParams {
   readonly search: string;
   readonly filter: NoteFilter;
   readonly tags: readonly string[];
+  readonly languages: readonly LanguageTag[];
   readonly day: string;
+}
+
+function sameFacets(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/** Sélection de facettes avec `value` basculée. Un ensemble neuf, jamais muté. */
+function toggled<T>(selection: ReadonlySet<T>, value: T): ReadonlySet<T> {
+  const next = new Set(selection);
+  if (!next.delete(value)) {
+    next.add(value);
+  }
+  return next;
 }
 
 /**
@@ -54,8 +68,8 @@ function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
     a.search === b.search &&
     a.filter === b.filter &&
     a.day === b.day &&
-    a.tags.length === b.tags.length &&
-    a.tags.every((tag, index) => tag === b.tags[index])
+    sameFacets(a.tags, b.tags) &&
+    sameFacets(a.languages, b.languages)
   );
 }
 
@@ -63,8 +77,8 @@ function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
  * État des notes.
  *
  * Ce store ne filtre pas, ne trie pas et ne regroupe pas : il décrit ce que
- * l'utilisateur demande (espace, recherche, filtre, tags) et affiche la **vue**
- * que le backend renvoie. Toute la logique correspondante vit dans
+ * l'utilisateur demande (espace, recherche, filtre, tags, langages) et affiche la
+ * **vue** que le backend renvoie. Toute la logique correspondante vit dans
  * `src-tauri/src/storage/` — voir `docs/architecture.md`.
  *
  * Deux principes structurent la classe :
@@ -86,12 +100,14 @@ export class NotesStore {
   private readonly _debouncedSearch = signal('');
   private readonly _activeFilter = signal<NoteFilter>('all');
   private readonly _selectedTags = signal<ReadonlySet<string>>(new Set());
+  private readonly _selectedLanguages = signal<ReadonlySet<LanguageTag>>(new Set());
   private readonly _selectedNote = signal<Note | null>(null);
 
   /** Reflète la frappe sans attendre : c'est la valeur affichée dans le champ. */
   readonly searchQuery = this._searchQuery.asReadonly();
   readonly activeFilter = this._activeFilter.asReadonly();
   readonly selectedTags = this._selectedTags.asReadonly();
+  readonly selectedLanguages = this._selectedLanguages.asReadonly();
   readonly selectedNote = this._selectedNote.asReadonly();
   readonly selectedNoteId = computed<string | null>(() => this._selectedNote()?.id ?? null);
 
@@ -111,6 +127,7 @@ export class NotesStore {
       search: this._debouncedSearch().trim(),
       filter: this._activeFilter(),
       tags: [...this._selectedTags()].sort(),
+      languages: [...this._selectedLanguages()].sort(),
       day: localDayKey(this.clock.now()),
     }),
     { equal: sameQueryParams },
@@ -127,6 +144,7 @@ export class NotesStore {
         search: params.search,
         filter: params.filter,
         tags: params.tags,
+        languages: params.languages,
         now,
         tzOffsetMinutes: now.getTimezoneOffset(),
       };
@@ -153,6 +171,7 @@ export class NotesStore {
 
   readonly sections = computed<readonly NoteSection[]>(() => this.view()?.sections ?? []);
   readonly allTags = computed<readonly string[]>(() => this.view()?.availableTags ?? []);
+  readonly allLanguages = computed<readonly LanguageTag[]>(() => this.view()?.availableLanguages ?? []);
   readonly isFiltering = computed(() => this.view()?.isFiltering ?? false);
 
   /** Recherche active mais aucun résultat : l'UI doit le dire explicitement. */
@@ -202,15 +221,11 @@ export class NotesStore {
   }
 
   toggleTag(tag: string): void {
-    this._selectedTags.update((tags) => {
-      const next = new Set(tags);
-      if (next.has(tag)) {
-        next.delete(tag);
-      } else {
-        next.add(tag);
-      }
-      return next;
-    });
+    this._selectedTags.update((tags) => toggled(tags, tag));
+  }
+
+  toggleLanguage(language: LanguageTag): void {
+    this._selectedLanguages.update((languages) => toggled(languages, language));
   }
 
   openNote(id: string): void {

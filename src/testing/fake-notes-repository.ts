@@ -95,6 +95,7 @@ export class FakeNotesRepository implements NotesRepository {
         },
       ],
       availableTags: [...new Set(this.notes.flatMap((note) => note.tags))].sort(),
+      availableLanguages: [...new Set(this.notes.map((note) => note.language))].sort(),
       isFiltering: false,
       matched: this.notes.length,
     };
