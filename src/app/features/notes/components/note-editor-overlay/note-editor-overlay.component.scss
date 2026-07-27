@@ -21,12 +21,23 @@
   box-shadow: var(--shadow-overlay);
 }
 
+// Le fond est déjà `position: fixed; inset: 0` : 100 % le remplit exactement,
+// sans les pièges de 100vw/100vh face à une barre de défilement.
+.overlay-panel.fullscreen {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .overlay-toolbar {
   padding: 14px 20px;
   border-bottom: 1px solid var(--line-soft);
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .overlay-title-input {
@@ -59,7 +70,9 @@
   border-color: var(--amber-dim);
 }
 
-.close-btn {
+// Bouton réduit à son glyphe, sans surface ni bordure — la croix et la bascule
+// plein écran, par opposition aux `.toolbar-btn` qui portent un libellé.
+.icon-btn {
   @include unstyled-control;
   color: var(--text-2);
   font-size: 18px;
@@ -67,7 +80,7 @@
   padding: 0 4px;
 }
 
-.close-btn:hover {
+.icon-btn:hover {
   color: var(--text-0);
 }
 
@@ -79,6 +92,7 @@
   border-bottom: 1px solid var(--line-soft);
   font-size: 11.5px;
   color: var(--text-2);
+  flex-shrink: 0;
 }
 
 .overlay-tags {
@@ -140,15 +154,18 @@
   font-family: var(--font-mono);
 }
 
-.overlay-body {
-  flex: 1;
-  min-height: 0;
-}
+// `flex: 1` et `min-height: 0` sont redéclarés dans chacune des deux variantes
+// plutôt que factorisés dans une règle `.overlay-body` : le `all: unset`
+// d'`unstyled-control` les remettrait à leur valeur initiale, et le corps
+// retomberait à sa hauteur de contenu — champ de saisie minuscule, pied de page
+// décollé du bas du panneau.
 
 // L'aperçu est un <button> : il faut lui rendre le rendu d'un bloc de texte,
 // alignement à gauche et défilement compris.
 .overlay-body-preview {
   @include unstyled-control;
+  flex: 1;
+  min-height: 0;
   display: block;
   width: 100%;
   overflow-y: auto;
@@ -166,6 +183,8 @@
 
 .overlay-body-editor {
   @include unstyled-control;
+  flex: 1;
+  min-height: 0;
   display: block;
   width: 100%;
   resize: none;
@@ -182,7 +201,8 @@
 .overlay-body-editor:focus-visible,
 .overlay-language-select:focus-visible,
 .tag-add-input:focus-visible,
-.tag-remove:focus-visible {
+.tag-remove:focus-visible,
+.icon-btn:focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: -2px;
 }
@@ -195,4 +215,5 @@
   font-size: 11px;
   color: var(--text-2);
   font-family: var(--font-mono);
+  flex-shrink: 0;
 }

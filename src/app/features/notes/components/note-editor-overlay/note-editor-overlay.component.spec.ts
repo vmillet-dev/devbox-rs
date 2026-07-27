@@ -27,6 +27,10 @@ describe('NoteEditorOverlayComponent', () => {
     return fixture.nativeElement.querySelector(selector);
   }
 
+  function fullscreenButton(): HTMLButtonElement {
+    return fixture.nativeElement.querySelector('.icon-btn:not(.close-btn)');
+  }
+
   function text(selector: string): string {
     return fixture.nativeElement.querySelector(selector).textContent.replace(/\s+/g, ' ').trim();
   }
@@ -43,18 +47,31 @@ describe('NoteEditorOverlayComponent', () => {
     return bodyEditor() as HTMLTextAreaElement;
   }
 
+  function createOverlay(): void {
+    fixture = TestBed.createComponent(NoteEditorOverlayComponent);
+    document.body.appendChild(fixture.nativeElement);
+    fixture.autoDetectChanges();
+  }
+
+  /** Rebuilds the overlay so a preference seeded in storage is read at construction. */
+  function recreateOverlay(): void {
+    fixture.nativeElement.remove();
+    fixture.destroy();
+    createOverlay();
+  }
+
   beforeEach(() => {
     // Only virtualize `Date`; Angular's zoneless scheduler relies on real rAF/setTimeout for `whenStable()` to resolve.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
+    // The fullscreen preference is persisted, so it would otherwise leak between tests.
+    localStorage.clear();
 
     TestBed.configureTestingModule({
       imports: [NoteEditorOverlayComponent],
       providers: [provideAppTesting()],
     });
-    fixture = TestBed.createComponent(NoteEditorOverlayComponent);
-    document.body.appendChild(fixture.nativeElement);
-    fixture.autoDetectChanges();
+    createOverlay();
   });
 
   afterEach(() => {
@@ -482,6 +499,77 @@ describe('NoteEditorOverlayComponent', () => {
       await fixture.whenStable();
 
       expect(text('.delete-btn')).toBe('🗑 Supprimer');
+    });
+  });
+
+  describe('fullscreen', () => {
+    function panel(): HTMLElement {
+      return fixture.nativeElement.querySelector('.overlay-panel');
+    }
+
+    async function openNote(): Promise<void> {
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+    }
+
+    beforeEach(openNote);
+
+    it('opens at the panel default size and exposes the button as a toggle', () => {
+      expect(panel().classList.contains('fullscreen')).toBe(false);
+      expect(fullscreenButton().getAttribute('aria-pressed')).toBe('false');
+      expect(fullscreenButton().getAttribute('aria-label')).toBe('Passer en plein écran');
+    });
+
+    it('expands the panel and flips the toggle when the button is clicked', async () => {
+      fullscreenButton().click();
+      await fixture.whenStable();
+
+      expect(panel().classList.contains('fullscreen')).toBe(true);
+      expect(fullscreenButton().getAttribute('aria-pressed')).toBe('true');
+      expect(fullscreenButton().getAttribute('aria-label')).toBe('Quitter le plein écran');
+    });
+
+    it('returns to the default size on a second click', async () => {
+      fullscreenButton().click();
+      await fixture.whenStable();
+      fullscreenButton().click();
+      await fixture.whenStable();
+
+      expect(panel().classList.contains('fullscreen')).toBe(false);
+    });
+
+    it('keeps the choice while another note is opened', async () => {
+      // A display preference, not note state: switching notes must not reset it.
+      fullscreenButton().click();
+      await fixture.whenStable();
+
+      fixture.componentRef.setInput('note', createNote({ id: 'other' }));
+      await fixture.whenStable();
+
+      expect(panel().classList.contains('fullscreen')).toBe(true);
+    });
+
+    it('persists the choice so it survives a restart', async () => {
+      fullscreenButton().click();
+      await fixture.whenStable();
+
+      expect(localStorage.getItem('devbox.editorFullscreen')).toBe('true');
+    });
+
+    it('reopens fullscreen when the preference was stored in a previous session', async () => {
+      localStorage.setItem('devbox.editorFullscreen', 'true');
+      recreateOverlay();
+      await openNote();
+
+      expect(panel().classList.contains('fullscreen')).toBe(true);
+    });
+
+    it('ignores an invalid persisted value', async () => {
+      localStorage.setItem('devbox.editorFullscreen', 'oui');
+      recreateOverlay();
+      await openNote();
+
+      expect(panel().classList.contains('fullscreen')).toBe(false);
     });
   });
 });

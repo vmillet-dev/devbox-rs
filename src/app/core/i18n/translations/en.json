@@ -44,6 +44,8 @@
     "delete": "Delete",
     "deleteConfirm": "Confirm?",
     "close": "Close editor",
+    "fullscreen": "Enter fullscreen",
+    "exitFullscreen": "Exit fullscreen",
     "pin": "Pin",
     "pinned": "Pinned",
     "footerStats": "{{lines}} lines · {{bytes}} bytes",

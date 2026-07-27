@@ -460,6 +460,9 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
   Injecting `now()` makes those computeds both pure and self-refreshing.
 - **`PreferencesService`** (`core/preferences/`) wraps `localStorage`, which throws in
   private-browsing WebViews. A preference that cannot be saved must never take the app down.
+  Two consumers: `LocaleService`, and the editor overlay's fullscreen toggle
+  (`devbox.editorFullscreen`), which reads it directly at construction — no app initializer
+  needed, since the overlay does not exist at first render.
 - **`ErrorNotifier` + `AppErrorHandler`** (`core/errors/`) surface failures on screen through
   `ErrorBannerComponent`. On a desktop app the console is not an interface: an uncaught
   exception or a failed write has to be visible, or the app just looks unresponsive.

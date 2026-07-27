@@ -15,6 +15,7 @@ import {
 import { TranslocoPipe } from '@jsverse/transloco';
 import { FALLBACK_LANGUAGE, LANGUAGE_LABELS, LanguageTag, isLanguageTag } from '@core/models/language.model';
 import { Note } from '@core/models/note.model';
+import { PreferencesService } from '@core/preferences/preferences.service';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/utils/relative-time.util';
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
@@ -24,6 +25,8 @@ import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
 
 /** Instancié une seule fois : `TextEncoder` est sans état, en recréer un à chaque recalcul est gratuit mais inutile. */
 const TEXT_ENCODER = new TextEncoder();
+
+const FULLSCREEN_STORAGE_KEY = 'devbox.editorFullscreen';
 
 /** Options du sélecteur de langage, dérivées de la table des libellés pour ne pas la dupliquer. */
 const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({
@@ -64,6 +67,7 @@ const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) =>
 })
 export class NoteEditorOverlayComponent {
   private readonly clock = inject(ClockService);
+  private readonly preferences = inject(PreferencesService);
 
   readonly note = input<Note | null>(null);
 
@@ -102,6 +106,13 @@ export class NoteEditorOverlayComponent {
 
   protected readonly tagInputValue = signal('');
 
+  /**
+   * Préférence d'affichage et non état de note : un `signal` simple, pas un
+   * `linkedSignal` sur `noteId`, pour qu'elle survive au passage d'une note à
+   * l'autre. Toute valeur stockée autre que `'true'` retombe sur le mode normal.
+   */
+  protected readonly fullscreen = signal(this.preferences.read(FULLSCREEN_STORAGE_KEY) === 'true');
+
   private readonly bodyEditor = viewChild<ElementRef<HTMLTextAreaElement>>('bodyEditor');
 
   protected readonly languageLabel = computed(
@@ -124,6 +135,12 @@ export class NoteEditorOverlayComponent {
         this.bodyEditor()?.nativeElement.focus();
       }
     });
+  }
+
+  protected toggleFullscreen(): void {
+    const next = !this.fullscreen();
+    this.fullscreen.set(next);
+    this.preferences.write(FULLSCREEN_STORAGE_KEY, String(next));
   }
 
   protected startEditingBody(): void {

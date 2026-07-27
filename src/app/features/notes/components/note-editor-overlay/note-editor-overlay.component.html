@@ -7,6 +7,7 @@
     <div
       appFocusTrap
       class="overlay-panel"
+      [class.fullscreen]="fullscreen()"
       role="dialog"
       aria-modal="true"
       aria-labelledby="overlay-title-input"
@@ -61,7 +62,16 @@
         </button>
         <button
           type="button"
-          class="close-btn"
+          class="icon-btn"
+          [attr.aria-pressed]="fullscreen()"
+          [attr.aria-label]="(fullscreen() ? 'editor.exitFullscreen' : 'editor.fullscreen') | transloco"
+          (click)="toggleFullscreen()"
+        >
+          <span aria-hidden="true">{{ fullscreen() ? '⤡' : '⤢' }}</span>
+        </button>
+        <button
+          type="button"
+          class="icon-btn close-btn"
           [attr.aria-label]="'editor.close' | transloco"
           (click)="requestClose()"
         >
