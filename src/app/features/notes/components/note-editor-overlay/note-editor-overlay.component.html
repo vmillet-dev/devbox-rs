@@ -113,32 +113,26 @@
         <app-lifecycle-badge [lifecycle]="note.lifecycle" [expiringSoon]="note.expiringSoon" />
       </div>
 
-      @if (editingBody()) {
-        <textarea
-          #bodyEditor
-          class="overlay-body overlay-body-editor"
-          spellcheck="false"
-          [attr.aria-label]="'editor.contentLabel' | transloco"
-          [value]="draftContent()"
-          (input)="draftContent.set(bodyEditor.value)"
-          (blur)="commitContent()"
-        ></textarea>
-      } @else {
-        <!-- Un <button> plutôt qu'un <div> cliquable : l'aperçu devient éditable
-             aussi bien à la souris qu'au clavier, sans piège de focus à écrire. -->
-        <button
-          type="button"
-          class="overlay-body overlay-body-preview"
-          [attr.aria-label]="'editor.contentLabel' | transloco"
-          (click)="startEditingBody()"
-        >
-          @if (draftContent()) {
-            <app-code-viewer [content]="draftContent()" [language]="note.language" />
-          } @else {
-            <span class="body-placeholder">{{ 'editor.emptyBody' | transloco }}</span>
-          }
-        </button>
-      }
+      <!-- Deux couches superposées plutôt qu'une bascule aperçu/édition : le
+           visualiseur colorie le brouillon en dessous, le <textarea> reçoit la
+           frappe par-dessus avec un texte transparent et un curseur visible.
+           C'est lui qui porte le texte accessible ; le visualiseur est masqué
+           aux lecteurs d'écran, qui liraient sinon le contenu deux fois. -->
+      <div class="overlay-body">
+        <div class="editor-stack">
+          <app-code-viewer aria-hidden="true" [content]="draftContent()" [language]="note.language" />
+          <textarea
+            #bodyEditor
+            class="overlay-body-editor"
+            spellcheck="false"
+            [attr.aria-label]="'editor.contentLabel' | transloco"
+            [placeholder]="'editor.emptyBody' | transloco"
+            [value]="draftContent()"
+            (input)="draftContent.set(bodyEditor.value)"
+            (blur)="commitContent()"
+          ></textarea>
+        </div>
+      </div>
 
       <div class="overlay-footer">
         <span>

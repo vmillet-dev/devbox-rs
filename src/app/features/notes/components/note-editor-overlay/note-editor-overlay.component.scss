@@ -154,50 +154,63 @@
   font-family: var(--font-mono);
 }
 
-// `flex: 1` et `min-height: 0` sont redéclarés dans chacune des deux variantes
-// plutôt que factorisés dans une règle `.overlay-body` : le `all: unset`
-// d'`unstyled-control` les remettrait à leur valeur initiale, et le corps
-// retomberait à sa hauteur de contenu — champ de saisie minuscule, pied de page
-// décollé du bas du panneau.
-
-// L'aperçu est un <button> : il faut lui rendre le rendu d'un bloc de texte,
-// alignement à gauche et défilement compris.
-.overlay-body-preview {
-  @include unstyled-control;
+// Seul élément qui défile : les deux couches se déplacent donc ensemble, sans
+// synchronisation de `scrollTop` à écrire.
+.overlay-body {
   flex: 1;
   min-height: 0;
-  display: block;
-  width: 100%;
   overflow-y: auto;
-  text-align: left;
-  cursor: text;
 }
 
-.body-placeholder {
-  display: block;
-  padding: 20px 24px;
-  color: var(--text-2);
-  font-size: 13px;
-  font-style: italic;
+// C'est le visualiseur, dans le flux, qui donne sa hauteur à la pile ; le
+// <textarea> s'y cale en absolu. `min-height: 100%` pour que le clic dans la
+// zone vide sous le texte atteigne quand même le champ.
+.editor-stack {
+  position: relative;
+  min-height: 100%;
 }
 
+.editor-stack app-code-viewer {
+  overflow: visible;
+  pointer-events: none;
+}
+
+// Métriques recopiées à l'identique sur celles du visualiseur, sans quoi le
+// curseur se décale du texte colorié : même police, même interlignage, même
+// césure, et un retrait à gauche qui ajoute au padding la gouttière des numéros
+// de ligne. Cette gouttière fait 32px au total, pas 32 + 16 : le `box-sizing:
+// border-box` global fait que le `padding-right` de `.line-no` tient dans sa
+// `width`. Se tromper ici décale la frappe de deux caractères sans rien décaler
+// visuellement — le curseur tombe à côté du glyphe qu'il prétend viser.
 .overlay-body-editor {
   @include unstyled-control;
-  flex: 1;
-  min-height: 0;
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   resize: none;
-  overflow-y: auto;
-  padding: 20px 24px;
+  overflow: hidden;
+  padding: 20px 24px 20px 56px;
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.7;
-  color: var(--text-0);
   white-space: pre-wrap;
+  word-break: break-word;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text-0);
 }
 
-.overlay-body-preview:focus-visible,
+// Texte transparent : la sélection ne se voit que par son fond, et le
+// placeholder doit reprendre une couleur explicite.
+.overlay-body-editor::selection {
+  background: rgba(var(--amber-rgb), 0.3);
+}
+
+.overlay-body-editor::placeholder {
+  color: var(--text-2);
+  font-style: italic;
+}
+
 .overlay-body-editor:focus-visible,
 .overlay-language-select:focus-visible,
 .tag-add-input:focus-visible,

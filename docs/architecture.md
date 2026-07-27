@@ -102,8 +102,9 @@ which also renders the hint, rather than travelling down a chain of `viewChild` 
 
 ### Syntax highlighting
 
-`CodeViewerComponent` renders a read-only, coloured preview. It delegates to
-`shared/ui/code-viewer/highlighter.ts`, the **only** module that imports highlight.js.
+`CodeViewerComponent` renders read-only coloured code — a card excerpt, or the layer under the
+editor's textarea. It delegates to `shared/ui/code-viewer/highlighter.ts`, the **only** module
+that imports highlight.js.
 
 - **Grammars are imported one by one** from `highlight.js/lib/`, never the default bundle,
   which carries close to 200 languages. `GRAMMARS` maps a `LanguageTag` onto the grammar that
@@ -251,10 +252,32 @@ Those drafts are `linkedSignal`s keyed on the note **id**, not on the note objec
 refreshes `updatedAt` and produces a new object, which would otherwise wipe the in-flight
 edit.
 
-The body toggles between the read-only `CodeViewerComponent` and a textarea. The preview is a
-`<button>`, so entering edit mode works with the mouse and the keyboard without a hand-written
-focus dance. Deletion is a two-step confirm in the toolbar rather than a native `confirm()`,
-which would freeze the whole WebView.
+The body is **two stacked layers**, not a preview/edit toggle: `CodeViewerComponent` colours
+the draft underneath, and a textarea sits on top with `color: transparent` and a visible
+`caret-color`. The note stays highlighted while it is being typed, and there is no mode to
+enter. Consequences worth knowing:
+
+- The textarea's metrics must match the viewer's **exactly** or the caret drifts off the
+  coloured text: same font, size and `line-height`, same `white-space: pre-wrap` /
+  `word-break: break-word`, and a `padding-left` that adds the viewer's line-number gutter to
+  its 24px padding — hence `padding: 20px 24px 20px 56px`. The gutter is **32px, not 48px**:
+  `.line-no` is `width: 32px; padding-right: 16px`, and the global `* { box-sizing:
+border-box }` folds that padding into the width. Getting this wrong shifts typing by two
+  characters while looking perfectly aligned, because the caret is drawn by the textarea at
+  its own — wrong — position.
+- The **scroller is the wrapping `.overlay-body`**, never the textarea. The viewer, in normal
+  flow, gives `.editor-stack` its height; the textarea is `position: absolute; inset: 0` over
+  it and so never overflows internally. Both layers therefore scroll together with no
+  `scrollTop` synchronisation to maintain. `.editor-stack` is `min-height: 100%` so a click in
+  the empty space below a short note still reaches the field.
+- The viewer is `aria-hidden` and `pointer-events: none`: the textarea carries the accessible
+  text and every interaction, otherwise a screen reader reads the body twice.
+- Escape leaves the body before closing the overlay (`onEscape` blurs the textarea when it
+  holds focus), so a keystroke aimed at the field does not dismiss the whole modal.
+
+Deletion is a two-step confirm in the toolbar rather than a native `confirm()`, which would
+freeze the whole WebView. The fullscreen toggle expands the panel to fill the backdrop and
+persists through `PreferencesService`.
 
 ### Data access
 

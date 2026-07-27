@@ -3,7 +3,6 @@ import {
   Component,
   ElementRef,
   computed,
-  effect,
   inject,
   input,
   linkedSignal,
@@ -94,9 +93,6 @@ export class NoteEditorOverlayComponent {
     computation: () => untracked(() => this.note()?.content ?? ''),
   });
 
-  /** Le corps s'ouvre en aperçu ; l'édition démarre au clic (ou à Entrée) dessus. */
-  protected readonly editingBody = linkedSignal({ source: this.noteId, computation: () => false });
-
   /**
    * Suppression en deux temps plutôt qu'un `confirm()` natif : la WebView
    * bloque tout pendant une boîte de dialogue système, et ce bouton doit rester
@@ -127,29 +123,14 @@ export class NoteEditorOverlayComponent {
     return note ? relativeTimeRef(note.updatedAt, this.clock.now()) : null;
   });
 
-  constructor() {
-    // Passer en édition sans y amener le focus obligerait à cliquer une seconde
-    // fois dans le champ qu'on vient d'ouvrir.
-    effect(() => {
-      if (this.editingBody()) {
-        this.bodyEditor()?.nativeElement.focus();
-      }
-    });
-  }
-
   protected toggleFullscreen(): void {
     const next = !this.fullscreen();
     this.fullscreen.set(next);
     this.preferences.write(FULLSCREEN_STORAGE_KEY, String(next));
   }
 
-  protected startEditingBody(): void {
-    this.editingBody.set(true);
-  }
-
-  /** Sort de l'édition et n'émet que si le corps a réellement changé. */
+  /** N'émet que si le corps a réellement changé. */
   protected commitContent(): void {
-    this.editingBody.set(false);
     const note = this.note();
     if (note && this.draftContent() !== note.content) {
       this.contentChanged.emit(this.draftContent());
@@ -189,14 +170,16 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * Échap sort d'abord de l'édition du corps, puis ferme la modale : sinon une
-   * frappe destinée au champ referait disparaître l'éditeur entier.
+   * Échap quitte d'abord le corps, puis ferme la modale : sinon une frappe
+   * destinée au champ referait disparaître l'éditeur entier. Le `blur` confirme
+   * le brouillon au passage.
    */
   protected onEscape(): void {
     if (!this.note()) return;
 
-    if (this.editingBody()) {
-      this.commitContent();
+    const editor = this.bodyEditor()?.nativeElement;
+    if (editor && document.activeElement === editor) {
+      editor.blur();
       return;
     }
     this.requestClose();

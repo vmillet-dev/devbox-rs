@@ -36,7 +36,7 @@
   "editor": {
     "titleLabel": "Titre de la note",
     "contentLabel": "Contenu de la note",
-    "emptyBody": "Cliquer ici pour écrire…",
+    "emptyBody": "Commencer à écrire…",
     "languageLabel": "Format du contenu",
     "addTagLabel": "Ajouter un tag",
     "addTagPlaceholder": "+ tag",

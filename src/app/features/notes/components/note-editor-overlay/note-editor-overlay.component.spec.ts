@@ -15,12 +15,13 @@ describe('NoteEditorOverlayComponent', () => {
     return fixture.nativeElement.querySelector('.overlay-title-input');
   }
 
-  function bodyPreview(): HTMLButtonElement | null {
-    return fixture.nativeElement.querySelector('.overlay-body-preview');
+  function bodyEditor(): HTMLTextAreaElement {
+    return fixture.nativeElement.querySelector('.overlay-body-editor');
   }
 
-  function bodyEditor(): HTMLTextAreaElement | null {
-    return fixture.nativeElement.querySelector('.overlay-body-editor');
+  function codeViewer(): CodeViewerComponent {
+    return fixture.debugElement.query(By.directive(CodeViewerComponent))
+      .componentInstance as CodeViewerComponent;
   }
 
   function toolbarButton(selector: string): HTMLButtonElement {
@@ -39,12 +40,6 @@ describe('NoteEditorOverlayComponent', () => {
     element.value = value;
     element.dispatchEvent(new Event('input'));
     await fixture.whenStable();
-  }
-
-  async function openBodyEditor(): Promise<HTMLTextAreaElement> {
-    bodyPreview()?.click();
-    await fixture.whenStable();
-    return bodyEditor() as HTMLTextAreaElement;
   }
 
   function createOverlay(): void {
@@ -125,12 +120,11 @@ describe('NoteEditorOverlayComponent', () => {
   });
 
   it('invites the user to write when the note is empty', async () => {
-    // An empty code viewer looks like a rendering bug rather than an empty note.
+    // An empty body looks like a rendering bug rather than an empty note.
     fixture.componentRef.setInput('note', createNote({ content: '' }));
     await fixture.whenStable();
 
-    expect(fixture.debugElement.query(By.directive(CodeViewerComponent))).toBeNull();
-    expect(text('.body-placeholder')).toBe('Cliquer ici pour écrire…');
+    expect(bodyEditor().placeholder).toBe('Commencer à écrire…');
   });
 
   it('computes the language label, line count and byte size in the footer', async () => {
@@ -164,7 +158,7 @@ describe('NoteEditorOverlayComponent', () => {
 
     it('labels the title field, the body and the close button', () => {
       expect(titleInput().getAttribute('aria-label')).toBe('Titre de la note');
-      expect(bodyPreview()?.getAttribute('aria-label')).toBe('Contenu de la note');
+      expect(bodyEditor().getAttribute('aria-label')).toBe('Contenu de la note');
       expect(fixture.nativeElement.querySelector('.close-btn').getAttribute('aria-label')).toBe(
         "Fermer l'éditeur",
       );
@@ -224,45 +218,57 @@ describe('NoteEditorOverlayComponent', () => {
   });
 
   describe('body editing', () => {
-    it('turns the preview into a text area on click, focused and ready to type', async () => {
+    it('is editable straight away, without a preview to click through first', async () => {
       fixture.componentRef.setInput('note', createNote({ content: 'before' }));
       await fixture.whenStable();
 
-      const editor = await openBodyEditor();
-
-      expect(editor).not.toBeNull();
-      expect(editor.value).toBe('before');
-      expect(document.activeElement).toBe(editor);
-      expect(bodyPreview()).toBeNull();
+      expect(bodyEditor().value).toBe('before');
     });
 
-    it('emits the new content on blur and returns to the preview', async () => {
+    it('keeps the highlighted layer in sync with the draft as the user types', async () => {
+      // The whole point of the overlaid textarea: colours must not vanish mid-edit.
+      fixture.componentRef.setInput('note', createNote({ content: '{"a":1}', language: 'json' }));
+      await fixture.whenStable();
+
+      await type(bodyEditor(), '{"a":2}');
+
+      expect(codeViewer().content()).toBe('{"a":2}');
+      expect(codeViewer().language()).toBe('json');
+    });
+
+    it('hides the highlighted layer from screen readers, which already read the textarea', async () => {
+      fixture.componentRef.setInput('note', createNote({ content: 'x' }));
+      await fixture.whenStable();
+
+      const viewer = fixture.debugElement.query(By.directive(CodeViewerComponent));
+      expect(viewer.nativeElement.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('emits the new content on blur', async () => {
       fixture.componentRef.setInput('note', createNote({ content: 'before' }));
       await fixture.whenStable();
       const emitted: string[] = [];
       fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
 
-      const editor = await openBodyEditor();
-      await type(editor, 'after');
+      await type(bodyEditor(), 'after');
       expect(emitted).toEqual([]);
 
-      editor.dispatchEvent(new Event('blur'));
+      bodyEditor().dispatchEvent(new Event('blur'));
       await fixture.whenStable();
 
       expect(emitted).toEqual(['after']);
-      expect(bodyPreview()).not.toBeNull();
     });
 
     it('updates the footer stats as the user types, before anything is saved', async () => {
       fixture.componentRef.setInput('note', createNote({ content: 'a', language: 'txt' }));
       await fixture.whenStable();
 
-      await type(await openBodyEditor(), 'one\ntwo');
+      await type(bodyEditor(), 'one\ntwo');
 
       expect(text('.overlay-footer span')).toBe('TXT · 2 lignes · 7 octets');
     });
 
-    it('leaves the editor on Escape instead of closing the whole overlay', async () => {
+    it('leaves the body on Escape instead of closing the whole overlay', async () => {
       fixture.componentRef.setInput('note', createNote({ content: 'before' }));
       await fixture.whenStable();
       let closed = false;
@@ -270,13 +276,14 @@ describe('NoteEditorOverlayComponent', () => {
       fixture.componentInstance.closed.subscribe(() => (closed = true));
       fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
 
-      await type(await openBodyEditor(), 'after');
+      bodyEditor().focus();
+      await type(bodyEditor(), 'after');
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       await fixture.whenStable();
 
       expect(emitted).toEqual(['after']);
       expect(closed).toBe(false);
-      expect(bodyPreview()).not.toBeNull();
+      expect(document.activeElement).not.toBe(bodyEditor());
     });
   });
 
@@ -301,7 +308,7 @@ describe('NoteEditorOverlayComponent', () => {
       const contents: string[] = [];
       fixture.componentInstance.contentChanged.subscribe((content) => contents.push(content));
 
-      await type(await openBodyEditor(), 'after');
+      await type(bodyEditor(), 'after');
       fixture.debugElement.query(By.css('.close-btn')).triggerEventHandler('click');
 
       expect(contents).toEqual(['after']);
