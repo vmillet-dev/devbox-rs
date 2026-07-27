@@ -1,3 +1,4 @@
+import { WritableSignal, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
@@ -5,6 +6,7 @@ import { Note } from '@core/models/note.model';
 import { NotesView } from '@core/models/notes-query.model';
 import { Space } from '@core/models/space.model';
 import { SpacesStore } from '@core/stores/spaces.store';
+import { ClockService } from '@core/time/clock.service';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
@@ -109,10 +111,16 @@ describe('NotesStore', () => {
     it('drops a tag that is toggled twice', async () => {
       const { store, repository } = await createStore([createNote()]);
 
+      const beforeAdd = repository.queryCount;
       store.toggleTag('urgent');
-      const before = repository.queryCount;
+      await awaitQuery(repository, beforeAdd);
+      expect(repository.lastQuery?.tags).toEqual(['urgent']);
+
+      // Each toggle is awaited: selecting then deselecting inside a single tick
+      // leaves the criteria untouched, and the store rightly asks nothing.
+      const beforeRemove = repository.queryCount;
       store.toggleTag('urgent');
-      await awaitQuery(repository, before);
+      await awaitQuery(repository, beforeRemove);
 
       expect(repository.lastQuery?.tags).toEqual([]);
     });
@@ -131,6 +139,52 @@ describe('NotesStore', () => {
 
       // Trimming here would mean two places deciding what a tag looks like.
       expect(update).toHaveBeenCalledWith('a', { tags: ['  #urgent '] });
+    });
+  });
+
+  /**
+   * `queryParams` builds a fresh object literal and reads `clock.now()`, while
+   * `resource` compares its parameters by identity. Only the `equal` comparator
+   * keeps a clock tick from firing a full IPC round trip — and the retained view
+   * would hide it, so nothing else would notice.
+   */
+  describe('clock sensitivity', () => {
+    async function createStoreWithClock(now: WritableSignal<Date>): Promise<Harness> {
+      const repository = new FakeNotesRepository([createNote()]);
+      TestBed.configureTestingModule({
+        providers: [
+          provideAppTesting({ notesRepository: repository, spaces: SPACES }),
+          { provide: ClockService, useValue: { now: now.asReadonly() } },
+        ],
+      });
+
+      const store = TestBed.inject(NotesStore);
+      await vi.waitFor(() => expect(store.isLoading()).toBe(false));
+
+      return { store, repository, spaces: TestBed.inject(SpacesStore) };
+    }
+
+    it('does not re-query when the clock ticks inside the same local day', async () => {
+      const now = signal(new Date(2026, 6, 25, 12, 0, 0));
+      const { repository } = await createStoreWithClock(now);
+      const before = repository.queryCount;
+
+      now.set(new Date(2026, 6, 25, 12, 0, 30));
+      now.set(new Date(2026, 6, 25, 23, 59, 59));
+      // Give the resource's load effect every chance to fire.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(repository.queryCount).toBe(before);
+    });
+
+    it('re-queries when the local day changes, or sections would stay on yesterday', async () => {
+      const now = signal(new Date(2026, 6, 25, 23, 59, 59));
+      const { repository } = await createStoreWithClock(now);
+      const before = repository.queryCount;
+
+      now.set(new Date(2026, 6, 26, 0, 0, 1));
+
+      await awaitQuery(repository, before);
     });
   });
 

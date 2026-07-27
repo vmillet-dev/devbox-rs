@@ -62,58 +62,46 @@ describe('NoteCardComponent', () => {
     expect(tags.map((tag) => tag.nativeElement.textContent)).toEqual(['#a', '#b']);
   });
 
-  it('shows the expiry countdown in the footer for an expiring note', async () => {
-    fixture.componentRef.setInput(
-      'note',
-      createNote({ lifecycle: { kind: 'expires', at: new Date('2026-01-13T12:00:00Z') } }),
-    );
-    await fixture.whenStable();
+  /**
+   * Which footer a note gets is decided in Rust (`domain::display`) and tested
+   * there. What is left here is rendering the variant that arrives — including
+   * formatting the dated ones locally, so the label keeps ageing on screen
+   * without another round trip.
+   */
+  describe('footer', () => {
+    it('renders an expiry footer as a countdown', async () => {
+      fixture.componentRef.setInput(
+        'note',
+        createNote({ footer: { kind: 'expiry', at: new Date('2026-01-13T12:00:00Z') } }),
+      );
+      await fixture.whenStable();
 
-    expect(text('.card-footer span')).toBe('expire dans 3j');
-  });
+      expect(text('.card-footer span')).toBe('expire dans 3j');
+    });
 
-  it('marks the footer as stale when the note is expiring soon', async () => {
-    fixture.componentRef.setInput(
-      'note',
-      createNote({ lifecycle: { kind: 'expires', at: new Date('2026-01-11T12:00:00Z') } }),
-    );
-    await fixture.whenStable();
+    it('renders an age footer as a relative time', async () => {
+      fixture.componentRef.setInput(
+        'note',
+        createNote({ footer: { kind: 'age', at: new Date('2026-01-10T11:00:00Z') } }),
+      );
+      await fixture.whenStable();
 
-    expect(fixture.debugElement.query(By.css('.card-footer span')).classes['stale']).toBe(true);
-  });
+      expect(text('.card-footer span')).toBe('il y a 1h');
+    });
 
-  it('shows the source prefix in the footer for a pinned, non-expiring note', async () => {
-    fixture.componentRef.setInput(
-      'note',
-      createNote({ pinned: true, source: 'API Gateway / Auth', lifecycle: { kind: 'permanent' } }),
-    );
-    await fixture.whenStable();
+    it('renders a source footer as plain text, with nothing to translate', async () => {
+      fixture.componentRef.setInput('note', createNote({ footer: { kind: 'source', value: 'API Gateway' } }));
+      await fixture.whenStable();
 
-    expect(text('.card-footer span')).toBe('API Gateway');
-  });
+      expect(text('.card-footer span')).toBe('API Gateway');
+    });
 
-  it('falls back to the relative time for a pinned note that has no source', async () => {
-    fixture.componentRef.setInput(
-      'note',
-      createNote({ pinned: true, source: '', updatedAt: new Date('2026-01-10T11:00:00Z') }),
-    );
-    await fixture.whenStable();
+    it('marks the footer stale on the backend flag, not on a threshold of its own', async () => {
+      fixture.componentRef.setInput('note', createNote({ expiringSoon: true }));
+      await fixture.whenStable();
 
-    expect(text('.card-footer span')).toBe('il y a 1h');
-  });
-
-  it('shows the relative update time in the footer for an unpinned, non-expiring note', async () => {
-    fixture.componentRef.setInput(
-      'note',
-      createNote({
-        pinned: false,
-        lifecycle: { kind: 'permanent' },
-        updatedAt: new Date('2026-01-10T11:00:00Z'),
-      }),
-    );
-    await fixture.whenStable();
-
-    expect(text('.card-footer span')).toBe('il y a 1h');
+      expect(fixture.debugElement.query(By.css('.card-footer span')).classes['stale']).toBe(true);
+    });
   });
 
   it('exposes the pinned state as text, since the design only conveys it with a pictogram', async () => {

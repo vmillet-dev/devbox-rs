@@ -50,7 +50,16 @@ export class FakeNotesRepository implements NotesRepository {
   create(draft: NoteDraft): Promise<Note> {
     return this.guard(() => {
       const now = new Date();
-      const note: Note = { ...draft, id: `fake-${++this.nextId}`, createdAt: now, updatedAt: now };
+      const note: Note = {
+        ...draft,
+        id: `fake-${++this.nextId}`,
+        createdAt: now,
+        updatedAt: now,
+        // Derived fields: the backend decides them, so the double returns the
+        // plain case rather than reimplementing the rule.
+        footer: { kind: 'age', at: now },
+        expiringSoon: false,
+      };
       this.notes = [note, ...this.notes];
       return note;
     });

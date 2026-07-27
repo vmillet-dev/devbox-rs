@@ -3,7 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Note } from '@core/models/note.model';
 import { TranslationRef } from '@core/models/translation-ref.model';
 import { ClockService } from '@core/time/clock.service';
-import { expiryRef, isExpiringSoon, relativeTimeRef } from '@core/utils/relative-time.util';
+import { expiryRef, relativeTimeRef } from '@core/utils/relative-time.util';
 import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
 
 /** Le libellé du pied de carte est soit du texte brut (nom de source), soit une référence de traduction (temps). */
@@ -33,22 +33,20 @@ export class NoteCardComponent {
 
   protected readonly displayedTags = computed(() => this.note().tags.slice(0, MAX_VISIBLE_TAGS));
 
+  /**
+   * Le back a déjà tranché **quoi** afficher ; il ne reste qu'à le rendre. Les
+   * deux variantes datées sont formatées ici pour que le libellé vieillisse à
+   * l'écran, sans nouvelle requête.
+   */
   protected readonly footerLabel = computed<FooterLabel>(() => {
-    const note = this.note();
-    if (note.lifecycle.kind === 'expires') {
-      return { kind: 'ref', ref: expiryRef(note.lifecycle.at, this.clock.now()) };
+    const footer = this.note().footer;
+    if (footer.kind === 'source') {
+      return { kind: 'text', value: footer.value };
     }
-    // Une note épinglée affiche son contexte plutôt que son âge : elle est là
-    // pour durer, savoir d'où elle vient est plus utile que sa date.
-    if (note.pinned && note.source) {
-      return { kind: 'text', value: note.source.split(' / ')[0] };
+    if (footer.kind === 'expiry') {
+      return { kind: 'ref', ref: expiryRef(footer.at, this.clock.now()) };
     }
-    return { kind: 'ref', ref: relativeTimeRef(note.updatedAt, this.clock.now()) };
-  });
-
-  protected readonly footerStale = computed(() => {
-    const note = this.note();
-    return note.lifecycle.kind === 'expires' && isExpiringSoon(note.lifecycle.at, this.clock.now());
+    return { kind: 'ref', ref: relativeTimeRef(footer.at, this.clock.now()) };
   });
 
   protected onOpen(): void {

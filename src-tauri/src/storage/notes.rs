@@ -1,21 +1,26 @@
-//! Lecture et écriture des notes.
+//! Lecture et écriture des notes : **du SQL, et rien d'autre**.
 //!
 //! Fonctions ordinaires prenant une `&Connection` : les `#[tauri::command]` de
 //! `commands/notes.rs` ne font que les appeler. Voir `storage/mod.rs`.
+//!
+//! Ce module ne décide de rien. Ce qui compte comme une correspondance de
+//! recherche, ce qui vaut « une recherche est en cours », la répartition en
+//! sections et la normalisation des tags sont des règles métier et vivent dans
+//! `crate::domain`. Ici, seulement les critères que SQLite indexe : espace,
+//! épinglage, cycle de vie, appartenance à un tag.
 //!
 //! L'horodatage n'est jamais lu ici depuis l'horloge système : il est passé en
 //! paramètre (`now`), ce qui rend les écritures reproductibles en test.
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
 use rusqlite::{Connection, Row, ToSql};
 use uuid::Uuid;
 
-use super::{sections, spaces, StorageError};
-use crate::commands::notes::{
-    Note, NoteDraft, NoteFilter, NoteLifecycle, NotePatch, NotesQuery, NotesView,
-};
+use super::{StorageError, spaces};
+use crate::domain::note::{Note, NoteDraft, NoteLifecycle, NotePatch};
+use crate::domain::query::{NoteFilter, NotesQuery};
+use crate::domain::tags;
 
 const NOTE_COLUMNS: &str = "id, space_id, title, language, content, source, pinned, \
                             created_at, updated_at, lifecycle_kind, lifecycle_expires_at";
@@ -62,7 +67,10 @@ fn all_tags(connection: &Connection) -> Result<HashMap<String, Vec<String>>, Sto
     let mut grouped: HashMap<String, Vec<String>> = HashMap::new();
 
     let rows = statement.query_map([], |row| {
-        Ok((row.get::<_, String>("note_id")?, row.get::<_, String>("tag")?))
+        Ok((
+            row.get::<_, String>("note_id")?,
+            row.get::<_, String>("tag")?,
+        ))
     })?;
     for row in rows {
         let (note_id, tag) = row?;
@@ -82,41 +90,11 @@ fn tags_of(connection: &Connection, note_id: &str) -> Result<Vec<String>, Storag
     Ok(tags)
 }
 
-/// Nettoie les tags avant écriture : espaces, `#` de tête, vides et doublons.
-///
-/// La déduplication est **insensible à la casse** et garde la première graphie
-/// rencontrée. Sans elle, `urgent` et `URGENT` produiraient deux entrées dans le
-/// rail alors qu'ils désignent la même chose pour l'utilisateur.
-///
-/// C'est le seul endroit où cette règle vit : le front envoie ce que
-/// l'utilisateur a tapé, tel quel.
-pub fn normalize_tags(tags: &[String]) -> Vec<String> {
-    let mut seen: Vec<String> = Vec::new();
-    let mut normalized: Vec<String> = Vec::new();
-
-    for tag in tags {
-        let cleaned = tag.trim().trim_start_matches('#').trim();
-        if cleaned.is_empty() {
-            continue;
-        }
-
-        let folded = cleaned.to_lowercase();
-        if seen.contains(&folded) {
-            continue;
-        }
-
-        seen.push(folded);
-        normalized.push(cleaned.to_string());
-    }
-
-    normalized
-}
-
 /// Remplace intégralement les tags d'une note. Appelée uniquement quand le patch
 /// porte un `tags` : un patch sans ce champ ne doit rien toucher.
 ///
 /// Renvoie les tags réellement écrits, qui peuvent différer de ceux reçus
-/// (cf. [`normalize_tags`]) : l'appelant doit adopter cette valeur, sinon il
+/// (cf. [`tags::normalize`]) : l'appelant doit adopter cette valeur, sinon il
 /// renverrait au front une note qui ne correspond pas à la base.
 ///
 /// Le tri final aligne l'écriture sur la lecture (`ORDER BY tag`) : sans lui,
@@ -125,9 +103,9 @@ pub fn normalize_tags(tags: &[String]) -> Vec<String> {
 fn replace_tags(
     connection: &Connection,
     note_id: &str,
-    tags: &[String],
+    requested: &[String],
 ) -> Result<Vec<String>, StorageError> {
-    let mut normalized = normalize_tags(tags);
+    let mut normalized = tags::normalize(requested);
 
     connection.execute("DELETE FROM note_tags WHERE note_id = ?1", [note_id])?;
 
@@ -143,11 +121,11 @@ fn replace_tags(
 }
 
 /// Toutes les notes, tous espaces confondus. **Réservée aux tests** : en
-/// production tout passe par [`query`], qui filtre et regroupe. Exposer une
+/// production tout passe par [`fetch`] puis `domain::view::build`. Exposer une
 /// liste brute au front l'inviterait à refiltrer lui-même.
 #[cfg(test)]
 pub fn list(connection: &Connection) -> Result<Vec<Note>, StorageError> {
-    query(
+    fetch(
         connection,
         &NotesQuery {
             space_id: None,
@@ -158,18 +136,7 @@ pub fn list(connection: &Connection) -> Result<Vec<Note>, StorageError> {
             tz_offset_minutes: 0,
         },
     )
-    .map(|view| view.sections.into_iter().flat_map(|s| s.notes).collect())
-}
-
-/// Une note correspond-elle au texte cherché ?
-///
-/// Le repliage de casse est fait **en Rust** et non en SQL : le `LOWER()` de
-/// SQLite ne traite que l'ASCII (sans extension ICU), donc `Étape` ne
-/// correspondrait pas à `étape`. `to_lowercase` est Unicode.
-fn matches_search(note: &Note, needle: &str) -> bool {
-    note.title.to_lowercase().contains(needle)
-        || note.tags.iter().any(|tag| tag.to_lowercase().contains(needle))
-        || note.content.to_lowercase().contains(needle)
+    .map(|(notes, _)| notes)
 }
 
 /// Tags proposables par le rail, portés à l'espace et non au filtre courant :
@@ -202,18 +169,16 @@ fn available_tags(
     Ok(tags)
 }
 
-/// Vue complète : notes filtrées, réparties en sections, plus les tags du rail.
+/// Notes retenues par les critères **grossiers**, et tags proposables par le rail.
 ///
-/// Le partage des tâches est délibéré :
-/// - **SQL** pour ce qu'il indexe bien — espace, épinglage, cycle de vie, et
-///   l'appartenance à un tag via `note_tags` ;
-/// - **Rust** pour la recherche texte, qui demande un repliage de casse
-///   Unicode (cf. [`matches_search`]) ;
-/// - [`sections`] pour le regroupement, qui ne touche pas à la base.
-///
-/// Une vue sans aucune note est une réponse valide (premier lancement, ou
-/// recherche infructueuse — `is_filtering` permet de distinguer les deux).
-pub fn query(connection: &Connection, request: &NotesQuery) -> Result<NotesView, StorageError> {
+/// Ne descendent dans le `WHERE` que les critères que SQLite indexe : espace,
+/// épinglage, cycle de vie, appartenance à un tag. La recherche texte reste au
+/// domaine (repliage de casse Unicode), tout comme le regroupement en sections.
+/// `domain::view::build` prend le relais sur ce que renvoie cette fonction.
+pub fn fetch(
+    connection: &Connection,
+    request: &NotesQuery,
+) -> Result<(Vec<Note>, Vec<String>), StorageError> {
     let mut conditions: Vec<String> = Vec::new();
     let mut params: Vec<Box<dyn ToSql>> = Vec::new();
 
@@ -230,7 +195,7 @@ pub fn query(connection: &Connection, request: &NotesQuery) -> Result<NotesView,
 
     // Les tags reçus passent par la même normalisation que ceux écrits, sinon
     // un `#urgent` saisi au clavier ne retrouverait pas le tag `urgent` stocké.
-    let selected_tags = normalize_tags(&request.tags);
+    let selected_tags = tags::normalize(&request.tags);
     if !selected_tags.is_empty() {
         let placeholders: Vec<String> = selected_tags
             .iter()
@@ -253,6 +218,12 @@ pub fn query(connection: &Connection, request: &NotesQuery) -> Result<NotesView,
     };
 
     // Le tri est décidé ici, une fois : le front conserve l'ordre reçu.
+    //
+    // Le tri porte sur `updated_at` alors que les sections regroupent sur
+    // `created_at`, et c'est délibéré : la section répond à « quand cette note
+    // est-elle née », l'ordre interne à « laquelle ai-je touchée en dernier ».
+    // Une note ancienne rouverte aujourd'hui remonte donc en tête de « plus
+    // anciennes » — elle reste ancienne, on vient juste de s'en servir.
     let mut statement = connection.prepare(&format!(
         "SELECT {NOTE_COLUMNS} FROM notes{where_clause} ORDER BY updated_at DESC, id"
     ))?;
@@ -261,33 +232,17 @@ pub fn query(connection: &Connection, request: &NotesQuery) -> Result<NotesView,
         .query_map(bound.as_slice(), row_to_note)?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
-    let mut tags = all_tags(connection)?;
+    // Les tags sont rattachés avant de rendre la main : la recherche du domaine
+    // porte aussi sur eux.
+    let mut grouped = all_tags(connection)?;
     for note in &mut notes {
-        note.tags = tags.remove(&note.id).unwrap_or_default();
+        note.tags = grouped.remove(&note.id).unwrap_or_default();
     }
 
-    // Après le rattachement des tags : la recherche porte aussi sur eux.
-    let needle = request.search.trim().to_lowercase();
-    if !needle.is_empty() {
-        notes.retain(|note| matches_search(note, &needle));
-    }
-
-    // Le filtre rapide (épinglées / à trier) ne bascule pas en mode résultats :
-    // il restreint une vue qui reste chronologique.
-    let is_filtering = !needle.is_empty() || !selected_tags.is_empty();
-    let matched = notes.len();
-
-    let offset = sections::offset_from_minutes(request.tz_offset_minutes);
-    let now = DateTime::parse_from_rfc3339(&request.now)
-        .map(|instant| instant.with_timezone(&offset))
-        .unwrap_or_else(|_| Utc::now().with_timezone(&offset));
-
-    Ok(NotesView {
-        sections: sections::build(notes, is_filtering, &now, &offset),
-        available_tags: available_tags(connection, request.space_id.as_deref())?,
-        is_filtering,
-        matched,
-    })
+    Ok((
+        notes,
+        available_tags(connection, request.space_id.as_deref())?,
+    ))
 }
 
 fn find(connection: &Connection, id: &str) -> Result<Option<Note>, StorageError> {
@@ -370,8 +325,8 @@ pub fn create(
 /// stockée : c'est ce que garantit le lire-modifier-écrire ci-dessous, exécuté
 /// dans une transaction pour qu'une commande concurrente ne s'intercale pas.
 ///
-/// Identifiant inconnu ⇒ `Err`, jamais un `Ok` silencieux : le front s'en sert
-/// pour annuler sa mise à jour optimiste.
+/// Identifiant inconnu ⇒ `Err`, jamais un `Ok` silencieux : sans ça le front
+/// croirait avoir enregistré.
 pub fn update(
     connection: &mut Connection,
     id: &str,
@@ -441,7 +396,7 @@ pub fn update(
 /// Supprime une note. Ses tags partent avec elle par cascade (d'où le
 /// `PRAGMA foreign_keys = ON` de `storage::configure`).
 ///
-/// Identifiant inconnu ⇒ `Err` : le front remet alors la note à sa place.
+/// Identifiant inconnu ⇒ `Err` : sans ça le front croirait avoir supprimé.
 pub fn delete(connection: &Connection, id: &str) -> Result<(), StorageError> {
     let deleted = connection.execute("DELETE FROM notes WHERE id = ?1", [id])?;
 
@@ -455,21 +410,23 @@ pub fn delete(connection: &Connection, id: &str) -> Result<(), StorageError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::spaces::SpaceDraft;
+    use crate::domain::query::NotesView;
+    use crate::domain::view;
     use crate::storage::open_in_memory;
 
     const T0: &str = "2026-07-25T09:00:00.000Z";
     const T1: &str = "2026-07-25T10:00:00.000Z";
 
+    /// Chemin de lecture complet — SQL puis règles — tel que `query_notes`
+    /// l'assemble. Les règles ont leurs propres tests dans `domain/` ; ici on
+    /// vérifie qu'elles s'appliquent bien à ce que la base a réellement rendu.
+    fn query(connection: &Connection, request: &NotesQuery) -> Result<NotesView, StorageError> {
+        let (notes, tags) = fetch(connection, request)?;
+        Ok(view::build(notes, tags, request).expect("les tests fournissent un instant valide"))
+    }
+
     fn space(connection: &Connection, name: &str) -> String {
-        spaces::create(
-            connection,
-            &SpaceDraft {
-                name: name.to_string(),
-            },
-        )
-        .unwrap()
-        .id
+        spaces::create(connection, name).unwrap().id
     }
 
     fn draft(space_id: &str) -> NoteDraft {
@@ -554,7 +511,11 @@ mod tests {
         let older = create(&mut connection, &draft(&space_id), T0).unwrap();
         let newer = create(&mut connection, &draft(&space_id), T1).unwrap();
 
-        let ids: Vec<String> = list(&connection).unwrap().into_iter().map(|n| n.id).collect();
+        let ids: Vec<String> = list(&connection)
+            .unwrap()
+            .into_iter()
+            .map(|n| n.id)
+            .collect();
 
         assert_eq!(ids, [newer.id, older.id]);
     }
@@ -879,7 +840,11 @@ mod tests {
                 },
             )
             .unwrap();
-            assert_eq!(matched_ids(&view), [expected.id.clone()], "needle: {needle}");
+            assert_eq!(
+                matched_ids(&view),
+                [expected.id.as_str()],
+                "needle: {needle}"
+            );
         }
     }
 
@@ -971,6 +936,40 @@ mod tests {
         .unwrap();
 
         assert_eq!(view.matched, 1);
+    }
+
+    #[test]
+    fn a_selected_tag_matches_a_stored_one_of_a_different_case() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &tagged(&space_id, &["Urgent"]), T0).unwrap();
+
+        let view = query(
+            &connection,
+            &NotesQuery {
+                tags: vec!["urgent".to_string()],
+                ..all_notes()
+            },
+        )
+        .unwrap();
+
+        // Without COLLATE NOCASE on note_tags.tag the IN (…) comparison runs in
+        // BINARY and misses: the rail would offer a facet selecting nothing.
+        assert_eq!(view.matched, 1);
+    }
+
+    #[test]
+    fn the_rail_offers_one_facet_for_tags_differing_only_in_case() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        create(&mut connection, &tagged(&space_id, &["Urgent"]), T0).unwrap();
+        create(&mut connection, &tagged(&space_id, &["urgent"]), T1).unwrap();
+
+        let view = query(&connection, &all_notes()).unwrap();
+
+        // normalize_tags folds case within one note; the collation extends that
+        // to the whole corpus, which is what the rail reads.
+        assert_eq!(view.available_tags.len(), 1);
     }
 
     #[test]
@@ -1167,22 +1166,6 @@ mod tests {
         // The front adopts the returned note; a different order here would make
         // the tags jump around on the next reload.
         assert_eq!(created.tags, list(&connection).unwrap()[0].tags);
-    }
-
-    #[test]
-    fn normalisation_keeps_the_first_spelling_of_a_duplicate() {
-        assert_eq!(
-            normalize_tags(&["Urgent".to_string(), "urgent".to_string()]),
-            ["Urgent"]
-        );
-    }
-
-    #[test]
-    fn normalisation_strips_only_leading_hashes() {
-        assert_eq!(
-            normalize_tags(&["##c++".to_string(), "a#b".to_string()]),
-            ["c++", "a#b"]
-        );
     }
 
     #[test]

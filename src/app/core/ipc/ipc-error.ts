@@ -1,28 +1,34 @@
-/**
- * Noms des commandes Rust exposées par `tauri::generate_handler![...]`
- * (`src-tauri/src/lib.rs`). Les garder en union de littéraux évite les fautes
- * de frappe, qui ne se manifesteraient sinon qu'à l'exécution par un
- * « command not found ».
- */
-export type IpcCommand =
-  'saluer' | 'query_notes' | 'create_note' | 'update_note' | 'delete_note' | 'list_spaces' | 'create_space';
+import { IpcCommand } from './ipc-contract';
 
 /**
  * Causes d'échec que le backend sait nommer, en miroir de `ErrorCode`
- * (`src-tauri/src/commands/error.rs`). Ajouter une variante d'un côté impose
- * de l'ajouter de l'autre.
+ * (`src-tauri/src/commands/error.rs`). Ajouter une variante d'un côté impose de
+ * l'ajouter de l'autre — **et** de la déclarer dans `IPC_ERROR_CODES`, sinon
+ * elle arrivera en `null`.
  *
  * Ce sont des **codes**, jamais du texte : c'est ce qui permet de réagir à une
  * cause précise et d'afficher un message traduit, là où une chaîne rédigée en
  * Rust imposerait sa langue à toute l'interface.
+ *
+ * `schemaTooRecent` n'y figure volontairement pas : il n'est produit que par la
+ * migration, pendant le `setup()` de Tauri, où l'échec avorte le lancement. Il
+ * ne peut pas traverser le pont, et le déclarer ici laisserait croire le contraire.
  */
 export type IpcErrorCode =
-  | 'noteNotFound'
-  | 'spaceNotFound'
-  | 'duplicateSpaceName'
-  | 'schemaTooRecent'
-  | 'storageUnavailable'
-  | 'storage';
+  'noteNotFound' | 'spaceNotFound' | 'duplicateSpaceName' | 'invalidInput' | 'storageUnavailable' | 'storage';
+
+const IPC_ERROR_CODES: readonly IpcErrorCode[] = [
+  'noteNotFound',
+  'spaceNotFound',
+  'duplicateSpaceName',
+  'invalidInput',
+  'storageUnavailable',
+  'storage',
+];
+
+function isIpcErrorCode(value: string): value is IpcErrorCode {
+  return (IPC_ERROR_CODES as readonly string[]).includes(value);
+}
 
 /** Forme sérialisée d'un `AppError` Rust. */
 interface IpcErrorPayload {
@@ -34,7 +40,15 @@ interface IpcErrorPayload {
 function isIpcErrorPayload(cause: unknown): cause is IpcErrorPayload {
   if (typeof cause !== 'object' || cause === null) return false;
   const candidate = cause as Partial<IpcErrorPayload>;
-  return typeof candidate.code === 'string' && typeof candidate.detail === 'string';
+  // `code` est confronté à la liste, pas seulement à son type : un back plus
+  // récent enverrait sinon une variante inconnue que `IpcErrorCode` prétendrait
+  // couvrir, et les appelants qui discriminent dessus tomberaient dans un cas
+  // qu'ils croient impossible.
+  return (
+    typeof candidate.code === 'string' &&
+    isIpcErrorCode(candidate.code) &&
+    typeof candidate.detail === 'string'
+  );
 }
 
 function describeCause(cause: unknown): string {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expiryRef, isExpiringSoon, relativeTimeRef } from './relative-time.util';
+import { expiryRef, relativeTimeRef } from './relative-time.util';
 
 describe('relativeTimeRef', () => {
   it('returns the "just now" key when under a minute has elapsed', () => {
@@ -50,28 +50,5 @@ describe('expiryRef', () => {
     const at = new Date('2026-01-04T12:00:00Z');
 
     expect(expiryRef(at, now)).toEqual({ key: 'time.expiresIn', params: { count: 3 } });
-  });
-});
-
-describe('isExpiringSoon', () => {
-  it('returns true when the expiry date is within the default 3-day threshold', () => {
-    const now = new Date('2026-01-01T12:00:00Z');
-    const at = new Date('2026-01-03T12:00:00Z');
-
-    expect(isExpiringSoon(at, now)).toBe(true);
-  });
-
-  it('returns false when the expiry date is beyond the default 3-day threshold', () => {
-    const now = new Date('2026-01-01T12:00:00Z');
-    const at = new Date('2026-01-10T12:00:00Z');
-
-    expect(isExpiringSoon(at, now)).toBe(false);
-  });
-
-  it('respects a custom threshold', () => {
-    const now = new Date('2026-01-01T12:00:00Z');
-    const at = new Date('2026-01-08T12:00:00Z');
-
-    expect(isExpiringSoon(at, now, 10)).toBe(true);
   });
 });

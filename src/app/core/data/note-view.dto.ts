@@ -1,13 +1,13 @@
 import { NoteSection, NoteSectionKey } from '../models/note-section.model';
 import { NoteFilter, NotesQuery, NotesView } from '../models/notes-query.model';
-import { NoteDto, toNote } from './note.dto';
+import { NoteDto, toIsoString, toNote } from './note.dto';
 
 /**
  * Représentation de la vue sur le pont Tauri. Même contrainte que `note.dto.ts` :
  * JSON n'a pas de type date, donc `now` part en chaîne ISO.
  *
  * Côté Rust, `NotesQuery` / `NotesView` portent `#[serde(rename_all = "camelCase")]`
- * (voir `src-tauri/src/commands/notes.rs`) — sans quoi le front recevrait
+ * (voir `src-tauri/src/domain/query.rs`) — sans quoi le front recevrait
  * `available_tags` là où il lit `availableTags`.
  */
 export interface NotesQueryDto {
@@ -53,7 +53,7 @@ export function toNotesQueryDto(query: NotesQuery): NotesQueryDto {
     search: query.search,
     filter: query.filter,
     tags: [...query.tags],
-    now: query.now.toISOString(),
+    now: toIsoString(query.now, 'now'),
     tzOffsetMinutes: query.tzOffsetMinutes,
   };
 }

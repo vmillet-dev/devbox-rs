@@ -14,6 +14,8 @@ const BASE_DTO: NoteDto = {
   createdAt: '2026-01-01T10:00:00.000Z',
   updatedAt: '2026-01-02T10:00:00.000Z',
   lifecycle: { kind: 'permanent' },
+  footer: { kind: 'age', at: '2026-01-02T10:00:00.000Z' },
+  expiringSoon: false,
 };
 
 describe('toNote', () => {
@@ -64,6 +66,38 @@ describe('toNote', () => {
     expect(() => toNote({ ...BASE_DTO, lifecycle: { kind: 'expires', at: 'nope' } })).toThrow(
       NoteContractError,
     );
+  });
+
+  describe('footer', () => {
+    it('parses the date of a dated footer so the label can age on screen', () => {
+      const note = toNote({ ...BASE_DTO, footer: { kind: 'age', at: '2026-01-02T10:00:00.000Z' } });
+
+      expect(note.footer).toEqual({ kind: 'age', at: new Date('2026-01-02T10:00:00.000Z') });
+    });
+
+    it('carries an expiry footer as its own variant, formatted differently', () => {
+      const note = toNote({ ...BASE_DTO, footer: { kind: 'expiry', at: '2026-03-01T00:00:00.000Z' } });
+
+      expect(note.footer).toEqual({ kind: 'expiry', at: new Date('2026-03-01T00:00:00.000Z') });
+    });
+
+    it('carries a source footer as plain text, with no date to parse', () => {
+      const note = toNote({ ...BASE_DTO, footer: { kind: 'source', value: 'API Gateway' } });
+
+      expect(note.footer).toEqual({ kind: 'source', value: 'API Gateway' });
+    });
+
+    it('throws a contract error on a footer variant this build does not know', () => {
+      // A newer backend variant must be reported, not rendered as a blank footer.
+      const unknown = { ...BASE_DTO, footer: { kind: 'weather', at: '2026-01-01' } } as unknown as NoteDto;
+
+      expect(() => toNote(unknown)).toThrow(NoteContractError);
+    });
+
+    it('carries the expiry proximity the backend decided', () => {
+      // The threshold lives in Rust only; the front must not recompute it.
+      expect(toNote({ ...BASE_DTO, expiringSoon: true }).expiringSoon).toBe(true);
+    });
   });
 });
 

@@ -27,7 +27,7 @@
   <span class="card-footer">
     <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). D'où le prettier-ignore, qui réintroduirait ces sauts de ligne. -->
     <!-- prettier-ignore -->
-    <span [class.stale]="footerStale()"
+    <span [class.stale]="note().expiringSoon"
       >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
     >
     <span class="card-tags">

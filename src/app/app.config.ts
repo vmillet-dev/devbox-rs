@@ -36,7 +36,7 @@ export const appConfig: ApplicationConfig = {
     }),
     provideAppInitializer(() => inject(LocaleService).restore()),
 
-    // Choix mock / backend Rust : voir core/data/data.providers.ts.
+    // Liaison des dépôts vers le backend Rust : voir core/data/data.providers.ts.
     ...provideDataAccess(),
 
     { provide: ErrorHandler, useClass: AppErrorHandler },

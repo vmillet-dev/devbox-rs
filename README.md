@@ -6,11 +6,10 @@ A developer's Swiss Army knife for the desktop: a notes/snippets manager, plus u
 **Angular 22** (standalone components, signals, zoneless change detection) on the front,
 **Rust / Tauri v2** as the native shell.
 
-> **Status** — the notes UI is complete and fully wired to the Rust backend: there is no
-> mock data left, every read and write goes through `invoke()`. The Rust commands are
-> declared and registered but **their bodies are still to be written** — they return a
-> "not implemented" error, so the app currently starts on its error/retry screen. See the
-> TODOs in `src-tauri/src/commands/notes.rs` and `spaces.rs`.
+> **Status** — the notes feature is complete end to end. The UI has no mock data left, every
+> read and write crosses the `invoke()` bridge, and the Rust side persists to an embedded
+> SQLite database. Business rules live in `src-tauri/src/domain/`, which depends on neither
+> rusqlite nor Tauri. `crypto` and `formatters` are documented placeholders, not yet built.
 
 ## Prerequisites
 
@@ -52,10 +51,17 @@ For Rust-only iteration, `cargo check` from `src-tauri/` is much faster than a f
 ## Layout
 
 ```
-src/          Angular front-end (core/ state & data, features/ screens, layout/, shared/)
-src-tauri/    Rust back-end: Tauri config, capabilities, commands/
-docs/         Architecture notes and UI mockup
+src/              Angular front-end (core/ state & data, features/ screens, layout/, shared/)
+src-tauri/src/
+  domain/         Model and business rules — knows neither SQLite nor Tauri
+  storage/        SQLite persistence: SQL only, depends on domain/
+  commands/       Tauri adapters: lock, delegate, translate the error
+docs/             Architecture notes and UI mockup
 ```
+
+Dependencies point one way: `commands/ → domain/ ← storage/`. Two greps keep it honest —
+`grep -rn "rusqlite\|tauri::" src-tauri/src/domain/` and
+`grep -rn "use crate::commands" src-tauri/src/storage/` must both come back empty.
 
 ## Documentation
 
@@ -74,14 +80,14 @@ docs/         Architecture notes and UI mockup
 - [x] Full note editing: content, format, tags, pin, deletion
 - [x] Spaces: notes carry a `spaceId`, the switcher filters on it and can create a space
 - [x] ESLint + Prettier, with template accessibility rules
-- [ ] **Persistence: the bodies of the Rust commands** (`list_notes`, `create_note`,
-      `update_note`, `delete_note`, `list_spaces`, `create_space`). Signatures, serde
-      contract and per-function TODOs are in `src-tauri/src/commands/`
+- [x] Persistence: embedded SQLite (`rusqlite`, `bundled`) with versioned, append-only
+      migrations
+- [x] Business rules isolated in `src-tauri/src/domain/`, testable without a database
+- [x] Rust tests, clippy (`deny(clippy::all)`) and rustfmt
 - [ ] Renaming and deleting a space — needs a decision on what happens to its notes
 - [ ] Moving a note between spaces (already expressible: `spaceId` is part of `NotePatch`)
 - [ ] `crypto` module: SHA-256, MD5, UUID generation
 - [ ] `formatters` module: base64 encode/decode, JSON formatting
-- [ ] Rust tests, clippy and rustfmt
 
 ## Conventions
 
@@ -89,8 +95,9 @@ Code comments, docstrings and UI strings are written in **French**. Test descrip
 test comments are in **English**, matching Vitest/Angular community conventions.
 
 The front-end is linted with ESLint (`angular-eslint`, including its template accessibility
-rules) and formatted with Prettier — run `npm run lint` before pushing. The Rust side has no
-clippy or rustfmt hook yet.
+rules) and formatted with Prettier — run `npm run lint` before pushing. The Rust side is
+gated by `cargo clippy -- -D warnings` and `cargo fmt --check`; `unsafe_code` is forbidden
+in `Cargo.toml`.
 
 ## Recommended IDE setup
 

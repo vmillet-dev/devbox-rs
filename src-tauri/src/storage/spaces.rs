@@ -7,7 +7,7 @@ use rusqlite::{Connection, Row};
 use uuid::Uuid;
 
 use super::StorageError;
-use crate::commands::spaces::{Space, SpaceDraft};
+use crate::domain::space::Space;
 
 fn row_to_space(row: &Row<'_>) -> rusqlite::Result<Space> {
     Ok(Space {
@@ -35,21 +35,23 @@ pub fn list(connection: &Connection) -> Result<Vec<Space>, StorageError> {
 /// note : la contrainte de clé étrangère l'attraperait aussi, mais avec un
 /// message SQLite illisible là où le front affiche l'erreur telle quelle.
 pub fn exists(connection: &Connection, id: &str) -> Result<bool, StorageError> {
-    let count: i64 = connection.query_row(
-        "SELECT COUNT(*) FROM spaces WHERE id = ?1",
-        [id],
-        |row| row.get(0),
-    )?;
+    let count: i64 =
+        connection.query_row("SELECT COUNT(*) FROM spaces WHERE id = ?1", [id], |row| {
+            row.get(0)
+        })?;
 
     Ok(count > 0)
 }
 
 /// Crée un espace et renvoie sa version persistée : le front sélectionne
 /// aussitôt l'espace à partir de cette valeur de retour.
-pub fn create(connection: &Connection, draft: &SpaceDraft) -> Result<Space, StorageError> {
+///
+/// `name` est attendu **déjà validé** (voir `SpaceDraft::validated_name`) :
+/// détouré et non vide. Cette couche ne tranche que l'unicité.
+pub fn create(connection: &Connection, name: &str) -> Result<Space, StorageError> {
     let space = Space {
         id: Uuid::new_v4().to_string(),
-        name: draft.name.clone(),
+        name: name.to_string(),
     };
 
     // Le doublon est détecté ici plutôt que laissé à l'index unique, pour
@@ -76,17 +78,11 @@ mod tests {
     use super::*;
     use crate::storage::open_in_memory;
 
-    fn draft(name: &str) -> SpaceDraft {
-        SpaceDraft {
-            name: name.to_string(),
-        }
-    }
-
     #[test]
     fn a_created_space_is_listed_back() {
         let connection = open_in_memory().unwrap();
 
-        let created = create(&connection, &draft("Perso")).unwrap();
+        let created = create(&connection, "Perso").unwrap();
         let listed = list(&connection).unwrap();
 
         assert_eq!(listed.len(), 1);
@@ -98,8 +94,8 @@ mod tests {
     fn each_space_gets_its_own_identifier() {
         let connection = open_in_memory().unwrap();
 
-        let first = create(&connection, &draft("Perso")).unwrap();
-        let second = create(&connection, &draft("Boulot")).unwrap();
+        let first = create(&connection, "Perso").unwrap();
+        let second = create(&connection, "Boulot").unwrap();
 
         assert_ne!(first.id, second.id);
     }
@@ -108,11 +104,15 @@ mod tests {
     fn spaces_are_listed_in_name_order() {
         let connection = open_in_memory().unwrap();
 
-        create(&connection, &draft("Veille")).unwrap();
-        create(&connection, &draft("Boulot")).unwrap();
-        create(&connection, &draft("perso")).unwrap();
+        create(&connection, "Veille").unwrap();
+        create(&connection, "Boulot").unwrap();
+        create(&connection, "perso").unwrap();
 
-        let names: Vec<String> = list(&connection).unwrap().into_iter().map(|s| s.name).collect();
+        let names: Vec<String> = list(&connection)
+            .unwrap()
+            .into_iter()
+            .map(|s| s.name)
+            .collect();
 
         assert_eq!(names, ["Boulot", "perso", "Veille"]);
     }
@@ -120,9 +120,9 @@ mod tests {
     #[test]
     fn a_duplicate_name_is_refused_regardless_of_case() {
         let connection = open_in_memory().unwrap();
-        create(&connection, &draft("Perso")).unwrap();
+        create(&connection, "Perso").unwrap();
 
-        let error = create(&connection, &draft("PERSO")).unwrap_err();
+        let error = create(&connection, "PERSO").unwrap_err();
 
         assert!(matches!(error, StorageError::DuplicateSpaceName(_)));
         assert_eq!(list(&connection).unwrap().len(), 1);
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn exists_distinguishes_known_from_unknown_identifiers() {
         let connection = open_in_memory().unwrap();
-        let space = create(&connection, &draft("Perso")).unwrap();
+        let space = create(&connection, "Perso").unwrap();
 
         assert!(exists(&connection, &space.id).unwrap());
         assert!(!exists(&connection, "inconnu").unwrap());

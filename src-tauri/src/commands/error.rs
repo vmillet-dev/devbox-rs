@@ -19,18 +19,25 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+use crate::domain::validation::ValidationError;
 use crate::storage::StorageError;
 
-/// Identifie la cause pour le front, qui en dérive `errors.<code>` ou choisit
-/// un message contextuel. Ajouter une variante = ajouter la traduction en face
-/// (`IpcErrorCode` dans `src/app/core/ipc/ipc-error.ts`).
+/// Identifie la cause pour le front, qui la mappe sur une clé de traduction.
+/// Ajouter une variante = ajouter la variante en face (`IpcErrorCode` dans
+/// `src/app/core/ipc/ipc-error.ts`) **et** sa clé dans les deux locales.
+///
+/// Il n'y a pas de variante pour un schéma trop récent : cette panne n'est
+/// produite que par la migration, pendant le `setup()` de Tauri, où l'échec
+/// avorte le lancement. Aucune commande ne peut la renvoyer, donc lui donner un
+/// code laisserait croire au front qu'il a quelque chose à en faire.
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ErrorCode {
     NoteNotFound,
     SpaceNotFound,
     DuplicateSpaceName,
-    SchemaTooRecent,
+    /// Donnée reçue non conforme. Le paramètre `field` nomme le champ en cause.
+    InvalidInput,
     /// Mutex empoisonné : une commande a paniqué en tenant la connexion.
     StorageUnavailable,
     /// Panne de lecture ou d'écriture SQLite.
@@ -75,6 +82,17 @@ impl AppError {
     }
 }
 
+impl From<ValidationError> for AppError {
+    fn from(error: ValidationError) -> Self {
+        Self::with(
+            ErrorCode::InvalidInput,
+            error.to_string(),
+            "field",
+            error.field,
+        )
+    }
+}
+
 impl From<StorageError> for AppError {
     fn from(error: StorageError) -> Self {
         // `detail` reprend le `Display` de `StorageError` : ces messages
@@ -94,13 +112,12 @@ impl From<StorageError> for AppError {
             StorageError::DuplicateSpaceName(name) => {
                 Self::with(ErrorCode::DuplicateSpaceName, detail, "name", &name)
             }
-            StorageError::SchemaTooRecent(version) => Self::with(
-                ErrorCode::SchemaTooRecent,
-                detail,
-                "version",
-                &version.to_string(),
-            ),
-            StorageError::Sqlite(_) => Self::new(ErrorCode::Storage, detail),
+            // Inatteignable par le pont (voir [`ErrorCode`]) : si cette
+            // conversion arrivait quand même, `Storage` reste vrai, et le
+            // `detail` porte déjà le numéro de version en clair.
+            StorageError::SchemaTooRecent(_) | StorageError::Sqlite(_) => {
+                Self::new(ErrorCode::Storage, detail)
+            }
         }
     }
 }
@@ -146,6 +163,31 @@ mod tests {
         for error in errors {
             assert!(!AppError::from(error).detail.is_empty());
         }
+    }
+
+    #[test]
+    fn a_refused_value_names_the_field_at_fault() {
+        let json = serde_json::to_value(AppError::from(ValidationError::new(
+            "language",
+            "« rust » n'est pas un langage reconnu",
+        )))
+        .unwrap();
+
+        // The front interpolates {{field}}; without it the banner would say
+        // "a value was rejected" and leave the user guessing which one.
+        assert_eq!(json["code"], "invalidInput");
+        assert_eq!(json["params"]["field"], "language");
+    }
+
+    #[test]
+    fn a_schema_too_recent_degrades_to_storage_rather_than_leaking_a_dead_code() {
+        // It cannot cross the bridge (it aborts startup), so the front has no
+        // branch for it — `storage` is the honest code, and the detail carries
+        // the version in plain text.
+        let error = AppError::from(StorageError::SchemaTooRecent(9));
+
+        assert!(matches!(error.code, ErrorCode::Storage));
+        assert!(error.detail.contains('9'));
     }
 
     #[test]

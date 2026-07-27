@@ -12,9 +12,14 @@
 
 use chrono::{DateTime, Datelike, FixedOffset};
 
-use crate::commands::notes::{Note, NoteSection, NoteSectionKey};
+use super::display::{self, DisplayNote};
+use super::note::Note;
+use super::query::{NoteSection, NoteSectionKey};
 
 const WEEK_DAYS: i64 = 7;
+
+/// Amplitude des fuseaux réels : UTC−12 à UTC+14.
+const MAX_TZ_OFFSET_MINUTES: u32 = 14 * 60;
 
 /// Décalage du front (`Date#getTimezoneOffset()`) en `FixedOffset` chrono.
 ///
@@ -22,8 +27,19 @@ const WEEK_DAYS: i64 = 7;
 /// locale pour obtenir UTC (−120 pour UTC+2), là où chrono attend le décalage
 /// à l'est de UTC. Une valeur aberrante retombe sur UTC plutôt que de faire
 /// échouer la requête : au pire les journées sont découpées à l'heure UTC.
+///
+/// La borne est vérifiée **avant** la multiplication : la valeur vient du pont
+/// IPC, et `-i32::MIN` comme `i32::MAX * 60` déborderaient — panique en debug,
+/// et le mutex de connexion resterait empoisonné pour le reste du processus.
+/// `unsigned_abs` plutôt que `abs`, qui déborde lui aussi sur `i32::MIN`.
 pub fn offset_from_minutes(tz_offset_minutes: i32) -> FixedOffset {
-    FixedOffset::east_opt(-tz_offset_minutes * 60).unwrap_or_else(|| FixedOffset::east_opt(0).expect("UTC est un décalage valide"))
+    let utc = FixedOffset::east_opt(0).expect("UTC est un décalage valide");
+
+    if tz_offset_minutes.unsigned_abs() > MAX_TZ_OFFSET_MINUTES {
+        return utc;
+    }
+
+    FixedOffset::east_opt(-tz_offset_minutes * 60).unwrap_or(utc)
 }
 
 /// Une date ISO illisible ne doit pas faire disparaître la note : elle est
@@ -44,11 +60,21 @@ fn is_within_days(date: &DateTime<FixedOffset>, now: &DateTime<FixedOffset>, day
     elapsed.num_milliseconds() >= 0 && elapsed.num_days() <= days
 }
 
-fn section(key: NoteSectionKey, notes: Vec<Note>, show_create_ghost: bool) -> NoteSection {
+/// Point unique où une note persistée devient une note affichable : c'est la
+/// seule porte de sortie vers le front, donc rien ne peut lui échapper.
+fn section(
+    key: NoteSectionKey,
+    notes: Vec<Note>,
+    show_create_ghost: bool,
+    now: &DateTime<FixedOffset>,
+) -> NoteSection {
+    let notes: Vec<DisplayNote> = notes
+        .into_iter()
+        .map(|note| display::decorate(note, now))
+        .collect();
+
     NoteSection {
-        has_expiring_notes: notes
-            .iter()
-            .any(|note| matches!(note.lifecycle, crate::commands::notes::NoteLifecycle::Expires { .. })),
+        has_expiring_notes: notes.iter().any(|note| note.expiring_soon),
         key,
         notes,
         show_create_ghost,
@@ -60,8 +86,8 @@ fn section(key: NoteSectionKey, notes: Vec<Note>, show_create_ghost: bool) -> No
 /// Répartir des résultats de recherche dans des sections de date les dilue et
 /// laisse croire qu'il n'y a rien à voir quand tout est tombé dans une section
 /// en bas de page. Un résultat de recherche se lit en liste.
-fn results(notes: Vec<Note>) -> Vec<NoteSection> {
-    vec![section(NoteSectionKey::Results, notes, false)]
+fn results(notes: Vec<Note>, now: &DateTime<FixedOffset>) -> Vec<NoteSection> {
+    vec![section(NoteSectionKey::Results, notes, false, now)]
 }
 
 /// Regroupe les notes en sections. `is_filtering` bascule en liste plate.
@@ -75,7 +101,7 @@ pub fn build(
     offset: &FixedOffset,
 ) -> Vec<NoteSection> {
     if is_filtering {
-        return results(notes);
+        return results(notes, now);
     }
 
     let mut pinned = Vec::new();
@@ -102,17 +128,17 @@ pub fn build(
     let mut sections = Vec::new();
 
     if !pinned.is_empty() {
-        sections.push(section(NoteSectionKey::Pinned, pinned, false));
+        sections.push(section(NoteSectionKey::Pinned, pinned, false, now));
     }
     if !today.is_empty() {
-        sections.push(section(NoteSectionKey::Today, today, false));
+        sections.push(section(NoteSectionKey::Today, today, false, now));
     }
 
     // Toujours présente : c'est elle qui héberge la carte « coller ou créer ».
-    sections.push(section(NoteSectionKey::Week, this_week, true));
+    sections.push(section(NoteSectionKey::Week, this_week, true, now));
 
     if !older.is_empty() {
-        sections.push(section(NoteSectionKey::Older, older, false));
+        sections.push(section(NoteSectionKey::Older, older, false, now));
     }
 
     sections
@@ -121,7 +147,7 @@ pub fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::notes::NoteLifecycle;
+    use crate::domain::note::NoteLifecycle;
 
     /// 25 July 2026, 09:00 UTC.
     const NOW: &str = "2026-07-25T09:00:00.000Z";
@@ -131,7 +157,27 @@ mod tests {
     }
 
     fn now_at(offset: &FixedOffset) -> DateTime<FixedOffset> {
-        DateTime::parse_from_rfc3339(NOW).unwrap().with_timezone(offset)
+        DateTime::parse_from_rfc3339(NOW)
+            .unwrap()
+            .with_timezone(offset)
+    }
+
+    #[test]
+    fn a_real_offset_keeps_its_sign_inverted() {
+        // JavaScript reports -120 for UTC+2 and 300 for UTC-5.
+        assert_eq!(offset_from_minutes(-120).local_minus_utc(), 2 * 3600);
+        assert_eq!(offset_from_minutes(300).local_minus_utc(), -5 * 3600);
+        assert_eq!(offset_from_minutes(0).local_minus_utc(), 0);
+    }
+
+    #[test]
+    fn an_absurd_offset_falls_back_to_utc_without_overflowing() {
+        // The value crosses the IPC bridge unvalidated. Negating i32::MIN or
+        // multiplying i32::MAX by 60 overflows, which panics in debug while the
+        // connection mutex is held — poisoning it for the rest of the process.
+        for absurd in [i32::MIN, i32::MAX, -100_000, 100_000, 841, -841] {
+            assert_eq!(offset_from_minutes(absurd).local_minus_utc(), 0);
+        }
     }
 
     fn note(id: &str, created_at: &str) -> Note {
@@ -236,7 +282,10 @@ mod tests {
             &offset,
         );
 
-        assert_eq!(keys(&sections), [NoteSectionKey::Today, NoteSectionKey::Week]);
+        assert_eq!(
+            keys(&sections),
+            [NoteSectionKey::Today, NoteSectionKey::Week]
+        );
     }
 
     #[test]
@@ -255,11 +304,11 @@ mod tests {
     }
 
     #[test]
-    fn a_section_reports_whether_any_of_its_notes_expires() {
+    fn a_section_reports_whether_any_of_its_notes_is_due_soon() {
         let offset = utc();
         let mut expiring = note("expiring", "2026-07-25T08:00:00.000Z");
         expiring.lifecycle = NoteLifecycle::Expires {
-            at: "2026-08-01T00:00:00.000Z".to_string(),
+            at: "2026-07-26T00:00:00.000Z".to_string(),
         };
 
         let sections = build(
@@ -269,10 +318,35 @@ mod tests {
             &offset,
         );
 
-        let today = sections.iter().find(|s| s.key == NoteSectionKey::Today).unwrap();
+        let today = sections
+            .iter()
+            .find(|s| s.key == NoteSectionKey::Today)
+            .unwrap();
         assert!(today.has_expiring_notes);
-        let week = sections.iter().find(|s| s.key == NoteSectionKey::Week).unwrap();
+        let week = sections
+            .iter()
+            .find(|s| s.key == NoteSectionKey::Week)
+            .unwrap();
         assert!(!week.has_expiring_notes);
+    }
+
+    #[test]
+    fn a_distant_deadline_does_not_light_up_the_section_hint() {
+        let offset = utc();
+        let mut expiring = note("expiring", "2026-07-25T08:00:00.000Z");
+        expiring.lifecycle = NoteLifecycle::Expires {
+            at: "2027-01-01T00:00:00.000Z".to_string(),
+        };
+
+        let sections = build(vec![expiring], false, &now_at(&offset), &offset);
+
+        // The hint reads "to triage soon"; firing it six months ahead would make
+        // it permanent background noise.
+        let today = sections
+            .iter()
+            .find(|s| s.key == NoteSectionKey::Today)
+            .unwrap();
+        assert!(!today.has_expiring_notes);
     }
 
     #[test]
@@ -324,7 +398,12 @@ mod tests {
     fn an_unparsable_creation_date_keeps_the_note_reachable() {
         let offset = utc();
 
-        let sections = build(vec![note("corrupt", "pas une date")], false, &now_at(&offset), &offset);
+        let sections = build(
+            vec![note("corrupt", "pas une date")],
+            false,
+            &now_at(&offset),
+            &offset,
+        );
 
         assert_eq!(ids_in(&sections, NoteSectionKey::Older), ["corrupt"]);
     }
@@ -356,6 +435,9 @@ mod tests {
         let sections = build(notes, false, &now_at(&offset), &offset);
 
         // The SQL ORDER BY decides; this module must not re-sort.
-        assert_eq!(ids_in(&sections, NoteSectionKey::Today), ["first", "second"]);
+        assert_eq!(
+            ids_in(&sections, NoteSectionKey::Today),
+            ["first", "second"]
+        );
     }
 }

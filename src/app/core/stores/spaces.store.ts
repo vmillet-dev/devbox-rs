@@ -1,7 +1,7 @@
 import { Injectable, Signal, computed, effect, inject, resource, signal } from '@angular/core';
 import { SPACES_REPOSITORY } from '../data/spaces-repository.token';
-import { AppNotice, ErrorNotifier } from '../errors/error-notifier.service';
-import { IpcError } from '../ipc/ipc.service';
+import { ErrorNotifier } from '../errors/error-notifier.service';
+import { ipcNotice } from '../errors/ipc-notice';
 import { Space } from '../models/space.model';
 
 /**
@@ -90,22 +90,10 @@ export class SpacesStore {
       return created;
     } catch (error) {
       console.error(error);
-      this.notifier.notify(this.describeCreateFailure(error, trimmed));
+      // Le nom saisi sert de repli d'interpolation si le back n'en fournit pas :
+      // « Un espace nommé {{name}} existe déjà » doit rester lisible.
+      this.notifier.notify(ipcNotice(error, { key: 'errors.spaceCreateFailed' }, { name: trimmed }));
       return null;
     }
-  }
-
-  private describeCreateFailure(error: unknown, name: string): AppNotice {
-    if (error instanceof IpcError && error.code === 'duplicateSpaceName') {
-      // Deux espaces homonymes ne seraient pas distinguables dans le sélecteur.
-      return {
-        ref: { key: 'errors.spaceNameTaken', params: { name: error.params['name'] ?? name } },
-      };
-    }
-
-    return {
-      ref: { key: 'errors.spaceCreateFailed' },
-      detail: error instanceof Error ? error.message : String(error),
-    };
   }
 }

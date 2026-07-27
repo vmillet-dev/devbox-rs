@@ -100,7 +100,7 @@
             />
           </form>
         </div>
-        <app-lifecycle-badge [lifecycle]="note.lifecycle" />
+        <app-lifecycle-badge [lifecycle]="note.lifecycle" [expiringSoon]="note.expiringSoon" />
       </div>
 
       @if (editingBody()) {

@@ -3,7 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteLifecycle } from '@core/models/note.model';
 import { TranslationRef } from '@core/models/translation-ref.model';
 import { ClockService } from '@core/time/clock.service';
-import { expiryRef, isExpiringSoon } from '@core/utils/relative-time.util';
+import { expiryRef } from '@core/utils/relative-time.util';
 
 @Component({
   selector: 'app-lifecycle-badge',
@@ -17,6 +17,13 @@ export class LifecycleBadgeComponent {
 
   readonly lifecycle = input.required<NoteLifecycle>();
 
+  /**
+   * Échéance proche, telle que le back l'a tranchée. Recalculer le seuil ici en
+   * ferait un second propriétaire, libre de diverger de celui qui décide de
+   * l'indice « à trier bientôt » des sections.
+   */
+  readonly expiringSoon = input(false);
+
   protected readonly icon = computed(() => (this.lifecycle().kind === 'permanent' ? '📌' : '⏳'));
 
   protected readonly label = computed<TranslationRef>(() => {
@@ -26,8 +33,5 @@ export class LifecycleBadgeComponent {
       : expiryRef(lifecycle.at, this.clock.now());
   });
 
-  protected readonly stale = computed(() => {
-    const lifecycle = this.lifecycle();
-    return lifecycle.kind === 'expires' && isExpiringSoon(lifecycle.at, this.clock.now());
-  });
+  protected readonly stale = this.expiringSoon;
 }

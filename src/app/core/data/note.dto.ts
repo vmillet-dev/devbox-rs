@@ -1,5 +1,5 @@
 import { FALLBACK_LANGUAGE, isLanguageTag } from '../models/language.model';
-import { Note, NoteDraft, NoteLifecycle, NotePatch } from '../models/note.model';
+import { Note, NoteDraft, NoteFooter, NoteLifecycle, NotePatch } from '../models/note.model';
 
 /**
  * Représentation transportée sur le pont Tauri. Elle diffère du modèle métier
@@ -10,7 +10,10 @@ import { Note, NoteDraft, NoteLifecycle, NotePatch } from '../models/note.model'
  * `#[serde(rename_all = "camelCase")]` (sinon on reçoit `created_at`) et
  * l'enum de cycle de vie `#[serde(tag = "kind", rename_all = "camelCase")]`
  * (sinon serde produit `{"Expires":{…}}`, que le discriminant TS ne reconnaît pas).
- * Voir les TODO de `src-tauri/src/commands/notes.rs`.
+ * Voir `src-tauri/src/domain/note.rs`, où ces attributs sont figés par des tests.
+ *
+ * `footer` et `expiringSoon` viennent de `domain::display` et sont aplatis dans
+ * le même objet (`#[serde(flatten)]`) : le front n'a qu'un type de note.
  */
 export interface NoteDto {
   readonly id: string;
@@ -24,18 +27,25 @@ export interface NoteDto {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly lifecycle: NoteLifecycleDto;
+  readonly footer: NoteFooterDto;
+  readonly expiringSoon: boolean;
 }
 
 export type NoteLifecycleDto =
   { readonly kind: 'permanent' } | { readonly kind: 'expires'; readonly at: string };
 
-export type NoteDraftDto = Omit<NoteDto, 'id' | 'createdAt' | 'updatedAt'>;
+export type NoteFooterDto =
+  | { readonly kind: 'source'; readonly value: string }
+  | { readonly kind: 'expiry'; readonly at: string }
+  | { readonly kind: 'age'; readonly at: string };
+
+export type NoteDraftDto = Omit<NoteDto, 'id' | 'createdAt' | 'updatedAt' | 'footer' | 'expiringSoon'>;
 export type NotePatchDto = Partial<NoteDraftDto>;
 
-/** Rupture de contrat entre le DTO reçu et ce que le front sait interpréter. */
+/** Rupture de contrat entre un DTO et ce que le front sait interpréter. */
 export class NoteContractError extends Error {
   constructor(field: string, value: unknown) {
-    super(`Note reçue invalide : champ « ${field} » inexploitable (${JSON.stringify(value)})`);
+    super(`Contrat de note rompu : champ « ${field} » inexploitable (${JSON.stringify(value)})`);
     this.name = 'NoteContractError';
   }
 }
@@ -50,6 +60,18 @@ function parseIsoDate(value: string, field: string): Date {
   return date;
 }
 
+/**
+ * Même exigence dans l'autre sens : `toISOString()` lève un `RangeError` nu sur
+ * une `Invalid Date`, sans dire quel champ est en cause. Le chemin d'écriture
+ * mérite le même diagnostic que le chemin de lecture.
+ */
+export function toIsoString(date: Date, field: string): string {
+  if (Number.isNaN(date.getTime())) {
+    throw new NoteContractError(field, date);
+  }
+  return date.toISOString();
+}
+
 function toLifecycle(dto: NoteLifecycleDto): NoteLifecycle {
   return dto.kind === 'expires'
     ? { kind: 'expires', at: parseIsoDate(dto.at, 'lifecycle.at') }
@@ -58,8 +80,17 @@ function toLifecycle(dto: NoteLifecycleDto): NoteLifecycle {
 
 function toLifecycleDto(lifecycle: NoteLifecycle): NoteLifecycleDto {
   return lifecycle.kind === 'expires'
-    ? { kind: 'expires', at: lifecycle.at.toISOString() }
+    ? { kind: 'expires', at: toIsoString(lifecycle.at, 'lifecycle.at') }
     : { kind: 'permanent' };
+}
+
+function toFooter(dto: NoteFooterDto): NoteFooter {
+  if (dto.kind === 'source') return { kind: 'source', value: dto.value };
+  if (dto.kind === 'expiry') return { kind: 'expiry', at: parseIsoDate(dto.at, 'footer.at') };
+  if (dto.kind === 'age') return { kind: 'age', at: parseIsoDate(dto.at, 'footer.at') };
+  // Une variante ajoutée côté Rust sans être répercutée ici : mieux vaut le dire
+  // que rendre un pied de carte vide.
+  throw new NoteContractError('footer.kind', (dto satisfies never as { kind: string }).kind);
 }
 
 export function toNote(dto: NoteDto): Note {
@@ -76,6 +107,8 @@ export function toNote(dto: NoteDto): Note {
     createdAt: parseIsoDate(dto.createdAt, 'createdAt'),
     updatedAt: parseIsoDate(dto.updatedAt, 'updatedAt'),
     lifecycle: toLifecycle(dto.lifecycle),
+    footer: toFooter(dto.footer),
+    expiringSoon: dto.expiringSoon,
   };
 }
 

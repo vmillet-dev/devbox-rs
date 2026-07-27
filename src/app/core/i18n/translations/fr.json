@@ -64,13 +64,17 @@
     "unexpected": "Une erreur inattendue est survenue.",
     "ipcFailed": "La communication avec le moteur natif a échoué ({{command}}).",
     "notesLoadFailed": "Impossible de charger les notes.",
-    "noteSaveFailed": "Impossible d'enregistrer la note. La modification a été annulée.",
+    "noteSaveFailed": "Impossible d'enregistrer la note. Votre texte est toujours à l'écran.",
     "noteCreateFailed": "Impossible de créer la note.",
-    "noteDeleteFailed": "Impossible de supprimer la note. Elle a été rétablie.",
+    "noteDeleteFailed": "Impossible de supprimer la note. Elle est toujours là.",
     "spacesLoadFailed": "Impossible de charger les espaces.",
     "spaceCreateFailed": "Impossible de créer l'espace.",
     "spaceNameTaken": "Un espace nommé « {{name}} » existe déjà.",
-    "spaceRequired": "Créez d'abord un espace pour y ranger vos notes."
+    "spaceRequired": "Créez d'abord un espace pour y ranger vos notes.",
+    "noteGone": "Cette note n'existe plus.",
+    "spaceGone": "Cet espace n'existe plus.",
+    "invalidInput": "Valeur refusée par le moteur : {{field}}.",
+    "storageUnavailable": "Le stockage est indisponible. Redémarrez DevBox."
   },
   "locale": {
     "groupLabel": "Langue de l'interface",

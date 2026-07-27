@@ -11,9 +11,10 @@ import {
 } from '@angular/core';
 import { NOTES_REPOSITORY } from '../data/notes-repository.token';
 import { ErrorNotifier } from '../errors/error-notifier.service';
+import { ipcNotice } from '../errors/ipc-notice';
 import { FALLBACK_LANGUAGE, LanguageTag } from '../models/language.model';
 import { NoteSection } from '../models/note-section.model';
-import { Note, NoteDraft } from '../models/note.model';
+import { Note, NoteDraft, NotePatch } from '../models/note.model';
 import { NoteFilter, NotesQuery, NotesView } from '../models/notes-query.model';
 import { ClockService } from '../time/clock.service';
 import { SpacesStore } from './spaces.store';
@@ -30,6 +31,32 @@ export const SEARCH_DEBOUNCE_MS = 150;
 /** Clé de journée **locale**, utilisée pour ne re-interroger qu'au changement de jour. */
 function localDayKey(now: Date): string {
   return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+}
+
+interface QueryParams {
+  readonly spaceId: string | null;
+  readonly search: string;
+  readonly filter: NoteFilter;
+  readonly tags: readonly string[];
+  readonly day: string;
+}
+
+/**
+ * Égalité **par valeur** des critères de requête.
+ *
+ * `resource` compare ses paramètres par identité (`===`) : sans ce comparateur,
+ * le littéral neuf que produit `queryParams` à chaque battement d'horloge
+ * relancerait une requête toutes les 30 s, masquée par le cache de vue.
+ */
+function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
+  return (
+    a.spaceId === b.spaceId &&
+    a.search === b.search &&
+    a.filter === b.filter &&
+    a.day === b.day &&
+    a.tags.length === b.tags.length &&
+    a.tags.every((tag, index) => tag === b.tags[index])
+  );
 }
 
 /**
@@ -72,17 +99,22 @@ export class NotesStore {
 
   /**
    * Critères déclenchant une nouvelle requête. L'instant exact n'en fait pas
-   * partie — seule la **journée** compte pour le découpage en sections, et
-   * dépendre de `clock.now()` relancerait une requête à chaque battement
-   * d'horloge (30 s) sans rien changer à l'affichage.
+   * partie — seule la **journée** compte pour le découpage en sections.
+   *
+   * ⚠️ Le comparateur `equal` est indispensable : `localDayKey` stabilise la
+   * *valeur* du jour, mais l'objet qui l'enveloppe est neuf à chaque battement
+   * d'horloge, et `resource` compare ses paramètres par identité.
    */
-  private readonly queryParams = computed(() => ({
-    spaceId: this.spaces.activeSpaceId(),
-    search: this._debouncedSearch().trim(),
-    filter: this._activeFilter(),
-    tags: [...this._selectedTags()].sort(),
-    day: localDayKey(this.clock.now()),
-  }));
+  private readonly queryParams = computed<QueryParams>(
+    () => ({
+      spaceId: this.spaces.activeSpaceId(),
+      search: this._debouncedSearch().trim(),
+      filter: this._activeFilter(),
+      tags: [...this._selectedTags()].sort(),
+      day: localDayKey(this.clock.now()),
+    }),
+    { equal: sameQueryParams },
+  );
 
   private readonly viewResource = resource({
     params: () => this.queryParams(),
@@ -221,7 +253,7 @@ export class NotesStore {
 
   /**
    * Ajoute un tag. Aucune normalisation ici : trim, `#` de tête et doublons sont
-   * tranchés par `storage::notes::normalize_tags`, seul endroit où la règle
+   * tranchés par `domain::tags::normalize`, seul endroit où la règle
    * vit. Le front envoie ce que l'utilisateur a tapé.
    */
   async addTag(id: string, tag: string): Promise<void> {
@@ -295,9 +327,13 @@ export class NotesStore {
   /**
    * Persiste puis recharge. La note renvoyée fait autorité : elle est adoptée
    * telle quelle dans l'éditeur, car elle porte ce que le backend a réellement
-   * écrit (`updatedAt`, tags normalisés).
+   * écrit (`updatedAt`, tags normalisés, pied de carte).
+   *
+   * Le patch est typé `NotePatch` et non `Partial<Note>` : le second laisserait
+   * passer `id`, `createdAt` ou `footer` jusqu'à la frontière du dépôt, où seule
+   * la recopie manuelle de `toNotePatchDto` les arrêterait.
    */
-  private async persist(id: string, patch: Partial<Note>): Promise<void> {
+  private async persist(id: string, patch: NotePatch): Promise<void> {
     try {
       const saved = await this.repository.update(id, patch);
       if (this.selectedNoteId() === id) {
@@ -332,11 +368,13 @@ export class NotesStore {
     }
   }
 
+  /**
+   * `key` décrit l'action tentée ; si le back a nommé la cause, `ipcNotice` lui
+   * donne la priorité — « cette note n'existe plus » est plus utile que
+   * « impossible d'enregistrer ».
+   */
   private reportFailure(key: string, error: unknown): void {
     console.error(error);
-    this.notifier.notify({
-      ref: { key },
-      detail: error instanceof Error ? error.message : String(error),
-    });
+    this.notifier.notify(ipcNotice(error, { key }));
   }
 }

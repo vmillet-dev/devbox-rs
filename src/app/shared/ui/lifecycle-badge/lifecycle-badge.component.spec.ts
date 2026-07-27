@@ -48,14 +48,17 @@ describe('LifecycleBadgeComponent', () => {
     expect(text()).toBe('⏳ expire dans 3j');
   });
 
-  it('is marked stale when the expiry is within the soon threshold', async () => {
+  it('is marked stale when the backend reports the expiry as near', async () => {
+    // The threshold itself lives in Rust (`domain::display`): a second copy here
+    // could drift from the one driving the section hint.
     fixture.componentRef.setInput('lifecycle', { kind: 'expires', at: new Date('2026-01-02T00:00:00Z') });
+    fixture.componentRef.setInput('expiringSoon', true);
     await fixture.whenStable();
 
     expect(fixture.debugElement.query(By.css('.lifecycle-badge')).classes['stale']).toBe(true);
   });
 
-  it('is not marked stale when the expiry is far away', async () => {
+  it('is not marked stale when the backend did not flag the expiry', async () => {
     fixture.componentRef.setInput('lifecycle', { kind: 'expires', at: new Date('2026-02-01T00:00:00Z') });
     await fixture.whenStable();
 

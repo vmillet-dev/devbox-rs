@@ -19,8 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
-# Sérialisation des structures échangées avec le front (voir commands/notes.rs).
+# Sérialisation des structures échangées avec le front (voir domain/note.rs).
 serde = { version = "1", features = ["derive"] }
 # Stockage : SQLite embarqué (voir storage/mod.rs). La feature `bundled` compile
 # SQLite depuis les sources et le lie en statique — aucune DLL à distribuer.
@@ -32,6 +31,15 @@ chrono = "0.4.45"
 
 [dev-dependencies]
 # Uniquement pour verrouiller par test la forme JSON traversant le pont Tauri
-# (voir les tests de commands/notes.rs). Tauri sérialise lui-même en production.
+# (voir les tests de domain/note.rs). Tauri sérialise lui-même en production.
 serde_json = "1.0.151"
+
+# Le Rust n'avait ni linter ni garde-fou : `cargo clippy -- -D warnings` échouait
+# sur rien, donc rien n'empêchait une régression d'entrer.
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+# `priority = -1` laisse la possibilité de rétrograder une lint précise ensuite.
+all = { level = "deny", priority = -1 }
 

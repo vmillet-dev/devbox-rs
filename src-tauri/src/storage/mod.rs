@@ -7,11 +7,14 @@
 //! # Organisation
 //!
 //! Ce module ne contient que l'ouverture, la configuration et les migrations.
-//! Les lectures et écritures métier sont dans `storage::notes` et
-//! `storage::spaces`, sous forme de fonctions ordinaires prenant une
-//! `&Connection`. Les `#[tauri::command]` de `commands/` ne sont que des
-//! adaptateurs par-dessus : c'est ce qui permet de tester la persistance sur une
-//! base en mémoire, sans lancer Tauri.
+//! Les lectures et écritures sont dans `storage::notes` et `storage::spaces`,
+//! sous forme de fonctions ordinaires prenant une `&Connection`. Les
+//! `#[tauri::command]` de `commands/` ne sont que des adaptateurs par-dessus :
+//! c'est ce qui permet de tester la persistance sur une base en mémoire, sans
+//! lancer Tauri.
+//!
+//! Cette couche ne porte **aucune règle métier** : elle lit et écrit le modèle
+//! défini dans `crate::domain`, dont elle dépend, et qui décide de tout le reste.
 //!
 //! # Concurrence
 //!
@@ -28,7 +31,6 @@
 //! l'utilisateur. Chaque migration est atomique (DDL transactionnel).
 
 pub mod notes;
-pub mod sections;
 pub mod spaces;
 
 use std::fmt;
@@ -54,7 +56,7 @@ pub type Db = Mutex<Connection>;
 pub const DB_FILE_NAME: &str = "devbox.sqlite3";
 
 /// Version de schéma attendue par ce binaire.
-const SCHEMA_VERSION: i32 = 1;
+const SCHEMA_VERSION: i32 = 2;
 
 /// Schéma initial.
 ///
@@ -106,6 +108,37 @@ CREATE TABLE note_tags (
 CREATE INDEX note_tags_tag ON note_tags (tag);
 
 PRAGMA user_version = 1;
+
+COMMIT;
+";
+
+/// Replie la casse des tags au niveau du stockage.
+///
+/// `normalize_tags` dédoublonnait déjà sans tenir compte de la casse, mais
+/// **au sein d'une seule note** : sans collation, `Urgent` et `urgent` portés
+/// par deux notes différentes produisaient deux facettes dans le rail, dont
+/// `tag IN (…)` — en collation BINARY — n'en retrouvait qu'une, alors que la
+/// recherche texte, elle, les confondait. Trois comportements pour un concept.
+///
+/// La collation d'une colonne ne s'altère pas : la table est recréée.
+/// `INSERT OR IGNORE` absorbe les doublons que la nouvelle clé primaire fusionne.
+const MIGRATION_2: &str = r"
+BEGIN;
+
+CREATE TABLE note_tags_v2 (
+    note_id TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
+    tag     TEXT NOT NULL COLLATE NOCASE,
+    PRIMARY KEY (note_id, tag)
+);
+
+INSERT OR IGNORE INTO note_tags_v2 (note_id, tag) SELECT note_id, tag FROM note_tags;
+
+DROP TABLE note_tags;
+ALTER TABLE note_tags_v2 RENAME TO note_tags;
+
+CREATE INDEX note_tags_tag ON note_tags (tag);
+
+PRAGMA user_version = 2;
 
 COMMIT;
 ";
@@ -196,8 +229,13 @@ fn migrate(connection: &Connection) -> Result<(), StorageError> {
         return Err(StorageError::SchemaTooRecent(version));
     }
 
+    // Chaque migration manquante est appliquée dans l'ordre : une base neuve
+    // les traverse toutes, une base existante ne reprend qu'à partir de la sienne.
     if version < 1 {
         connection.execute_batch(MIGRATION_1)?;
+    }
+    if version < 2 {
+        connection.execute_batch(MIGRATION_2)?;
     }
 
     Ok(())
@@ -224,6 +262,47 @@ mod tests {
         assert_eq!(version, SCHEMA_VERSION);
 
         std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn a_v1_database_upgrades_and_folds_tag_case() {
+        let connection = Connection::open_in_memory().unwrap();
+        configure(&connection).unwrap();
+        connection.execute_batch(MIGRATION_1).unwrap();
+        connection
+            .execute_batch(
+                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Perso');
+                 INSERT INTO notes VALUES
+                   ('n-1', 's-1', 'A', 'txt', '', '', 0, '2026-07-25T09:00:00.000Z',
+                    '2026-07-25T09:00:00.000Z', 'permanent', NULL),
+                   ('n-2', 's-1', 'B', 'txt', '', '', 0, '2026-07-25T09:00:00.000Z',
+                    '2026-07-25T09:00:00.000Z', 'permanent', NULL);
+                 INSERT INTO note_tags VALUES ('n-1', 'Urgent'), ('n-2', 'urgent');",
+            )
+            .unwrap();
+
+        migrate(&connection).unwrap();
+
+        let version: i32 = connection
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+
+        // Both rows survive: the collation folds the facet, it does not drop data.
+        let rows: i64 = connection
+            .query_row("SELECT COUNT(*) FROM note_tags", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(rows, 2);
+
+        // But the rail now sees one tag where it used to see two.
+        let facets: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM (SELECT DISTINCT tag FROM note_tags)",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(facets, 1);
     }
 
     #[test]

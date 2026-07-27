@@ -29,8 +29,8 @@ describe('IpcError', () => {
   });
 
   it('is an Error, so it survives being thrown and caught', () => {
-    expect(new IpcError('saluer', 'x')).toBeInstanceOf(Error);
-    expect(new IpcError('saluer', 'x').name).toBe('IpcError');
+    expect(new IpcError('list_spaces', 'x')).toBeInstanceOf(Error);
+    expect(new IpcError('list_spaces', 'x').name).toBe('IpcError');
   });
 
   describe('structured causes', () => {

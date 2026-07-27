@@ -11,15 +11,17 @@ The two halves talk only through Tauri's `invoke()` bridge.
 
 Notes and spaces are complete end to end: the front-end has no in-memory dataset left, every
 read and write goes through `invoke()`, and the Rust commands persist to an embedded SQLite
-database. The remaining domains (`crypto`, `formatters`) are still unregistered stubs.
+database. The remaining domains (`crypto`, `formatters`) are module files carrying their
+intended contract as documentation and no code — a placeholder implementation would ship dead
+in the binary and be thrown away anyway.
 
 **Where the work happens.** Data processing belongs to Rust. Filtering (space, full-text,
-tags, quick filters), grouping into display sections, tag aggregation and tag normalisation
-all run in `src-tauri/src/storage/`. The front-end describes what the user asked for and
-renders the view it gets back — it does not filter, sort or group. The deliberate exceptions
-are relative-time labels (they must age on their own, without a round trip), the ISO ↔ `Date`
-conversion at the serialisation boundary, and plain UI concerns like keyboard shortcuts and
-editor drafts.
+tags, quick filters), grouping into display sections, tag aggregation and normalisation, and
+the choice of what a card's footer shows all run in `src-tauri/src/domain/`. The front-end
+describes what the user asked for and renders the view it gets back — it does not filter,
+sort or group. The deliberate exceptions are relative-time **formatting** (labels must age on
+their own, without a round trip), the ISO ↔ `Date` conversion at the serialisation boundary,
+and plain UI concerns like keyboard shortcuts and editor drafts.
 
 ```
 src/                Angular front-end
@@ -32,11 +34,34 @@ src/                Angular front-end
 ├── styles.scss     global theme
 └── testing/        test doubles, fixtures and shared providers
 src-tauri/          Rust back-end
-├── src/commands/   one file per functional domain — thin adapters over storage
-├── src/storage/    SQLite persistence: schema, migrations, notes and spaces access
+├── src/domain/     model and business rules — knows neither SQLite nor Tauri
+├── src/storage/    SQLite persistence: schema, migrations, SQL only
+├── src/commands/   Tauri adapters: lock, delegate, translate the error
 ├── src/lib.rs      Tauri builder, database setup + command registration
 └── capabilities/   Tauri v2 permission manifests
 ```
+
+### The three Rust layers
+
+Dependencies point one way — **`commands/ → domain/ ← storage/`**. The persistence layer
+knows how to read and write the model, the transport layer knows how to serialise it, and
+neither one defines it. (Before the domain layer existed, the model lived in `commands/` and
+`storage/` imported it from there, which pointed persistence at transport.)
+
+Two greps enforce it, and are worth running after any structural change:
+
+```bash
+grep -rn "rusqlite\|tauri::" src-tauri/src/domain/    # must be empty
+grep -rn "use crate::commands" src-tauri/src/storage/ # must be empty
+```
+
+The payoff is concrete: the domain tests run without opening a database. `cargo test domain::`
+covers section placement, timezone boundaries, tag normalisation, search folding, footer
+choice and expiry thresholds in a few milliseconds, with no fixture setup.
+
+Serde attributes sit on the domain types rather than on a separate DTO family. At this size a
+second set of types and their mapping would cost more than it protects; the wire shape is
+pinned by tests in `domain/note.rs`, `domain/query.rs` and `domain/space.rs` instead.
 
 Imports use path aliases rather than deep relative paths: `@core/*`, `@shared/*`,
 `@features/*`, `@layout/*`, `@testing/*` (declared in `tsconfig.json`).
@@ -114,10 +139,15 @@ Rules of the house:
   mutation therefore goes through a method, which stays the single entry point the day a
   write becomes more than a `set()`.
 - **The view is a parameterised `resource()`.** Its params are the query criteria plus the
-  current **local day** — not `clock.now()`, which would fire a query on every 30 s tick
-  while only the day affects section boundaries. The exact instant is read `untracked` in
-  the loader. `resource.value()` **throws** while the resource is in error; read it through
-  a `hasValue()` guard.
+  current **local day** — not `clock.now()`, since only the day affects section boundaries.
+  The exact instant is read `untracked` in the loader. `resource.value()` **throws** while
+  the resource is in error; read it through a `hasValue()` guard.
+- **That params `computed` needs its `equal` comparator.** `resource` compares its parameters
+  by identity, and `queryParams` builds a fresh object literal that depends on `clock.now()`.
+  Stabilising the day _value_ is not enough — without `sameQueryParams`, every 30 s tick
+  produced a new object, a new request, and a full `query_notes` + SQLite round trip, hidden
+  by the retained view and by `isLoading` staying false. A spec covers it: a clock tick must
+  not increment `queryCount`.
 - **The back-end is authoritative; writes are not optimistic.** A mutation persists, adopts
   the returned note, then reloads the view. Nothing is applied locally first, so there is
   nothing to roll back on failure — an `ErrorNotifier` message is raised and the screen still
@@ -130,7 +160,7 @@ Rules of the house:
 
 ### Display sections
 
-Sections are built in Rust (`src-tauri/src/storage/sections.rs`) and arrive ready to render.
+Sections are built in Rust (`src-tauri/src/domain/sections.rs`) and arrive ready to render.
 The front-end preserves the order it receives and never drops or merges a section.
 
 The classification into `pinned`, `today`, `week` and `older` is **exhaustive**: apart from
@@ -151,6 +181,26 @@ expects.
 
 A section's key **is** its translation key (`'sections.' + key`), which is why the Rust enum
 serialises to `"pinned"` / `"today"` / … and no user-visible label ever crosses the bridge.
+
+### What a card's footer shows
+
+The footer carries one of three things, and which one is a **product rule**, so it is decided
+in `domain::display` and arrives as a tagged `footer` field:
+
+| variant  | when                         | rendered as                |
+| -------- | ---------------------------- | -------------------------- |
+| `expiry` | the note has a deadline      | `expiryRef(at, now)`       |
+| `source` | pinned, and it has a context | the first path segment     |
+| `age`    | everything else              | `relativeTimeRef(at, now)` |
+
+The dated variants carry a **date, not a label**: formatting stays on the front so "4 min ago"
+keeps ageing on screen without a round trip. That is the line — the back decides _what_ to
+show, the front decides _how_.
+
+`expiringSoon` comes with it, computed against a single threshold in `domain::display`. It
+previously lived only on the front (`isExpiringSoon`, 3 days) while the back separately
+computed `has_expiring_notes` — two definitions of "soon" behind a hint that reads "to triage
+soon". The section flag now derives from the same per-note value.
 
 ### Editing a note
 
@@ -189,9 +239,13 @@ Keep this seam intact: no component calls `invoke()`, and `IpcService` is its on
 
 ## IPC boundary (Angular ↔ Rust)
 
-All calls go through `IpcService` (`core/ipc/`), which types command names as a literal
-union — a typo would otherwise only surface at runtime as "command not found" — and wraps
-every failure in `IpcError`.
+All calls go through `IpcService` (`core/ipc/`) and every failure comes back as an `IpcError`.
+
+The command **and its arguments** are typed by `core/ipc/ipc-contract.ts`, a table mapping
+each command name to its argument shape and return type. This matters more than it looks:
+Tauri matches arguments **by name**, so a misspelled key used to compile fine and fail at
+runtime as a serde rejection — an `IpcError` with no code, the most opaque failure the app
+can produce. It is now a build error.
 
 ### Error contract
 
@@ -205,14 +259,27 @@ and a technical **detail**:
 
 This exists because business rules live in Rust. A message written there would be French in
 an English UI, and branching on a cause would mean parsing a sentence that breaks at the
-first rewording. Instead the front maps the code to a translation key —
-`duplicateSpaceName` → `errors.spaceNameTaken` with `{{name}}` — and shows `detail` as
-secondary text. `IpcErrorCode` mirrors the Rust `ErrorCode`; adding a variant on one side
-means adding it on the other.
+first rewording.
+
+The mapping lives in **one** place, `core/errors/ipc-notice.ts`: `ipcNotice(error, fallback)`
+turns a failure into the message that helps most. A named cause wins over the attempted
+action — "this note no longer exists" beats "could not save the note", which would leave the
+user retrying something that can never succeed. `fallback` is used when the cause adds
+nothing actionable (a generic SQLite failure) or when there is no code at all.
+
+Its table is typed `Record<IpcErrorCode, string | null>`, so adding a variant to
+`IpcErrorCode` fails the build until its key is decided. That is what makes the Rust ↔ front
+mirror compiler-checked rather than review-checked.
 
 `IpcError.code` is `null` when the rejection is not one of ours: Tauri itself rejects with a
 plain string for an unknown command or an argument that fails to deserialise, and that case
-must stay readable.
+must stay readable. It is also `null` for a code this build does not recognise —
+`isIpcErrorPayload` validates the string against the known list rather than trusting it, so
+the declared type cannot lie at runtime.
+
+`ErrorCode` has no variant for a too-recent schema: that failure is only produced by the
+migration during Tauri's `setup()`, where it aborts startup. No command can return it, so
+giving it a code would advertise a case the front can never handle.
 
 ### Serialisation contract
 
@@ -236,28 +303,47 @@ serialise to `null` and overwrite the stored value instead of leaving it untouch
 
 ### Rules
 
-- Argument names must match exactly between the TS call site (`{ nom: … }`) and the Rust
-  signature (`fn saluer(nom: String)`) — Tauri matches by name, not position.
+- Argument names must match between the TS call site and the Rust signature — Tauri matches
+  by name, not position. Declare each command in `ipc-contract.ts` and the compiler enforces
+  it. ⚠️ Tauri v2 applies `rename_all = "camelCase"` to arguments, so a Rust parameter
+  `note_id` is `noteId` on the wire. No parameter is multi-word today, but the first one will
+  hit this.
 - **Every** command must be registered in `tauri::generate_handler![...]` in
   `src-tauri/src/lib.rs`, or the call fails at runtime even though the Rust compiles fine.
+- Commands are **adapters only**: validate the input, lock the shared connection, delegate,
+  translate the error. A command that grows is a sign a rule was written in the wrong place.
 
-The commands the front-end calls — `query_notes`, `create_note`, `update_note`, `delete_note`,
-`list_spaces`, `create_space` — live in `src-tauri/src/commands/notes.rs` and `spaces.rs`.
-They are **adapters only**: lock the shared connection, delegate to `storage::`, convert the
-error to an `AppError`. The guarantees the front-end relies on (persisted value returned,
-`Err` on an unknown id, "absent field means unchanged" for patches) are implemented and tested
-in `src-tauri/src/storage/`.
+The six commands are `query_notes`, `create_note`, `update_note`, `delete_note`,
+`list_spaces` and `create_space`. The guarantees the front-end relies on (persisted value
+returned, `Err` on an unknown id, "absent field means unchanged" for patches) are implemented
+in `storage/` and `domain/`, and tested there.
 
 `query_notes` takes a `NotesQuery` (space, search, quick filter, tags, `now`,
 `tzOffsetMinutes`) and returns a `NotesView` (sections, `availableTags`, `isFiltering`,
 `matched`). The pair `isFiltering` + `matched` is what lets the UI distinguish "no results"
-from "this space is empty" without recomputing anything.
+from "this space is empty" without recomputing anything. Its two steps are visible in the
+command body: `storage::notes::fetch` runs the indexed SQL, `domain::view::build` applies the
+rules to what came back.
 
-The serialisation contract is pinned by tests in `commands/notes.rs` rather than left to
-review: they assert the emitted JSON keys are camelCase, that a lifecycle serialises to
-`{"kind":"expires","at":…}`, that a section key serialises to `"older"` and that an error code
-serialises to `"noteNotFound"`. A serde attribute deleted by accident fails `cargo test`
-instead of silently breaking the UI.
+The serialisation contract is pinned by tests in `domain/note.rs`, `domain/query.rs`,
+`domain/display.rs` and `domain/space.rs` rather than left to review: they assert the emitted
+JSON keys are camelCase, that a lifecycle serialises to `{"kind":"expires","at":…}`, that a
+section key serialises to `"older"`, that a decorated note serialises **flat**, and that an
+error code serialises to `"noteNotFound"`. A serde attribute deleted by accident fails
+`cargo test` instead of silently breaking the UI.
+
+### Input validation
+
+The back validates what the front already constrains, because a rule held only by a form is
+not held at all. `domain/validation.rs` defines a `ValidationError` carrying the offending
+`field`; commands call `draft.validate()` / `draft.validated_name()` before touching the
+connection, and `AppError` turns the refusal into `invalidInput` with `{{field}}`.
+
+What is checked: `language` against the known list (an arbitrary value would be unreadable by
+any front build), a space name trimmed and non-empty (`COLLATE NOCASE` folds case but not
+whitespace, so `"Perso "` would otherwise sit beside `"Perso"`, identical on screen), and
+`NotesQuery.now` as a parseable instant — falling back to the server clock would silently
+re-cut every section on a different day.
 
 ## Persistence (Rust)
 
@@ -267,7 +353,8 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
 
 - **Layering.** `storage::notes` and `storage::spaces` are plain functions taking a
   `&Connection`; the `#[tauri::command]`s sit on top. That is what makes persistence testable
-  against `Connection::open_in_memory()` without launching Tauri.
+  against `Connection::open_in_memory()` without launching Tauri. This layer holds **no
+  business rule** — it reads and writes the model defined in `domain/`, which it depends on.
 - **Concurrency.** A rusqlite `Connection` is not `Sync`. A single connection is shared as
   `tauri::State<Db>` (`Db = Mutex<Connection>`), registered with `.manage()` in `lib.rs` —
   never a global. Overlapping commands serialise on that mutex.
@@ -281,19 +368,26 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
   filtering by tag, or querying what expires before a date, is a `WHERE` clause instead of a
   full re-read — which is why `query_notes` needed no migration. `PRAGMA foreign_keys` is set
   per connection, which is what makes the `ON DELETE CASCADE` on notes and tags actually fire.
-- **Ordering is the back-end's call.** `storage::notes::query` orders by `updated_at DESC, id`;
+- **Ordering is the back-end's call.** `storage::notes::fetch` orders by `updated_at DESC, id`;
   the front-end preserves the order it receives, so this one query decides what the user sees
-  first.
+  first. Note the deliberate asymmetry: the order is by `updated_at` while sections group by
+  `created_at`. The section answers "when was this note born", the order within it answers
+  "which did I touch last", so an old note reopened today tops the "older" section.
 - **Querying splits the work by what each tool does well.** SQL handles what it indexes —
   space, pin state, lifecycle, and tag membership through `EXISTS` on `note_tags`. Full-text
-  matching is done **in Rust**, because SQLite's `LOWER()` only folds ASCII without ICU, so
-  `Étape` would not match `étape`. Grouping is delegated to `storage::sections`, which touches
-  no connection at all and is therefore testable without a database.
-- **Tag normalisation lives in `replace_tags`, and only there.** Trimming, stripping leading
-  `#`, dropping blanks and collapsing case-insensitive duplicates (first spelling wins) all
-  happen on write, so the front sends what the user typed. The returned tags are sorted to
-  match what a read gives back — otherwise a note's tags would reorder themselves on the next
-  reload.
+  matching is done **in Rust** (`domain::search`), because SQLite's `LOWER()` only folds ASCII
+  without ICU, so `Étape` would not match `étape`. Grouping is `domain::sections`, which
+  touches no connection and is therefore testable without a database.
+- **Tag normalisation lives in `domain::tags::normalize`, and only there.** Trimming,
+  stripping leading `#`, dropping blanks and collapsing case-insensitive duplicates (first
+  spelling wins) all happen on write, so the front sends what the user typed. The returned
+  tags are sorted to match what a read gives back — otherwise a note's tags would reorder
+  themselves on the next reload.
+- **Tag case folds at the storage level too.** `note_tags.tag` is `COLLATE NOCASE`
+  (migration 2). Without it `normalize` only deduplicated _within_ one note: `Urgent` and
+  `urgent` carried by two different notes produced two facets in the rail, of which
+  `tag IN (…)` — running in BINARY — matched only one, while the text search confused them.
+  Three behaviours for one concept.
 - **Timestamps are injected, not read.** `storage::notes` takes `now` as a parameter and the
   command passes `storage::now_iso()` — the same reason `ClockService` exists on the front.
   Millisecond precision is deliberate: two notes saved within one second would otherwise be
@@ -453,17 +547,24 @@ Component specs follow one consistent pattern:
 
 ### Rust
 
-`cargo test` from `src-tauri/` runs the persistence and serialisation tests. There is still no
-linter or formatter configured (no clippy or rustfmt hook).
+`cargo test` from `src-tauri/` runs everything. `cargo clippy -- -D warnings` and
+`cargo fmt --check` gate the code; `Cargo.toml` sets `unsafe_code = "forbid"` and
+`deny(clippy::all)`.
 
-Persistence tests run against `storage::open_in_memory()`, which applies the real migrations —
-so they exercise the actual schema, constraints and cascades, not a simplified stand-in. They
-pass timestamps explicitly instead of reading the clock, which is what makes assertions on
-`created_at` / `updated_at` deterministic. Test names and comments are in English, like the
-front-end specs.
+The tests split along the layers, which is the point of the split:
 
-Now that the display rules live here, so do their tests: `storage::sections` covers grouping,
-exhaustiveness and the local-midnight boundary as pure functions, and `storage::notes` covers
-each filter alone and combined, accent-insensitive search, the scoping of `available_tags`,
-and tag normalisation. `storage::notes::list` survives only as a `#[cfg(test)]` helper — no
-command returns a raw list.
+- **`domain::`** — pure, no database, milliseconds to run. Section placement and
+  exhaustiveness, local-midnight boundaries, absurd timezone offsets, tag normalisation,
+  Unicode search folding, footer choice, expiry thresholds, the refusal of an unreadable
+  `now`, and the JSON wire shape.
+- **`storage::`** — against `open_in_memory()`, which applies the **real** migrations, so the
+  tests exercise the actual schema, constraints and cascades rather than a stand-in. They pass
+  timestamps explicitly instead of reading the clock, which makes assertions on `created_at` /
+  `updated_at` deterministic. A `query` helper in the test module recomposes
+  `fetch` + `domain::view::build` so the whole read path stays covered end to end.
+- **`commands::`** — the adapter layer: that a poisoned mutex reports `storageUnavailable`
+  instead of panicking a second time, and that each error variant maps to the right code and
+  params.
+
+Test names and comments are in English, like the front-end specs. `storage::notes::list`
+survives only as a `#[cfg(test)]` helper — no command returns a raw list.

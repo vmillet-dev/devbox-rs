@@ -2,40 +2,34 @@ import { Injectable, inject } from '@angular/core';
 import { IpcService } from '../ipc/ipc.service';
 import { Note, NoteDraft, NotePatch } from '../models/note.model';
 import { NotesQuery, NotesView } from '../models/notes-query.model';
-import { NotesViewDto, toNotesQueryDto, toNotesView } from './note-view.dto';
-import { NoteDto, toNote, toNoteDraftDto, toNotePatchDto } from './note.dto';
+import { toNotesQueryDto, toNotesView } from './note-view.dto';
+import { toNote, toNoteDraftDto, toNotePatchDto } from './note.dto';
 import { NotesRepository } from './notes-repository.token';
 
 /**
  * Dépôt de notes adossé aux commandes Rust — c'est la source de données active
  * de l'application (voir `data.providers.ts`).
  *
- * Les noms d'arguments (`query`, `draft`, `id`, `patch`) doivent correspondre
- * **exactement** aux paramètres des fonctions Rust : Tauri apparie par nom, pas
- * par position.
+ * Les noms d'arguments et les types de retour ne sont plus déclarés ici : ils
+ * viennent de `IpcContract`, qui les tient alignés sur les signatures Rust.
  */
 @Injectable()
 export class TauriNotesRepository implements NotesRepository {
   private readonly ipc = inject(IpcService);
 
   async query(query: NotesQuery): Promise<NotesView> {
-    const dto = await this.ipc.invoke<NotesViewDto>('query_notes', {
-      query: toNotesQueryDto(query),
-    });
-    return toNotesView(dto);
+    return toNotesView(await this.ipc.invoke('query_notes', { query: toNotesQueryDto(query) }));
   }
 
   async create(draft: NoteDraft): Promise<Note> {
-    const dto = await this.ipc.invoke<NoteDto>('create_note', { draft: toNoteDraftDto(draft) });
-    return toNote(dto);
+    return toNote(await this.ipc.invoke('create_note', { draft: toNoteDraftDto(draft) }));
   }
 
   async update(id: string, patch: NotePatch): Promise<Note> {
-    const dto = await this.ipc.invoke<NoteDto>('update_note', { id, patch: toNotePatchDto(patch) });
-    return toNote(dto);
+    return toNote(await this.ipc.invoke('update_note', { id, patch: toNotePatchDto(patch) }));
   }
 
   async delete(id: string): Promise<void> {
-    await this.ipc.invoke<void>('delete_note', { id });
+    await this.ipc.invoke('delete_note', { id });
   }
 }

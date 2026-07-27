@@ -22,7 +22,3 @@ export function expiryRef(at: Date, now: Date): TranslationRef {
   if (days <= 0) return { key: 'time.expired' };
   return { key: 'time.expiresIn', params: { count: days } };
 }
-
-export function isExpiringSoon(at: Date, now: Date, thresholdDays = 3): boolean {
-  return (at.getTime() - now.getTime()) / MS_PER_DAY <= thresholdDays;
-}

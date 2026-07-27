@@ -64,13 +64,17 @@
     "unexpected": "An unexpected error occurred.",
     "ipcFailed": "Communication with the native engine failed ({{command}}).",
     "notesLoadFailed": "Could not load notes.",
-    "noteSaveFailed": "Could not save the note. The change was reverted.",
+    "noteSaveFailed": "Could not save the note. Your text is still on screen.",
     "noteCreateFailed": "Could not create the note.",
-    "noteDeleteFailed": "Could not delete the note. It has been restored.",
+    "noteDeleteFailed": "Could not delete the note. It is still there.",
     "spacesLoadFailed": "Could not load spaces.",
     "spaceCreateFailed": "Could not create the space.",
     "spaceNameTaken": "A space named “{{name}}” already exists.",
-    "spaceRequired": "Create a space first to store your notes in."
+    "spaceRequired": "Create a space first to store your notes in.",
+    "noteGone": "This note no longer exists.",
+    "spaceGone": "This space no longer exists.",
+    "invalidInput": "The engine rejected this value: {{field}}.",
+    "storageUnavailable": "Storage is unavailable. Restart DevBox."
   },
   "locale": {
     "groupLabel": "Interface language",
