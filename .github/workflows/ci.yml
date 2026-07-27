@@ -1,0 +1,309 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+# On annule les runs empilés sur une branche, jamais un run de tag qui publie une release.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  lint-front:
+    name: Lint front
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # ESLint (règles d'accessibilité des templates incluses) + vérification Prettier,
+      # qui couvre aussi les fichiers de ce workflow.
+      - run: npm run lint
+
+  lint-rust:
+    name: Lint Rust
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: rust-ubuntu
+
+      # `generate_context!` lit frontendDist à la compilation. Faire dépendre ce job du
+      # build front le sérialiserait pour rien : il valide du Rust, pas le bundle.
+      - name: Placeholder frontendDist
+        run: |
+          mkdir -p dist/devbox/browser
+          printf '<!doctype html><title>ci</title>' > dist/devbox/browser/index.html
+
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+
+      # Les deux gardes de direction des dépendances documentées dans CLAUDE.md :
+      # domain/ ne connaît ni rusqlite ni Tauri, storage/ ne remonte pas vers commands/.
+      - name: Garde des dépendances entre couches
+        run: |
+          ! grep -rn "rusqlite\|tauri::" src-tauri/src/domain/
+          ! grep -rn "use crate::commands" src-tauri/src/storage/
+
+  build-front:
+    name: Build front
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/cache@v4
+        with:
+          path: .angular/cache
+          key: angular-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            angular-${{ hashFiles('package-lock.json') }}-
+            angular-
+
+      - run: npm ci
+
+      - name: Build
+        run: |
+          start=$(date +%s)
+          npm run build
+          echo "\`build-front\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+
+      # Pas consommé par `test-front` : la cible `test` d'angular.json refait sa propre build
+      # dev (buildTarget "::development"). Conservé court, comme preuve et pour le debug.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: front-dist
+          path: dist/devbox/browser
+          retention-days: 1
+
+  build-rust:
+    name: Build Rust
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Seul job autorisé à écrire le cache cargo, pour que `test-rust` le lise sans course.
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: rust-ubuntu
+          save-if: 'true'
+
+      - name: Placeholder frontendDist
+        run: |
+          mkdir -p dist/devbox/browser
+          printf '<!doctype html><title>ci</title>' > dist/devbox/browser/index.html
+
+      - name: Build
+        run: |
+          start=$(date +%s)
+          cargo build --manifest-path src-tauri/Cargo.toml --locked
+          echo "\`build-rust\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+
+  test-front:
+    name: Test front
+    needs: build-front
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Lecture seule : le cache a été écrit par `build-front`, dont le post-step est terminé.
+      - uses: actions/cache/restore@v4
+        with:
+          path: .angular/cache
+          key: angular-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            angular-${{ hashFiles('package-lock.json') }}-
+            angular-
+
+      - run: npm ci
+
+      # Les seuils de couverture à 80 % font la garde.
+      - name: Test
+        run: |
+          start=$(date +%s)
+          npm run test:coverage
+          echo "\`test-front\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: front-coverage
+          path: coverage
+          retention-days: 7
+
+  test-rust:
+    name: Test Rust
+    needs: build-rust
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Restaure le target/ de `build-rust` — dont la compilation de SQLite (rusqlite
+      # `bundled` compile les sources C), qui est l'essentiel du temps de ce job.
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: rust-ubuntu
+
+      - name: Placeholder frontendDist
+        run: |
+          mkdir -p dist/devbox/browser
+          printf '<!doctype html><title>ci</title>' > dist/devbox/browser/index.html
+
+      - name: Test
+        run: |
+          start=$(date +%s)
+          cargo test --manifest-path src-tauri/Cargo.toml --locked
+          echo "\`test-rust\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+
+  # Rien ne synchronise les trois fichiers de version. Job court et sans dépendance :
+  # sur un tag qui a dérivé, la CI casse en quelques secondes plutôt qu'après la matrice.
+  check-version:
+    name: Cohérence des versions
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Le tag doit correspondre à package.json, tauri.conf.json et Cargo.toml
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          conf=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          echo "tag=$tag package.json=$pkg tauri.conf.json=$conf Cargo.toml=$cargo"
+          for found in "$pkg" "$conf" "$cargo"; do
+            if [ "$found" != "$tag" ]; then
+              echo "::error::version $found ne correspond pas au tag $tag"
+              exit 1
+            fi
+          done
+
+  release-build:
+    name: Bundle ${{ matrix.target }}
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [lint-front, lint-rust, test-front, test-rust, check-version]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ubuntu-22.04 et non ubuntu-latest : 24.04 lie une glibc plus récente et
+          # l'AppImage produit refuse alors de démarrer sur les distributions plus anciennes.
+          - os: ubuntu-22.04
+            target: linux
+          - os: windows-latest
+            target: windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: release-${{ matrix.target }}
+          save-if: 'true'
+
+      - run: npm ci
+
+      # Sans `tagName`, l'action se contente de builder : elle ne crée aucune release,
+      # donc les deux jobs de la matrice ne se disputent pas la même.
+      # `bundle.targets: "all"` produit NSIS + MSI sur Windows, deb + rpm + AppImage sur Linux.
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --verbose
+
+      - name: Rassembler installateurs et exécutable standalone
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          mkdir -p release
+          find src-tauri/target/release/bundle -type f \
+            \( -name '*.exe' -o -name '*.msi' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) \
+            -exec cp {} release/ \;
+          # Le bundler ne remonte pas le binaire nu ; on le renomme pour que les deux OS
+          # ne se recouvrent pas dans la release.
+          if [ '${{ matrix.target }}' = 'windows' ]; then
+            cp src-tauri/target/release/devbox.exe "release/devbox-${tag}-windows.exe"
+          else
+            cp src-tauri/target/release/devbox "release/devbox-${tag}-linux"
+          fi
+          ls -l release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: release
+          retention-days: 7
+
+  publish:
+    name: Publier la release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release-build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: release
+
+      - name: Checksums
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      # Draft : la release est relue puis publiée à la main, ce qui laisse une porte de
+      # sortie si un artefact manque. Un seul job publie, donc pas de release dupliquée.
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: release/*
