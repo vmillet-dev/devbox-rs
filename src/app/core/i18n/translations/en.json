@@ -78,11 +78,23 @@
     "noteGone": "This note no longer exists.",
     "spaceGone": "This space no longer exists.",
     "invalidInput": "The engine rejected this value: {{field}}.",
-    "storageUnavailable": "Storage is unavailable. Restart DevBox."
+    "storageUnavailable": "Storage is unavailable. Restart DevBox.",
+    "updateFailed": "The update failed. DevBox remains usable on its current version."
   },
   "locale": {
     "groupLabel": "Interface language",
     "fr": "French",
     "en": "English"
+  },
+  "update": {
+    "title": "Update available",
+    "summary": "DevBox {{version}} is available. You are currently running version {{current}}.",
+    "notesLabel": "Release notes",
+    "install": "Install now",
+    "later": "Later",
+    "downloading": "Downloading…",
+    "downloadingPercent": "Downloading… {{percent}}%",
+    "restarting": "Restarting DevBox…",
+    "progressLabel": "Download progress"
   }
 }

@@ -78,11 +78,23 @@
     "noteGone": "Cette note n'existe plus.",
     "spaceGone": "Cet espace n'existe plus.",
     "invalidInput": "Valeur refusée par le moteur : {{field}}.",
-    "storageUnavailable": "Le stockage est indisponible. Redémarrez DevBox."
+    "storageUnavailable": "Le stockage est indisponible. Redémarrez DevBox.",
+    "updateFailed": "La mise à jour a échoué. DevBox reste utilisable dans sa version actuelle."
   },
   "locale": {
     "groupLabel": "Langue de l'interface",
     "fr": "Français",
     "en": "Anglais"
+  },
+  "update": {
+    "title": "Mise à jour disponible",
+    "summary": "DevBox {{version}} est disponible. Vous utilisez actuellement la version {{current}}.",
+    "notesLabel": "Notes de version",
+    "install": "Installer maintenant",
+    "later": "Plus tard",
+    "downloading": "Téléchargement…",
+    "downloadingPercent": "Téléchargement… {{percent}} %",
+    "restarting": "Redémarrage de DevBox…",
+    "progressLabel": "Avancement du téléchargement"
   }
 }

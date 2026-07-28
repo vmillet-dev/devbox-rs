@@ -18,7 +18,15 @@ use commands::spaces::{create_space, list_spaces};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            // L'updater est absent des cibles mobiles (voir Cargo.toml) : le
+            // `cfg` doit donc aussi couvrir son enregistrement, sinon la
+            // compilation Android/iOS bute sur un crate inconnu.
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+
             // La base vit dans le répertoire de données de l'application, pas à
             // côté de l'exécutable : c'est le seul emplacement inscriptible
             // garanti une fois l'application installée.

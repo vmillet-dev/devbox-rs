@@ -14,6 +14,7 @@ import { provideDataAccess } from '@core/data/data.providers';
 import { AppErrorHandler } from '@core/errors/app-error-handler';
 import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from '@core/i18n/locale.service';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
+import { provideUpdateCheck } from '@core/updates/update.providers';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -38,6 +39,9 @@ export const appConfig: ApplicationConfig = {
 
     // Liaison des dépôts vers le backend Rust : voir core/data/data.providers.ts.
     ...provideDataAccess(),
+
+    // Recherche de mise à jour au lancement, sans bloquer le démarrage.
+    provideUpdateCheck(),
 
     { provide: ErrorHandler, useClass: AppErrorHandler },
   ],

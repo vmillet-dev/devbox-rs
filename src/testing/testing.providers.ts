@@ -3,8 +3,10 @@ import { NOTES_REPOSITORY } from '@core/data/notes-repository.token';
 import { SPACES_REPOSITORY } from '@core/data/spaces-repository.token';
 import { Note } from '@core/models/note.model';
 import { Space } from '@core/models/space.model';
+import { UpdaterService } from '@core/updates/updater.service';
 import { FakeNotesRepository } from './fake-notes-repository';
 import { FakeSpacesRepository } from './fake-spaces-repository';
+import { FakeUpdater } from './fake-updater';
 import { provideTranslocoTesting } from './provide-transloco-testing';
 
 interface DataDoubles {
@@ -13,6 +15,7 @@ interface DataDoubles {
   /** Pass an existing fake to keep a handle on it (e.g. to set `failNext`). */
   readonly notesRepository?: FakeNotesRepository;
   readonly spacesRepository?: FakeSpacesRepository;
+  readonly updater?: FakeUpdater;
 }
 
 /**
@@ -30,6 +33,9 @@ export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
       provide: SPACES_REPOSITORY,
       useValue: doubles.spacesRepository ?? new FakeSpacesRepository(doubles.spaces ?? []),
     },
+    // The shell hosts the update prompt, so every spec reaching it transitively
+    // pulls `UpdaterService` — and with it the Tauri bridge, absent under jsdom.
+    { provide: UpdaterService, useValue: doubles.updater ?? new FakeUpdater() },
     provideTranslocoTesting(),
   ];
 }

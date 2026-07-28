@@ -31,6 +31,12 @@ testem.log
 /typings
 .claude/
 
+# Signature — clés privées de l'updater et certificats de signature de code.
+# Filet de sécurité : ces fichiers vivent normalement hors du dépôt.
+*.key
+*.pfx
+.tauri/
+
 # System files
 .DS_Store
 Thumbs.db

@@ -558,6 +558,40 @@ Fonts are self-hosted through the `@fontsource` packages listed in `angular.json
 array. They used to come from Google Fonts, which on a desktop app meant degraded typography
 offline and a CSP that could not be locked down.
 
+## Application updates
+
+Built on `tauri-plugin-updater`. Each release bundle is signed at build time with a minisign
+key; the matching public key is compiled into the binary, so a compromised release host
+cannot push a payload the app will accept — only the private key can produce an installable
+update.
+
+- **The user decides.** `check()` only produces an offer; `UpdateStore.accept()` is the only
+  path that downloads. A silent update would restart the app mid-keystroke, and the editor
+  only commits its drafts on blur.
+- **`UpdaterService`** (`core/updates/`) is the seam, for the same reason `IpcService` is one:
+  no component or store imports `@tauri-apps/plugin-updater`, which needs a Tauri bridge that
+  jsdom does not have. These are plugin commands, not ours, so they cannot go through
+  `IpcContract`. The service also holds the plugin's `Update` object — a **native resource**
+  with a Rust-side id that must be closed if the offer is declined, hence
+  `UpdaterService.discard()`.
+- **A failed check is silent; a failed install is not.** Offline, behind a proxy, or on a dev
+  build whose public key is still the placeholder, `check()` fails on every launch — a banner
+  there would be a daily reproach about something the user cannot act on. An install failure
+  follows an explicit click, so it reaches `ErrorNotifier` and leaves the prompt open for a
+  retry.
+- **The download does not cross the CSP.** It runs in Rust through the plugin's HTTP client,
+  not in the WebView, so pointing `endpoints` at GitHub needs no widening of `connect-src`.
+- `bundle.createUpdaterArtifacts` makes the bundler emit a `.sig` next to the NSIS installer
+  and the AppImage — the only two targets the updater can install. `.deb` and `.rpm` are
+  updated by their package manager, by design.
+- The manifest (`latest.json`) is assembled by the `publish` job from those `.sig` files
+  rather than by `tauri-action`, which only writes one when it creates the release itself —
+  something the build matrix deliberately avoids. Since the release is created as a **draft**,
+  `releases/latest/download/latest.json` stays unreachable until it is published by hand.
+- Building a bundle now requires `TAURI_SIGNING_PRIVATE_KEY` (and its password) in the
+  environment. Without it `tauri build` fails, instead of shipping binaries the updater would
+  later refuse.
+
 ## Tauri configuration
 
 - `src-tauri/tauri.conf.json` wires the pipeline to Angular: `beforeDevCommand` /
@@ -565,7 +599,9 @@ offline and a CSP that could not be locked down.
   (1420, fixed in `angular.json`), and `frontendDist` must match Angular's build output path.
 - `src-tauri/capabilities/default.json` is the v2 permission manifest for the main window.
   Any new plugin or restricted API needs its permission listed there, or the call is denied
-  at runtime.
+  at runtime — that is where `updater:default` and `process:allow-restart` come from.
+- `serde_json` is a **runtime** dependency, not just a dev one: `generate_context!` embeds the
+  `plugins` section of `tauri.conf.json` as JSON, and drops the section without it.
 - **CSP is enabled.** `csp` locks production down to same-origin resources; `devCsp`
   additionally allows the dev server's websocket and inline scripts for hot reload. Both
   keep `ipc:` and `http://ipc.localhost` in `connect-src` — without them `invoke()` is

@@ -21,6 +21,10 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 # Sérialisation des structures échangées avec le front (voir domain/note.rs).
 serde = { version = "1", features = ["derive"] }
+# Exigé par `generate_context!` depuis que tauri.conf.json porte une section
+# `plugins` : la macro embarque cette configuration sous forme de JSON. Sert
+# aussi aux tests, qui verrouillent la forme traversant le pont (domain/note.rs).
+serde_json = "1.0.151"
 # Stockage : SQLite embarqué (voir storage/mod.rs). La feature `bundled` compile
 # SQLite depuis les sources et le lie en statique — aucune DLL à distribuer.
 rusqlite = { version = "0.40.1", features = ["bundled"] }
@@ -28,11 +32,13 @@ rusqlite = { version = "0.40.1", features = ["bundled"] }
 uuid = { version = "1.24.0", features = ["v4"] }
 # Horodatages ISO 8601 / RFC 3339 UTC, le format attendu par le pont Tauri.
 chrono = "0.4.45"
+# Redémarrage de l'application après l'installation d'une mise à jour.
+tauri-plugin-process = "2"
 
-[dev-dependencies]
-# Uniquement pour verrouiller par test la forme JSON traversant le pont Tauri
-# (voir les tests de domain/note.rs). Tauri sérialise lui-même en production.
-serde_json = "1.0.151"
+# L'updater n'existe pas sur mobile — les magasins d'applications s'en chargent —
+# et le déclarer inconditionnellement casserait une compilation Android/iOS.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
 
 # Le Rust n'avait ni linter ni garde-fou : `cargo clippy -- -D warnings` échouait
 # sur rien, donc rien n'empêchait une régression d'entrer.

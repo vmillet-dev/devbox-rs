@@ -251,18 +251,28 @@ jobs:
       # Sans `tagName`, l'action se contente de builder : elle ne crée aucune release,
       # donc les deux jobs de la matrice ne se disputent pas la même.
       # `bundle.targets: "all"` produit NSIS + MSI sur Windows, deb + rpm + AppImage sur Linux.
+      #
+      # `bundle.createUpdaterArtifacts` étant actif, le bundler exige la clé privée
+      # de signature : sans le secret, ce job échoue au lieu de publier des binaires
+      # que l'updater refuserait ensuite d'installer.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: --verbose
 
+      # Les `.sig` accompagnent l'installateur NSIS et l'AppImage : ce sont les
+      # seules cibles que l'updater sait installer, et `publish` s'en sert pour
+      # reconstituer le manifeste.
       - name: Rassembler installateurs et exécutable standalone
         run: |
           tag="${GITHUB_REF_NAME#v}"
           mkdir -p release
           find src-tauri/target/release/bundle -type f \
-            \( -name '*.exe' -o -name '*.msi' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) \
+            \( -name '*.exe' -o -name '*.msi' -o -name '*.deb' -o -name '*.rpm' \
+               -o -name '*.AppImage' -o -name '*.sig' \) \
             -exec cp {} release/ \;
           # Le bundler ne remonte pas le binaire nu ; on le renomme pour que les deux OS
           # ne se recouvrent pas dans la release.
@@ -294,16 +304,68 @@ jobs:
           merge-multiple: true
           path: release
 
+      # Manifeste lu par le plugin updater. Il est assemblé ici plutôt que par
+      # `tauri-action` : celle-ci ne le produit qu'en créant elle-même la release,
+      # ce que la matrice de build évite pour ne pas publier deux fois.
+      - name: Assembler latest.json
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+
+          const dir = 'release';
+          const { TAG, REPO } = process.env;
+
+          // Chaque .sig désigne le fichier qu'il signe. C'est ce qui distingue
+          // l'installateur NSIS du MSI et de l'exécutable standalone : les trois
+          // sont des .exe, un seul est installable par l'updater.
+          const platforms = {};
+          for (const sig of fs.readdirSync(dir).filter((name) => name.endsWith('.sig'))) {
+            const asset = sig.slice(0, -'.sig'.length);
+            if (!fs.existsSync(`${dir}/${asset}`)) {
+              throw new Error(`signature orpheline : ${sig}`);
+            }
+
+            const target = asset.endsWith('.AppImage')
+              ? 'linux-x86_64'
+              : asset.endsWith('.exe')
+                ? 'windows-x86_64'
+                : null;
+            if (!target) throw new Error(`cible inconnue pour ${asset}`);
+
+            platforms[target] = {
+              signature: fs.readFileSync(`${dir}/${sig}`, 'utf8').trim(),
+              url: `https://github.com/${REPO}/releases/download/${TAG}/${asset}`,
+            };
+          }
+
+          // Un manifeste amputé d'une plateforme laisserait ses utilisateurs sans
+          // mise à jour, en silence : mieux vaut casser la publication.
+          const missing = ['windows-x86_64', 'linux-x86_64'].filter((key) => !(key in platforms));
+          if (missing.length) {
+            throw new Error(`plateformes sans artefact de mise à jour : ${missing.join(', ')}`);
+          }
+
+          // Sans le « v » : l'updater compare la valeur en semver, un préfixe la
+          // rendrait illisible et aucune mise à jour ne serait jamais proposée.
+          const manifest = {
+            version: TAG.replace(/^v/, ''),
+            pub_date: new Date().toISOString(),
+            platforms,
+          };
+          fs.writeFileSync(`${dir}/latest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+          console.log(JSON.stringify(manifest, null, 2));
+          EOF
+
       - name: Checksums
         run: |
           cd release
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      # Draft : la release est relue puis publiée à la main, ce qui laisse une porte de
-      # sortie si un artefact manque. Un seul job publie, donc pas de release dupliquée.
       - uses: softprops/action-gh-release@v2
         with:
-          draft: true
           generate_release_notes: true
           files: release/*
