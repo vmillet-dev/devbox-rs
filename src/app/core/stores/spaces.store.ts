@@ -96,4 +96,57 @@ export class SpacesStore {
       return null;
     }
   }
+
+  /**
+   * Renomme un espace. Comme la création, l'écriture n'est pas optimiste : la
+   * liste n'adopte que ce que la persistance a renvoyé.
+   *
+   * L'unicité est de nouveau tranchée par le stockage, qui exclut l'espace
+   * renommé de la comparaison — corriger la casse d'un nom est légitime.
+   */
+  async renameSpace(id: string, name: string): Promise<boolean> {
+    const trimmed = name.trim();
+    const current = this.spaces().find((space) => space.id === id);
+    if (!trimmed || !current || current.name === trimmed) return false;
+
+    try {
+      const renamed = await this.repository.rename(id, { name: trimmed });
+      this.spacesResource.set(this.spaces().map((space) => (space.id === id ? renamed : space)));
+      return true;
+    } catch (error) {
+      console.error(error);
+      this.notifier.notify(ipcNotice(error, { key: 'errors.spaceRenameFailed' }, { name: trimmed }));
+      return false;
+    }
+  }
+
+  /**
+   * Supprime un espace en transférant ses notes vers `targetSpaceId`.
+   *
+   * L'espace refuge devient actif : les notes viennent d'y atterrir, et retomber
+   * sur « tous les espaces » ferait perdre de vue où elles sont passées.
+   *
+   * Ne recharge **pas** les notes — ce store ne connaît pas `NotesStore`, et
+   * l'inverse serait un cycle d'injection. C'est l'appelant qui enchaîne, d'où
+   * le booléen renvoyé.
+   */
+  async deleteSpace(id: string, targetSpaceId: string): Promise<boolean> {
+    // Un espace ne peut pas être son propre refuge : la cascade du schéma
+    // emporterait les notes juste après le transfert. Le back refuse aussi, ce
+    // garde évite simplement un aller-retour pour une erreur évitable.
+    if (id === targetSpaceId || !this.spaces().some((space) => space.id === targetSpaceId)) {
+      return false;
+    }
+
+    try {
+      await this.repository.delete(id, targetSpaceId);
+      this.spacesResource.set(this.spaces().filter((space) => space.id !== id));
+      this.selectSpace(targetSpaceId);
+      return true;
+    } catch (error) {
+      console.error(error);
+      this.notifier.notify(ipcNotice(error, { key: 'errors.spaceDeleteFailed' }));
+      return false;
+    }
+  }
 }

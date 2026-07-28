@@ -37,6 +37,10 @@ tauri-plugin-process = "2"
 # Ouverture du dépôt dans le navigateur système. Le CSP est verrouillé sur
 # `'self'` : un lien ordinaire ne mène nulle part depuis la WebView.
 tauri-plugin-opener = "2"
+# Préférences d'interface (langue, plein écran) dans un vrai fichier sur disque
+# plutôt que dans le `localStorage` de la WebView, qu'un vidage de cache efface
+# et que Rust ne sait pas relire. Voir core/preferences/preferences.service.ts.
+tauri-plugin-store = "2"
 
 # L'updater n'existe pas sur mobile — les magasins d'applications s'en chargent —
 # et le déclarer inconditionnellement casserait une compilation Android/iOS.

@@ -1,10 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Space } from '@core/models/space.model';
 import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
-import { NoteCardComponent } from './note-card.component';
+import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
+import { NoteCardComponent, NoteMove } from './note-card.component';
 
 describe('NoteCardComponent', () => {
   let fixture: ComponentFixture<NoteCardComponent>;
@@ -154,5 +156,55 @@ describe('NoteCardComponent', () => {
     fixture.debugElement.query(By.css('.card')).triggerEventHandler('click');
 
     expect(emitted).toBe('note-42');
+  });
+
+  describe('actions menu', () => {
+    function menu(): NoteCardMenuComponent {
+      return fixture.debugElement.query(By.directive(NoteCardMenuComponent))
+        .componentInstance as NoteCardMenuComponent;
+    }
+
+    it('hands the menu the note space so it can be excluded from the targets', async () => {
+      const spaces: Space[] = [
+        { id: 'work', name: 'Work' },
+        { id: 'personal', name: 'Personal' },
+      ];
+      fixture.componentRef.setInput('note', createNote({ spaceId: 'work' }));
+      fixture.componentRef.setInput('spaces', spaces);
+      await fixture.whenStable();
+
+      expect(menu().currentSpaceId()).toBe('work');
+      expect(menu().spaces()).toEqual(spaces);
+    });
+
+    it('gives the menu the placeholder title the card itself shows', async () => {
+      // Resolving it once here keeps the untitled rule in a single place.
+      fixture.componentRef.setInput('note', createNote({ title: '' }));
+      await fixture.whenStable();
+
+      expect(menu().noteTitle()).toBe('Sans titre');
+    });
+
+    it('attaches the note id to a move, which the menu does not know', async () => {
+      fixture.componentRef.setInput('note', createNote({ id: 'note-42', spaceId: 'work' }));
+      await fixture.whenStable();
+      const moves: NoteMove[] = [];
+      fixture.componentInstance.moveRequested.subscribe((move) => moves.push(move));
+
+      menu().moveRequested.emit('personal');
+
+      expect(moves).toEqual([{ noteId: 'note-42', spaceId: 'personal' }]);
+    });
+
+    it('attaches the note id to a deletion', async () => {
+      fixture.componentRef.setInput('note', createNote({ id: 'note-42' }));
+      await fixture.whenStable();
+      let deleted: string | undefined;
+      fixture.componentInstance.deleteRequested.subscribe((id) => (deleted = id));
+
+      menu().deleteRequested.emit();
+
+      expect(deleted).toBe('note-42');
+    });
   });
 });

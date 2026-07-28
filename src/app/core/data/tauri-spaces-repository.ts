@@ -20,4 +20,12 @@ export class TauriSpacesRepository implements SpacesRepository {
   async create(draft: SpaceDraft): Promise<Space> {
     return toSpace(await this.ipc.invoke('create_space', { draft: toSpaceDraftDto(draft) }));
   }
+
+  async rename(id: string, draft: SpaceDraft): Promise<Space> {
+    return toSpace(await this.ipc.invoke('rename_space', { id, draft: toSpaceDraftDto(draft) }));
+  }
+
+  async delete(id: string, targetSpaceId: string): Promise<void> {
+    await this.ipc.invoke('delete_space', { id, targetSpaceId });
+  }
 }

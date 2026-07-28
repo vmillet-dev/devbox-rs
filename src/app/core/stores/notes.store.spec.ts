@@ -2,6 +2,7 @@ import { WritableSignal, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { IpcError } from '@core/ipc/ipc.service';
 import { Note } from '@core/models/note.model';
 import { NotesView } from '@core/models/notes-query.model';
 import { Space } from '@core/models/space.model';
@@ -463,6 +464,92 @@ describe('NotesStore', () => {
       await store.removeTag('a', 'absent');
 
       expect(update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('moveNote', () => {
+    it('files the note in another space', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', spaceId: 'space-1' })]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.moveNote('a', 'space-2');
+
+      expect(update).toHaveBeenCalledWith('a', { spaceId: 'space-2' });
+    });
+
+    it('does not write when the note is already in that space', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', spaceId: 'space-1' })]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.moveNote('a', 'space-1');
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('reports a space that no longer exists', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', spaceId: 'space-1' })]);
+      const notifier = TestBed.inject(ErrorNotifier);
+      repository.failNext = new IpcError('update_note', {
+        code: 'spaceNotFound',
+        params: { id: 'space-2' },
+        detail: 'Espace introuvable : space-2',
+      });
+
+      await store.moveNote('a', 'space-2');
+
+      // Naming the cause beats "could not save": the space was deleted in
+      // another window while this menu was open.
+      expect(notifier.notice()?.ref.key).toBe('errors.spaceGone');
+    });
+  });
+
+  describe('setLifecycle', () => {
+    it('turns a permanent note into an expiring one', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a' })]);
+      const update = vi.spyOn(repository, 'update');
+      const at = new Date('2026-08-01T23:59:59.999Z');
+
+      await store.setLifecycle('a', { kind: 'expires', at });
+
+      // This write is the only thing that feeds the "À trier" filter: without
+      // it the chip and the lifecycle badge have nothing to show.
+      expect(update).toHaveBeenCalledWith('a', { lifecycle: { kind: 'expires', at } });
+    });
+
+    it('clears an expiry back to permanent', async () => {
+      const { store, repository } = await createStore([
+        createNote({ id: 'a', lifecycle: { kind: 'expires', at: new Date('2026-08-01T00:00:00Z') } }),
+      ]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.setLifecycle('a', { kind: 'permanent' });
+
+      expect(update).toHaveBeenCalledWith('a', { lifecycle: { kind: 'permanent' } });
+    });
+
+    it('does not write when the deadline is unchanged', async () => {
+      const at = new Date('2026-08-01T00:00:00Z');
+      const { store, repository } = await createStore([
+        createNote({ id: 'a', lifecycle: { kind: 'expires', at } }),
+      ]);
+      const update = vi.spyOn(repository, 'update');
+
+      // A fresh `Date` carrying the same instant: comparing by identity would
+      // write on every visit to the date field.
+      await store.setLifecycle('a', { kind: 'expires', at: new Date(at.getTime()) });
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('writes when only the deadline moves', async () => {
+      const { store, repository } = await createStore([
+        createNote({ id: 'a', lifecycle: { kind: 'expires', at: new Date('2026-08-01T00:00:00Z') } }),
+      ]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.setLifecycle('a', { kind: 'expires', at: new Date('2026-09-01T00:00:00Z') });
+
+      expect(update).toHaveBeenCalled();
     });
   });
 

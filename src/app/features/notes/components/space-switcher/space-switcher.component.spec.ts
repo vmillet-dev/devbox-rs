@@ -265,4 +265,141 @@ describe('SpaceSwitcherComponent', () => {
       expect(document.activeElement).toBe(trigger());
     });
   });
+
+  describe('editing a space', () => {
+    function editTriggers(): HTMLButtonElement[] {
+      return [...fixture.nativeElement.querySelectorAll('.space-edit-trigger')];
+    }
+
+    function renameInput(): HTMLInputElement | null {
+      return fixture.nativeElement.querySelector('.space-edit-panel .space-create-input');
+    }
+
+    function renameForm(): HTMLFormElement {
+      return fixture.nativeElement.querySelector('.space-edit-panel form');
+    }
+
+    function targetSelect(): HTMLSelectElement | null {
+      return fixture.nativeElement.querySelector('#space-move-target');
+    }
+
+    function deleteButton(): HTMLButtonElement | null {
+      return fixture.nativeElement.querySelector('.space-delete-submit');
+    }
+
+    /** Opens the dropdown if needed — after Escape it is already back on the menu. */
+    async function edit(index: number): Promise<void> {
+      if (!fixture.nativeElement.querySelector('.space-dropdown')) {
+        await open();
+      }
+      editTriggers()[index].click();
+      await fixture.whenStable();
+    }
+
+    it('offers one options button per space, none for "all spaces"', async () => {
+      await open();
+
+      // "All spaces" is a display mode, not a space: it has nothing to rename.
+      expect(editTriggers()).toHaveLength(SPACES.length);
+      expect(editTriggers()[0].getAttribute('aria-label')).toBe("Options de l'espace Work");
+    });
+
+    it('replaces the menu with the edit panel rather than nesting inside it', async () => {
+      await edit(0);
+
+      // A text field inside a role="menu" is neither valid ARIA nor navigable
+      // the way options are.
+      expect(fixture.debugElement.query(By.css('.space-menu'))).toBeNull();
+      expect(renameInput()?.value).toBe('Work');
+    });
+
+    it('emits the new name on submit and closes', async () => {
+      const renames: { id: string; name: string }[] = [];
+      fixture.componentInstance.spaceRenamed.subscribe((event) => renames.push(event));
+      await edit(0);
+
+      renameInput()!.value = 'Boulot';
+      renameForm().dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+
+      expect(renames).toEqual([{ id: 'work', name: 'Boulot' }]);
+      expect(fixture.debugElement.query(By.css('.space-dropdown'))).toBeNull();
+    });
+
+    it('emits nothing for a blank name', async () => {
+      const renames: unknown[] = [];
+      fixture.componentInstance.spaceRenamed.subscribe(() => renames.push(true));
+      await edit(0);
+
+      renameInput()!.value = '   ';
+      renameForm().dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+
+      expect(renames).toEqual([]);
+    });
+
+    it('offers every other space as a refuge for the notes', async () => {
+      await edit(0);
+
+      const targets = [...targetSelect()!.options].map((option) => option.value);
+      // A space cannot be its own refuge: the cascade would take the notes back
+      // out one statement after the move.
+      expect(targets).toEqual(['personal']);
+    });
+
+    it('requires two clicks and emits the chosen refuge', async () => {
+      const deletions: { id: string; targetSpaceId: string }[] = [];
+      fixture.componentInstance.spaceDeleted.subscribe((event) => deletions.push(event));
+      await edit(0);
+
+      deleteButton()!.click();
+      await fixture.whenStable();
+      expect(deletions).toEqual([]);
+      expect(deleteButton()!.textContent?.trim()).toBe('Confirmer ?');
+
+      deleteButton()!.click();
+      await fixture.whenStable();
+
+      expect(deletions).toEqual([{ id: 'work', targetSpaceId: 'personal' }]);
+    });
+
+    it('refuses deletion outright when there is no other space', async () => {
+      fixture.componentRef.setInput('spaces', [SPACES[0]]);
+      await fixture.whenStable();
+
+      await edit(0);
+
+      // Offering a button that could only fail is worse than explaining why.
+      expect(deleteButton()).toBeNull();
+      expect(targetSelect()).toBeNull();
+      expect(fixture.nativeElement.querySelector('.space-delete-blocked')).not.toBeNull();
+    });
+
+    it('returns to the menu on a first Escape, and closes on the second', async () => {
+      await edit(0);
+
+      await pressKey('Escape');
+      expect(fixture.debugElement.query(By.css('.space-menu'))).not.toBeNull();
+
+      await pressKey('Escape');
+      expect(fixture.debugElement.query(By.css('.space-dropdown'))).toBeNull();
+    });
+
+    it('forgets a pending confirmation when the panel is left', async () => {
+      await edit(0);
+      deleteButton()!.click();
+      await fixture.whenStable();
+
+      await pressKey('Escape');
+      await edit(0);
+
+      expect(deleteButton()!.textContent?.trim()).toBe('Supprimer');
+    });
+
+    it('moves focus to the rename field so the panel is reachable by keyboard', async () => {
+      await edit(0);
+
+      expect(document.activeElement).toBe(renameInput());
+    });
+  });
 });

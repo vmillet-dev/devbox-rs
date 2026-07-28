@@ -110,7 +110,19 @@
             />
           </form>
         </div>
-        <app-lifecycle-badge [lifecycle]="note.lifecycle" [expiringSoon]="note.expiringSoon" />
+        <!-- Le badge dit l'état, le champ le change. Vider le champ rend la note
+             permanente ; y poser une date la fait entrer dans « À trier ». -->
+        <span class="overlay-expiry">
+          <app-lifecycle-badge [lifecycle]="note.lifecycle" [expiringSoon]="note.expiringSoon" />
+          <input
+            #expiryInput
+            type="date"
+            class="overlay-expiry-input"
+            [attr.aria-label]="'editor.expiryLabel' | transloco"
+            [value]="expiryInputValue()"
+            (change)="onExpiryChange(expiryInput.value)"
+          />
+        </span>
       </div>
 
       <!-- Deux couches superposées plutôt qu'une bascule aperçu/édition : le

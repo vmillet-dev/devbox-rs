@@ -73,6 +73,67 @@ pub fn create(connection: &Connection, name: &str) -> Result<Space, StorageError
     Ok(space)
 }
 
+/// Renomme un espace et renvoie sa version persistée.
+///
+/// `name` est attendu **déjà validé** (voir `SpaceDraft::validated_name`).
+/// L'unicité exclut l'espace lui-même : sans le `id <> ?2`, corriger la casse
+/// d'un nom (« perso » → « Perso ») se ferait refuser comme un doublon de
+/// lui-même, la comparaison étant en `COLLATE NOCASE`.
+pub fn rename(connection: &Connection, id: &str, name: &str) -> Result<Space, StorageError> {
+    if !exists(connection, id)? {
+        return Err(StorageError::SpaceNotFound(id.to_string()));
+    }
+
+    let taken: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM spaces WHERE name = ?1 COLLATE NOCASE AND id <> ?2",
+        (name, id),
+        |row| row.get(0),
+    )?;
+    if taken > 0 {
+        return Err(StorageError::DuplicateSpaceName(name.to_string()));
+    }
+
+    connection.execute("UPDATE spaces SET name = ?2 WHERE id = ?1", (id, name))?;
+
+    Ok(Space {
+        id: id.to_string(),
+        name: name.to_string(),
+    })
+}
+
+/// Supprime un espace après avoir déplacé ses notes vers `target_id`.
+///
+/// Les deux opérations sont dans la **même transaction**, et dans cet ordre :
+/// `notes.space_id` porte un `ON DELETE CASCADE`, donc supprimer d'abord — ou
+/// échouer entre les deux — emporterait les notes au lieu de les déplacer.
+///
+/// `updated_at` n'est délibérément pas rafraîchi : le contenu des notes n'a pas
+/// changé, et le toucher ferait remonter tout l'espace absorbé en tête du
+/// canevas, qui trie sur cette colonne.
+///
+/// L'égalité `id == target_id` n'est pas vérifiée ici : c'est une règle du
+/// domaine (`space::validate_move_target`), appliquée avant d'ouvrir la connexion.
+pub fn delete(connection: &mut Connection, id: &str, target_id: &str) -> Result<(), StorageError> {
+    let transaction = connection.transaction()?;
+
+    if !exists(&transaction, id)? {
+        return Err(StorageError::SpaceNotFound(id.to_string()));
+    }
+    if !exists(&transaction, target_id)? {
+        return Err(StorageError::SpaceNotFound(target_id.to_string()));
+    }
+
+    transaction.execute(
+        "UPDATE notes SET space_id = ?2 WHERE space_id = ?1",
+        (id, target_id),
+    )?;
+    transaction.execute("DELETE FROM spaces WHERE id = ?1", [id])?;
+
+    transaction.commit()?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,5 +196,152 @@ mod tests {
 
         assert!(exists(&connection, &space.id).unwrap());
         assert!(!exists(&connection, "inconnu").unwrap());
+    }
+
+    #[test]
+    fn a_renamed_space_keeps_its_identifier() {
+        let connection = open_in_memory().unwrap();
+        let space = create(&connection, "Perso").unwrap();
+
+        let renamed = rename(&connection, &space.id, "Personnel").unwrap();
+
+        // The id is what the notes point at: changing it would orphan them.
+        assert_eq!(renamed.id, space.id);
+        assert_eq!(renamed.name, "Personnel");
+        assert_eq!(list(&connection).unwrap()[0].name, "Personnel");
+    }
+
+    #[test]
+    fn a_space_can_be_renamed_to_a_different_case_of_its_own_name() {
+        let connection = open_in_memory().unwrap();
+        let space = create(&connection, "perso").unwrap();
+
+        // The uniqueness check is COLLATE NOCASE: without excluding the row
+        // being renamed, it would see the space as a duplicate of itself.
+        let renamed = rename(&connection, &space.id, "Perso").unwrap();
+
+        assert_eq!(renamed.name, "Perso");
+    }
+
+    #[test]
+    fn renaming_onto_another_space_name_is_refused() {
+        let connection = open_in_memory().unwrap();
+        create(&connection, "Boulot").unwrap();
+        let space = create(&connection, "Perso").unwrap();
+
+        let error = rename(&connection, &space.id, "BOULOT").unwrap_err();
+
+        assert!(matches!(error, StorageError::DuplicateSpaceName(_)));
+        assert_eq!(list(&connection).unwrap()[1].name, "Perso");
+    }
+
+    #[test]
+    fn renaming_an_unknown_space_reports_an_error() {
+        let connection = open_in_memory().unwrap();
+
+        let error = rename(&connection, "inconnu", "Perso").unwrap_err();
+
+        assert!(matches!(error, StorageError::SpaceNotFound(_)));
+    }
+
+    #[test]
+    fn deleting_a_space_moves_its_notes_to_the_target() {
+        let mut connection = open_in_memory().unwrap();
+        let doomed = create(&connection, "Perso").unwrap();
+        let refuge = create(&connection, "Boulot").unwrap();
+        connection
+            .execute(
+                "INSERT INTO notes VALUES ('n-1', ?1, 'A', 'txt', '', '', 0, \
+                 '2026-07-25T09:00:00.000Z', '2026-07-25T09:00:00.000Z', 'permanent', NULL)",
+                [&doomed.id],
+            )
+            .unwrap();
+
+        delete(&mut connection, &doomed.id, &refuge.id).unwrap();
+
+        // The schema cascades on space deletion; the move must happen first or
+        // the note disappears with its space.
+        let space_id: String = connection
+            .query_row("SELECT space_id FROM notes WHERE id = 'n-1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(space_id, refuge.id);
+        assert_eq!(list(&connection).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn moving_notes_out_of_a_deleted_space_does_not_touch_their_timestamps() {
+        let mut connection = open_in_memory().unwrap();
+        let doomed = create(&connection, "Perso").unwrap();
+        let refuge = create(&connection, "Boulot").unwrap();
+        connection
+            .execute(
+                "INSERT INTO notes VALUES ('n-1', ?1, 'A', 'txt', '', '', 0, \
+                 '2026-07-25T09:00:00.000Z', '2026-07-25T09:00:00.000Z', 'permanent', NULL)",
+                [&doomed.id],
+            )
+            .unwrap();
+
+        delete(&mut connection, &doomed.id, &refuge.id).unwrap();
+
+        // The canvas orders on updated_at: refreshing it would float the whole
+        // absorbed space to the top as if every note had just been edited.
+        let updated_at: String = connection
+            .query_row("SELECT updated_at FROM notes WHERE id = 'n-1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(updated_at, "2026-07-25T09:00:00.000Z");
+    }
+
+    #[test]
+    fn deleting_an_empty_space_leaves_the_others_alone() {
+        let mut connection = open_in_memory().unwrap();
+        let doomed = create(&connection, "Perso").unwrap();
+        let refuge = create(&connection, "Boulot").unwrap();
+
+        delete(&mut connection, &doomed.id, &refuge.id).unwrap();
+
+        let names: Vec<String> = list(&connection)
+            .unwrap()
+            .into_iter()
+            .map(|s| s.name)
+            .collect();
+        assert_eq!(names, ["Boulot"]);
+    }
+
+    #[test]
+    fn deleting_an_unknown_space_reports_an_error() {
+        let mut connection = open_in_memory().unwrap();
+        let refuge = create(&connection, "Boulot").unwrap();
+
+        let error = delete(&mut connection, "inconnu", &refuge.id).unwrap_err();
+
+        assert!(matches!(error, StorageError::SpaceNotFound(_)));
+    }
+
+    #[test]
+    fn deleting_into_an_unknown_space_changes_nothing() {
+        let mut connection = open_in_memory().unwrap();
+        let doomed = create(&connection, "Perso").unwrap();
+        connection
+            .execute(
+                "INSERT INTO notes VALUES ('n-1', ?1, 'A', 'txt', '', '', 0, \
+                 '2026-07-25T09:00:00.000Z', '2026-07-25T09:00:00.000Z', 'permanent', NULL)",
+                [&doomed.id],
+            )
+            .unwrap();
+
+        let error = delete(&mut connection, &doomed.id, "inconnu").unwrap_err();
+
+        // Rolling back matters here: a half-applied delete would have taken the
+        // notes with it.
+        assert!(matches!(error, StorageError::SpaceNotFound(_)));
+        assert_eq!(list(&connection).unwrap().len(), 1);
+        let remaining: i64 = connection
+            .query_row("SELECT COUNT(*) FROM notes", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(remaining, 1);
     }
 }

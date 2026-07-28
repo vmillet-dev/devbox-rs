@@ -1,5 +1,12 @@
 @use 'mixins' as *;
 
+// Ancre du menu d'actions, positionné en absolu par-dessus la carte. C'est
+// aussi ce conteneur que le menu observe (`:host-context(.card-shell:hover)`)
+// pour n'apparaître qu'au survol.
+.card-shell {
+  position: relative;
+}
+
 .card {
   @include unstyled-control;
   @include surface(var(--bg-1), 10px);
@@ -29,14 +36,6 @@
   box-shadow: 0 0 0 1px var(--amber-dim);
 }
 
-.card.pinned::after {
-  content: '📌';
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  font-size: 11px;
-}
-
 // Les enfants sont des <span> (contrainte de contenu du <button> parent) :
 // il faut donc leur rendre explicitement le comportement de bloc.
 .card-top {
@@ -44,6 +43,15 @@
   align-items: center;
   gap: 7px;
   margin-bottom: 8px;
+  // Réserve la place du bouton ⋯, qui flotte au-dessus du coin haut-droit.
+  padding-right: 22px;
+}
+
+// La pastille d'épinglage vivait en `::after` dans ce même coin ; elle est
+// désormais un élément de la première ligne, le menu occupant le coin.
+.card-pin {
+  margin-left: auto;
+  font-size: 11px;
 }
 
 .card-title {

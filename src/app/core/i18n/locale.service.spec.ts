@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { PreferencesService } from '@core/preferences/preferences.service';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { LocaleService } from './locale.service';
 
@@ -11,9 +12,17 @@ describe('LocaleService', () => {
     return service;
   }
 
+  /**
+   * Persistence is asserted through `PreferencesService`, not through whatever
+   * it happens to sit on: the backing store moved from `localStorage` to
+   * `tauri-plugin-store` without this service changing a line.
+   */
+  function preferences(): PreferencesService {
+    return TestBed.inject(PreferencesService);
+  }
+
   beforeEach(() => {
     TestBed.resetTestingModule();
-    localStorage.clear();
     document.documentElement.lang = '';
     TestBed.configureTestingModule({ providers: [provideTranslocoTesting()] });
   });
@@ -23,13 +32,13 @@ describe('LocaleService', () => {
   });
 
   it('restores a previously persisted locale', () => {
-    localStorage.setItem('devbox.locale', 'en');
+    preferences().write('devbox.locale', 'en');
 
     expect(createService().activeLocale()).toBe('en');
   });
 
   it('ignores an invalid persisted value', () => {
-    localStorage.setItem('devbox.locale', 'de');
+    preferences().write('devbox.locale', 'de');
 
     expect(createService().activeLocale()).toBe('fr');
   });
@@ -40,7 +49,7 @@ describe('LocaleService', () => {
     service.setLocale('en');
 
     expect(service.activeLocale()).toBe('en');
-    expect(localStorage.getItem('devbox.locale')).toBe('en');
+    expect(preferences().read('devbox.locale')).toBe('en');
   });
 
   it('keeps the document language in sync, which drives screen-reader pronunciation', () => {

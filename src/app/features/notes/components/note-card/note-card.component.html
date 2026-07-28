@@ -1,45 +1,65 @@
-<!-- Contenu en <span> et non en <div> : le modèle de contenu d'un <button>
-     n'admet que du contenu de phrasé. Un <div> imbriqué produit un HTML
-     invalide, au comportement d'accessibilité indéfini selon les navigateurs. -->
-<button
-  type="button"
-  class="card"
-  [class.pinned]="note().pinned"
-  [class.selected]="selected()"
-  (click)="onOpen()"
->
-  @if (note().pinned) {
-    <!-- L'épinglage n'est signalé que par une pastille décorative : sans ce
-         doublon textuel, l'information n'existe pas pour un lecteur d'écran. -->
-    <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
-  }
-  <span class="card-top">
-    <app-language-badge [language]="note().language" />
-  </span>
-  <span class="card-title">
-    @if (note().title) {
-      {{ note().title }}
-    } @else {
-      {{ 'notes.untitled' | transloco }}
+<!-- Le libellé de remplacement est déjà celui qu'affiche la carte : le résoudre
+     ici évite que le menu ait à connaître une seconde fois la règle. -->
+@let menuTitle = note().title || ('notes.untitled' | transloco);
+
+<!-- Enveloppe et non `<button>` racine : le menu d'actions est lui-même un
+     bouton, et le modèle de contenu d'un <button> interdit d'en imbriquer un.
+     C'est aussi elle qui ancre le menu (`position: relative`). -->
+<div class="card-shell">
+  <!-- Contenu en <span> et non en <div> : le modèle de contenu d'un <button>
+       n'admet que du contenu de phrasé. Un <div> imbriqué produit un HTML
+       invalide, au comportement d'accessibilité indéfini selon les navigateurs. -->
+  <button
+    type="button"
+    class="card"
+    [class.pinned]="note().pinned"
+    [class.selected]="selected()"
+    (click)="onOpen()"
+  >
+    @if (note().pinned) {
+      <!-- L'épinglage n'est signalé que par une pastille décorative : sans ce
+           doublon textuel, l'information n'existe pas pour un lecteur d'écran. -->
+      <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
     }
-  </span>
-  <app-code-viewer
-    class="card-snippet"
-    [content]="snippet()"
-    [language]="note().language"
-    [showLineNumbers]="false"
-    [compact]="true"
-  />
-  <span class="card-footer">
-    <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). D'où le prettier-ignore, qui réintroduirait ces sauts de ligne. -->
-    <!-- prettier-ignore -->
-    <span [class.stale]="note().expiringSoon"
-      >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
-    >
-    <span class="card-tags">
-      @for (tag of displayedTags(); track tag) {
-        <span>#{{ tag }}</span>
+    <span class="card-top">
+      <app-language-badge [language]="note().language" />
+      @if (note().pinned) {
+        <span class="card-pin" aria-hidden="true">📌</span>
       }
     </span>
-  </span>
-</button>
+    <span class="card-title">
+      @if (note().title) {
+        {{ note().title }}
+      } @else {
+        {{ 'notes.untitled' | transloco }}
+      }
+    </span>
+    <app-code-viewer
+      class="card-snippet"
+      [content]="snippet()"
+      [language]="note().language"
+      [showLineNumbers]="false"
+      [compact]="true"
+    />
+    <span class="card-footer">
+      <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). D'où le prettier-ignore, qui réintroduirait ces sauts de ligne. -->
+      <!-- prettier-ignore -->
+      <span [class.stale]="note().expiringSoon"
+        >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
+      >
+      <span class="card-tags">
+        @for (tag of displayedTags(); track tag) {
+          <span>#{{ tag }}</span>
+        }
+      </span>
+    </span>
+  </button>
+
+  <app-note-card-menu
+    [noteTitle]="menuTitle"
+    [spaces]="spaces()"
+    [currentSpaceId]="note().spaceId"
+    (moveRequested)="onMove($event)"
+    (deleteRequested)="onDelete()"
+  />
+</div>

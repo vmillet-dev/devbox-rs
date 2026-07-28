@@ -46,6 +46,23 @@ impl SpaceDraft {
     }
 }
 
+/// Refuge acceptable pour les notes d'un espace supprimé.
+///
+/// Un espace ne peut pas être son propre refuge : le `DELETE` porte un
+/// `ON DELETE CASCADE`, donc les notes qu'on viendrait d'y « déplacer » seraient
+/// emportées juste après. La persistance ne peut pas trancher ça — des deux
+/// côtés, l'espace existe.
+pub fn validate_move_target(id: &str, target_id: &str) -> Result<(), ValidationError> {
+    if id == target_id {
+        return Err(ValidationError::new(
+            "targetSpaceId",
+            "les notes doivent être déplacées vers un autre espace",
+        ));
+    }
+
+    Ok(())
+}
+
 /// `rename_all` est sans effet tant que les champs tiennent en un mot — et c'est
 /// précisément pourquoi ces tests existent : ils échoueront le jour où un
 /// `created_at` s'ajoutera sans que l'attribut ait été porté, au lieu de laisser
@@ -92,5 +109,19 @@ mod tests {
             let error = draft(blank).validated_name().unwrap_err();
             assert_eq!(error.field, "name");
         }
+    }
+
+    #[test]
+    fn a_space_cannot_be_its_own_move_target() {
+        // The cascade would take the notes back out a statement later, so this
+        // has to be refused before any SQL runs.
+        let error = validate_move_target("s-1", "s-1").unwrap_err();
+
+        assert_eq!(error.field, "targetSpaceId");
+    }
+
+    #[test]
+    fn another_space_is_an_acceptable_move_target() {
+        assert!(validate_move_target("s-1", "s-2").is_ok());
     }
 }

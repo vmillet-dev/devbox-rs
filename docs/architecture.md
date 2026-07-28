@@ -239,6 +239,56 @@ previously lived only on the front (`isExpiringSoon`, 3 days) while the back sep
 computed `has_expiring_notes` — two definitions of "soon" behind a hint that reads "to triage
 soon". The section flag now derives from the same per-note value.
 
+### "Untriaged" — the ephemeral note
+
+In the product model, a note carrying a deadline is a note whose fate has not been decided
+yet: that is what the `untriaged` quick filter selects, what the `⏳` lifecycle badge shows,
+and what the "to triage soon" section hint counts. All of it hangs on one field, `lifecycle`.
+
+The deadline is set from the editor's date field, next to the badge: an empty field means
+permanent, a date means expiring. The value is turned into the **end of the local day**
+(`endOfLocalDay`), not midnight — a note dated today would otherwise be expired the moment it
+was set — and the reverse conversion is local too, or the field would show the previous day
+west of Greenwich. This is the same class of exception as relative-time formatting: an
+`<input type="date">` value is a UI representation, not a business rule.
+
+Until that field existed, every note was created permanent and nothing could ever change it,
+so the filter, the badge and the section hint were all reachable but permanently empty.
+
+### The card actions menu
+
+`NoteCardMenuComponent` is the `⋯` menu on a card: move the note to another space, or delete
+it. It is a separate component from `NoteCardComponent` because it brings what the card has
+none of — open/closed state, a document-click listener, focus management — leaving the card
+purely derived from its note.
+
+Two structural consequences:
+
+- The card's root is a `.card-shell` wrapper, not the `<button>` itself. A `<button>` may not
+  contain another `<button>`, and the menu trigger is one. The shell also anchors the menu
+  (`position: relative`) and is what the trigger watches to appear on hover
+  (`:host-context(.card-shell:hover)`).
+- The pin indicator moved out of `.card.pinned::after` into the first row of the card, since
+  the menu now occupies the top-right corner.
+
+The trigger stops propagation: the whole card is a button, so without it a click on `⋯` would
+open the editor at the same time as the menu. The trigger is `opacity: 0` rather than
+`display: none` — hiding it would take it out of the tab order and make the menu unreachable
+by keyboard. The menu emits no note id (it does not know one); the card attaches it, the same
+way the editor lets the store decide which note is open.
+
+### Managing spaces from the switcher
+
+The space switcher's dropdown has three mutually exclusive states: the menu, the creation
+form, and the per-space edit panel (rename + delete). Each **replaces** the menu instead of
+nesting inside it — a text field or a `<select>` inside a `role="menu"` is neither valid ARIA
+nor navigable the way options are. Escape unwinds one level at a time.
+
+The delete control only appears when another space exists to receive the notes; with a single
+space the panel explains why rather than offering a button that could only fail. Each space
+row is a `role="none"` wrapper holding the select button and the `⋯` trigger, so the menu
+keeps its direct menuitem children. Arrow-key navigation stays on the select buttons only.
+
 ### Editing a note
 
 The editor overlay is where every note mutation starts (title, body, language, tags, pin,
@@ -288,11 +338,18 @@ repositories; the only remaining doubles are the test ones in `src/testing/`, in
 `provideAppTesting()`.
 
 The notes contract is `query` / `create` / `update` / `delete`; spaces expose `loadAll` /
-`create`. There is deliberately **no method returning the raw list of notes** — offering one
-would invite a caller to filter it again. Renaming and deleting a space are not implemented
-on either side: the
-open question is what happens to the notes of a deleted space (cascade, or move to a default
-space). Moving a note is already expressible — `spaceId` is part of `NotePatch`.
+`create` / `rename` / `delete`. There is deliberately **no method returning the raw list of
+notes** — offering one would invite a caller to filter it again.
+
+`SpacesRepository.delete` takes a refuge (`delete(id, targetSpaceId)`) rather than an id
+alone: a one-argument signature would have made data loss the default, since the schema
+cascades. Moving a single note needs no dedicated method — `spaceId` is part of `NotePatch`,
+and `NotesStore.moveNote` is a thin wrapper over the ordinary update path.
+
+`SpacesStore.deleteSpace` returns a boolean and does **not** reload the notes: it does not
+know `NotesStore` (the reverse dependency already exists, and closing the loop would be an
+injection cycle). `NotesPageComponent` chains the reload, which matters when the current
+query does not mention the deleted space and would otherwise show nothing new.
 
 Keep this seam intact: no component calls `invoke()`, and `IpcService` is its only caller.
 
@@ -379,10 +436,19 @@ serialise to `null` and overwrite the stored value instead of leaving it untouch
 - Commands are **adapters only**: validate the input, lock the shared connection, delegate,
   translate the error. A command that grows is a sign a rule was written in the wrong place.
 
-The six commands are `query_notes`, `create_note`, `update_note`, `delete_note`,
-`list_spaces` and `create_space`. The guarantees the front-end relies on (persisted value
-returned, `Err` on an unknown id, "absent field means unchanged" for patches) are implemented
-in `storage/` and `domain/`, and tested there.
+The eight commands are `query_notes`, `create_note`, `update_note`, `delete_note`,
+`list_spaces`, `create_space`, `rename_space` and `delete_space`. The guarantees the
+front-end relies on (persisted value returned, `Err` on an unknown id, "absent field means
+unchanged" for patches) are implemented in `storage/` and `domain/`, and tested there.
+
+`delete_space` takes a **refuge** (`targetSpaceId`) and is the one command whose argument is
+multi-word, so it is the first to actually exercise Tauri's camelCase renaming. The refuge is
+not optional: `notes.space_id` carries an `ON DELETE CASCADE`, so a bare delete would take
+the notes with it. `storage::spaces::delete` moves them and drops the space in one
+transaction, in that order, and deliberately leaves `updated_at` alone — the canvas orders on
+that column, and refreshing it would float the whole absorbed space to the top as if every
+note had just been edited. A space cannot be its own refuge (`domain::space::validate_move_target`);
+the cascade would take the notes back out one statement after the move.
 
 `query_notes` takes a `NotesQuery` (space, search, quick filter, tags, languages, `now`,
 `tzOffsetMinutes`) and returns a `NotesView` (sections, `availableTags`, `availableLanguages`,
@@ -481,11 +547,23 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
   time computed with `new Date()` inside a `computed()` freezes: the computed depends on no
   signal representing time, so it never re-evaluates and a card shows "4 min ago" forever.
   Injecting `now()` makes those computeds both pure and self-refreshing.
-- **`PreferencesService`** (`core/preferences/`) wraps `localStorage`, which throws in
-  private-browsing WebViews. A preference that cannot be saved must never take the app down.
-  Two consumers: `LocaleService`, and the editor overlay's fullscreen toggle
-  (`devbox.editorFullscreen`), which reads it directly at construction — no app initializer
-  needed, since the overlay does not exist at first render.
+- **`PreferencesService`** (`core/preferences/`) stores UI preferences in a real file through
+  `tauri-plugin-store` (`preferences.json` in `app_config_dir()`), readable from Rust and
+  immune to a WebView cache wipe — unlike the `localStorage` it replaced. Two consumers:
+  `LocaleService`, and the editor overlay's fullscreen toggle (`devbox.editorFullscreen`).
+  - **The API stays synchronous** although the plugin's is not: both consumers read at
+    construction time, and an async read would show the interface in one state then the
+    other. The file is loaded **once** by `hydrate()` from an app initializer, into an
+    in-memory cache; writes hit the cache immediately and are pushed without being awaited.
+  - The plugin is reached through the `PREFERENCES_STORE_LOADER` token rather than by calling
+    `load` directly. Beyond the usual seam argument, it is a practical necessity: the Angular
+    builder bundles modules before Vitest sees them, so `vi.mock` on an external package
+    intercepts only intermittently. Outside Tauri the loader rejects and the service degrades
+    to a memory-only cache, which is how every other spec runs.
+  - `hydrate()` adopts any `devbox.*` key left in `localStorage` by an earlier version, then
+    clears it. Without that, updating the app would silently reset the interface language.
+  - Adding a plugin also means declaring its permission (`store:default`) in
+    `src-tauri/capabilities/default.json`, or the call is refused at runtime.
 - **`ErrorNotifier` + `AppErrorHandler`** (`core/errors/`) surface failures on screen through
   `ErrorBannerComponent`. On a desktop app the console is not an interface: an uncaught
   exception or a failed write has to be visible, or the app just looks unresponsive.

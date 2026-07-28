@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { LanguageTag } from '@core/models/language.model';
+import { NoteLifecycle } from '@core/models/note.model';
 import { NotesStore } from '@core/stores/notes.store';
 import { SpacesStore } from '@core/stores/spaces.store';
+import { SpaceDeletion, SpaceRenaming } from '../components/space-switcher/space-switcher.component';
 import { LanguageRailComponent } from '../components/language-rail/language-rail.component';
 import { NoteCanvasComponent } from '../components/note-canvas/note-canvas.component';
 import { NoteEditorOverlayComponent } from '../components/note-editor-overlay/note-editor-overlay.component';
@@ -28,6 +30,23 @@ export class NotesPageComponent {
   /** Le raccourci de recherche est neutralisé tant que la modale est ouverte. */
   protected readonly searchShortcutEnabled = computed(() => this.store.selectedNote() === null);
 
+  protected onSpaceRenamed({ id, name }: SpaceRenaming): void {
+    // Rien à recharger : une note ne porte que le `spaceId`, jamais le nom.
+    void this.spaces.renameSpace(id, name);
+  }
+
+  /**
+   * `SpacesStore` ne connaît pas `NotesStore` — l'injecter serait un cycle. Le
+   * rechargement est donc enchaîné ici : les notes de l'espace supprimé ont
+   * changé de `spaceId` côté base, et rien ne le signalerait autrement quand la
+   * requête courante ne dépend pas de l'espace disparu.
+   */
+  protected async onSpaceDeleted({ id, targetSpaceId }: SpaceDeletion): Promise<void> {
+    if (await this.spaces.deleteSpace(id, targetSpaceId)) {
+      this.store.reload();
+    }
+  }
+
   protected onTitleChanged(title: string): void {
     this.withSelectedNote((id) => this.store.renameNote(id, title));
   }
@@ -50,6 +69,10 @@ export class NotesPageComponent {
 
   protected onPinToggled(): void {
     this.withSelectedNote((id) => this.store.togglePinned(id));
+  }
+
+  protected onLifecycleChanged(lifecycle: NoteLifecycle): void {
+    this.withSelectedNote((id) => this.store.setLifecycle(id, lifecycle));
   }
 
   protected onDeleteRequested(): void {

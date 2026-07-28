@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { FALLBACK_LANGUAGE, LANGUAGE_LABELS, LanguageTag, isLanguageTag } from '@core/models/language.model';
-import { Note } from '@core/models/note.model';
+import { Note, NoteLifecycle } from '@core/models/note.model';
 import { PreferencesService } from '@core/preferences/preferences.service';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/utils/relative-time.util';
@@ -32,6 +32,28 @@ const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) =>
   value: value as LanguageTag,
   label,
 }));
+
+/**
+ * Date d'un `<input type="date">` (`yyyy-MM-dd`) vers l'échéance correspondante.
+ *
+ * L'heure est portée à la **fin de la journée locale**, pas à minuit : une note
+ * datée d'aujourd'hui serait sinon déjà périmée au moment où on la saisit.
+ *
+ * La construction est explicite plutôt qu'un `new Date(value)`, qui interprète
+ * `"2026-08-01"` en UTC — à l'ouest de Greenwich, l'échéance reculerait d'un jour.
+ */
+function endOfLocalDay(value: string): Date | null {
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+
+  return new Date(year, month - 1, day, 23, 59, 59, 999);
+}
+
+/** Chemin inverse : ce que le champ doit afficher, dans le fuseau de l'utilisateur. */
+function toDateInputValue(date: Date): string {
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
 /**
  * Éditeur plein écran d'une note.
@@ -77,6 +99,7 @@ export class NoteEditorOverlayComponent {
   readonly tagAdded = output<string>();
   readonly tagRemoved = output<string>();
   readonly pinToggled = output<void>();
+  readonly lifecycleChanged = output<NoteLifecycle>();
   readonly deleteRequested = output<void>();
 
   protected readonly languageOptions = LANGUAGE_OPTIONS;
@@ -123,6 +146,19 @@ export class NoteEditorOverlayComponent {
     return note ? relativeTimeRef(note.updatedAt, this.clock.now()) : null;
   });
 
+  /**
+   * Échéance telle que le champ date l'affiche — vide pour une note permanente.
+   *
+   * Une note éphémère est, dans le modèle du produit, une note dont on n'a pas
+   * encore décidé du sort : c'est **elle** que le filtre « À trier » retient et
+   * elle seule que la section signale comme « à trier bientôt ». Sans ce champ,
+   * ces deux affordances existaient sans que rien ne puisse les alimenter.
+   */
+  protected readonly expiryInputValue = computed(() => {
+    const lifecycle = this.note()?.lifecycle;
+    return lifecycle?.kind === 'expires' ? toDateInputValue(lifecycle.at) : '';
+  });
+
   protected toggleFullscreen(): void {
     const next = !this.fullscreen();
     this.fullscreen.set(next);
@@ -141,6 +177,23 @@ export class NoteEditorOverlayComponent {
     const note = this.note();
     if (note && this.draftTitle() !== note.title) {
       this.titleChanged.emit(this.draftTitle());
+    }
+  }
+
+  /**
+   * Un champ vidé rend la note permanente : c'est la façon naturelle de dire
+   * « finalement, je la garde ». Une date illisible est ignorée plutôt que
+   * transformée en `Invalid Date`, que le DTO rejetterait à la sérialisation.
+   */
+  protected onExpiryChange(value: string): void {
+    if (!value) {
+      this.lifecycleChanged.emit({ kind: 'permanent' });
+      return;
+    }
+
+    const at = endOfLocalDay(value);
+    if (at) {
+      this.lifecycleChanged.emit({ kind: 'expires', at });
     }
   }
 

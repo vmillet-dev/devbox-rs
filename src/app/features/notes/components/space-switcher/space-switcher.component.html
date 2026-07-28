@@ -14,7 +14,54 @@
   </button>
   @if (open()) {
     <div class="space-dropdown">
-      @if (creating()) {
+      @if (editing(); as edited) {
+        <!-- Panneau d'édition : il remplace le menu, comme le formulaire de
+             création. Deux actions distinctes sur le même espace, donc deux
+             groupes séparés plutôt qu'un formulaire unique. -->
+        <div class="space-edit-panel">
+          <p class="space-edit-title">{{ edited.name }}</p>
+
+          <form class="space-create-form" (submit)="submitRename($event, renameInput.value)">
+            <input
+              #renameInput
+              type="text"
+              class="space-create-input"
+              [attr.aria-label]="'notes.renameSpaceLabel' | transloco"
+              [value]="edited.name"
+            />
+            <button type="submit" class="space-create-submit">
+              {{ 'notes.renameSpaceSubmit' | transloco }}
+            </button>
+          </form>
+
+          @if (moveTargets().length > 0) {
+            <div class="space-delete-group">
+              <label class="space-delete-label" [attr.for]="'space-move-target'">
+                {{ 'notes.moveNotesTo' | transloco }}
+              </label>
+              <div class="space-delete-row">
+                <!-- La cible est obligatoire : l'espace part avec ses notes
+                     (ON DELETE CASCADE) si personne ne les recueille. -->
+                <select #targetSelect id="space-move-target" class="space-create-input">
+                  @for (target of moveTargets(); track target.id) {
+                    <option [value]="target.id">{{ target.name }}</option>
+                  }
+                </select>
+                <button
+                  type="button"
+                  class="space-create-submit space-delete-submit"
+                  [class.confirming]="confirmingDelete()"
+                  (click)="onDeleteClick(targetSelect.value)"
+                >
+                  {{ (confirmingDelete() ? 'notes.deleteSpaceConfirm' : 'notes.deleteSpace') | transloco }}
+                </button>
+              </div>
+            </div>
+          } @else {
+            <p class="space-delete-blocked">{{ 'notes.deleteSpaceNeedsAnother' | transloco }}</p>
+          }
+        </div>
+      } @else if (creating()) {
         <!-- Le formulaire remplace le menu au lieu de s'y ajouter : un champ de
              saisie dans un role="menu" n'est ni valide ARIA, ni navigable de la
              même façon que des options. -->
@@ -48,17 +95,30 @@
             {{ 'notes.allSpaces' | transloco }}
           </button>
           @for (space of spaces(); track space.id) {
-            <button
-              #option
-              type="button"
-              role="menuitemradio"
-              class="space-option"
-              [class.active]="space.id === activeSpace()?.id"
-              [attr.aria-checked]="space.id === activeSpace()?.id"
-              (click)="select(space)"
-            >
-              {{ space.name }}
-            </button>
+            <!-- `role="none"` : un conteneur nu entre le menu et ses items
+                 casserait la relation attendue par les lecteurs d'écran. -->
+            <div class="space-row" role="none">
+              <button
+                #option
+                type="button"
+                role="menuitemradio"
+                class="space-option"
+                [class.active]="space.id === activeSpace()?.id"
+                [attr.aria-checked]="space.id === activeSpace()?.id"
+                (click)="select(space)"
+              >
+                {{ space.name }}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="space-edit-trigger"
+                [attr.aria-label]="'notes.spaceOptionsLabel' | transloco: { name: space.name }"
+                (click)="startEditing(space)"
+              >
+                <span aria-hidden="true">⋯</span>
+              </button>
+            </div>
           }
           <button
             #option

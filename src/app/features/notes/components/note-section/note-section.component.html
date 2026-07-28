@@ -10,7 +10,10 @@
       <app-note-card
         [note]="note"
         [selected]="note.id === selectedNoteId()"
+        [spaces]="spaces()"
         (opened)="noteOpened.emit($event)"
+        (moveRequested)="noteMoved.emit($event)"
+        (deleteRequested)="noteDeleted.emit($event)"
       />
     }
     @if (section().showCreateGhost) {

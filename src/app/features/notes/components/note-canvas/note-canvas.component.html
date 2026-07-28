@@ -20,7 +20,10 @@
       <app-note-section
         [section]="section"
         [selectedNoteId]="selectedNoteId()"
+        [spaces]="spaces()"
         (noteOpened)="noteOpened.emit($event)"
+        (noteMoved)="noteMoved.emit($event)"
+        (noteDeleted)="noteDeleted.emit($event)"
         (createRequested)="createRequested.emit()"
       />
     }

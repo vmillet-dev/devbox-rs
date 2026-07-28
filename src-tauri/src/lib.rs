@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use commands::notes::{create_note, delete_note, query_notes, update_note};
-use commands::spaces::{create_space, list_spaces};
+use commands::spaces::{create_space, delete_space, list_spaces, rename_space};
 
 /// Point d'entrée de l'application Tauri.
 /// Sur mobile, cette même fonction sert aussi de point d'entrée natif
@@ -20,6 +20,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             // L'updater est absent des cibles mobiles (voir Cargo.toml) : le
             // `cfg` doit donc aussi couvrir son enregistrement, sinon la
@@ -50,6 +51,8 @@ pub fn run() {
             delete_note,
             list_spaces,
             create_space,
+            rename_space,
+            delete_space,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");

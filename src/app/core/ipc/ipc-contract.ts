@@ -30,6 +30,13 @@ export interface IpcContract {
   /** Pas d'arguments : `db: State` est injecté par Tauri, pas fourni par le front. */
   readonly list_spaces: { args: undefined; result: readonly SpaceDto[] };
   readonly create_space: { args: { draft: SpaceDraftDto }; result: SpaceDto };
+  readonly rename_space: { args: { id: string; draft: SpaceDraftDto }; result: SpaceDto };
+  /**
+   * ⚠️ Premier paramètre composé du contrat : le Rust déclare `target_space_id`,
+   * Tauri v2 l'expose en `targetSpaceId`. L'écrire en snake_case ici compilerait
+   * et échouerait à l'exécution sur un rejet serde sans code.
+   */
+  readonly delete_space: { args: { id: string; targetSpaceId: string }; result: void };
 }
 
 export type IpcCommand = keyof IpcContract;

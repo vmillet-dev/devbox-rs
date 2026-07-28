@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PreferencesService } from '@core/preferences/preferences.service';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
 import { LifecycleBadgeComponent } from '@shared/ui/lifecycle-badge/lifecycle-badge.component';
 import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
@@ -48,6 +49,15 @@ describe('NoteEditorOverlayComponent', () => {
     fixture.autoDetectChanges();
   }
 
+  /**
+   * The seam the fullscreen preference goes through. TestBed hands out a fresh
+   * instance per test, so nothing leaks between them; `recreateOverlay` keeps
+   * the same one, which is exactly what "stored in a previous session" means here.
+   */
+  function preferences(): PreferencesService {
+    return TestBed.inject(PreferencesService);
+  }
+
   /** Rebuilds the overlay so a preference seeded in storage is read at construction. */
   function recreateOverlay(): void {
     fixture.nativeElement.remove();
@@ -59,8 +69,6 @@ describe('NoteEditorOverlayComponent', () => {
     // Only virtualize `Date`; Angular's zoneless scheduler relies on real rAF/setTimeout for `whenStable()` to resolve.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
-    // The fullscreen preference is persisted, so it would otherwise leak between tests.
-    localStorage.clear();
 
     TestBed.configureTestingModule({
       imports: [NoteEditorOverlayComponent],
@@ -509,6 +517,91 @@ describe('NoteEditorOverlayComponent', () => {
     });
   });
 
+  describe('expiry', () => {
+    function expiryInput(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('.overlay-expiry-input');
+    }
+
+    async function pick(value: string): Promise<void> {
+      expiryInput().value = value;
+      expiryInput().dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+    }
+
+    it('is empty for a permanent note', async () => {
+      fixture.componentRef.setInput('note', createNote({ lifecycle: { kind: 'permanent' } }));
+      await fixture.whenStable();
+
+      expect(expiryInput().value).toBe('');
+    });
+
+    it('shows an existing deadline in the local timezone', async () => {
+      // Built from local parts on purpose: a UTC-based conversion would show
+      // the previous day west of Greenwich.
+      const at = new Date(2026, 7, 1, 23, 59, 59, 999);
+      fixture.componentRef.setInput('note', createNote({ lifecycle: { kind: 'expires', at } }));
+      await fixture.whenStable();
+
+      expect(expiryInput().value).toBe('2026-08-01');
+    });
+
+    it('emits a deadline at the end of the chosen local day', async () => {
+      const emitted: { kind: string; at?: Date }[] = [];
+      fixture.componentInstance.lifecycleChanged.subscribe((lifecycle) => emitted.push(lifecycle));
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+
+      await pick('2026-08-01');
+
+      // Midnight would make a note dated today already expired the moment it
+      // is set; the end of the day is what the user means by "until then".
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0].kind).toBe('expires');
+      expect(emitted[0].at).toEqual(new Date(2026, 7, 1, 23, 59, 59, 999));
+    });
+
+    it('makes the note permanent again when the field is cleared', async () => {
+      const emitted: { kind: string }[] = [];
+      fixture.componentInstance.lifecycleChanged.subscribe((lifecycle) => emitted.push(lifecycle));
+      fixture.componentRef.setInput(
+        'note',
+        createNote({
+          lifecycle: { kind: 'expires', at: new Date(2026, 7, 1) },
+        }),
+      );
+      await fixture.whenStable();
+
+      await pick('');
+
+      expect(emitted).toEqual([{ kind: 'permanent' }]);
+    });
+
+    it('ignores an unparseable value rather than emitting an invalid date', async () => {
+      const emitted: unknown[] = [];
+      fixture.componentInstance.lifecycleChanged.subscribe(() => emitted.push(true));
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+
+      // Driven through the handler and not the field: a date input sanitizes
+      // anything malformed to "", so the guard is unreachable from the DOM. It
+      // still matters — an `Invalid Date` would only blow up later, at the
+      // serialisation boundary, with no field name attached.
+      (fixture.componentInstance as unknown as { onExpiryChange: (v: string) => void }).onExpiryChange(
+        'pas-une-date',
+      );
+      await fixture.whenStable();
+
+      expect(emitted).toEqual([]);
+    });
+
+    it('is labelled, since a bare date field says nothing about what it sets', async () => {
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+
+      expect(expiryInput().getAttribute('aria-label')).toBe('Échéance de la note (vide = permanente)');
+    });
+  });
+
   describe('fullscreen', () => {
     function panel(): HTMLElement {
       return fixture.nativeElement.querySelector('.overlay-panel');
@@ -560,11 +653,11 @@ describe('NoteEditorOverlayComponent', () => {
       fullscreenButton().click();
       await fixture.whenStable();
 
-      expect(localStorage.getItem('devbox.editorFullscreen')).toBe('true');
+      expect(preferences().read('devbox.editorFullscreen')).toBe('true');
     });
 
     it('reopens fullscreen when the preference was stored in a previous session', async () => {
-      localStorage.setItem('devbox.editorFullscreen', 'true');
+      preferences().write('devbox.editorFullscreen', 'true');
       recreateOverlay();
       await openNote();
 
@@ -572,7 +665,7 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('ignores an invalid persisted value', async () => {
-      localStorage.setItem('devbox.editorFullscreen', 'oui');
+      preferences().write('devbox.editorFullscreen', 'oui');
       recreateOverlay();
       await openNote();
 

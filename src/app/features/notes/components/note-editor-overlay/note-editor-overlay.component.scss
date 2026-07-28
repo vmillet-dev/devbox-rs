@@ -101,8 +101,36 @@
   flex-wrap: wrap;
 }
 
-.overlay-meta-row app-lifecycle-badge {
+// Le badge et son champ forment un bloc : c'est l'ensemble qui est poussé à
+// droite, pas le badge seul, sinon le champ resterait collé aux tags.
+.overlay-expiry {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.overlay-expiry-input {
+  @include unstyled-control;
+  @include surface(var(--bg-1), 6px);
+  padding: 5px 8px;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.overlay-expiry-input:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+// Le sélecteur de date natif est blanc sur fond sombre : sans ce filtre,
+// l'icône disparaît complètement sur le thème du produit.
+.overlay-expiry-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
 }
 
 .overlay-language-select {

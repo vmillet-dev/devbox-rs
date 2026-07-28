@@ -30,6 +30,25 @@ export class FakeSpacesRepository implements SpacesRepository {
     });
   }
 
+  rename(id: string, draft: SpaceDraft): Promise<Space> {
+    return this.guard(() => {
+      const renamed: Space = { id, name: draft.name };
+      this.spaces = this.spaces.map((space) => (space.id === id ? renamed : space));
+      return renamed;
+    });
+  }
+
+  /**
+   * The target is accepted without checking it holds the notes: this double owns
+   * no notes at all. `NotesStore` reloads from its own repository afterwards,
+   * which is what the move is observable through.
+   */
+  delete(id: string, _targetSpaceId: string): Promise<void> {
+    return this.guard(() => {
+      this.spaces = this.spaces.filter((space) => space.id !== id);
+    });
+  }
+
   private guard<T>(operation: () => T): Promise<T> {
     if (this.failNext) {
       const error = this.failNext;

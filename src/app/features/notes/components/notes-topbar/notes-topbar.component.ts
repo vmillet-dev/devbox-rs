@@ -4,7 +4,11 @@ import { Space } from '@core/models/space.model';
 import { NoteFilter } from '@core/stores/notes.store';
 import { FilterChipsComponent } from '../filter-chips/filter-chips.component';
 import { SearchBoxComponent } from '../search-box/search-box.component';
-import { SpaceSwitcherComponent } from '../space-switcher/space-switcher.component';
+import {
+  SpaceDeletion,
+  SpaceRenaming,
+  SpaceSwitcherComponent,
+} from '../space-switcher/space-switcher.component';
 
 @Component({
   selector: 'app-notes-topbar',
@@ -23,6 +27,8 @@ export class NotesTopbarComponent {
 
   readonly spaceChanged = output<string | null>();
   readonly spaceCreated = output<string>();
+  readonly spaceRenamed = output<SpaceRenaming>();
+  readonly spaceDeleted = output<SpaceDeletion>();
   readonly searchQueryChanged = output<string>();
   readonly filterChanged = output<NoteFilter>();
   readonly newNoteRequested = output<void>();

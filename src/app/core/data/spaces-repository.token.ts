@@ -10,15 +10,19 @@ import { Space, SpaceDraft } from '../models/space.model';
  * persisté** (c'est la persistance qui attribue l'`id`), et toute erreur est
  * propagée en rejet.
  *
- * TODO(feature) : renommage et suppression d'espaces. La suppression demande
- * d'abord une décision produit — que deviennent les notes de l'espace supprimé
- * (suppression en cascade, ou déplacement vers un espace par défaut) ? Le champ
- * `spaceId` d'une note est déjà modifiable via `NotePatch`, donc le déplacement
- * ne demanderait qu'une commande Rust et une entrée de menu.
+ * `delete` prend un espace **refuge** et non un simple identifiant : le schéma
+ * SQLite emporte les notes d'un espace supprimé (`ON DELETE CASCADE`), donc une
+ * signature à un seul argument aurait fait de la perte de données le
+ * comportement par défaut. Le transfert et la suppression sont atomiques côté
+ * Rust ; il n'existe pas de variante sans refuge.
  */
 export interface SpacesRepository {
   loadAll(): Promise<readonly Space[]>;
   create(draft: SpaceDraft): Promise<Space>;
+  /** Renvoie l'espace renommé tel que persisté. */
+  rename(id: string, draft: SpaceDraft): Promise<Space>;
+  /** `targetSpaceId` recueille les notes de l'espace supprimé. */
+  delete(id: string, targetSpaceId: string): Promise<void>;
 }
 
 export const SPACES_REPOSITORY = new InjectionToken<SpacesRepository>('SPACES_REPOSITORY');

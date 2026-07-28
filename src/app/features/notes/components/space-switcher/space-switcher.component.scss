@@ -115,3 +115,101 @@
   outline: 2px solid var(--amber);
   outline-offset: 2px;
 }
+
+// L'option occupe toute la largeur restante : le ⋯ ne doit pas rogner la zone
+// de clic qui sélectionne l'espace.
+.space-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.space-row .space-option {
+  flex: 1;
+  min-width: 0;
+}
+
+.space-edit-trigger {
+  @include unstyled-control;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-2);
+  cursor: pointer;
+  // Discret au repos, mais jamais masqué : `visibility: hidden` le sortirait de
+  // l'ordre de tabulation et le rendrait inatteignable au clavier.
+  opacity: 0.45;
+}
+
+.space-row:hover .space-edit-trigger,
+.space-edit-trigger:hover,
+.space-edit-trigger:focus-visible {
+  opacity: 1;
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+.space-edit-trigger:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.space-edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+  min-width: 240px;
+}
+
+.space-edit-title {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.space-delete-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.space-delete-label {
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.space-delete-row {
+  display: flex;
+  gap: 6px;
+}
+
+.space-delete-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.space-delete-submit:hover,
+.space-delete-submit:focus-visible {
+  @include accent-state(var(--red), var(--red));
+}
+
+.space-delete-submit.confirming {
+  @include accent-state(var(--red), var(--red));
+}
+
+.space-delete-blocked {
+  margin: 0;
+  padding: 8px 4px 0;
+  border-top: 1px solid var(--line-soft);
+  font-size: 11px;
+  color: var(--text-2);
+}

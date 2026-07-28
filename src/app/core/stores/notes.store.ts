@@ -14,7 +14,7 @@ import { ErrorNotifier } from '../errors/error-notifier.service';
 import { ipcNotice } from '../errors/ipc-notice';
 import { FALLBACK_LANGUAGE, LanguageTag } from '../models/language.model';
 import { NoteSection } from '../models/note-section.model';
-import { Note, NoteDraft, NotePatch } from '../models/note.model';
+import { Note, NoteDraft, NoteLifecycle, NotePatch } from '../models/note.model';
 import { NoteFilter, NotesQuery, NotesView } from '../models/notes-query.model';
 import { ClockService } from '../time/clock.service';
 import { SpacesStore } from './spaces.store';
@@ -44,6 +44,16 @@ interface QueryParams {
 
 function sameFacets(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/**
+ * Égalité **par valeur** de deux cycles de vie : `Date` se compare par identité,
+ * donc rejouer la même échéance déclencherait sinon une écriture inutile à
+ * chaque passage dans le champ date.
+ */
+function sameLifecycle(a: NoteLifecycle, b: NoteLifecycle): boolean {
+  if (a.kind !== b.kind) return false;
+  return a.kind !== 'expires' || a.at.getTime() === (b as { at: Date }).at.getTime();
 }
 
 /** Sélection de facettes avec `value` basculée. Un ensemble neuf, jamais muté. */
@@ -259,11 +269,35 @@ export class NotesStore {
     await this.persist(id, { content });
   }
 
+  /**
+   * Range la note dans un autre espace. Le `spaceId` est le seul champ que le
+   * front pousse sans que l'utilisateur l'ait saisi : c'est aussi le seul dont
+   * le stockage refuse la valeur si l'espace n'existe plus (`spaceGone`).
+   */
+  async moveNote(id: string, spaceId: string): Promise<void> {
+    const target = this.find(id);
+    if (!target || target.spaceId === spaceId) return;
+
+    await this.persist(id, { spaceId });
+  }
+
   async setLanguage(id: string, language: LanguageTag): Promise<void> {
     const target = this.find(id);
     if (!target || target.language === language) return;
 
     await this.persist(id, { language });
+  }
+
+  /**
+   * Pose ou retire l'échéance d'une note. Une note éphémère est celle dont on
+   * n'a pas encore décidé du sort : c'est cette écriture, et elle seule, qui
+   * alimente le filtre « À trier » et l'indice « à trier bientôt » des sections.
+   */
+  async setLifecycle(id: string, lifecycle: NoteLifecycle): Promise<void> {
+    const target = this.find(id);
+    if (!target || sameLifecycle(target.lifecycle, lifecycle)) return;
+
+    await this.persist(id, { lifecycle });
   }
 
   /**

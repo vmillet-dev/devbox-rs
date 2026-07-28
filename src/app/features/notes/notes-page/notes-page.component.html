@@ -6,6 +6,8 @@
   [searchShortcutEnabled]="searchShortcutEnabled()"
   (spaceChanged)="spaces.selectSpace($event)"
   (spaceCreated)="spaces.createSpace($event)"
+  (spaceRenamed)="onSpaceRenamed($event)"
+  (spaceDeleted)="onSpaceDeleted($event)"
   (searchQueryChanged)="store.setSearchQuery($event)"
   (filterChanged)="store.setFilter($event)"
   (newNoteRequested)="store.createNote()"
@@ -29,7 +31,10 @@
   [isLoading]="store.isLoading()"
   [loadError]="store.loadError()"
   [hasNoResults]="store.hasNoResults()"
+  [spaces]="spaces.spaces()"
   (noteOpened)="store.openNote($event)"
+  (noteMoved)="store.moveNote($event.noteId, $event.spaceId)"
+  (noteDeleted)="store.deleteNote($event)"
   (createRequested)="store.createNote()"
   (reloadRequested)="store.reload()"
 />
@@ -43,5 +48,6 @@
   (tagAdded)="onTagAdded($event)"
   (tagRemoved)="onTagRemoved($event)"
   (pinToggled)="onPinToggled()"
+  (lifecycleChanged)="onLifecycleChanged($event)"
   (deleteRequested)="onDeleteRequested()"
 />

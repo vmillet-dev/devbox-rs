@@ -1,21 +1,29 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Note } from '@core/models/note.model';
+import { Space } from '@core/models/space.model';
 import { TranslationRef } from '@core/models/translation-ref.model';
 import { ClockService } from '@core/time/clock.service';
 import { expiryRef, relativeTimeRef } from '@core/utils/relative-time.util';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
 import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
+import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
 
 /** Le libellé du pied de carte est soit du texte brut (nom de source), soit une référence de traduction (temps). */
 type FooterLabel = { kind: 'text'; value: string } | { kind: 'ref'; ref: TranslationRef };
+
+/** Déplacement demandé depuis le menu d'une carte. */
+export interface NoteMove {
+  readonly noteId: string;
+  readonly spaceId: string;
+}
 
 const SNIPPET_LINES = 3;
 const MAX_VISIBLE_TAGS = 2;
 
 @Component({
   selector: 'app-note-card',
-  imports: [CodeViewerComponent, LanguageBadgeComponent, TranslocoPipe],
+  imports: [CodeViewerComponent, LanguageBadgeComponent, NoteCardMenuComponent, TranslocoPipe],
   templateUrl: './note-card.component.html',
   styleUrl: './note-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -25,8 +33,12 @@ export class NoteCardComponent {
 
   readonly note = input.required<Note>();
   readonly selected = input(false);
+  /** Destinations proposées par le menu ; l'espace de la note en est retiré. */
+  readonly spaces = input<readonly Space[]>([]);
 
   readonly opened = output<string>();
+  readonly moveRequested = output<NoteMove>();
+  readonly deleteRequested = output<string>();
 
   protected readonly snippet = computed(() =>
     this.note().content.split('\n').slice(0, SNIPPET_LINES).join('\n'),
@@ -52,5 +64,14 @@ export class NoteCardComponent {
 
   protected onOpen(): void {
     this.opened.emit(this.note().id);
+  }
+
+  /** Le menu ne connaît pas la note : c'est la carte qui rattache l'identifiant. */
+  protected onMove(spaceId: string): void {
+    this.moveRequested.emit({ noteId: this.note().id, spaceId });
+  }
+
+  protected onDelete(): void {
+    this.deleteRequested.emit(this.note().id);
   }
 }

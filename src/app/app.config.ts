@@ -14,6 +14,7 @@ import { provideDataAccess } from '@core/data/data.providers';
 import { AppErrorHandler } from '@core/errors/app-error-handler';
 import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from '@core/i18n/locale.service';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
+import { PreferencesService } from '@core/preferences/preferences.service';
 import { provideUpdateCheck } from '@core/updates/update.providers';
 
 export const appConfig: ApplicationConfig = {
@@ -35,7 +36,16 @@ export const appConfig: ApplicationConfig = {
       },
       loader: AppTranslocoLoader,
     }),
-    provideAppInitializer(() => inject(LocaleService).restore()),
+    // Un seul initialiseur pour les deux étapes, et non deux enchaînés :
+    // Angular lance les initialiseurs ensemble et n'attend que leurs promesses
+    // en bloc, donc `restore()` lirait un cache encore vide.
+    provideAppInitializer(async () => {
+      const preferences = inject(PreferencesService);
+      const locale = inject(LocaleService);
+
+      await preferences.hydrate();
+      locale.restore();
+    }),
 
     // Liaison des dépôts vers le backend Rust : voir core/data/data.providers.ts.
     ...provideDataAccess(),

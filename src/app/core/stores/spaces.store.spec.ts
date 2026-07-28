@@ -176,4 +176,99 @@ describe('SpacesStore', () => {
       expect(notifier.notice()?.ref.key).toBe('errors.spaceCreateFailed');
     });
   });
+
+  describe('renameSpace', () => {
+    it('adopts the space the repository returned', async () => {
+      const { store } = await createStore();
+
+      const renamed = await store.renameSpace('work', 'Boulot');
+
+      expect(renamed).toBe(true);
+      expect(store.spaces().find((space) => space.id === 'work')?.name).toBe('Boulot');
+    });
+
+    it('trims the name before sending it', async () => {
+      const { store, repository } = await createStore();
+      const rename = vi.spyOn(repository, 'rename');
+
+      await store.renameSpace('work', '  Boulot  ');
+
+      expect(rename).toHaveBeenCalledWith('work', { name: 'Boulot' });
+    });
+
+    it('writes nothing when the name is unchanged or blank', async () => {
+      const { store, repository } = await createStore();
+      const rename = vi.spyOn(repository, 'rename');
+
+      expect(await store.renameSpace('work', 'Work')).toBe(false);
+      expect(await store.renameSpace('work', '   ')).toBe(false);
+
+      expect(rename).not.toHaveBeenCalled();
+    });
+
+    it('reports a name already taken with the name the user typed', async () => {
+      const { store, repository } = await createStore();
+      const notifier = TestBed.inject(ErrorNotifier);
+      repository.failNext = new IpcError('rename_space', {
+        code: 'duplicateSpaceName',
+        params: { name: 'Personal' },
+        detail: 'Un espace nommé « Personal » existe déjà',
+      });
+
+      const renamed = await store.renameSpace('work', 'Personal');
+
+      expect(renamed).toBe(false);
+      expect(notifier.notice()?.ref.key).toBe('errors.spaceNameTaken');
+      expect(notifier.notice()?.ref.params).toEqual({ name: 'Personal' });
+      // The list must not have drifted from the backend.
+      expect(store.spaces()).toEqual(SPACES);
+    });
+  });
+
+  describe('deleteSpace', () => {
+    it('drops the space and activates the one that took its notes', async () => {
+      const { store } = await createStore();
+
+      const deleted = await store.deleteSpace('work', 'personal');
+
+      expect(deleted).toBe(true);
+      expect(store.spaces().map((space) => space.id)).toEqual(['personal']);
+      // Falling back to "all spaces" would lose sight of where the notes went.
+      expect(store.activeSpaceId()).toBe('personal');
+    });
+
+    it('refuses to make a space its own refuge', async () => {
+      const { store, repository } = await createStore();
+      const remove = vi.spyOn(repository, 'delete');
+
+      const deleted = await store.deleteSpace('work', 'work');
+
+      // The schema cascades on delete: the notes would be taken back out one
+      // statement after being "moved".
+      expect(deleted).toBe(false);
+      expect(remove).not.toHaveBeenCalled();
+      expect(store.spaces()).toEqual(SPACES);
+    });
+
+    it('refuses a refuge that is not a known space', async () => {
+      const { store, repository } = await createStore();
+      const remove = vi.spyOn(repository, 'delete');
+
+      expect(await store.deleteSpace('work', 'ghost')).toBe(false);
+
+      expect(remove).not.toHaveBeenCalled();
+    });
+
+    it('keeps the space listed when the backend refuses', async () => {
+      const { store, repository } = await createStore();
+      const notifier = TestBed.inject(ErrorNotifier);
+      repository.failNext = new Error('read-only');
+
+      const deleted = await store.deleteSpace('work', 'personal');
+
+      expect(deleted).toBe(false);
+      expect(store.spaces()).toEqual(SPACES);
+      expect(notifier.notice()?.ref.key).toBe('errors.spaceDeleteFailed');
+    });
+  });
 });

@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "updater:default",
+    "store:default",
     "process:allow-restart",
     {
       "identifier": "opener:allow-open-url",

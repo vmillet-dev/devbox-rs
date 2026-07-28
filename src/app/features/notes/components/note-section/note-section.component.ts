@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteSection } from '@core/models/note-section.model';
-import { NoteCardComponent } from '../note-card/note-card.component';
+import { Space } from '@core/models/space.model';
+import { NoteCardComponent, NoteMove } from '../note-card/note-card.component';
 
 @Component({
   selector: 'app-note-section',
@@ -13,8 +14,12 @@ import { NoteCardComponent } from '../note-card/note-card.component';
 export class NoteSectionComponent {
   readonly section = input.required<NoteSection>();
   readonly selectedNoteId = input<string | null>(null);
+  /** Relayé aux cartes : leur menu propose d'y déplacer la note. */
+  readonly spaces = input<readonly Space[]>([]);
 
   readonly noteOpened = output<string>();
+  readonly noteMoved = output<NoteMove>();
+  readonly noteDeleted = output<string>();
   readonly createRequested = output<void>();
 
   /** La clé de section *est* la clé de traduction : aucun libellé à maintenir en double. */
