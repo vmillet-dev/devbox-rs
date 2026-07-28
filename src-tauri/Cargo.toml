@@ -34,6 +34,9 @@ uuid = { version = "1.24.0", features = ["v4"] }
 chrono = "0.4.45"
 # Redémarrage de l'application après l'installation d'une mise à jour.
 tauri-plugin-process = "2"
+# Ouverture du dépôt dans le navigateur système. Le CSP est verrouillé sur
+# `'self'` : un lien ordinaire ne mène nulle part depuis la WebView.
+tauri-plugin-opener = "2"
 
 # L'updater n'existe pas sur mobile — les magasins d'applications s'en chargent —
 # et le déclarer inconditionnellement casserait une compilation Android/iOS.

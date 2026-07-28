@@ -79,7 +79,8 @@
     "spaceGone": "This space no longer exists.",
     "invalidInput": "The engine rejected this value: {{field}}.",
     "storageUnavailable": "Storage is unavailable. Restart DevBox.",
-    "updateFailed": "The update failed. DevBox remains usable on its current version."
+    "updateFailed": "The update failed. DevBox remains usable on its current version.",
+    "updateCheckFailed": "The update check failed. Try again later."
   },
   "locale": {
     "groupLabel": "Interface language",
@@ -96,5 +97,20 @@
     "downloadingPercent": "Downloading… {{percent}}%",
     "restarting": "Restarting DevBox…",
     "progressLabel": "Download progress"
+  },
+  "about": {
+    "menuLabel": "About",
+    "checkUpdates": "Check for updates",
+    "checking": "Checking…",
+    "upToDate": "✓ DevBox is up to date",
+    "checkFailed": "✕ Check failed",
+    "openAbout": "About DevBox",
+    "title": "DevBox",
+    "description": "A developer's Swiss Army knife: notes and snippets, with hashing and encoding to come. Angular 22 on the front, Rust and Tauri v2 as the native engine.",
+    "versionLabel": "Version",
+    "versionUnknown": "unknown",
+    "developedBy": "Developed by",
+    "repository": "Repository",
+    "close": "Close"
   }
 }

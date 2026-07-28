@@ -13,17 +13,32 @@ export class FakeUpdater {
   /** Progress values replayed to the callback on `install()`. */
   progressSteps: DownloadProgress[] = [null, 1];
 
+  checkCalls = 0;
   installCalls = 0;
   relaunched = false;
   discarded = false;
 
-  /** Holds `install()` open so a spec can observe the in-flight state. */
+  /** Hold `install()` / `check()` open so a spec can observe the in-flight state. */
   deferInstall = false;
+  deferCheck = false;
   private release: (() => void) | null = null;
+  private releaseCheck: (() => void) | null = null;
 
   async check(): Promise<AvailableUpdate | null> {
+    this.checkCalls += 1;
+
+    if (this.deferCheck) {
+      await new Promise<void>((resolve) => {
+        this.releaseCheck = resolve;
+      });
+    }
     if (this.checkError) throw this.checkError;
     return this.available;
+  }
+
+  finishCheck(): void {
+    this.releaseCheck?.();
+    this.releaseCheck = null;
   }
 
   async install(onProgress: (progress: DownloadProgress) => void): Promise<void> {

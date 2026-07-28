@@ -19,6 +19,7 @@ use commands::spaces::{create_space, list_spaces};
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // L'updater est absent des cibles mobiles (voir Cargo.toml) : le
             // `cfg` doit donc aussi couvrir son enregistrement, sinon la

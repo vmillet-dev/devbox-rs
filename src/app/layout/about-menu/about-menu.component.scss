@@ -1,0 +1,87 @@
+@use 'mixins' as *;
+
+.about-wrapper {
+  position: relative;
+}
+
+.about-trigger {
+  @include unstyled-control;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.about-trigger:hover,
+.about-trigger[aria-expanded='true'] {
+  color: var(--text-0);
+  background: var(--bg-2);
+}
+
+.about-trigger:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+.chev {
+  font-size: 9px;
+}
+
+// Ancré à droite : le menu est en fin de barre, l'ouvrir vers la gauche évite
+// qu'il déborde de la fenêtre.
+.about-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 210px;
+  @include surface;
+  padding: 4px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--shadow-dropdown);
+}
+
+.about-option {
+  @include unstyled-control;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.about-option:hover {
+  color: var(--text-0);
+  background: var(--bg-3);
+}
+
+.about-option:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: -2px;
+}
+
+.about-option[aria-disabled='true'] {
+  cursor: default;
+  color: var(--text-2);
+}
+
+// Vide tant qu'il n'y a rien à annoncer : pas de `display: none`, la zone
+// `aria-live` doit exister dans le DOM avant la mise à jour pour être annoncée.
+.about-option-status {
+  font-size: 11px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+
+  &:empty {
+    display: none;
+  }
+}

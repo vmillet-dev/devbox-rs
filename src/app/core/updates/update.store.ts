@@ -10,6 +10,16 @@ import { AvailableUpdate, DownloadProgress, UpdaterService } from './updater.ser
 export type UpdateStatus = 'idle' | 'available' | 'installing' | 'installed';
 
 /**
+ * Ce que la dernière vérification laisse à dire dans le menu, **distinct** de
+ * `UpdateStatus` qui décrit le cycle d'installation. Les mélanger ferait dépendre
+ * l'état de la pop-in du résultat d'une recherche sans suite.
+ *
+ * `idle` couvre les deux cas où le menu n'a rien à annoncer : avant toute
+ * recherche, et après une recherche fructueuse — c'est alors la pop-in qui parle.
+ */
+export type CheckState = 'idle' | 'checking' | 'upToDate' | 'failed';
+
+/**
  * État de la mise à jour applicative.
  *
  * Rien ne s'installe sans un geste explicite de l'utilisateur : `check()`
@@ -32,9 +42,11 @@ export class UpdateStore {
   private readonly _update = signal<AvailableUpdate | null>(null);
   private readonly _status = signal<UpdateStatus>('idle');
   private readonly _progress = signal<DownloadProgress>(null);
+  private readonly _checkState = signal<CheckState>('idle');
 
   readonly update: Signal<AvailableUpdate | null> = this._update.asReadonly();
   readonly status: Signal<UpdateStatus> = this._status.asReadonly();
+  readonly checkState: Signal<CheckState> = this._checkState.asReadonly();
 
   /** Entier 0–100, ou `null` tant que l'avancement est indéterminé. */
   readonly progressPercent = computed<number | null>(() => {
@@ -42,17 +54,45 @@ export class UpdateStore {
     return progress === null ? null : Math.round(progress * 100);
   });
 
+  /** Vérification automatique du démarrage : muette dans tous les cas. */
   async check(): Promise<void> {
+    await this.runCheck({ silent: true });
+  }
+
+  /**
+   * Vérification demandée depuis le menu « À propos ».
+   *
+   * Contrairement à celle du démarrage, elle **parle** : l'utilisateur a cliqué
+   * et attend une réponse, y compris « il n'y a rien ». Un échec passe donc aussi
+   * par `ErrorNotifier`, dont le bandeau survit à la fermeture du menu — la ligne
+   * d'état, elle, disparaît avec lui.
+   */
+  async checkNow(): Promise<void> {
+    await this.runCheck({ silent: false });
+  }
+
+  private async runCheck({ silent }: { silent: boolean }): Promise<void> {
+    // Une installation en cours ne se laisse pas doubler, et une proposition déjà
+    // affichée n'a pas besoin d'être redemandée.
     if (this._status() !== 'idle') return;
 
+    this._checkState.set('checking');
     try {
       const found = await this.updater.check();
       if (found) {
         this._update.set(found);
         this._status.set('available');
       }
+      this._checkState.set(found ? 'idle' : 'upToDate');
     } catch (error) {
+      this._checkState.set('failed');
       console.warn('Vérification des mises à jour impossible.', error);
+      if (!silent) {
+        this.notifier.notify({
+          ref: { key: 'errors.updateCheckFailed' },
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 

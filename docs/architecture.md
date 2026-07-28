@@ -579,6 +579,15 @@ update.
   there would be a daily reproach about something the user cannot act on. An install failure
   follows an explicit click, so it reaches `ErrorNotifier` and leaves the prompt open for a
   retry.
+- **A manual check speaks where the startup one stays quiet.** `checkNow()`, behind the
+  titlebar's About menu, reports all three outcomes — including "nothing to do", which the
+  silent path has no way to express. Its failures also reach `ErrorNotifier`: the user clicked
+  and is owed an answer, and the banner outlives the menu, whereas the in-menu status line
+  disappears with it. Both paths share one private `runCheck({ silent })`.
+- **`CheckState` is deliberately separate from `UpdateStatus`.** The latter is the install
+  lifecycle that `UpdatePromptComponent.busy()` reads; the former is only what the menu has
+  left to announce. Its `idle` covers both "not checked yet" and "found something" — in the
+  second case the prompt is doing the talking.
 - **The download does not cross the CSP.** It runs in Rust through the plugin's HTTP client,
   not in the WebView, so pointing `endpoints` at GitHub needs no widening of `connect-src`.
 - `bundle.createUpdaterArtifacts` makes the bundler emit a `.sig` beside **every** bundle it
@@ -604,6 +613,12 @@ update.
 - `src-tauri/capabilities/default.json` is the v2 permission manifest for the main window.
   Any new plugin or restricted API needs its permission listed there, or the call is denied
   at runtime — that is where `updater:default` and `process:allow-restart` come from.
+- **`opener:allow-open-url` carries a scope**, not the bare permission: only
+  `https://github.com/vmillet-dev/*` may be opened. `opener:default` would let any URL through
+  the WebView's only escape hatch to the system browser. The About dialog needs the plugin
+  precisely because the CSP is locked to `'self'` — a plain `<a href>` leads nowhere — and
+  `AppInfoService` (`core/app-info/`) is its seam, alongside `getVersion()`. That one needs no
+  permission of its own: `core:app:allow-version` already ships inside `core:default`.
 - `serde_json` is a **runtime** dependency, not just a dev one: `generate_context!` embeds the
   `plugins` section of `tauri.conf.json` as JSON, and drops the section without it.
 - **CSP is enabled.** `csp` locks production down to same-origin resources; `devCsp`

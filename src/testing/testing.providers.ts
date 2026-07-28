@@ -1,9 +1,11 @@
 import { Provider } from '@angular/core';
 import { NOTES_REPOSITORY } from '@core/data/notes-repository.token';
 import { SPACES_REPOSITORY } from '@core/data/spaces-repository.token';
+import { AppInfoService } from '@core/app-info/app-info.service';
 import { Note } from '@core/models/note.model';
 import { Space } from '@core/models/space.model';
 import { UpdaterService } from '@core/updates/updater.service';
+import { FakeAppInfo } from './fake-app-info';
 import { FakeNotesRepository } from './fake-notes-repository';
 import { FakeSpacesRepository } from './fake-spaces-repository';
 import { FakeUpdater } from './fake-updater';
@@ -16,6 +18,7 @@ interface DataDoubles {
   readonly notesRepository?: FakeNotesRepository;
   readonly spacesRepository?: FakeSpacesRepository;
   readonly updater?: FakeUpdater;
+  readonly appInfo?: FakeAppInfo;
 }
 
 /**
@@ -33,9 +36,11 @@ export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
       provide: SPACES_REPOSITORY,
       useValue: doubles.spacesRepository ?? new FakeSpacesRepository(doubles.spaces ?? []),
     },
-    // The shell hosts the update prompt, so every spec reaching it transitively
-    // pulls `UpdaterService` — and with it the Tauri bridge, absent under jsdom.
+    // The shell hosts the update prompt and the about menu, so every spec
+    // reaching it transitively pulls these two — and with them the Tauri bridge,
+    // absent under jsdom.
     { provide: UpdaterService, useValue: doubles.updater ?? new FakeUpdater() },
+    { provide: AppInfoService, useValue: doubles.appInfo ?? new FakeAppInfo() },
     provideTranslocoTesting(),
   ];
 }

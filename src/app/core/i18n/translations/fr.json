@@ -79,7 +79,8 @@
     "spaceGone": "Cet espace n'existe plus.",
     "invalidInput": "Valeur refusée par le moteur : {{field}}.",
     "storageUnavailable": "Le stockage est indisponible. Redémarrez DevBox.",
-    "updateFailed": "La mise à jour a échoué. DevBox reste utilisable dans sa version actuelle."
+    "updateFailed": "La mise à jour a échoué. DevBox reste utilisable dans sa version actuelle.",
+    "updateCheckFailed": "La recherche de mise à jour a échoué. Réessayez plus tard."
   },
   "locale": {
     "groupLabel": "Langue de l'interface",
@@ -96,5 +97,20 @@
     "downloadingPercent": "Téléchargement… {{percent}} %",
     "restarting": "Redémarrage de DevBox…",
     "progressLabel": "Avancement du téléchargement"
+  },
+  "about": {
+    "menuLabel": "À propos",
+    "checkUpdates": "Rechercher les mises à jour",
+    "checking": "Recherche…",
+    "upToDate": "✓ DevBox est à jour",
+    "checkFailed": "✕ Recherche impossible",
+    "openAbout": "À propos de DevBox",
+    "title": "DevBox",
+    "description": "Couteau suisse du développeur : prise de notes et de snippets, hachage et encodage à venir. Angular 22 côté interface, Rust et Tauri v2 pour le moteur natif.",
+    "versionLabel": "Version",
+    "versionUnknown": "inconnue",
+    "developedBy": "Développé par",
+    "repository": "Dépôt",
+    "close": "Fermer"
   }
 }

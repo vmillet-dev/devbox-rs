@@ -1,0 +1,47 @@
+<div class="about-wrapper">
+  <button
+    #trigger
+    type="button"
+    class="about-trigger"
+    aria-haspopup="menu"
+    [attr.aria-expanded]="open()"
+    (click)="toggle()"
+  >
+    {{ 'about.menuLabel' | transloco }}
+    <span class="chev" aria-hidden="true">▾</span>
+  </button>
+
+  @if (open()) {
+    <!-- Écoute déléguée : le conteneur n'est jamais focusé, ce sont ses entrées
+         qui le sont, et l'événement remonte jusqu'ici. Le rendre focusable
+         ajouterait un arrêt de tabulation parasite dans le menu. -->
+    <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -->
+    <div class="about-dropdown" role="menu" (keydown)="onMenuKeydown($event)">
+      <button
+        #option
+        type="button"
+        role="menuitem"
+        class="about-option"
+        [attr.aria-disabled]="checking()"
+        (click)="checkUpdates()"
+      >
+        {{ 'about.checkUpdates' | transloco }}
+        <!-- aria-live : le résultat arrive après le clic, il doit être annoncé
+             sans déplacer le focus, qui est resté sur cette entrée. -->
+        <span class="about-option-status" aria-live="polite">
+          @if (checkStatusRef(); as ref) {
+            {{ ref.key | transloco }}
+          }
+        </span>
+      </button>
+
+      <button #option type="button" role="menuitem" class="about-option" (click)="openDialog()">
+        {{ 'about.openAbout' | transloco }}
+      </button>
+    </div>
+  }
+</div>
+
+@if (dialogOpen()) {
+  <app-about-dialog (closed)="closeDialog()" />
+}

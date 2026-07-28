@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { APP_LOCALES, LocaleService } from '@core/i18n/locale.service';
+import { AboutMenuComponent } from '../about-menu/about-menu.component';
 
 @Component({
   selector: 'app-titlebar',
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, AboutMenuComponent],
   templateUrl: './titlebar.component.html',
   styleUrl: './titlebar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

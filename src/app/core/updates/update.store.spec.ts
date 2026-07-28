@@ -123,6 +123,66 @@ describe('UpdateStore', () => {
     await installing;
   });
 
+  it('confirms in place that the app is up to date, which the startup check never says', async () => {
+    await store.check();
+    expect(store.checkState()).toBe('upToDate');
+
+    await store.checkNow();
+
+    expect(store.checkState()).toBe('upToDate');
+    expect(notifier.notice()).toBeNull();
+  });
+
+  it('says nothing in the menu when a check turns up an update — the prompt speaks', async () => {
+    updater.available = { version: '0.2.0', currentVersion: '0.1.0' };
+
+    await store.checkNow();
+
+    expect(store.checkState()).toBe('idle');
+    expect(store.update()).not.toBeNull();
+  });
+
+  it('passes through a checking state so the menu entry can lock', async () => {
+    updater.deferCheck = true;
+    const running = store.checkNow();
+
+    expect(store.checkState()).toBe('checking');
+
+    updater.finishCheck();
+    await running;
+    expect(store.checkState()).toBe('upToDate');
+  });
+
+  it('surfaces a manual check failure, where the automatic one stays silent', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    updater.checkError = new Error('network unreachable');
+
+    await store.check();
+    expect(notifier.notice()).toBeNull();
+
+    await store.checkNow();
+
+    // The user clicked and is owed an answer; the banner also outlives the menu.
+    expect(notifier.notice()?.ref.key).toBe('errors.updateCheckFailed');
+    expect(store.checkState()).toBe('failed');
+    warn.mockRestore();
+  });
+
+  it('refuses a manual check while the installer is running', async () => {
+    updater.available = { version: '0.2.0', currentVersion: '0.1.0' };
+    updater.deferInstall = true;
+    await store.check();
+    const installing = store.accept();
+    const callsBefore = updater.checkCalls;
+
+    await store.checkNow();
+
+    expect(updater.checkCalls).toBe(callsBefore);
+
+    updater.finishInstall();
+    await installing;
+  });
+
   it('ignores a second check while an update is already on the table', async () => {
     updater.available = { version: '0.2.0', currentVersion: '0.1.0' };
     await store.check();
