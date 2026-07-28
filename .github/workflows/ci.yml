@@ -263,9 +263,10 @@ jobs:
         with:
           args: --verbose
 
-      # Les `.sig` accompagnent l'installateur NSIS et l'AppImage : ce sont les
-      # seules cibles que l'updater sait installer, et `publish` s'en sert pour
-      # reconstituer le manifeste.
+      # Les `.sig` sont remontés en bloc — le bundler en produit pour chaque cible,
+      # y compris celles que l'updater ne sait pas installer. C'est `publish` qui
+      # trie, plutôt que ce filtre : une signature écartée ici disparaîtrait des
+      # journaux, et avec elle le moyen de comprendre un manifeste incomplet.
       - name: Rassembler installateurs et exécutable standalone
         run: |
           tag="${GITHUB_REF_NAME#v}"
@@ -318,34 +319,59 @@ jobs:
           const dir = 'release';
           const { TAG, REPO } = process.env;
 
+          // Le bundler signe tout ce qu'il produit, paquets système compris. Or
+          // l'updater ne sait installer que l'installateur NSIS et l'AppImage :
+          // les autres signatures (.deb, .rpm, .msi) sont ignorées, pas fatales.
+          const TARGETS = [
+            { suffix: '.exe', key: 'windows-x86_64' },
+            { suffix: '.AppImage', key: 'linux-x86_64' },
+          ];
+
           // Chaque .sig désigne le fichier qu'il signe. C'est ce qui distingue
-          // l'installateur NSIS du MSI et de l'exécutable standalone : les trois
-          // sont des .exe, un seul est installable par l'updater.
+          // l'installateur NSIS de l'exécutable standalone, tous deux en .exe :
+          // seul le premier est signé.
           const platforms = {};
+          const chosen = {};
+          const ignored = [];
+
           for (const sig of fs.readdirSync(dir).filter((name) => name.endsWith('.sig'))) {
             const asset = sig.slice(0, -'.sig'.length);
             if (!fs.existsSync(`${dir}/${asset}`)) {
               throw new Error(`signature orpheline : ${sig}`);
             }
 
-            const target = asset.endsWith('.AppImage')
-              ? 'linux-x86_64'
-              : asset.endsWith('.exe')
-                ? 'windows-x86_64'
-                : null;
-            if (!target) throw new Error(`cible inconnue pour ${asset}`);
+            const target = TARGETS.find(({ suffix }) => asset.endsWith(suffix));
+            if (!target) {
+              ignored.push(asset);
+              continue;
+            }
+            // Deux candidats pour une même plateforme : en retenir un au hasard
+            // livrerait peut-être celui que l'updater ne sait pas lancer.
+            if (chosen[target.key]) {
+              throw new Error(
+                `deux artefacts pour ${target.key} : ${chosen[target.key]} et ${asset}`,
+              );
+            }
 
-            platforms[target] = {
+            chosen[target.key] = asset;
+            platforms[target.key] = {
               signature: fs.readFileSync(`${dir}/${sig}`, 'utf8').trim(),
               url: `https://github.com/${REPO}/releases/download/${TAG}/${asset}`,
             };
           }
 
-          // Un manifeste amputé d'une plateforme laisserait ses utilisateurs sans
-          // mise à jour, en silence : mieux vaut casser la publication.
-          const missing = ['windows-x86_64', 'linux-x86_64'].filter((key) => !(key in platforms));
-          if (missing.length) {
-            throw new Error(`plateformes sans artefact de mise à jour : ${missing.join(', ')}`);
+          if (ignored.length) {
+            console.log(`Signatures ignorées (cibles hors updater) : ${ignored.join(', ')}`);
+          }
+
+          // Windows est la cible prioritaire : sans elle le manifeste ne servirait
+          // personne, donc la publication casse. Linux est livré s'il est là, mais
+          // son absence ne doit pas retenir une release Windows par ailleurs saine.
+          if (!platforms['windows-x86_64']) {
+            throw new Error("aucun artefact de mise à jour Windows dans release/");
+          }
+          if (!platforms['linux-x86_64']) {
+            console.log("::warning::Pas d'artefact de mise à jour Linux : manifeste Windows seul.");
           }
 
           // Sans le « v » : l'updater compare la valeur en semver, un préfixe la

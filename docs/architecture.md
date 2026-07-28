@@ -581,13 +581,17 @@ update.
   retry.
 - **The download does not cross the CSP.** It runs in Rust through the plugin's HTTP client,
   not in the WebView, so pointing `endpoints` at GitHub needs no widening of `connect-src`.
-- `bundle.createUpdaterArtifacts` makes the bundler emit a `.sig` next to the NSIS installer
-  and the AppImage — the only two targets the updater can install. `.deb` and `.rpm` are
-  updated by their package manager, by design.
+- `bundle.createUpdaterArtifacts` makes the bundler emit a `.sig` beside **every** bundle it
+  produces, `.deb` and `.rpm` included — but the updater can only install the NSIS installer
+  and the AppImage. System packages are updated by their package manager, by design, so the
+  manifest step ignores their signatures instead of choking on them.
 - The manifest (`latest.json`) is assembled by the `publish` job from those `.sig` files
   rather than by `tauri-action`, which only writes one when it creates the release itself —
-  something the build matrix deliberately avoids. Since the release is created as a **draft**,
-  `releases/latest/download/latest.json` stays unreachable until it is published by hand.
+  something the build matrix deliberately avoids. Windows is the one platform whose absence
+  fails the job; a missing Linux artifact only logs a warning, so a Linux bundling problem
+  cannot hold back an otherwise sound Windows release. Since the release is created as a
+  **draft**, `releases/latest/download/latest.json` stays unreachable until it is published
+  by hand.
 - Building a bundle now requires `TAURI_SIGNING_PRIVATE_KEY` (and its password) in the
   environment. Without it `tauri build` fails, instead of shipping binaries the updater would
   later refuse.
