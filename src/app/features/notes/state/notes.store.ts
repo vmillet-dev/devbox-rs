@@ -9,7 +9,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { NOTES_REPOSITORY } from '../data/notes.repository';
+import { NotesRepository } from '../data/notes.repository';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { FALLBACK_LANGUAGE, LanguageTag } from '@core/language/language.model';
 import {
@@ -92,7 +92,7 @@ function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
  */
 @Injectable({ providedIn: 'root' })
 export class NotesStore {
-  private readonly repository = inject(NOTES_REPOSITORY);
+  private readonly repository = inject(NotesRepository);
   private readonly clock = inject(ClockService);
   private readonly notifier = inject(ErrorNotifier);
   private readonly spaces = inject(SpacesStore);

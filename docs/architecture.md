@@ -424,11 +424,19 @@ persists through `PreferencesService`.
 
 ### Data access
 
-Stores never talk to a data source directly. They inject `NOTES_REPOSITORY` /
-`SPACES_REPOSITORY`, and `app.config.ts` binds those tokens — **the single
-place where the application's data source is chosen**. Both are bound to the `Tauri*`
-repositories; the only remaining doubles are the test ones in `src/testing/`, injected by
-`provideAppTesting()`.
+Stores never talk to a data source directly. They inject `NotesRepository` /
+`SpacesRepository` — ordinary `providedIn: 'root'` classes, not an interface behind an
+`InjectionToken`. There is one implementation and there has only ever been one; the triad
+described a variation that does not exist, and `app.config.ts` binds nothing for them.
+
+Substituting them is still a one-liner: `provideAppTesting()` overrides each class with
+`{ provide: NotesRepository, useValue: fake }`, exactly as it already does for
+`UpdaterService` and `AppInfoService`. What the interface really bought was the _compile-time
+check on the doubles_, and the fakes keep it with
+`implements Pick<NotesRepository, keyof NotesRepository>`: `keyof` on a class type yields only
+its public members, which both drops the private `ipc` (nominal, hence unimplementable) and
+keeps the method list in sync by construction. Rename a method on the real class and
+`src/testing/` fails to compile.
 
 The notes contract is `query` / `create` / `update` / `delete`; spaces expose `loadAll` /
 `create` / `rename` / `delete`. There is deliberately **no method returning the raw list of
@@ -493,11 +501,19 @@ giving it a code would advertise a case the front can never handle.
 
 ### Serialisation contract
 
-`features/notes/data/note.dto.ts` defines what actually travels over the bridge and converts it to the
-domain model. Two traps it exists to handle:
+**A DTO exists only where the wire shape differs from the domain shape.** `model/` is the
+vocabulary the application reasons in — what stores, components and templates manipulate;
+`data/` is the boundary — the shape that crosses the bridge, the repository that crosses it,
+and the conversion between the two. Where the two shapes coincide, the model type travels as
+it is: a space has no DTO, and `IpcContract` types `list_spaces` with `Space` directly. An
+identity mapper is not symmetry, it is one more name for one type — and it teaches the reader
+that "DTO" is decorative, which makes the notes case unreadable by contagion.
+
+Notes earn theirs four times over, and `features/notes/data/note.dto.ts` is where it lives.
+Two traps it exists to handle:
 
 - **JSON has no date type.** Every `Date` becomes an ISO 8601 string on the wire. The mapper
-  parses it back and throws a `NoteContractError` on an unparseable value, rather than
+  parses it back and throws a `ContractError` on an unparseable value, rather than
   letting an `Invalid Date` propagate and resurface as `NaN` in a relative-time label.
 - **Serde's defaults do not match the TypeScript shape.** The Rust `Note` struct needs
   `#[serde(rename_all = "camelCase")]` (otherwise the front receives `space_id` /

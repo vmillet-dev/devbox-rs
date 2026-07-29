@@ -1,6 +1,6 @@
 import { Provider } from '@angular/core';
-import { NOTES_REPOSITORY } from '@features/notes/data/notes.repository';
-import { SPACES_REPOSITORY } from '@features/notes/data/spaces.repository';
+import { NotesRepository } from '@features/notes/data/notes.repository';
+import { SpacesRepository } from '@features/notes/data/spaces.repository';
 import { AppInfoService } from '@core/app-info/app-info.service';
 import { Note } from '@features/notes/model/note.model';
 import { Space } from '@features/notes/model/space.model';
@@ -29,11 +29,11 @@ interface DataDoubles {
 export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
   return [
     {
-      provide: NOTES_REPOSITORY,
+      provide: NotesRepository,
       useValue: doubles.notesRepository ?? new FakeNotesRepository(doubles.notes ?? []),
     },
     {
-      provide: SPACES_REPOSITORY,
+      provide: SpacesRepository,
       useValue: doubles.spacesRepository ?? new FakeSpacesRepository(doubles.spaces ?? []),
     },
     // The shell hosts the update prompt and the about menu, so every spec

@@ -6,9 +6,10 @@ import { Space, SpaceDraft } from '@features/notes/model/space.model';
  * In-memory `SpacesRepository` test double.
  *
  * Like `FakeNotesRepository`, it owns the list and assigns ids, and it can be
- * made to reject through `failNext` so failure paths are testable.
+ * made to reject through `failNext` so failure paths are testable. See that
+ * file for why the implemented type is a `Pick`.
  */
-export class FakeSpacesRepository implements SpacesRepository {
+export class FakeSpacesRepository implements Pick<SpacesRepository, keyof SpacesRepository> {
   private spaces: readonly Space[];
   private nextId = 0;
 

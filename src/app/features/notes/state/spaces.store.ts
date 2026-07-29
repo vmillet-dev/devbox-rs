@@ -1,5 +1,5 @@
 import { Injectable, Signal, computed, effect, inject, resource, signal } from '@angular/core';
-import { SPACES_REPOSITORY } from '../data/spaces.repository';
+import { SpacesRepository } from '../data/spaces.repository';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { Space } from '../model/space.model';
 
@@ -13,7 +13,7 @@ import { Space } from '../model/space.model';
  */
 @Injectable({ providedIn: 'root' })
 export class SpacesStore {
-  private readonly repository = inject(SPACES_REPOSITORY);
+  private readonly repository = inject(SpacesRepository);
   private readonly notifier = inject(ErrorNotifier);
 
   private readonly spacesResource = resource({

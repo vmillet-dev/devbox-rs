@@ -10,8 +10,6 @@ import { provideRouter, withHashLocation } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 
 import { routes } from './app.routes';
-import { NOTES_REPOSITORY, TauriNotesRepository } from '@features/notes/data/notes.repository';
-import { SPACES_REPOSITORY, TauriSpacesRepository } from '@features/notes/data/spaces.repository';
 import { AppErrorHandler } from '@core/errors/app-error-handler';
 import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from '@core/i18n/locale.service';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
@@ -56,10 +54,6 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(() => {
       void inject(UpdateStore).check();
     }),
-
-    // Seule source de données de l'application : le backend Rust.
-    { provide: NOTES_REPOSITORY, useClass: TauriNotesRepository },
-    { provide: SPACES_REPOSITORY, useClass: TauriSpacesRepository },
 
     { provide: ErrorHandler, useClass: AppErrorHandler },
   ],

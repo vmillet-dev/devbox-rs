@@ -7,7 +7,7 @@ import type {
   NotesQueryDto,
   NotesViewDto,
 } from '@features/notes/data/note.dto';
-import type { SpaceDraftDto, SpaceDto } from '@features/notes/data/space.dto';
+import type { Space, SpaceDraft } from '@features/notes/model/space.model';
 import { IpcError } from './ipc.error';
 
 /**
@@ -20,7 +20,11 @@ import { IpcError } from './ipc.error';
  *
  * ⚠️ Tauri v2 applique `rename_all = "camelCase"` aux arguments : un paramètre
  * Rust `target_space_id` s'écrit `targetSpaceId` ici. Les imports sont
- * `import type` pour ne créer aucun cycle avec `core/data`.
+ * `import type` pour ne créer aucun cycle avec `features/notes/data`.
+ *
+ * Un espace circule sous son type du modèle : sa forme sur le fil est celle du
+ * domaine, donc il n'a pas de DTO — contrairement à une note, dont les dates et
+ * les unions demandent une conversion (`note.dto.ts`).
  */
 export interface IpcContract {
   readonly query_notes: { args: { query: NotesQueryDto }; result: NotesViewDto };
@@ -28,9 +32,9 @@ export interface IpcContract {
   readonly update_note: { args: { id: string; patch: NotePatchDto }; result: NoteDto };
   readonly delete_note: { args: { id: string }; result: void };
   /** `db: State` est injecté par Tauri, pas fourni par le front. */
-  readonly list_spaces: { args: undefined; result: readonly SpaceDto[] };
-  readonly create_space: { args: { draft: SpaceDraftDto }; result: SpaceDto };
-  readonly rename_space: { args: { id: string; draft: SpaceDraftDto }; result: SpaceDto };
+  readonly list_spaces: { args: undefined; result: readonly Space[] };
+  readonly create_space: { args: { draft: SpaceDraft }; result: Space };
+  readonly rename_space: { args: { id: string; draft: SpaceDraft }; result: Space };
   readonly delete_space: { args: { id: string; targetSpaceId: string }; result: void };
 }
 

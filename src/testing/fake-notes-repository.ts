@@ -18,8 +18,12 @@ import { NotesQuery, NotesView } from '@features/notes/model/note.model';
  *
  * `lastQuery` and `queryCount` expose what the store asked for, which is the
  * only part of querying the front is still responsible for.
+ *
+ * `Pick<…, keyof …>` is the public surface of the real class: `keyof` drops its
+ * private members, which would otherwise make it nominal and unimplementable.
+ * A method renamed or dropped there fails this file at compile time.
  */
-export class FakeNotesRepository implements NotesRepository {
+export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRepository> {
   private notes: readonly Note[];
   private forcedView: NotesView | null = null;
   private nextId = 0;
