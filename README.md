@@ -22,7 +22,7 @@ A developer's Swiss Army knife for the desktop: a notes/snippets manager, plus u
 
 ```bash
 npm install          # also needed before the first Rust build: Tauri's build script reads the front-end config
-npm run tauri dev    # Angular dev server + Tauri window
+npm run tauri dev    # Vite dev server + Tauri window
 ```
 
 Front-end changes hot-reload; Rust changes trigger an automatic (slower) recompile.
@@ -35,9 +35,9 @@ retry screen. Use it for pure styling work, `npm run tauri dev` for anything els
 
 | Command                 | What it does                                       |
 | ----------------------- | -------------------------------------------------- |
-| `npm start`             | Angular dev server only, port 1420                 |
-| `npm run tauri dev`     | Full dev loop: Angular dev server + Tauri window   |
-| `npm run build`         | Production Angular build → `dist/devbox/browser`   |
+| `npm start`             | Vite dev server only, port 1420                    |
+| `npm run tauri dev`     | Full dev loop: Vite dev server + Tauri window      |
+| `npm run build`         | Production build (Vite) → `dist/devbox/browser`    |
 | `npm run tauri build`   | Full production build → `src-tauri/target/release` |
 | `npm test`              | Unit tests (Vitest, jsdom — no browser required)   |
 | `npm run test:watch`    | Tests, re-running on change                        |

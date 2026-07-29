@@ -5,5 +5,7 @@
     "outDir": "./out-tsc/spec",
     "types": []
   },
-  "include": ["src/**/*.spec.ts", "src/**/*.d.ts"]
+  // Toutes les sources, pas seulement les specs : le plugin Angular de Vite
+  // compile les composants sous test à partir de ce programme.
+  "include": ["src/**/*.ts"]
 }

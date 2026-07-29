@@ -736,14 +736,15 @@ matches `<html>`, silently invalidating every variable.
 
 Recurring style patterns (unstyled control, card surface, accent state, tinted badge) are
 SCSS mixins in `src/styles/_mixins.scss`, imported as `@use 'mixins' as *;` — resolved via
-`stylePreprocessorOptions.includePaths` in `angular.json`. Colors needing translucency are
+`css.preprocessorOptions.scss.loadPaths` in `vite.config.ts`. Colors needing translucency are
 also exposed as RGB triplets (e.g. `--amber-rgb`) so `rgba()` never hard-codes a hex value.
 
 `styles.scss` also carries the `.visually-hidden` utility and a `prefers-reduced-motion`
 block.
 
-Fonts are self-hosted through the `@fontsource` packages listed in `angular.json`'s `styles`
-array. They used to come from Google Fonts, which on a desktop app meant degraded typography
+Fonts are self-hosted through the `@fontsource` packages imported at the top of
+`src/main.ts`, alongside the global stylesheet — under Vite the JS entry point is what pulls
+CSS in. They used to come from Google Fonts, which on a desktop app meant degraded typography
 offline and a CSP that could not be locked down.
 
 ## Application updates
@@ -793,11 +794,34 @@ update.
   environment. Without it `tauri build` fails, instead of shipping binaries the updater would
   later refuse.
 
+## Build tooling
+
+The front-end is built by **Vite** (`vite.config.ts`) with `@analogjs/vite-plugin-angular`,
+not by the Angular CLI. One file describes the dev server, the production build and the test
+runner, which is the whole point of the arrangement: there is a single place where an alias,
+a SCSS load path or a plugin is declared, and no way for the build and the specs to disagree
+about it. The plugin compiles **AOT** — `@angular/compiler` is not in the shipped bundle.
+
+Consequences worth knowing before editing that file:
+
+- **`index.html` lives at the repo root**, not in `src/`. It is Vite's entry document and
+  pulls `/src/main.ts` through a `<script type="module">`.
+- **Vite does not read the `paths` of `tsconfig.json`.** The `@core`/`@shared`/`@features`/
+  `@layout`/`@testing` aliases are declared twice — once for TypeScript, once in
+  `resolve.alias`. Adding one means adding it in both places, or the editor resolves an
+  import the bundler cannot.
+- **The root `tsconfig.json` is a solution file** (nothing but `references`), so it describes
+  no program. The plugin is pointed at `tsconfig.app.json`, or `tsconfig.spec.json` in test
+  mode — hence `tsconfig.spec.json` including all of `src`, not just the specs: the
+  components under test have to be part of that program.
+- `@angular/cli` and `angular.json` are kept for `ng generate` only (SCSS + `OnPush`
+  defaults). `angular.json` has no build targets left; changing one would have no effect.
+
 ## Tauri configuration
 
-- `src-tauri/tauri.conf.json` wires the pipeline to Angular: `beforeDevCommand` /
-  `beforeBuildCommand` run the npm scripts, `devUrl` must match the Angular dev server port
-  (1420, fixed in `angular.json`), and `frontendDist` must match Angular's build output path.
+- `src-tauri/tauri.conf.json` wires the pipeline to the front-end: `beforeDevCommand` /
+  `beforeBuildCommand` run the npm scripts, `devUrl` must match the Vite dev server port
+  (1420, `strictPort` in `vite.config.ts`), and `frontendDist` must match `build.outDir`.
 - `src-tauri/capabilities/default.json` is the v2 permission manifest for the main window.
   Any new plugin or restricted API needs its permission listed there, or the call is denied
   at runtime — that is where `updater:default` and `process:allow-restart` come from.
@@ -816,10 +840,15 @@ update.
 
 ## Testing
 
-Unit tests run with Vitest through the `@angular/build:unit-test` builder in a jsdom
-environment (configured in `angular.json`'s `test` target and `vitest-base.config.ts`), so
-no browser is needed. Specs sit next to the file they cover. Coverage thresholds are set at
-80% and enforced by `npm run test:coverage`.
+Unit tests run with Vitest directly, in a jsdom environment, off the `test` block of
+`vite.config.ts` — the same file and the same Angular transform that build the app, so a
+spec compiles exactly like production code. No browser is needed. Specs sit next to the file
+they cover. Coverage thresholds are set at 80% and enforced by `npm run test:coverage`.
+
+`src/test-setup.ts` does what the Angular CLI builder used to do implicitly: it initialises
+the `TestBed` environment, and resets it after each test. It deliberately does **not** import
+`zone.js` — the app is zoneless, and loading it here would let a component missing
+`provideZonelessChangeDetection()` pass its specs and fail in the app.
 
 Test descriptions and comments are written in **English**, the one deliberate exception to
 this repo's French-first convention.

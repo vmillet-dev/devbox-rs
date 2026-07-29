@@ -79,14 +79,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - uses: actions/cache@v4
-        with:
-          path: .angular/cache
-          key: angular-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: |
-            angular-${{ hashFiles('package-lock.json') }}-
-            angular-
-
       - run: npm ci
 
       - name: Build
@@ -95,8 +87,8 @@ jobs:
           npm run build
           echo "\`build-front\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
-      # Pas consommé par `test-front` : la cible `test` d'angular.json refait sa propre build
-      # dev (buildTarget "::development"). Conservé court, comme preuve et pour le debug.
+      # Pas consommé par `test-front` : Vitest recompile les sources via sa propre
+      # passe de transformation. Conservé court, comme preuve et pour le debug.
       - uses: actions/upload-artifact@v4
         with:
           name: front-dist
@@ -139,15 +131,6 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-
-      # Lecture seule : le cache a été écrit par `build-front`, dont le post-step est terminé.
-      - uses: actions/cache/restore@v4
-        with:
-          path: .angular/cache
-          key: angular-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: |
-            angular-${{ hashFiles('package-lock.json') }}-
-            angular-
 
       - run: npm ci
 

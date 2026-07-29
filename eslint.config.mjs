@@ -11,7 +11,6 @@ export default tseslint.config(
       'out-tsc/**',
       'node_modules/**',
       'src-tauri/target/**',
-      '.angular/**',
       'coverage/**',
       // Maquette statique de référence, ni compilée ni importée.
       'docs/**',

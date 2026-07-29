@@ -29,7 +29,7 @@ export class AppInfoService {
 
   /**
    * Version de `tauri.conf.json`, que le job CI `check-version` maintient
-   * alignée sur le tag. `null` hors runtime Tauri (`ng serve` seul) : la fiche
+   * alignée sur le tag. `null` hors runtime Tauri (`npm start` seul) : la fiche
    * affiche alors un tiret plutôt que de mentir.
    */
   readonly version: Signal<string | null> = computed(() =>
