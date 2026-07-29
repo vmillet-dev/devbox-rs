@@ -98,6 +98,12 @@
     "updateFailed": "The update failed. DevBox remains usable on its current version.",
     "updateCheckFailed": "The update check failed. Try again later."
   },
+  "tray": {
+    "open": "Open DevBox",
+    "newNote": "New note",
+    "capture": "Paste from clipboard",
+    "quit": "Quit DevBox"
+  },
   "locale": {
     "groupLabel": "Interface language",
     "fr": "French",

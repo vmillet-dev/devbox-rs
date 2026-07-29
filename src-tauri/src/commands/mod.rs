@@ -5,10 +5,12 @@
 //!
 //! Une nouvelle commande doit être `pub`, annotée `#[tauri::command]`, renvoyer
 //! `Result<_, AppError>` et être enregistrée dans `generate_handler!` (`lib.rs`).
+//! `tray` fait exception au `Result` — voir son module.
 
 pub mod error;
 pub mod notes;
 pub mod spaces;
+pub mod tray;
 
 use crate::storage::Db;
 use error::AppError;

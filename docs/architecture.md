@@ -577,11 +577,19 @@ front something happened — goes through **`AppEventsService`** (`core/ipc/app-
 which wraps `listen` from `@tauri-apps/api/event`. `IpcService` keeps the upward direction and
 stays the only caller of `invoke()`.
 
-Today it carries the global shortcuts. They are registered **in Rust** (`register_shortcuts` in
-`src-tauri/src/lib.rs`, desktop-only), which is why they need no capability: capabilities gate
-the API the WebView calls, not what the native side does on its own. On a keypress Rust reveals
-the window and emits `devbox:capture` or `devbox:new-note`; the front reads the clipboard and
-creates the note.
+Today it carries the desktop integration, which lives in `src-tauri/src/desktop.rs` — global
+shortcuts and the system tray. That module is neither a command, a rule nor SQL, so it sits
+outside `commands/ → domain/ ← storage/` and depends on none of the three. None of it needs a
+capability: capabilities gate the API the **WebView** calls, not what the native side does on
+its own.
+
+Two producers, **the same two events**, so the front wires the actions once:
+
+- `Ctrl+Alt+V` / `Ctrl+Alt+N`, registered at startup;
+- the tray menu's "new note" and "paste from clipboard" items.
+
+Both reveal the window and emit `devbox:capture` or `devbox:new-note`; `NotesPageComponent`
+listens, reads the clipboard and creates the note.
 
 - **Rust does not create the note.** Keeping creation on the front means one creation path
   (`create_note`), so a captured note gets language detection without a second implementation,
@@ -594,6 +602,24 @@ creates the note.
 - `AppEventsService.on()` returns an unsubscribe immediately although the subscription only
   lands a tick later; a component destroyed in between would otherwise stay subscribed for the
   whole session.
+
+### System tray
+
+DevBox stays resident in the notification area, and **the window's close button only hides it**
+— quitting goes through the tray menu. An app made to be one shortcut away would be pointless
+if closing it killed the shortcut.
+
+- **The front creates the tray, not the native startup.** `TrayService` (`core/tray/`) pushes
+  the menu labels through `sync_tray`, and Rust holds **no user-visible string at all**: the
+  interface language is a front-end preference, and a translation table in Rust would be a
+  second source to keep in step. The subscription re-emits on every language change, so the
+  menu re-translates itself.
+- **Closing only hides when a tray exists** (`desktop::has_tray`). Without that guard, a
+  desktop with no notification area would leave a hidden window and a process nothing could
+  bring back.
+- `sync_tray` is the one command that returns no `Result`. A missing tray is not a failure the
+  front can act on, and giving it an `ErrorCode` would add a branch no UI would ever render —
+  it is logged natively, like an unavailable global shortcut.
 
 The eight commands are `query_notes`, `create_note`, `update_note`, `delete_note`,
 `list_spaces`, `create_space`, `rename_space` and `delete_space`. The guarantees the

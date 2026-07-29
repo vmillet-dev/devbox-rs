@@ -1,4 +1,6 @@
 mod commands;
+#[cfg(desktop)]
+mod desktop;
 mod domain;
 mod storage;
 
@@ -8,69 +10,7 @@ use tauri::Manager;
 
 use commands::notes::{create_note, delete_note, query_notes, update_note};
 use commands::spaces::{create_space, delete_space, list_spaces, rename_space};
-
-/// Événements poussés vers le front. Miroir de `core/ipc/app-events.service.ts`,
-/// où une faute de frappe produirait un abonnement silencieusement inerte.
-#[cfg(desktop)]
-mod events {
-    pub const CAPTURE: &str = "devbox:capture";
-    pub const NEW_NOTE: &str = "devbox:new-note";
-}
-
-/// Raccourcis actifs hors de la fenêtre : c'est ce qui remplace le réflexe
-/// « j'ouvre le Bloc-notes ».
-///
-/// Le Rust ne crée pas la note — il montre la fenêtre et prévient. La création
-/// reste au front, qui passe par `create_note` comme pour toute autre note et
-/// profite donc de la détection de langage sans la dupliquer ici.
-///
-/// Un enregistrement qui échoue (raccourci déjà pris par une autre application)
-/// est signalé mais **non fatal** : DevBox doit démarrer sans son raccourci.
-#[cfg(desktop)]
-fn register_shortcuts(app: &tauri::AppHandle) -> tauri::Result<()> {
-    use tauri::Emitter;
-    use tauri_plugin_global_shortcut::{
-        Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
-    };
-
-    const CONTROL_ALT: Modifiers = Modifiers::CONTROL.union(Modifiers::ALT);
-    let capture = Shortcut::new(Some(CONTROL_ALT), Code::KeyV);
-    let new_note = Shortcut::new(Some(CONTROL_ALT), Code::KeyN);
-
-    app.plugin(
-        tauri_plugin_global_shortcut::Builder::new()
-            .with_handler(move |app, shortcut, event| {
-                // Sans ce filtre le relâchement rejouerait l'action.
-                if event.state() != ShortcutState::Pressed {
-                    return;
-                }
-
-                let topic = if shortcut == &capture {
-                    events::CAPTURE
-                } else if shortcut == &new_note {
-                    events::NEW_NOTE
-                } else {
-                    return;
-                };
-
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.unminimize();
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-                let _ = app.emit(topic, ());
-            })
-            .build(),
-    )?;
-
-    for shortcut in [capture, new_note] {
-        if let Err(error) = app.global_shortcut().register(shortcut) {
-            eprintln!("Raccourci global {shortcut:?} indisponible : {error}");
-        }
-    }
-
-    Ok(())
-}
+use commands::tray::sync_tray;
 
 /// Point d'entrée de l'application, natif sur mobile via `mobile_entry_point`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -88,9 +28,10 @@ pub fn run() {
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
 
             // Idem : un système mobile ne laisse pas une application écouter le
-            // clavier hors de sa fenêtre.
+            // clavier hors de sa fenêtre. La barre système, elle, n'est pas
+            // créée ici — elle attend du front ses libellés traduits.
             #[cfg(desktop)]
-            register_shortcuts(app.handle())?;
+            desktop::register_shortcuts(app.handle())?;
 
             // Seul emplacement inscriptible garanti une fois l'app installée.
             let directory = app.path().app_data_dir()?;
@@ -103,6 +44,21 @@ pub fn run() {
 
             Ok(())
         })
+        // Fermer range dans la barre système au lieu de quitter : l'application
+        // est faite pour rester à portée de raccourci, et la quitter à chaque
+        // fois rendrait `Ctrl+Alt+V` inutile.
+        //
+        // ⚠️ Uniquement s'il y a une barre système où la retrouver. Sans elle,
+        // cacher la fenêtre laisserait un processus que plus rien ne rappelle.
+        .on_window_event(|_window, _event| {
+            #[cfg(desktop)]
+            if let tauri::WindowEvent::CloseRequested { api, .. } = _event
+                && desktop::has_tray(_window.app_handle())
+            {
+                api.prevent_close();
+                let _ = _window.hide();
+            }
+        })
         // Sans enregistrement ici, `invoke()` échoue sur « command not found ».
         .invoke_handler(tauri::generate_handler![
             query_notes,
@@ -113,6 +69,7 @@ pub fn run() {
             create_space,
             rename_space,
             delete_space,
+            sync_tray,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");

@@ -8,6 +8,7 @@ import type {
   NotesViewDto,
 } from '@features/notes/data/note.dto';
 import type { Space, SpaceDraft } from '@features/notes/model/space.model';
+import type { TrayLabels } from '@core/tray/tray.service';
 import { IpcError } from './ipc.error';
 
 /**
@@ -36,6 +37,11 @@ export interface IpcContract {
   readonly create_space: { args: { draft: SpaceDraft }; result: Space };
   readonly rename_space: { args: { id: string; draft: SpaceDraft }; result: Space };
   readonly delete_space: { args: { id: string; targetSpaceId: string }; result: void };
+  /**
+   * Seule commande sans `Result` côté Rust : une barre système absente n'est pas
+   * une panne que le front puisse traiter (voir `commands/tray.rs`).
+   */
+  readonly sync_tray: { args: { labels: TrayLabels }; result: void };
 }
 
 export type IpcCommand = keyof IpcContract;

@@ -14,6 +14,7 @@ import { AppErrorHandler } from '@core/errors/app-error-handler';
 import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from '@core/i18n/locale.service';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
 import { PreferencesService } from '@core/preferences/preferences.service';
+import { TrayService } from '@core/tray/tray.service';
 import { UpdateStore } from '@core/updates/update.store';
 
 export const appConfig: ApplicationConfig = {
@@ -42,9 +43,14 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(async () => {
       const preferences = inject(PreferencesService);
       const locale = inject(LocaleService);
+      const tray = inject(TrayService);
 
       await preferences.hydrate();
       locale.restore();
+      // Après `restore()` : c'est le front qui crée la barre système, en lui
+      // donnant ses libellés, et la créer avant aurait affiché la langue par
+      // défaut le temps d'un aller-retour.
+      tray.start();
     }),
 
     // Recherche de mise à jour au lancement. La promesse n'est délibérément pas

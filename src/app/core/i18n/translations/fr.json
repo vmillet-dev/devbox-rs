@@ -98,6 +98,12 @@
     "updateFailed": "La mise à jour a échoué. DevBox reste utilisable dans sa version actuelle.",
     "updateCheckFailed": "La recherche de mise à jour a échoué. Réessayez plus tard."
   },
+  "tray": {
+    "open": "Ouvrir DevBox",
+    "newNote": "Nouvelle note",
+    "capture": "Coller le presse-papier",
+    "quit": "Quitter DevBox"
+  },
   "locale": {
     "groupLabel": "Langue de l'interface",
     "fr": "Français",

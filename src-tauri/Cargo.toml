@@ -18,7 +18,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# `tray-icon` : DevBox reste résidente dans la zone de notification, d'où on la
+# rappelle et d'où on la quitte — la croix de la fenêtre ne fait plus que cacher.
+tauri = { version = "2", features = ["tray-icon"] }
 # Sérialisation des structures échangées avec le front (voir domain/note.rs).
 serde = { version = "1", features = ["derive"] }
 # Exigé par `generate_context!` depuis que tauri.conf.json porte une section
