@@ -2,7 +2,7 @@
 
 .tag-pill {
   font: inherit;
-  font-family: var(--font-mono);
+  font-family: var(--font-mono), serif;
   font-size: 11px;
   padding: 4px 10px;
   @include surface($radius: 12px);

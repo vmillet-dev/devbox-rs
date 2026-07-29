@@ -25,6 +25,30 @@
   color: $color;
 }
 
+// Fond d'une modale. Le z-index reste à l'appelant : c'est la seule chose qui
+// distingue les trois modales, et leur ordre d'empilement est une décision
+// (l'éditeur 50, la fiche À propos 55, la mise à jour 60).
+@mixin backdrop($z-index) {
+  position: fixed;
+  inset: 0;
+  background: rgba(var(--backdrop-rgb), 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: $z-index;
+}
+
+// Panneau posé sur un `backdrop`, dimensionné par son contenu.
+@mixin dialog-panel($width) {
+  width: min($width, 88vw);
+  @include surface(var(--bg-1), 14px, var(--line));
+  box-shadow: var(--shadow-overlay);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
 // Badge teinté façon "pill" (lifecycle badge, tag de langage) : fond
 // translucide + texte plein dans la même teinte, à partir d'une variable
 // CSS RGB (ex. --amber-rgb) pour ne pas dupliquer chaque couleur en hex.

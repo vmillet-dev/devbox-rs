@@ -1,0 +1,38 @@
+<div appDialogBackdrop class="about-backdrop" (dismissed)="closed.emit()">
+  <div appFocusTrap class="about-panel" role="dialog" aria-modal="true" aria-labelledby="about-dialog-title">
+    <div class="about-header">
+      <h2 id="about-dialog-title" class="about-name">{{ 'about.title' | transloco }}</h2>
+      <!-- La version est absente hors runtime Tauri : un tiret plutôt qu'un
+           numéro inventé, et un doublon textuel pour les lecteurs d'écran. -->
+      <span class="about-version" aria-hidden="true">
+        {{ version() ? 'v' + version() : '—' }}
+      </span>
+      <span class="visually-hidden">
+        {{ 'about.versionLabel' | transloco }} {{ version() ?? ('about.versionUnknown' | transloco) }}
+      </span>
+    </div>
+
+    <p class="about-description">{{ 'about.description' | transloco }}</p>
+
+    <dl class="about-facts">
+      <dt>{{ 'about.developedBy' | transloco }}</dt>
+      <dd>{{ authorName }} ({{ authorHandle }})</dd>
+
+      <dt>{{ 'about.repository' | transloco }}</dt>
+      <dd>
+        <!-- Un <button> et non un <a> : c'est le plugin `opener` qui agit, la
+             WebView ne navigue pas. Un href donnerait un lien mort. -->
+        <button type="button" class="about-repo" (click)="openRepository()">
+          {{ repositoryLabel }}
+          <span aria-hidden="true">↗</span>
+        </button>
+      </dd>
+    </dl>
+
+    <div class="about-actions">
+      <button type="button" class="about-close" (click)="closed.emit()">
+        {{ 'about.close' | transloco }}
+      </button>
+    </div>
+  </div>
+</div>

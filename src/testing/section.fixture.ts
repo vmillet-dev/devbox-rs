@@ -1,5 +1,5 @@
-import { NoteSection, NoteSectionKey } from '@core/models/note-section.model';
-import { Note } from '@core/models/note.model';
+import { NoteSection, NoteSectionKey } from '@features/notes/model/note.model';
+import { Note } from '@features/notes/model/note.model';
 
 /** Builds a `NoteSection` for tests without repeating every flag at each call site. */
 export function createSection(

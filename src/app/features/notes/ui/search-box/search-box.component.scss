@@ -1,0 +1,36 @@
+@use 'mixins' as *;
+
+.search-bar {
+  flex: 1;
+  max-width: 520px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  @include surface;
+  padding: 7px 12px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.search-bar input {
+  @include unstyled-control;
+  flex: 1;
+  color: var(--text-0);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+.search-bar input::placeholder {
+  color: var(--text-2);
+}
+
+.kbd {
+  font-family: var(--font-mono), serif;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: var(--text-1);
+  margin-left: auto;
+}

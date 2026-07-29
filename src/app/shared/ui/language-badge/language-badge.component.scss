@@ -1,7 +1,7 @@
 @use 'mixins' as *;
 
 .lang-tag {
-  font-family: var(--font-mono);
+  font-family: var(--font-mono), serif;
   font-size: 9.5px;
   padding: 2px 6px;
   border-radius: 4px;

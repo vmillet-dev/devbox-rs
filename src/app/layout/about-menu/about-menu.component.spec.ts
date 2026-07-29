@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppInfoService } from '@core/app-info/app-info.service';
 import { UpdateStore } from '@core/updates/update.store';
 import { UpdaterService } from '@core/updates/updater.service';
-import { AboutDialogComponent } from '@shared/ui/about-dialog/about-dialog.component';
+import { AboutDialogComponent } from '@layout/about-dialog/about-dialog.component';
 import { FakeAppInfo } from '@testing/fake-app-info';
 import { FakeUpdater } from '@testing/fake-updater';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';

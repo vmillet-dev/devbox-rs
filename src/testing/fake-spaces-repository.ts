@@ -1,5 +1,6 @@
-import { SpacesRepository } from '@core/data/spaces-repository.token';
-import { Space, SpaceDraft } from '@core/models/space.model';
+import { guard } from './fail-next';
+import { SpacesRepository } from '@features/notes/data/spaces.repository';
+import { Space, SpaceDraft } from '@features/notes/model/space.model';
 
 /**
  * In-memory `SpacesRepository` test double.
@@ -19,11 +20,11 @@ export class FakeSpacesRepository implements SpacesRepository {
   }
 
   loadAll(): Promise<readonly Space[]> {
-    return this.guard(() => this.spaces);
+    return guard(this, () => this.spaces);
   }
 
   create(draft: SpaceDraft): Promise<Space> {
-    return this.guard(() => {
+    return guard(this, () => {
       const space: Space = { id: `fake-space-${++this.nextId}`, name: draft.name };
       this.spaces = [...this.spaces, space];
       return space;
@@ -31,7 +32,7 @@ export class FakeSpacesRepository implements SpacesRepository {
   }
 
   rename(id: string, draft: SpaceDraft): Promise<Space> {
-    return this.guard(() => {
+    return guard(this, () => {
       const renamed: Space = { id, name: draft.name };
       this.spaces = this.spaces.map((space) => (space.id === id ? renamed : space));
       return renamed;
@@ -44,21 +45,8 @@ export class FakeSpacesRepository implements SpacesRepository {
    * which is what the move is observable through.
    */
   delete(id: string, _targetSpaceId: string): Promise<void> {
-    return this.guard(() => {
+    return guard(this, () => {
       this.spaces = this.spaces.filter((space) => space.id !== id);
     });
-  }
-
-  private guard<T>(operation: () => T): Promise<T> {
-    if (this.failNext) {
-      const error = this.failNext;
-      this.failNext = null;
-      return Promise.reject(error);
-    }
-    try {
-      return Promise.resolve(operation());
-    } catch (error) {
-      return Promise.reject(error);
-    }
   }
 }

@@ -22,9 +22,10 @@ export default defineConfig({
         'src/main.ts',
         '**/app.config.ts',
         '**/app.routes.ts',
-        '**/*.providers.ts',
         // Thin `invoke()` adapters: nothing to assert without a live Tauri runtime.
-        '**/tauri-*-repository.ts',
+        // Each repository file also holds its interface and DI token, which are
+        // type-level or one-liners.
+        '**/*.repository.ts',
         '**/ipc.service.ts',
       ],
       thresholds: {

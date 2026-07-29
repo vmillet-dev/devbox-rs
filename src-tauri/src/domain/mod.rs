@@ -1,39 +1,17 @@
-//! Modèle et règles métier de DevBox.
+//! Modèle et règles métier : `commands/ ──► domain/ ◄── storage/`.
 //!
-//! # Ce que cette couche ne connaît pas
-//!
-//! Ni la base de données, ni Tauri. Elle ne dépend que de `serde` et `chrono`,
-//! et c'est ce qui permet d'éprouver une règle — regroupement en sections,
-//! normalisation des tags, correspondance d'une recherche — sans ouvrir de
+//! Ne connaît ni SQLite ni Tauri — d'où des règles éprouvables sans ouvrir de
 //! connexion ni lancer l'application.
 //!
-//! # Sens des dépendances
-//!
-//! ```text
-//! commands/  ──►  domain/  ◄──  storage/
-//! ```
-//!
-//! La persistance sait lire et écrire ce modèle, le transport sait le
-//! sérialiser, aucun des deux ne le définit. L'inverse — le modèle rangé dans
-//! `commands/` — faisait dépendre la persistance du transport.
-//!
-//! # Pourquoi serde vit ici
-//!
-//! Les attributs de sérialisation sont portés par le modèle plutôt que par une
-//! seconde famille de DTO : à cette échelle, le mapping coûterait plus qu'il ne
-//! protège. Le contrat traversant le pont est figé par les tests de [`note`],
-//! [`query`] et [`space`] — la seule chose que le compilateur ne peut pas
-//! vérifier et qui casse silencieusement le front.
+//! Les attributs serde sont portés par le modèle plutôt que par une seconde
+//! famille de DTO. Le contrat traversant le pont est figé par des tests de
+//! sérialisation : c'est ce que le compilateur ne peut pas vérifier et qui
+//! casse silencieusement le front.
 
-pub mod display;
-pub mod language;
 pub mod note;
-pub mod query;
-pub mod search;
+pub mod rules;
 pub mod sections;
 pub mod space;
-pub mod tags;
-pub mod validation;
 pub mod view;
 
 /// Reference note shared by the domain tests, so a field added to `Note` is

@@ -1,20 +1,55 @@
 import { Injectable } from '@angular/core';
 import { InvokeArgs, invoke } from '@tauri-apps/api/core';
-import { IpcCommand, IpcInvocation, IpcResult } from './ipc-contract';
-import { IpcError } from './ipc-error';
-
-export { IpcError } from './ipc-error';
-export type { IpcErrorCode } from './ipc-error';
-export type { IpcCommand } from './ipc-contract';
+import type {
+  NoteDraftDto,
+  NoteDto,
+  NotePatchDto,
+  NotesQueryDto,
+  NotesViewDto,
+} from '@features/notes/data/note.dto';
+import type { SpaceDraftDto, SpaceDto } from '@features/notes/data/space.dto';
+import { IpcError } from './ipc.error';
 
 /**
- * Unique point de passage vers le backend Rust. Aucun composant ni store
- * n'appelle `invoke()` directement : ça centralise la normalisation des erreurs
- * et ça rend les dépôts testables en se contentant de doubler ce service.
+ * Signature de chaque commande Tauri : nom, arguments, valeur de retour.
  *
- * Le nom de commande, la forme de ses arguments et son type de retour viennent
- * tous de `IpcContract` : une clé d'argument mal orthographiée ne compile plus,
- * alors qu'elle ne se voyait auparavant qu'à l'exécution.
+ * Tauri apparie les arguments **par nom**. Une clé mal orthographiée compilerait
+ * sans broncher et n'échouerait qu'à l'exécution, sur un rejet serde — donc un
+ * `IpcError` sans code, le cas le plus opaque à diagnostiquer. Cette table en
+ * fait une erreur de build.
+ *
+ * ⚠️ Tauri v2 applique `rename_all = "camelCase"` aux arguments : un paramètre
+ * Rust `target_space_id` s'écrit `targetSpaceId` ici. Les imports sont
+ * `import type` pour ne créer aucun cycle avec `core/data`.
+ */
+export interface IpcContract {
+  readonly query_notes: { args: { query: NotesQueryDto }; result: NotesViewDto };
+  readonly create_note: { args: { draft: NoteDraftDto }; result: NoteDto };
+  readonly update_note: { args: { id: string; patch: NotePatchDto }; result: NoteDto };
+  readonly delete_note: { args: { id: string }; result: void };
+  /** `db: State` est injecté par Tauri, pas fourni par le front. */
+  readonly list_spaces: { args: undefined; result: readonly SpaceDto[] };
+  readonly create_space: { args: { draft: SpaceDraftDto }; result: SpaceDto };
+  readonly rename_space: { args: { id: string; draft: SpaceDraftDto }; result: SpaceDto };
+  readonly delete_space: { args: { id: string; targetSpaceId: string }; result: void };
+}
+
+export type IpcCommand = keyof IpcContract;
+export type IpcResult<C extends IpcCommand> = IpcContract[C]['result'];
+
+/**
+ * Argument optionnel exactement pour les commandes qui n'en prennent pas, au
+ * lieu d'un `args?` uniformément facultatif qui laisserait passer un appel
+ * dépourvu de sa charge utile.
+ */
+export type IpcInvocation<C extends IpcCommand> = IpcContract[C]['args'] extends undefined
+  ? []
+  : [IpcContract[C]['args']];
+
+/**
+ * Unique point de passage vers le backend Rust : aucun composant ni store
+ * n'appelle `invoke()` directement. Centralise la normalisation des erreurs et
+ * rend les dépôts testables en doublant ce seul service.
  */
 @Injectable({ providedIn: 'root' })
 export class IpcService {

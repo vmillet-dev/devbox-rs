@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IpcError } from './ipc.service';
+import { IpcError } from './ipc.error';
 
 describe('IpcError', () => {
   it('keeps the failing command and the raw cause', () => {

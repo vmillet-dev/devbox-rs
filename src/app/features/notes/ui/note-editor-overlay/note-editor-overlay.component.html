@@ -1,0 +1,156 @@
+@if (note(); as note) {
+  <div appDialogBackdrop class="overlay-backdrop" (dismissed)="requestClose()">
+    <div
+      appFocusTrap
+      class="overlay-panel"
+      [class.fullscreen]="fullscreen()"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="overlay-title-input"
+    >
+      <div class="overlay-toolbar">
+        <!-- Le titre est confirmé au blur et à la fermeture, pas à chaque
+             frappe : une note enregistrée par caractère, c'est un aller-retour
+             IPC par caractère. -->
+        <input
+          #titleInput
+          id="overlay-title-input"
+          class="overlay-title-input"
+          [attr.aria-label]="'editor.titleLabel' | transloco"
+          [placeholder]="'notes.untitled' | transloco"
+          [value]="draftTitle()"
+          (input)="draftTitle.set(titleInput.value)"
+          (blur)="commitTitle()"
+        />
+
+        <select
+          #languageSelect
+          class="overlay-language-select"
+          [attr.aria-label]="'editor.languageLabel' | transloco"
+          [value]="note.language"
+          (change)="onLanguageChange(languageSelect.value)"
+        >
+          @for (option of languageOptions; track option.value) {
+            <option [value]="option.value" [selected]="option.value === note.language">
+              {{ option.label }}
+            </option>
+          }
+        </select>
+
+        <button
+          type="button"
+          class="toolbar-btn"
+          [class.pinned]="note.pinned"
+          [attr.aria-pressed]="note.pinned"
+          (click)="pinToggled.emit()"
+        >
+          <span aria-hidden="true">📌</span>
+          {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
+        </button>
+        <button
+          type="button"
+          class="toolbar-btn delete-btn"
+          [class.confirming]="confirmingDelete()"
+          (click)="onDeleteClick()"
+        >
+          <span aria-hidden="true">🗑</span>
+          {{ (confirmingDelete() ? 'editor.deleteConfirm' : 'editor.delete') | transloco }}
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          [attr.aria-pressed]="fullscreen()"
+          [attr.aria-label]="(fullscreen() ? 'editor.exitFullscreen' : 'editor.fullscreen') | transloco"
+          (click)="toggleFullscreen()"
+        >
+          <span aria-hidden="true">{{ fullscreen() ? '⤡' : '⤢' }}</span>
+        </button>
+        <button
+          type="button"
+          class="icon-btn close-btn"
+          [attr.aria-label]="'editor.close' | transloco"
+          (click)="requestClose()"
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
+      </div>
+
+      <div class="overlay-meta-row">
+        @if (note.source) {
+          <span>{{ note.source }}</span>
+          <span aria-hidden="true">·</span>
+        }
+        <div class="overlay-tags">
+          @for (tag of note.tags; track tag) {
+            <span class="editable-tag">
+              <app-tag-pill [label]="tag" [active]="true" [interactive]="false" />
+              <button
+                type="button"
+                class="tag-remove"
+                [attr.aria-label]="'editor.removeTag' | transloco: { tag: tag }"
+                (click)="tagRemoved.emit(tag)"
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
+            </span>
+          }
+          <form class="tag-add-form" (submit)="submitTag($event)">
+            <input
+              #tagInput
+              type="text"
+              class="tag-add-input"
+              [attr.aria-label]="'editor.addTagLabel' | transloco"
+              [placeholder]="'editor.addTagPlaceholder' | transloco"
+              [value]="tagInputValue()"
+              (input)="tagInputValue.set(tagInput.value)"
+            />
+          </form>
+        </div>
+        <!-- Le badge dit l'état, le champ le change. Vider le champ rend la note
+             permanente ; y poser une date la fait entrer dans « À trier ». -->
+        <span class="overlay-expiry">
+          <app-lifecycle-badge [lifecycle]="note.lifecycle" [expiringSoon]="note.expiringSoon" />
+          <input
+            #expiryInput
+            type="date"
+            class="overlay-expiry-input"
+            [attr.aria-label]="'editor.expiryLabel' | transloco"
+            [value]="expiryInputValue()"
+            (change)="onExpiryChange(expiryInput.value)"
+          />
+        </span>
+      </div>
+
+      <!-- Deux couches superposées plutôt qu'une bascule aperçu/édition : le
+           visualiseur colorie le brouillon en dessous, le <textarea> reçoit la
+           frappe par-dessus avec un texte transparent et un curseur visible.
+           C'est lui qui porte le texte accessible ; le visualiseur est masqué
+           aux lecteurs d'écran, qui liraient sinon le contenu deux fois. -->
+      <div class="overlay-body">
+        <div class="editor-stack">
+          <app-code-viewer aria-hidden="true" [content]="draftContent()" [language]="note.language" />
+          <textarea
+            #bodyEditor
+            class="overlay-body-editor"
+            spellcheck="false"
+            [attr.aria-label]="'editor.contentLabel' | transloco"
+            [placeholder]="'editor.emptyBody' | transloco"
+            [value]="draftContent()"
+            (input)="draftContent.set(bodyEditor.value)"
+            (blur)="commitContent()"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="overlay-footer">
+        <span>
+          {{ languageLabel() }} ·
+          {{ 'editor.footerStats' | transloco: { lines: lineCount(), bytes: byteSize() } }}
+        </span>
+        @if (modifiedRef(); as ref) {
+          <span>{{ 'editor.modifiedPrefix' | transloco }} {{ ref.key | transloco: ref.params }}</span>
+        }
+      </div>
+    </div>
+  </div>
+}

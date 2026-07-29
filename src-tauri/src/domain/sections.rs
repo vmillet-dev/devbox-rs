@@ -1,20 +1,13 @@
 //! Regroupement des notes en sections d'affichage.
 //!
-//! Module **pur** : aucune connexion, aucune horloge lue en interne. Il ne
-//! manipule que des notes déjà filtrées et un instant de référence, ce qui le
-//! rend testable sans base et sans figer le temps.
-//!
-//! # L'exhaustivité est une garantie, pas un détail
-//!
-//! Hors notes épinglées, chaque note tombe dans **exactement une** section parmi
-//! `today`, `week` et `older`. Une note n'appartenant à aucune section serait
-//! introuvable dans l'interface, recherche comprise.
+//! ⚠️ **L'exhaustivité est une garantie.** Hors notes épinglées, chaque note
+//! tombe dans exactement une section parmi `today`, `week` et `older` : une note
+//! sans section serait introuvable dans l'interface, recherche comprise.
 
 use chrono::{DateTime, Datelike, FixedOffset};
 
-use super::display::{self, DisplayNote};
-use super::note::Note;
-use super::query::{NoteSection, NoteSectionKey};
+use super::note::{self, DisplayNote, Note};
+use super::view::{NoteSection, NoteSectionKey};
 
 const WEEK_DAYS: i64 = 7;
 
@@ -23,15 +16,12 @@ const MAX_TZ_OFFSET_MINUTES: u32 = 14 * 60;
 
 /// Décalage du front (`Date#getTimezoneOffset()`) en `FixedOffset` chrono.
 ///
-/// Le signe s'inverse : JavaScript compte les minutes à **ajouter** à l'heure
-/// locale pour obtenir UTC (−120 pour UTC+2), là où chrono attend le décalage
-/// à l'est de UTC. Une valeur aberrante retombe sur UTC plutôt que de faire
-/// échouer la requête : au pire les journées sont découpées à l'heure UTC.
+/// ⚠️ Le signe s'inverse : JavaScript compte les minutes à **ajouter** à l'heure
+/// locale pour obtenir UTC (−120 pour UTC+2), chrono attend le décalage à l'est.
 ///
-/// La borne est vérifiée **avant** la multiplication : la valeur vient du pont
-/// IPC, et `-i32::MIN` comme `i32::MAX * 60` déborderaient — panique en debug,
-/// et le mutex de connexion resterait empoisonné pour le reste du processus.
-/// `unsigned_abs` plutôt que `abs`, qui déborde lui aussi sur `i32::MIN`.
+/// La borne est vérifiée **avant** la multiplication — la valeur vient du pont
+/// IPC, et `-i32::MIN` comme `i32::MAX * 60` déborderaient, empoisonnant le
+/// mutex pour le reste du processus. D'où aussi `unsigned_abs` plutôt qu'`abs`.
 pub fn offset_from_minutes(tz_offset_minutes: i32) -> FixedOffset {
     let utc = FixedOffset::east_opt(0).expect("UTC est un décalage valide");
 
@@ -42,9 +32,8 @@ pub fn offset_from_minutes(tz_offset_minutes: i32) -> FixedOffset {
     FixedOffset::east_opt(-tz_offset_minutes * 60).unwrap_or(utc)
 }
 
-/// Une date ISO illisible ne doit pas faire disparaître la note : elle est
-/// classée dans `older`, où elle reste atteignable. `created_at` vient de notre
-/// propre écriture, donc le cas relève de la corruption, pas du fonctionnement.
+/// `None` classe la note dans `older`, où elle reste atteignable — une date
+/// illisible ne doit pas la faire disparaître.
 fn parse(value: &str, offset: &FixedOffset) -> Option<DateTime<FixedOffset>> {
     DateTime::parse_from_rfc3339(value)
         .ok()
@@ -60,8 +49,7 @@ fn is_within_days(date: &DateTime<FixedOffset>, now: &DateTime<FixedOffset>, day
     elapsed.num_milliseconds() >= 0 && elapsed.num_days() <= days
 }
 
-/// Point unique où une note persistée devient une note affichable : c'est la
-/// seule porte de sortie vers le front, donc rien ne peut lui échapper.
+/// Seule porte de sortie vers le front : rien ne peut lui échapper.
 fn section(
     key: NoteSectionKey,
     notes: Vec<Note>,
@@ -70,7 +58,7 @@ fn section(
 ) -> NoteSection {
     let notes: Vec<DisplayNote> = notes
         .into_iter()
-        .map(|note| display::decorate(note, now))
+        .map(|note| note::decorate(note, now))
         .collect();
 
     NoteSection {
@@ -81,11 +69,8 @@ fn section(
     }
 }
 
-/// Vue plate, utilisée dès qu'une recherche ou un filtre par tag est actif.
-///
-/// Répartir des résultats de recherche dans des sections de date les dilue et
-/// laisse croire qu'il n'y a rien à voir quand tout est tombé dans une section
-/// en bas de page. Un résultat de recherche se lit en liste.
+/// Vue plate dès qu'une recherche ou une facette est active : répartis par date,
+/// les résultats se diluent et semblent absents quand tout tombe en bas de page.
 fn results(notes: Vec<Note>, now: &DateTime<FixedOffset>) -> Vec<NoteSection> {
     vec![section(NoteSectionKey::Results, notes, false, now)]
 }
@@ -115,9 +100,8 @@ pub fn build(
             continue;
         }
 
-        // Le `else` du `match` couvre à la fois « plus vieux qu'une semaine » et
-        // « date illisible » : dans les deux cas la note atterrit dans `older`,
-        // jamais nulle part.
+        // Le bras `_` couvre « plus vieux qu'une semaine » et « date illisible » :
+        // dans les deux cas `older`, jamais nulle part.
         match parse(&note.created_at, offset) {
             Some(created) if is_same_local_day(&created, now) => today.push(note),
             Some(created) if is_within_days(&created, now, WEEK_DAYS) => this_week.push(note),
@@ -385,13 +369,6 @@ mod tests {
         );
 
         assert_eq!(ids_in(&sections, NoteSectionKey::Today), ["after-midnight"]);
-    }
-
-    #[test]
-    fn a_javascript_offset_is_inverted_into_a_chrono_offset() {
-        // getTimezoneOffset() returns -120 for UTC+2: the opposite sign.
-        assert_eq!(offset_from_minutes(-120).local_minus_utc(), 2 * 3600);
-        assert_eq!(offset_from_minutes(300).local_minus_utc(), -5 * 3600);
     }
 
     #[test]

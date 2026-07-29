@@ -1,16 +1,12 @@
 //! Lecture et écriture des notes : **du SQL, et rien d'autre**.
 //!
-//! Fonctions ordinaires prenant une `&Connection` : les `#[tauri::command]` de
-//! `commands/notes.rs` ne font que les appeler. Voir `storage/mod.rs`.
+//! Ne descendent dans le `WHERE` que les critères indexés par SQLite — espace,
+//! épinglage, cycle de vie, langage, tag. Correspondance de recherche,
+//! regroupement en sections et normalisation des tags sont des règles, et vivent
+//! dans `crate::domain`.
 //!
-//! Ce module ne décide de rien. Ce qui compte comme une correspondance de
-//! recherche, ce qui vaut « une recherche est en cours », la répartition en
-//! sections et la normalisation des tags sont des règles métier et vivent dans
-//! `crate::domain`. Ici, seulement les critères que SQLite indexe : espace,
-//! épinglage, cycle de vie, langage, appartenance à un tag.
-//!
-//! L'horodatage n'est jamais lu ici depuis l'horloge système : il est passé en
-//! paramètre (`now`), ce qui rend les écritures reproductibles en test.
+//! `now` est passé en paramètre plutôt que lu de l'horloge : les écritures
+//! restent reproductibles en test.
 
 use std::collections::HashMap;
 
@@ -19,20 +15,19 @@ use uuid::Uuid;
 
 use super::{StorageError, spaces};
 use crate::domain::note::{Note, NoteDraft, NoteLifecycle, NotePatch};
-use crate::domain::query::{Facets, NoteFilter, NotesQuery};
-use crate::domain::tags;
+use crate::domain::rules;
+use crate::domain::view::{Facets, NoteFilter, NotesQuery};
 
 const NOTE_COLUMNS: &str = "id, space_id, title, language, content, source, pinned, \
                             created_at, updated_at, lifecycle_kind, lifecycle_expires_at";
 
-/// Reconstruit une note **sans ses tags** : ils vivent dans `note_tags` et sont
-/// rattachés ensuite, en une seule requête pour toute la liste (cf. [`list`]).
+/// Note **sans ses tags** : ils vivent dans `note_tags` et sont rattachés
+/// ensuite, en une requête pour toute la liste.
 fn row_to_note(row: &Row<'_>) -> rusqlite::Result<Note> {
     let lifecycle_kind: String = row.get("lifecycle_kind")?;
     let expires_at: Option<String> = row.get("lifecycle_expires_at")?;
 
-    // La contrainte CHECK du schéma garantit que « expires » implique une date :
-    // le cas `("expires", None)` est donc inatteignable, pas un cas dégradé.
+    // Le `CHECK` du schéma rend `("expires", None)` inatteignable.
     let lifecycle = match (lifecycle_kind.as_str(), expires_at) {
         ("expires", Some(at)) => NoteLifecycle::Expires { at },
         _ => NoteLifecycle::Permanent,
@@ -60,8 +55,8 @@ fn lifecycle_columns(lifecycle: &NoteLifecycle) -> (&'static str, Option<&str>) 
     }
 }
 
-/// Tags de toutes les notes, en une requête — la version naïve ferait une
-/// requête par note et le coût deviendrait visible dès quelques centaines.
+/// Tags de toutes les notes en une requête ; une par note coûterait cher dès
+/// quelques centaines.
 fn all_tags(connection: &Connection) -> Result<HashMap<String, Vec<String>>, StorageError> {
     let mut statement = connection.prepare("SELECT note_id, tag FROM note_tags ORDER BY tag")?;
     let mut grouped: HashMap<String, Vec<String>> = HashMap::new();
@@ -90,22 +85,18 @@ fn tags_of(connection: &Connection, note_id: &str) -> Result<Vec<String>, Storag
     Ok(tags)
 }
 
-/// Remplace intégralement les tags d'une note. Appelée uniquement quand le patch
-/// porte un `tags` : un patch sans ce champ ne doit rien toucher.
+/// Remplace intégralement les tags, uniquement quand le patch en porte.
 ///
-/// Renvoie les tags réellement écrits, qui peuvent différer de ceux reçus
-/// (cf. [`tags::normalize`]) : l'appelant doit adopter cette valeur, sinon il
-/// renverrait au front une note qui ne correspond pas à la base.
-///
-/// Le tri final aligne l'écriture sur la lecture (`ORDER BY tag`) : sans lui,
-/// une note fraîchement enregistrée afficherait ses tags dans un ordre, puis
-/// dans un autre au rechargement suivant.
+/// Renvoie les tags **réellement écrits**, qui peuvent différer de ceux reçus :
+/// l'appelant doit adopter cette valeur, sinon il rendrait au front une note qui
+/// ne correspond pas à la base. Le tri final aligne l'écriture sur la lecture,
+/// sans quoi les tags se réordonneraient au rechargement suivant.
 fn replace_tags(
     connection: &Connection,
     note_id: &str,
     requested: &[String],
 ) -> Result<Vec<String>, StorageError> {
-    let mut normalized = tags::normalize(requested);
+    let mut normalized = rules::normalize_tags(requested);
 
     connection.execute("DELETE FROM note_tags WHERE note_id = ?1", [note_id])?;
 
@@ -120,9 +111,8 @@ fn replace_tags(
     Ok(normalized)
 }
 
-/// Toutes les notes, tous espaces confondus. **Réservée aux tests** : en
-/// production tout passe par [`fetch`] puis `domain::view::build`. Exposer une
-/// liste brute au front l'inviterait à refiltrer lui-même.
+/// **Réservée aux tests** : en production tout passe par [`fetch`] puis
+/// `domain::view::build`.
 #[cfg(test)]
 pub fn list(connection: &Connection) -> Result<Vec<Note>, StorageError> {
     fetch(
@@ -138,6 +128,19 @@ pub fn list(connection: &Connection) -> Result<Vec<Note>, StorageError> {
         },
     )
     .map(|(notes, _)| notes)
+}
+
+/// Lie `values` et rend la liste de placeholders correspondante (`?3, ?4`).
+/// Les numéros suivent `params`, qui peut déjà porter d'autres critères.
+fn placeholders(values: &[String], params: &mut Vec<Box<dyn ToSql>>) -> String {
+    values
+        .iter()
+        .map(|value| {
+            params.push(Box::new(value.clone()));
+            format!("?{}", params.len())
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Valeurs distinctes d'une colonne, portées à un espace. Sert les deux rails de
@@ -188,14 +191,8 @@ fn facets(connection: &Connection, space_id: Option<&str>) -> Result<Facets, Sto
     })
 }
 
-/// Notes retenues par les critères **grossiers**, et facettes proposables par
-/// les rails.
-///
-/// Ne descendent dans le `WHERE` que les critères que SQLite indexe : espace,
-/// épinglage, cycle de vie, langage, appartenance à un tag. La recherche texte
-/// reste au domaine (repliage de casse Unicode), tout comme le regroupement en
-/// sections. `domain::view::build` prend le relais sur ce que renvoie cette
-/// fonction.
+/// Notes retenues par les critères **grossiers**, et facettes des rails.
+/// `domain::view::build` prend le relais pour la recherche texte et les sections.
 pub fn fetch(
     connection: &Connection,
     request: &NotesQuery,
@@ -214,38 +211,23 @@ pub fn fetch(
         NoteFilter::Untriaged => conditions.push("lifecycle_kind = 'expires'".to_string()),
     }
 
-    // Pas de normalisation ici, contrairement aux tags : un langage n'est pas
-    // saisi au clavier mais choisi dans une liste fermée, et `domain::language`
-    // le compare à l'identique. Une valeur inconnue ne correspondra à rien, ce
-    // qui est exactement le résultat attendu.
+    // Pas de normalisation, contrairement aux tags : un langage est choisi dans
+    // une liste fermée, et une valeur inconnue ne correspond à rien — c'est le
+    // résultat attendu.
     if !request.languages.is_empty() {
-        let placeholders: Vec<String> = request
-            .languages
-            .iter()
-            .map(|language| {
-                params.push(Box::new(language.clone()));
-                format!("?{}", params.len())
-            })
-            .collect();
         // Union, comme les tags : sélectionner JSON puis YAML montre les deux.
-        conditions.push(format!("language IN ({})", placeholders.join(", ")));
+        let bound = placeholders(&request.languages, &mut params);
+        conditions.push(format!("language IN ({bound})"));
     }
 
-    // Les tags reçus passent par la même normalisation que ceux écrits, sinon
-    // un `#urgent` saisi au clavier ne retrouverait pas le tag `urgent` stocké.
-    let selected_tags = tags::normalize(&request.tags);
+    // Même normalisation qu'à l'écriture, sinon un `#urgent` saisi au clavier ne
+    // retrouverait pas le tag `urgent` stocké.
+    let selected_tags = rules::normalize_tags(&request.tags);
     if !selected_tags.is_empty() {
-        let placeholders: Vec<String> = selected_tags
-            .iter()
-            .map(|tag| {
-                params.push(Box::new(tag.clone()));
-                format!("?{}", params.len())
-            })
-            .collect();
-        // « au moins un tag », pas « tous » : c'est le comportement d'un rail de facettes.
+        // « au moins un tag », pas « tous » : comportement d'un rail de facettes.
+        let bound = placeholders(&selected_tags, &mut params);
         conditions.push(format!(
-            "EXISTS (SELECT 1 FROM note_tags WHERE note_id = notes.id AND tag IN ({}))",
-            placeholders.join(", ")
+            "EXISTS (SELECT 1 FROM note_tags WHERE note_id = notes.id AND tag IN ({bound}))"
         ));
     }
 
@@ -255,13 +237,10 @@ pub fn fetch(
         format!(" WHERE {}", conditions.join(" AND "))
     };
 
-    // Le tri est décidé ici, une fois : le front conserve l'ordre reçu.
-    //
-    // Le tri porte sur `updated_at` alors que les sections regroupent sur
-    // `created_at`, et c'est délibéré : la section répond à « quand cette note
-    // est-elle née », l'ordre interne à « laquelle ai-je touchée en dernier ».
-    // Une note ancienne rouverte aujourd'hui remonte donc en tête de « plus
-    // anciennes » — elle reste ancienne, on vient juste de s'en servir.
+    // Tri décidé ici une fois pour toutes ; le front conserve l'ordre reçu.
+    // Sur `updated_at` alors que les sections regroupent sur `created_at` :
+    // la section dit quand la note est née, l'ordre interne laquelle a été
+    // touchée en dernier.
     let mut statement = connection.prepare(&format!(
         "SELECT {NOTE_COLUMNS} FROM notes{where_clause} ORDER BY updated_at DESC, id"
     ))?;
@@ -270,8 +249,7 @@ pub fn fetch(
         .query_map(bound.as_slice(), row_to_note)?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
-    // Les tags sont rattachés avant de rendre la main : la recherche du domaine
-    // porte aussi sur eux.
+    // Rattachés avant de rendre la main : la recherche du domaine porte dessus.
     let mut grouped = all_tags(connection)?;
     for note in &mut notes {
         note.tags = grouped.remove(&note.id).unwrap_or_default();
@@ -296,9 +274,8 @@ fn find(connection: &Connection, id: &str) -> Result<Option<Note>, StorageError>
     }))
 }
 
-/// Crée une note et renvoie sa version persistée — identifiant définitif et
-/// horodatages compris. Le store front remplace sa copie locale par cette
-/// valeur : ce qui est renvoyé ici est ce que l'utilisateur voit.
+/// Renvoie la version persistée — identifiant définitif et horodatages compris.
+/// Le front adopte cette valeur telle quelle.
 pub fn create(
     connection: &mut Connection,
     draft: &NoteDraft,
@@ -344,8 +321,7 @@ pub fn create(
             expires_at,
         ],
     )?;
-    // La note renvoyée doit refléter ce qui est réellement en base : les tags
-    // écrits sont normalisés, pas ceux du brouillon.
+    // Les tags écrits sont normalisés, pas ceux du brouillon.
     note.tags = replace_tags(&transaction, &note.id, &draft.tags)?;
 
     transaction.commit()?;
@@ -353,15 +329,11 @@ pub fn create(
     Ok(note)
 }
 
-/// Applique **uniquement** les champs renseignés du patch, rafraîchit
-/// `updated_at` et renvoie la note mise à jour.
+/// Applique **uniquement** les champs renseignés du patch et rafraîchit
+/// `updated_at`. Un `None` signifie « ne pas toucher » — d'où le
+/// lire-modifier-écrire, en transaction pour qu'aucune commande ne s'intercale.
 ///
-/// Un `None` signifie « ne pas toucher » et ne doit jamais écraser la valeur
-/// stockée : c'est ce que garantit le lire-modifier-écrire ci-dessous, exécuté
-/// dans une transaction pour qu'une commande concurrente ne s'intercale pas.
-///
-/// Identifiant inconnu ⇒ `Err`, jamais un `Ok` silencieux : sans ça le front
-/// croirait avoir enregistré.
+/// Identifiant inconnu ⇒ `Err` : le front croirait sinon avoir enregistré.
 pub fn update(
     connection: &mut Connection,
     id: &str,
@@ -428,10 +400,8 @@ pub fn update(
     Ok(note)
 }
 
-/// Supprime une note. Ses tags partent avec elle par cascade (d'où le
-/// `PRAGMA foreign_keys = ON` de `storage::configure`).
-///
-/// Identifiant inconnu ⇒ `Err` : sans ça le front croirait avoir supprimé.
+/// Ses tags partent par cascade (d'où le `PRAGMA foreign_keys = ON` de
+/// `storage::configure`). Identifiant inconnu ⇒ `Err`.
 pub fn delete(connection: &Connection, id: &str) -> Result<(), StorageError> {
     let deleted = connection.execute("DELETE FROM notes WHERE id = ?1", [id])?;
 
@@ -445,8 +415,8 @@ pub fn delete(connection: &Connection, id: &str) -> Result<(), StorageError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::query::NotesView;
     use crate::domain::view;
+    use crate::domain::view::NotesView;
     use crate::storage::open_in_memory;
 
     const T0: &str = "2026-07-25T09:00:00.000Z";

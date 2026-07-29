@@ -1,22 +1,10 @@
-//! Point d'entrée unique pour toutes les commandes Tauri exposées au front Angular.
+//! Commandes Tauri exposées au front : verrouiller, déléguer, traduire l'erreur.
 //!
-//! Cette couche est **mince par contrat** : elle verrouille la connexion,
-//! délègue, et traduit l'erreur. Toute décision appartient à `crate::domain`,
-//! tout SQL à `crate::storage`. Une commande qui grossit est le signe qu'une
-//! règle a été écrite au mauvais endroit.
+//! Une commande qui grossit signale qu'une règle est au mauvais endroit — les
+//! décisions vivent dans `crate::domain`, le SQL dans `crate::storage`.
 //!
-//! - `error`      : erreur commune traversant le pont (code + paramètres)
-//! - `notes`      : prise de notes et interrogation de la vue
-//! - `spaces`     : espaces de rangement des notes
-//! - `crypto`     : hashing / chiffrement           (à implémenter)
-//! - `formatters` : encodage, décodage, formatage   (à implémenter)
-//!
-//! Pour ajouter une nouvelle commande :
-//! 1. L'écrire dans le fichier du domaine concerné (ou en créer un nouveau ici).
-//! 2. La déclarer `pub` et l'annoter avec `#[tauri::command]`.
-//! 3. L'enregistrer dans `tauri::generate_handler![...]` au sein de `lib.rs`.
-//! 4. Lui faire renvoyer `Result<_, AppError>` — jamais `Result<_, String>`,
-//!    voir `error.rs`.
+//! Une nouvelle commande doit être `pub`, annotée `#[tauri::command]`, renvoyer
+//! `Result<_, AppError>` et être enregistrée dans `generate_handler!` (`lib.rs`).
 
 pub mod error;
 pub mod notes;
@@ -25,11 +13,8 @@ pub mod spaces;
 use crate::storage::Db;
 use error::AppError;
 
-/// Prend le verrou sur la connexion partagée.
-///
-/// Un mutex empoisonné signifie qu'une commande a paniqué en le tenant : la
-/// base peut être incohérente, autant le dire au front plutôt que de paniquer
-/// une seconde fois.
+/// Verrou sur la connexion partagée. Un mutex empoisonné signifie qu'une
+/// commande a paniqué en le tenant : mieux vaut le dire que paniquer à nouveau.
 fn lock(db: &Db) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, AppError> {
     db.lock().map_err(|_| AppError::storage_unavailable())
 }

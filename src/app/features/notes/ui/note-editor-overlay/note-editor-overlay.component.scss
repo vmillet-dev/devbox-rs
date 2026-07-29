@@ -1,0 +1,253 @@
+@use 'mixins' as *;
+
+.overlay-backdrop {
+  @include backdrop(50);
+}
+
+.overlay-panel {
+  width: min(880px, 90vw);
+  height: min(640px, 85vh);
+  @include surface(var(--bg-1), 14px, var(--line));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-overlay);
+}
+
+// Le fond est déjà `position: fixed; inset: 0` : 100 % le remplit exactement,
+// sans les pièges de 100vw/100vh face à une barre de défilement.
+.overlay-panel.fullscreen {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.overlay-toolbar {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.overlay-title-input {
+  @include unstyled-control;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-0);
+  flex: 1;
+  font-family: var(--font-sans), serif;
+}
+
+.toolbar-btn {
+  @include unstyled-control;
+  @include surface($radius: 7px);
+  color: var(--text-1);
+  padding: 6px 11px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.toolbar-btn:hover {
+  @include accent-state(var(--text-0), var(--amber-dim));
+}
+
+.toolbar-btn.pinned {
+  @include tint-badge('--amber-rgb', 0.08);
+  border-color: var(--amber-dim);
+}
+
+// Bouton réduit à son glyphe, sans surface ni bordure — la croix et la bascule
+// plein écran, par opposition aux `.toolbar-btn` qui portent un libellé.
+.icon-btn {
+  @include unstyled-control;
+  color: var(--text-2);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.icon-btn:hover {
+  color: var(--text-0);
+}
+
+.overlay-meta-row {
+  padding: 9px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 11.5px;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.overlay-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+// Le badge et son champ forment un bloc : c'est l'ensemble qui est poussé à
+// droite, pas le badge seul, sinon le champ resterait collé aux tags.
+.overlay-expiry {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.overlay-expiry-input {
+  @include unstyled-control;
+  @include surface(var(--bg-1), 6px);
+  padding: 5px 8px;
+  font-size: 11.5px;
+  font-family: var(--font-mono), serif;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.overlay-expiry-input:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+// Le sélecteur de date natif est blanc sur fond sombre : sans ce filtre,
+// l'icône disparaît complètement sur le thème du produit.
+.overlay-expiry-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+
+.overlay-language-select {
+  @include unstyled-control;
+  @include surface($radius: 7px);
+  color: var(--text-1);
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: var(--font-mono), serif;
+  cursor: pointer;
+}
+
+.delete-btn:hover,
+.delete-btn.confirming {
+  @include accent-state(var(--red), var(--red));
+}
+
+.editable-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tag-remove {
+  @include unstyled-control;
+  color: var(--text-2);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px;
+  cursor: pointer;
+}
+
+.tag-remove:hover {
+  color: var(--red);
+}
+
+.tag-add-form {
+  display: inline-flex;
+}
+
+.tag-add-input {
+  @include unstyled-control;
+  width: 90px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px dashed var(--line);
+  font-size: 11px;
+  color: var(--text-1);
+  font-family: var(--font-mono), serif;
+}
+
+// Seul élément qui défile : les deux couches se déplacent donc ensemble, sans
+// synchronisation de `scrollTop` à écrire.
+.overlay-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+// C'est le visualiseur, dans le flux, qui donne sa hauteur à la pile ; le
+// <textarea> s'y cale en absolu. `min-height: 100%` pour que le clic dans la
+// zone vide sous le texte atteigne quand même le champ.
+.editor-stack {
+  position: relative;
+  min-height: 100%;
+}
+
+.editor-stack app-code-viewer {
+  overflow: visible;
+  pointer-events: none;
+}
+
+// Métriques recopiées à l'identique sur celles du visualiseur, sans quoi le
+// curseur se décale du texte colorié : même police, même interlignage, même
+// césure, et un retrait à gauche qui ajoute au padding la gouttière des numéros
+// de ligne. Cette gouttière fait 32px au total, pas 32 + 16 : le `box-sizing:
+// border-box` global fait que le `padding-right` de `.line-no` tient dans sa
+// `width`. Se tromper ici décale la frappe de deux caractères sans rien décaler
+// visuellement — le curseur tombe à côté du glyphe qu'il prétend viser.
+.overlay-body-editor {
+  @include unstyled-control;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  resize: none;
+  overflow: hidden;
+  padding: 20px 24px 20px 56px;
+  font-family: var(--font-mono), serif;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text-0);
+}
+
+// Texte transparent : la sélection ne se voit que par son fond, et le
+// placeholder doit reprendre une couleur explicite.
+.overlay-body-editor::selection {
+  background: rgba(var(--amber-rgb), 0.3);
+}
+
+.overlay-body-editor::placeholder {
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.overlay-body-editor:focus-visible,
+.overlay-language-select:focus-visible,
+.tag-add-input:focus-visible,
+.tag-remove:focus-visible,
+.icon-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: -2px;
+}
+
+.overlay-footer {
+  padding: 8px 20px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-2);
+  font-family: var(--font-mono), serif;
+  flex-shrink: 0;
+}

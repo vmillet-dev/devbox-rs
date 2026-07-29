@@ -1,22 +1,15 @@
 import { DestroyRef, Injectable, Signal, inject, signal } from '@angular/core';
 
-/**
- * Cadence de rafraîchissement de l'horloge. 30 s : assez court pour que
- * « à l'instant » devienne « il y a 1 min » sans décalage visible, assez long
- * pour que le réveil périodique du moteur de rendu reste négligeable.
- */
+/** Assez court pour que « à l'instant » devienne « il y a 1 min » à temps. */
 export const CLOCK_TICK_MS = 30_000;
 
 /**
- * Horloge applicative exposée sous forme de signal.
+ * Horloge applicative sous forme de signal.
  *
- * Elle existe parce qu'un libellé de temps relatif calculé avec `new Date()`
- * à l'intérieur d'un `computed()` se fige : le `computed` ne dépend d'aucun
- * signal représentant le temps, il ne se réévalue donc jamais tant que la note
- * ne change pas — une carte affiche « il y a 4 min » indéfiniment.
- *
- * Injecter `now()` rend ces `computed()` à la fois **purs** (plus de lecture
- * cachée de l'horloge système) et **auto-rafraîchissants**.
+ * ⚠️ Un `new Date()` lu dans un `computed()` le **fige** : il ne dépend alors
+ * d'aucun signal représentant le temps et ne se réévalue jamais — une carte
+ * afficherait « il y a 4 min » indéfiniment. Injecter `now()` rend ces
+ * `computed()` purs et auto-rafraîchissants.
  */
 @Injectable({ providedIn: 'root' })
 export class ClockService {
