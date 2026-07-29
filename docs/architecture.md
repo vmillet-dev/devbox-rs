@@ -27,12 +27,13 @@ yet — a round trip per keystroke), and plain UI concerns like keyboard shortcu
 ```
 src/                Angular front-end
 ├── app/
-│   ├── core/       state, data access, models, IPC, i18n, time, errors, pure utils
-│   ├── features/   feature screens (notes)
-│   ├── layout/     app shell, titlebar
-│   └── shared/     reusable presentational components and a11y directives
+│   ├── core/       cross-cutting infrastructure, one folder per subject:
+│   │               IPC, i18n, errors, time, preferences, updates, app-info, language
+│   ├── features/   one folder per tool, owning its data/, model/, state/ and ui/
+│   ├── layout/     the app chrome: shell, titlebar, about, error banner, update prompt
+│   └── shared/     presentation kit — a11y directives and components that inject nothing
 ├── assets/         static images
-├── styles.scss     global theme
+├── styles/         global theme (styles.scss) and SCSS partials
 └── testing/        test doubles, fixtures and shared providers
 src-tauri/          Rust back-end
 ├── src/domain/     model and business rules — knows neither SQLite nor Tauri
@@ -78,10 +79,52 @@ Serde attributes sit on the domain types rather than on a separate DTO family. A
 second set of types and their mapping would cost more than it protects; the wire shape is
 pinned by tests in `domain/note.rs`, `domain/view.rs` and `domain/space.rs` instead.
 
-Imports use path aliases rather than deep relative paths: `@core/*`, `@shared/*`,
-`@features/*`, `@layout/*`, `@testing/*` (declared in `tsconfig.json`).
-
 ## Front-end
+
+### Where a file goes
+
+> A feature owns its data, its model, its state and its components. `core/` is cross-cutting
+> infrastructure — one folder per subject, a service and its store together. `shared/` is a
+> presentation kit: nothing in it injects. `layout/` is the chrome around the tools.
+
+The axis is the **subject**, never the technical nature. There is no `stores/` folder holding
+every store, because that files one domain under four addresses; `UpdateStore` sits beside
+`UpdaterService` in `core/updates/`, and `NotesStore` sits in `features/notes/state/`. State
+lives beside what it manages.
+
+The payoff is the second tool: `features/hashing/` will hold `{data,model,state,ui}` and its
+page, the slots it does not need simply will not exist, and **nothing in `core/` moves**. The
+inverse test is just as useful — deleting `features/notes/` deletes the notes feature and
+leaves nothing dangling.
+
+Membership is decidable, not a matter of taste:
+
+| Folder      | Test                                                          |
+| ----------- | ------------------------------------------------------------- |
+| `features/` | does one tool need it, and no other?                          |
+| `core/`     | would a second, unrelated tool inject it verbatim?            |
+| `shared/`   | does it take everything through `input()` and inject nothing? |
+| `layout/`   | is it the frame around a tool rather than part of one?        |
+
+That last rule is why `ErrorBannerComponent`, `UpdatePromptComponent` and
+`AboutDialogComponent` live in `layout/` and not in `shared/ui/`: they inject. And why
+`LifecycleBadgeComponent`, which reads `NoteLifecycle`, lives under `features/notes/ui/`.
+
+### Imports
+
+Path aliases rather than deep relative paths: `@core/*`, `@shared/*`, `@features/*`,
+`@layout/*`, `@testing/*` (declared in `tsconfig.json`). The rule is **relative when a single
+`../` reaches the target, alias otherwise** — so `features/notes/state/notes.store.ts` reads
+`../data/notes.repository`, while `features/notes/ui/note-card/` reaches the model through
+`@features/notes/model/note.model`. There is no `../../` anywhere in `src/`, and that is worth
+keeping: it is the property that makes an import line readable without opening a file tree.
+
+**No `index.ts` barrels.** Three reasons, in order of weight: a barrel at
+`features/notes/index.ts` would pull `data/`, `state/` and every `ui/` component into the lazy
+chunk _while hiding that it does_ — the explicit `loadComponent` path is what keeps the chunk
+honest; barrels re-close import cycles by construction, and this codebase has one deliberate
+cycle broken by hand (`core/ipc` ↔ `features/notes/data`, see below); and with five aliases the
+import lines are already short. The tree has zero barrels — keep it that way.
 
 The app bootstraps standalone components (`src/main.ts` → `bootstrapApplication`); there
 are no NgModules. Change detection is **zoneless** (`provideZonelessChangeDetection()`).
@@ -108,7 +151,8 @@ presentational and stateless, which is what makes the components testable in iso
 
 Presentational components that could serve any feature live in `shared/ui/` — including
 `CodeViewerComponent`, which knows nothing about notes and will be reused by the formatters
-feature. Components specific to notes live under the feature's own `components/` folder.
+feature. Components specific to notes live under the feature's own `ui/` folder, next to the
+page that composes them.
 
 Components never reach into each other imperatively. A keyboard shortcut belongs to the
 component that owns the affected element: `Ctrl/⌘+K` is handled inside `SearchBoxComponent`,
@@ -241,7 +285,7 @@ Rules of the house:
   why the view is recomputed rather than patched.
 - **Ids, timestamps and normalisation come from persistence**, never from the front-end.
 - Derived state is `computed()`, never a manually maintained signal.
-- Formatting logic that needs no injection lives in `core/utils/` as pure functions taking
+- Formatting logic that needs no injection lives beside its subject (relative time in `core/time/`) as pure functions taking
   `now: Date` as a parameter.
 
 ### Display sections
@@ -449,7 +493,7 @@ giving it a code would advertise a case the front can never handle.
 
 ### Serialisation contract
 
-`core/data/note.dto.ts` defines what actually travels over the bridge and converts it to the
+`features/notes/data/note.dto.ts` defines what actually travels over the bridge and converts it to the
 domain model. Two traps it exists to handle:
 
 - **JSON has no date type.** Every `Date` becomes an ISO 8601 string on the wire. The mapper
@@ -466,7 +510,7 @@ entry in `availableLanguages` is dropped from the rail: a newer backend may know
 this front-end build does not. Contrast with an unknown section key, which does throw — a rail
 missing one facet stays usable, a canvas with an unreadable section does not.
 
-The known list is `domain/language.rs` (`LANGUAGES`), mirrored by `core/models/language.model.ts`
+The known list is `domain/language.rs` (`LANGUAGES`), mirrored by `core/language/language.model.ts`
 (`LanguageTag` + `LANGUAGE_LABELS`). Adding a language means editing both, plus a `.lang-*`
 rule in `language-badge.component.scss` and, if it should be coloured, an entry in `GRAMMARS`.
 Nothing compares the two lists, so a drift only surfaces at runtime as a fallback to `txt`.
@@ -668,7 +712,7 @@ Treated as part of the definition of done, and partly enforced by
 ## Theming
 
 All colors, fonts and shadows are CSS custom properties defined on `:root` in the global
-`src/styles.scss`; components only consume them via `var(…)`.
+`src/styles/styles.scss`; components only consume them via `var(…)`.
 
 Those variables **must** stay in the global stylesheet. Angular's emulated encapsulation
 rewrites a `:root` selector written inside a `*.component.scss` into a form that never

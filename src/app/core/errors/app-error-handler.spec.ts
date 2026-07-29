@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { IpcError } from '@core/ipc/ipc-error';
+import { IpcError } from '@core/ipc/ipc.error';
 import { AppErrorHandler } from './app-error-handler';
 import { ErrorNotifier } from './error-notifier.service';
 

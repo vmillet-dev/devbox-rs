@@ -1,8 +1,14 @@
 import { Injectable } from '@angular/core';
 import { InvokeArgs, invoke } from '@tauri-apps/api/core';
-import type { NoteDraftDto, NoteDto, NotePatchDto, NotesQueryDto, NotesViewDto } from '../data/note.dto';
-import type { SpaceDraftDto, SpaceDto } from '../data/spaces.repository';
-import { IpcError } from './ipc-error';
+import type {
+  NoteDraftDto,
+  NoteDto,
+  NotePatchDto,
+  NotesQueryDto,
+  NotesViewDto,
+} from '@features/notes/data/note.dto';
+import type { SpaceDraftDto, SpaceDto } from '@features/notes/data/space.dto';
+import { IpcError } from './ipc.error';
 
 /**
  * Signature de chaque commande Tauri : nom, arguments, valeur de retour.

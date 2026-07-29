@@ -79,7 +79,7 @@
 .about-option-status {
   font-size: 11px;
   color: var(--text-2);
-  font-family: var(--font-mono);
+  font-family: var(--font-mono), serif;
 
   &:empty {
     display: none;

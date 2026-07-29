@@ -1,7 +1,7 @@
 import { guard } from './fail-next';
-import { NotesRepository } from '@core/data/notes.repository';
-import { Note, NoteDraft, NotePatch } from '@core/models/note.model';
-import { NotesQuery, NotesView } from '@core/models/note.model';
+import { NotesRepository } from '@features/notes/data/notes.repository';
+import { Note, NoteDraft, NotePatch } from '@features/notes/model/note.model';
+import { NotesQuery, NotesView } from '@features/notes/model/note.model';
 
 /**
  * In-memory `NotesRepository` test double.

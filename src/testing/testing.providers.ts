@@ -1,9 +1,9 @@
 import { Provider } from '@angular/core';
-import { NOTES_REPOSITORY } from '@core/data/notes.repository';
-import { SPACES_REPOSITORY } from '@core/data/spaces.repository';
+import { NOTES_REPOSITORY } from '@features/notes/data/notes.repository';
+import { SPACES_REPOSITORY } from '@features/notes/data/spaces.repository';
 import { AppInfoService } from '@core/app-info/app-info.service';
-import { Note } from '@core/models/note.model';
-import { Space } from '@core/models/space.model';
+import { Note } from '@features/notes/model/note.model';
+import { Space } from '@features/notes/model/space.model';
 import { UpdaterService } from '@core/updates/updater.service';
 import { FakeAppInfo } from './fake-app-info';
 import { FakeNotesRepository } from './fake-notes-repository';

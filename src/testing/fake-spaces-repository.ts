@@ -1,6 +1,6 @@
 import { guard } from './fail-next';
-import { SpacesRepository } from '@core/data/spaces.repository';
-import { Space, SpaceDraft } from '@core/models/space.model';
+import { SpacesRepository } from '@features/notes/data/spaces.repository';
+import { Space, SpaceDraft } from '@features/notes/model/space.model';
 
 /**
  * In-memory `SpacesRepository` test double.

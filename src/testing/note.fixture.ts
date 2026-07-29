@@ -1,4 +1,4 @@
-import { Note } from '@core/models/note.model';
+import { Note } from '@features/notes/model/note.model';
 
 /** Builds a fully-populated `Note` for tests, with sensible defaults overridable per test. */
 export function createNote(overrides: Partial<Note> = {}): Note {

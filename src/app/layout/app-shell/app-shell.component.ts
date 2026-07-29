@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ErrorBannerComponent } from '@shared/ui/error-banner/error-banner.component';
-import { UpdatePromptComponent } from '@shared/ui/update-prompt/update-prompt.component';
+import { ErrorBannerComponent } from '@layout/error-banner/error-banner.component';
+import { UpdatePromptComponent } from '@layout/update-prompt/update-prompt.component';
 import { TitlebarComponent } from '../titlebar/titlebar.component';
 
 /**

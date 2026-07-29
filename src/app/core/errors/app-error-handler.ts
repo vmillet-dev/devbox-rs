@@ -1,5 +1,5 @@
 import { ErrorHandler, Injectable, inject } from '@angular/core';
-import { IpcError } from '../ipc/ipc-error';
+import { IpcError } from '../ipc/ipc.error';
 import { ErrorNotifier, errorDetail } from './error-notifier.service';
 
 /**

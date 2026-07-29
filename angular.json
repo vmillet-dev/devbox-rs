@@ -44,7 +44,7 @@
               "@fontsource/jetbrains-mono/500.css",
               "@fontsource/jetbrains-mono/600.css",
               "@fontsource/jetbrains-mono/700.css",
-              "src/styles.scss"
+              "src/styles/styles.scss"
             ]
           },
           "configurations": {

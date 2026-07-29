@@ -10,8 +10,8 @@ import { provideRouter, withHashLocation } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 
 import { routes } from './app.routes';
-import { NOTES_REPOSITORY, TauriNotesRepository } from '@core/data/notes.repository';
-import { SPACES_REPOSITORY, TauriSpacesRepository } from '@core/data/spaces.repository';
+import { NOTES_REPOSITORY, TauriNotesRepository } from '@features/notes/data/notes.repository';
+import { SPACES_REPOSITORY, TauriSpacesRepository } from '@features/notes/data/spaces.repository';
 import { AppErrorHandler } from '@core/errors/app-error-handler';
 import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from '@core/i18n/locale.service';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
