@@ -25,6 +25,7 @@ import { relativeTimeRef } from '@core/time/relative-time.util';
 import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
+import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { LifecycleBadgeComponent } from '../lifecycle-badge/lifecycle-badge.component';
 import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
 
@@ -76,6 +77,7 @@ function toDateInputValue(date: Date): string {
   selector: 'app-note-editor-overlay',
   imports: [
     DialogBackdropDirective,
+    CopyButtonComponent,
     TagPillComponent,
     LifecycleBadgeComponent,
     CodeViewerComponent,
@@ -98,6 +100,7 @@ export class NoteEditorOverlayComponent {
   readonly closed = output<void>();
   readonly titleChanged = output<string>();
   readonly contentChanged = output<string>();
+  readonly sourceChanged = output<string>();
   readonly languageChanged = output<LanguageTag>();
   readonly tagAdded = output<string>();
   readonly tagRemoved = output<string>();
@@ -117,6 +120,11 @@ export class NoteEditorOverlayComponent {
   protected readonly draftContent = linkedSignal({
     source: this.noteId,
     computation: () => untracked(() => this.note()?.content ?? ''),
+  });
+
+  protected readonly draftSource = linkedSignal({
+    source: this.noteId,
+    computation: () => untracked(() => this.note()?.source ?? ''),
   });
 
   /** Deux temps plutôt qu'un `confirm()` natif, qui bloque toute la WebView. */
@@ -159,6 +167,23 @@ export class NoteEditorOverlayComponent {
     this.preferences.write(FULLSCREEN_STORAGE_KEY, String(next));
   }
 
+  /**
+   * Un **collage** est confirmé tout de suite, la frappe reste différée au blur.
+   *
+   * C'est le collage qui donne son langage à une note vide (`domain::detect`),
+   * et le langage n'est connu qu'une fois le contenu persisté : attendre la
+   * sortie du champ laisserait le badge sur TXT, ce qui se lit comme « rien n'a
+   * été reconnu ». Une frappe, elle, ne justifie toujours pas un aller-retour
+   * IPC par caractère.
+   */
+  protected onBodyInput(event: Event, value: string): void {
+    this.draftContent.set(value);
+
+    if ((event as InputEvent).inputType === 'insertFromPaste') {
+      this.commitContent();
+    }
+  }
+
   /** N'émet que si le corps a réellement changé. */
   protected commitContent(): void {
     const note = this.note();
@@ -171,6 +196,13 @@ export class NoteEditorOverlayComponent {
     const note = this.note();
     if (note && this.draftTitle() !== note.title) {
       this.titleChanged.emit(this.draftTitle());
+    }
+  }
+
+  protected commitSource(): void {
+    const note = this.note();
+    if (note && this.draftSource() !== note.source) {
+      this.sourceChanged.emit(this.draftSource());
     }
   }
 
@@ -235,6 +267,7 @@ export class NoteEditorOverlayComponent {
   /** Seul chemin de fermeture : il confirme les brouillons avant de sortir. */
   protected requestClose(): void {
     this.commitTitle();
+    this.commitSource();
     this.commitContent();
     this.closed.emit();
   }

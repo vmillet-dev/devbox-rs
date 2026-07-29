@@ -9,6 +9,7 @@ use tauri::State;
 
 use super::error::AppError;
 use super::lock;
+use crate::domain::detect;
 use crate::domain::note::{self, DisplayNote, NoteDraft, NotePatch};
 use crate::domain::view::{self, NotesQuery, NotesView};
 use crate::storage::{self, Db};
@@ -25,6 +26,8 @@ pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, Ap
 
 #[tauri::command]
 pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<DisplayNote, AppError> {
+    let draft = detect::with_detected_language(draft);
+
     // Validé avant de verrouiller : inutile de prendre le verrou pour un refus.
     draft.validate()?;
 

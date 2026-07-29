@@ -26,6 +26,21 @@
   background: var(--bg-2);
 }
 
+// Voisin du menu ⋯, qui occupe déjà le coin. Discret au repos plutôt que
+// masqué : `display: none` le sortirait de l'ordre de tabulation.
+app-copy-button {
+  position: absolute;
+  top: 8px;
+  right: 34px;
+  z-index: 1;
+  opacity: 0;
+}
+
+.card-shell:hover app-copy-button,
+app-copy-button:focus-within {
+  opacity: 1;
+}
+
 .card:focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 2px;
@@ -43,8 +58,9 @@
   align-items: center;
   gap: 7px;
   margin-bottom: 8px;
-  // Réserve la place du bouton ⋯, qui flotte au-dessus du coin haut-droit.
-  padding-right: 22px;
+  // Réserve la place des boutons copie et ⋯, qui flottent au-dessus du coin
+  // haut-droit.
+  padding-right: 50px;
 }
 
 // La pastille d'épinglage vivait en `::after` dans ce même coin ; elle est

@@ -10,6 +10,7 @@ import {
   untracked,
 } from '@angular/core';
 import { NotesRepository } from '../data/notes.repository';
+import { ClipboardService } from '@core/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { FALLBACK_LANGUAGE, LanguageTag } from '@core/language/language.model';
 import {
@@ -93,6 +94,7 @@ function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
 @Injectable({ providedIn: 'root' })
 export class NotesStore {
   private readonly repository = inject(NotesRepository);
+  private readonly clipboard = inject(ClipboardService);
   private readonly clock = inject(ClockService);
   private readonly notifier = inject(ErrorNotifier);
   private readonly spaces = inject(SpacesStore);
@@ -243,6 +245,14 @@ export class NotesStore {
   }
 
   /**
+   * Fil d'Ariane libre. C'est lui qui rend atteignable la variante `source` du
+   * pied de carte, que `domain::note::footer_of` réserve aux notes épinglées.
+   */
+  setSource(id: string, source: string): Promise<void> {
+    return this.edit(id, (note) => (note.source === source ? null : { source }));
+  }
+
+  /**
    * `spaceId` est le seul champ que le front pousse sans saisie de
    * l'utilisateur, et le seul dont le stockage refuse la valeur si l'espace
    * n'existe plus.
@@ -285,7 +295,23 @@ export class NotesStore {
    * choisir un. Sans aucun espace la création échoue : une note sans espace
    * serait invisible dès qu'un filtre d'espace est posé.
    */
-  async createNote(): Promise<void> {
+  createNote(): Promise<void> {
+    return this.create('');
+  }
+
+  /**
+   * Note faite du presse-papier, déclenchée par le raccourci global. Un
+   * presse-papier vide ne produit rien : une note vide de plus serait un déchet
+   * à ranger, pas une capture.
+   */
+  async captureFromClipboard(): Promise<void> {
+    const content = await this.clipboard.paste();
+    if (content.trim()) {
+      await this.create(content);
+    }
+  }
+
+  private async create(content: string): Promise<void> {
     const spaceId = this.spaces.activeSpaceId() ?? this.spaces.spaces()[0]?.id;
     if (!spaceId) {
       this.notifier.notify({ ref: { key: 'errors.spaceRequired' } });
@@ -298,8 +324,10 @@ export class NotesStore {
       // traduits. Stocker « Nouvelle note » en dur figerait du français
       // dans les données.
       title: '',
+      // `txt` vaut « rien choisi » : c'est ce que `create_note` remplace par
+      // une détection sur le contenu (`domain::detect`).
       language: FALLBACK_LANGUAGE,
-      content: '',
+      content,
       source: '',
       tags: [],
       pinned: false,

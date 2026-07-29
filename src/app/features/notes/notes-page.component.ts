@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { AppEventsService } from '@core/ipc/app-events.service';
 import { NotesStore } from './state/notes.store';
 import { SpacesStore } from './state/spaces.store';
 import { FilterChipsComponent } from './ui/filter-chips/filter-chips.component';
@@ -40,6 +41,19 @@ export class NotesPageComponent {
 
   /** Le raccourci de recherche est neutralisé tant que la modale est ouverte. */
   protected readonly searchShortcutEnabled = computed(() => this.store.selectedNote() === null);
+
+  /**
+   * Les raccourcis globaux sont enregistrés côté Rust, qui se contente de
+   * montrer la fenêtre et de prévenir : la création reste ici, et passe donc par
+   * le même `create_note` que n'importe quelle autre note.
+   */
+  constructor() {
+    const events = inject(AppEventsService);
+    const destroyRef = inject(DestroyRef);
+
+    destroyRef.onDestroy(events.on('devbox:capture', () => void this.store.captureFromClipboard()));
+    destroyRef.onDestroy(events.on('devbox:new-note', () => void this.store.createNote()));
+  }
 
   protected onSpaceRenamed({ id, name }: SpaceRenaming): void {
     // Rien à recharger : une note ne porte que le `spaceId`, jamais le nom.

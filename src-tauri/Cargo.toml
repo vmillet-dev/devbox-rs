@@ -41,11 +41,17 @@ tauri-plugin-opener = "2"
 # plutôt que dans le `localStorage` de la WebView, qu'un vidage de cache efface
 # et que Rust ne sait pas relire. Voir core/preferences/preferences.service.ts.
 tauri-plugin-store = "2"
+# Presse-papier : sortir un snippet de DevBox, et y entrer celui d'une autre
+# application. La WebView ne donne pas accès au presse-papier système sous CSP.
+tauri-plugin-clipboard-manager = "2"
 
 # L'updater n'existe pas sur mobile — les magasins d'applications s'en chargent —
 # et le déclarer inconditionnellement casserait une compilation Android/iOS.
+# Les raccourcis globaux non plus : un système mobile ne laisse pas une
+# application écouter le clavier hors de sa fenêtre.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
+tauri-plugin-global-shortcut = "2"
 
 # Le Rust n'avait ni linter ni garde-fou : `cargo clippy -- -D warnings` échouait
 # sur rien, donc rien n'empêchait une régression d'entrer.

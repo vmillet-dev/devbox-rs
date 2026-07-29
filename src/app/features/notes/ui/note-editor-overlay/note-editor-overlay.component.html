@@ -47,6 +47,7 @@
           <span aria-hidden="true">📌</span>
           {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
         </button>
+        <app-copy-button [value]="draftContent()" [showLabel]="true" />
         <button
           type="button"
           class="toolbar-btn delete-btn"
@@ -76,10 +77,18 @@
       </div>
 
       <div class="overlay-meta-row">
-        @if (note.source) {
-          <span>{{ note.source }}</span>
-          <span aria-hidden="true">·</span>
-        }
+        <!-- Fil d'Ariane libre ("API Gateway / Auth"). C'est lui que le pied
+             d'une carte épinglée affiche à la place de son âge. -->
+        <input
+          #sourceInput
+          class="overlay-source-input"
+          [attr.aria-label]="'editor.sourceLabel' | transloco"
+          [placeholder]="'editor.sourcePlaceholder' | transloco"
+          [value]="draftSource()"
+          (input)="draftSource.set(sourceInput.value)"
+          (blur)="commitSource()"
+        />
+        <span aria-hidden="true">·</span>
         <div class="overlay-tags">
           @for (tag of note.tags; track tag) {
             <span class="editable-tag">
@@ -136,7 +145,7 @@
             [attr.aria-label]="'editor.contentLabel' | transloco"
             [placeholder]="'editor.emptyBody' | transloco"
             [value]="draftContent()"
-            (input)="draftContent.set(bodyEditor.value)"
+            (input)="onBodyInput($event, bodyEditor.value)"
             (blur)="commitContent()"
           ></textarea>
         </div>

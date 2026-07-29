@@ -88,6 +88,22 @@
   flex-shrink: 0;
 }
 
+.overlay-source-input {
+  @include unstyled-control;
+  width: 160px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px dashed transparent;
+  font-size: 11.5px;
+  color: var(--text-1);
+  font-family: var(--font-sans), serif;
+}
+
+.overlay-source-input:hover,
+.overlay-source-input:focus {
+  border-color: var(--line);
+}
+
 .overlay-tags {
   display: flex;
   gap: 6px;
@@ -234,6 +250,7 @@
 
 .overlay-body-editor:focus-visible,
 .overlay-language-select:focus-visible,
+.overlay-source-input:focus-visible,
 .tag-add-input:focus-visible,
 .tag-remove:focus-visible,
 .icon-btn:focus-visible {

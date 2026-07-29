@@ -1,4 +1,5 @@
 import { Provider } from '@angular/core';
+import { CLIPBOARD_ADAPTER } from '@core/clipboard/clipboard.service';
 import { NotesRepository } from '@features/notes/data/notes.repository';
 import { SpacesRepository } from '@features/notes/data/spaces.repository';
 import { AppInfoService } from '@core/app-info/app-info.service';
@@ -6,6 +7,7 @@ import { Note } from '@features/notes/model/note.model';
 import { Space } from '@features/notes/model/space.model';
 import { UpdaterService } from '@core/updates/updater.service';
 import { FakeAppInfo } from './fake-app-info';
+import { FakeClipboard } from './fake-clipboard';
 import { FakeNotesRepository } from './fake-notes-repository';
 import { FakeSpacesRepository } from './fake-spaces-repository';
 import { FakeUpdater } from './fake-updater';
@@ -19,6 +21,7 @@ interface DataDoubles {
   readonly spacesRepository?: FakeSpacesRepository;
   readonly updater?: FakeUpdater;
   readonly appInfo?: FakeAppInfo;
+  readonly clipboard?: FakeClipboard;
 }
 
 /**
@@ -41,6 +44,7 @@ export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
     // absent under jsdom.
     { provide: UpdaterService, useValue: doubles.updater ?? new FakeUpdater() },
     { provide: AppInfoService, useValue: doubles.appInfo ?? new FakeAppInfo() },
+    { provide: CLIPBOARD_ADAPTER, useValue: doubles.clipboard ?? new FakeClipboard() },
     provideTranslocoTesting(),
   ];
 }

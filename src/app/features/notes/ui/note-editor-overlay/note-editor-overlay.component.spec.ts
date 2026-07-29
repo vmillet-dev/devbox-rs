@@ -276,6 +276,36 @@ describe('NoteEditorOverlayComponent', () => {
       expect(text('.overlay-footer span')).toBe('TXT · 2 lignes · 7 octets');
     });
 
+    it('confirms a paste immediately instead of waiting for the blur', async () => {
+      // The paste is what gives an empty note its language, and the language is
+      // only known once the content is persisted: waiting would leave the badge
+      // on TXT, which reads as "nothing was recognised".
+      fixture.componentRef.setInput('note', createNote({ content: '' }));
+      await fixture.whenStable();
+      const emitted: string[] = [];
+      fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
+
+      bodyEditor().value = 'interface Note { id: string }';
+      bodyEditor().dispatchEvent(new InputEvent('input', { inputType: 'insertFromPaste' }));
+      await fixture.whenStable();
+
+      expect(emitted).toEqual(['interface Note { id: string }']);
+    });
+
+    it('still defers plain typing to the blur', async () => {
+      // One IPC round-trip per character is exactly what the draft avoids.
+      fixture.componentRef.setInput('note', createNote({ content: '' }));
+      await fixture.whenStable();
+      const emitted: string[] = [];
+      fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
+
+      bodyEditor().value = 'a';
+      bodyEditor().dispatchEvent(new InputEvent('input', { inputType: 'insertText' }));
+      await fixture.whenStable();
+
+      expect(emitted).toEqual([]);
+    });
+
     it('leaves the body on Escape instead of closing the whole overlay', async () => {
       fixture.componentRef.setInput('note', createNote({ content: 'before' }));
       await fixture.whenStable();
@@ -292,6 +322,54 @@ describe('NoteEditorOverlayComponent', () => {
       expect(emitted).toEqual(['after']);
       expect(closed).toBe(false);
       expect(document.activeElement).not.toBe(bodyEditor());
+    });
+  });
+
+  describe('source editing', () => {
+    function sourceInput(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('.overlay-source-input');
+    }
+
+    it('shows the stored context and emits the new one on blur', async () => {
+      fixture.componentRef.setInput('note', createNote({ source: 'Before' }));
+      await fixture.whenStable();
+      const emitted: string[] = [];
+      fixture.componentInstance.sourceChanged.subscribe((source) => emitted.push(source));
+
+      expect(sourceInput().value).toBe('Before');
+
+      await type(sourceInput(), 'API Gateway / Auth');
+      expect(emitted).toEqual([]);
+
+      sourceInput().dispatchEvent(new Event('blur'));
+
+      expect(emitted).toEqual(['API Gateway / Auth']);
+    });
+
+    it('confirms the pending context before closing', async () => {
+      // Escape, the backdrop and the close button all skip `blur`.
+      fixture.componentRef.setInput('note', createNote({ source: '' }));
+      await fixture.whenStable();
+      const emitted: string[] = [];
+      fixture.componentInstance.sourceChanged.subscribe((source) => emitted.push(source));
+
+      await type(sourceInput(), 'API');
+      fixture.debugElement.query(By.css('.close-btn')).triggerEventHandler('click');
+
+      expect(emitted).toEqual(['API']);
+    });
+
+    it('resets the draft when another note is opened', async () => {
+      // Keyed on the id, not on the note: every save produces a new object and
+      // would otherwise wipe what is being typed.
+      fixture.componentRef.setInput('note', createNote({ id: 'a', source: 'First' }));
+      await fixture.whenStable();
+      await type(sourceInput(), 'Edited');
+
+      fixture.componentRef.setInput('note', createNote({ id: 'b', source: 'Second' }));
+      await fixture.whenStable();
+
+      expect(sourceInput().value).toBe('Second');
     });
   });
 

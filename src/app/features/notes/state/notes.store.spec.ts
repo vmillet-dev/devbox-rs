@@ -8,6 +8,7 @@ import { NotesView } from '../model/note.model';
 import { Space } from '../model/space.model';
 import { SpacesStore } from './spaces.store';
 import { ClockService } from '@core/time/clock.service';
+import { FakeClipboard } from '@testing/fake-clipboard';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
@@ -30,12 +31,17 @@ interface Harness {
   readonly store: NotesStore;
   readonly repository: FakeNotesRepository;
   readonly spaces: SpacesStore;
+  readonly clipboard: FakeClipboard;
 }
 
-async function createStore(notes: Note[] = [], spaces: readonly Space[] = SPACES): Promise<Harness> {
+async function createStore(
+  notes: Note[] = [],
+  spaces: readonly Space[] = SPACES,
+  clipboard: FakeClipboard = new FakeClipboard(),
+): Promise<Harness> {
   const repository = new FakeNotesRepository(notes);
   TestBed.configureTestingModule({
-    providers: [provideAppTesting({ notesRepository: repository, spaces })],
+    providers: [provideAppTesting({ notesRepository: repository, spaces, clipboard })],
   });
 
   const store = TestBed.inject(NotesStore);
@@ -43,7 +49,7 @@ async function createStore(notes: Note[] = [], spaces: readonly Space[] = SPACES
   await vi.waitFor(() => expect(store.isLoading()).toBe(false));
   await vi.waitFor(() => expect(spacesStore.spaces()).toHaveLength(spaces.length));
 
-  return { store, repository, spaces: spacesStore };
+  return { store, repository, spaces: spacesStore, clipboard };
 }
 
 /** Notes as the store currently displays them, across every section. */
@@ -179,9 +185,10 @@ describe('NotesStore', () => {
   describe('clock sensitivity', () => {
     async function createStoreWithClock(now: WritableSignal<Date>): Promise<Harness> {
       const repository = new FakeNotesRepository([createNote()]);
+      const clipboard = new FakeClipboard();
       TestBed.configureTestingModule({
         providers: [
-          provideAppTesting({ notesRepository: repository, spaces: SPACES }),
+          provideAppTesting({ notesRepository: repository, spaces: SPACES, clipboard }),
           { provide: ClockService, useValue: { now: now.asReadonly() } },
         ],
       });
@@ -189,7 +196,7 @@ describe('NotesStore', () => {
       const store = TestBed.inject(NotesStore);
       await vi.waitFor(() => expect(store.isLoading()).toBe(false));
 
-      return { store, repository, spaces: TestBed.inject(SpacesStore) };
+      return { store, repository, spaces: TestBed.inject(SpacesStore), clipboard };
     }
 
     it('does not re-query when the clock ticks inside the same local day', async () => {
@@ -550,6 +557,77 @@ describe('NotesStore', () => {
       await store.setLifecycle('a', { kind: 'expires', at: new Date('2026-09-01T00:00:00Z') });
 
       expect(update).toHaveBeenCalled();
+    });
+
+    it('stores the context a note is given', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', source: '' })]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.setSource('a', 'API Gateway / Auth');
+
+      expect(update).toHaveBeenCalledWith('a', { source: 'API Gateway / Auth' });
+    });
+
+    it('does not write an unchanged context', async () => {
+      // The editor commits on blur and on every closing path, so it re-submits
+      // the same value routinely.
+      const { store, repository } = await createStore([createNote({ id: 'a', source: 'API' })]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.setSource('a', 'API');
+
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('captureFromClipboard', () => {
+    it('creates a note carrying what the clipboard held', async () => {
+      const { store } = await createStore([], SPACES, new FakeClipboard('SELECT 1'));
+
+      await store.captureFromClipboard();
+
+      expect(store.selectedNote()).toMatchObject({ id: 'fake-1', content: 'SELECT 1' });
+    });
+
+    it('leaves the language for the backend to detect', async () => {
+      const { store, repository } = await createStore([], SPACES, new FakeClipboard('{"a": 1}'));
+      const create = vi.spyOn(repository, 'create');
+
+      await store.captureFromClipboard();
+
+      // `txt` is the "nothing chosen" signal `create_note` replaces by running
+      // `domain::detect` on the content; deciding here would duplicate the rule.
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ language: 'txt' }));
+    });
+
+    it('creates nothing from an empty or blank clipboard', async () => {
+      // An empty note would be one more thing to file away, not a capture.
+      const { store, repository } = await createStore([], SPACES, new FakeClipboard('  \n '));
+      const create = vi.spyOn(repository, 'create');
+
+      await store.captureFromClipboard();
+
+      expect(create).not.toHaveBeenCalled();
+      expect(store.selectedNote()).toBeNull();
+    });
+
+    it('creates nothing when the clipboard cannot be read', async () => {
+      const clipboard = new FakeClipboard('SELECT 1');
+      clipboard.failNext = new Error('no plugin');
+      const { store, repository } = await createStore([], SPACES, clipboard);
+      const create = vi.spyOn(repository, 'create');
+
+      await store.captureFromClipboard();
+
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('opens the captured note so it can be titled straight away', async () => {
+      const { store } = await createStore([], SPACES, new FakeClipboard('kubectl rollout'));
+
+      await store.captureFromClipboard();
+
+      expect(store.selectedNoteId()).toBe('fake-1');
     });
   });
 

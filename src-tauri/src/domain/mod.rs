@@ -8,6 +8,7 @@
 //! sérialisation : c'est ce que le compilateur ne peut pas vérifier et qui
 //! casse silencieusement le front.
 
+pub mod detect;
 pub mod note;
 pub mod rules;
 pub mod sections;

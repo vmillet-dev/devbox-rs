@@ -27,8 +27,8 @@ yet — a round trip per keystroke), and plain UI concerns like keyboard shortcu
 ```
 src/                Angular front-end
 ├── app/
-│   ├── core/       cross-cutting infrastructure, one folder per subject:
-│   │               IPC, i18n, errors, time, preferences, updates, app-info, language
+│   ├── core/       cross-cutting infrastructure, one folder per subject: IPC, i18n,
+│   │               errors, time, preferences, updates, app-info, language, clipboard
 │   ├── features/   one folder per tool, owning its data/, model/, state/ and ui/
 │   ├── layout/     the app chrome: shell, titlebar, about, error banner, update prompt
 │   └── shared/     presentation kit — a11y directives and components that inject nothing
@@ -526,10 +526,34 @@ entry in `availableLanguages` is dropped from the rail: a newer backend may know
 this front-end build does not. Contrast with an unknown section key, which does throw — a rail
 missing one facet stays usable, a canvas with an unreadable section does not.
 
-The known list is `domain/language.rs` (`LANGUAGES`), mirrored by `core/language/language.model.ts`
+The known list is `domain/rules.rs` (`LANGUAGES`), mirrored by `core/language/language.model.ts`
 (`LanguageTag` + `LANGUAGE_LABELS`). Adding a language means editing both, plus a `.lang-*`
 rule in `language-badge.component.scss` and, if it should be coloured, an entry in `GRAMMARS`.
 Nothing compares the two lists, so a drift only surfaces at runtime as a fallback to `txt`.
+
+**The language is detected, not asked for.** `domain/detect.rs` reads the content and returns
+one of `LANGUAGES`; without it every note is born `txt` and the format rail only serves people
+who remember to touch the select. Three things keep it honest:
+
+- `txt` doubles as **"nothing chosen"**, and detection runs on exactly two moments, both of
+  which are a note acquiring its first content:
+  - `with_detected_language` on a draft that reaches `create_note` as `txt` — the capture
+    shortcut, which pastes and creates in one go;
+  - `language_after_patch` when a patch gives a **still-empty** note its content — the ordinary
+    "+ New note, then paste", where creation sees no content at all. Applied from
+    `storage::notes::update`, which calls into the domain for the rule the same way it calls
+    `rules::normalize_tags`.
+- It **never replays afterwards**. Once a note has content, or carries a language other than
+  `txt`, or the patch sets a language itself, nothing is guessed: re-detecting on every write
+  would take the select back from the user, and there would be no way to overrule a bad guess.
+- The heuristics are cheap and **allowed to be wrong**: the result is a starting value the
+  editor can change. A miss costs one click.
+- Order runs from the most discriminating signal to the vaguest (a wrapping brace beats a
+  `key: value`), so each new rule goes in at the position its confidence earns.
+- The editor commits a **paste** immediately rather than on blur (`onBodyInput` tests
+  `inputType === 'insertFromPaste'`). The language is only known once the content is persisted,
+  so waiting for the blur would leave the badge on TXT — which reads as a failed detection.
+  Plain typing stays deferred: that is what avoids one round trip per character.
 
 Patches are serialised field by field, omitting absent keys — an explicit `undefined` would
 serialise to `null` and overwrite the stored value instead of leaving it untouched.
@@ -545,6 +569,31 @@ serialise to `null` and overwrite the stored value instead of leaving it untouch
   `src-tauri/src/lib.rs`, or the call fails at runtime even though the Rust compiles fine.
 - Commands are **adapters only**: validate the input, lock the shared connection, delegate,
   translate the error. A command that grows is a sign a rule was written in the wrong place.
+
+### The downward direction: events
+
+`IpcContract` covers the front asking the back a question. The reverse — the back telling the
+front something happened — goes through **`AppEventsService`** (`core/ipc/app-events.service.ts`),
+which wraps `listen` from `@tauri-apps/api/event`. `IpcService` keeps the upward direction and
+stays the only caller of `invoke()`.
+
+Today it carries the global shortcuts. They are registered **in Rust** (`register_shortcuts` in
+`src-tauri/src/lib.rs`, desktop-only), which is why they need no capability: capabilities gate
+the API the WebView calls, not what the native side does on its own. On a keypress Rust reveals
+the window and emits `devbox:capture` or `devbox:new-note`; the front reads the clipboard and
+creates the note.
+
+- **Rust does not create the note.** Keeping creation on the front means one creation path
+  (`create_note`), so a captured note gets language detection without a second implementation,
+  and the adapter stays thin.
+- The topic strings are a **mirror**: `mod events` in `lib.rs` and `AppEventTopic` in the
+  service. Nothing checks them against each other, and a typo produces a subscription that is
+  silently inert rather than an error.
+- A shortcut already taken by another application is **logged and ignored**, never fatal:
+  DevBox has to start without it.
+- `AppEventsService.on()` returns an unsubscribe immediately although the subscription only
+  lands a tick later; a component destroyed in between would otherwise stay subscribed for the
+  whole session.
 
 The eight commands are `query_notes`, `create_note`, `update_note`, `delete_note`,
 `list_spaces`, `create_space`, `rename_space` and `delete_space`. The guarantees the
@@ -677,6 +726,13 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
 - **`ErrorNotifier` + `AppErrorHandler`** (`core/errors/`) surface failures on screen through
   `ErrorBannerComponent`. On a desktop app the console is not an interface: an uncaught
   exception or a failed write has to be visible, or the app just looks unresponsive.
+- **`ClipboardService`** (`core/clipboard/`) is the system clipboard. The CSP locks the WebView
+  to `'self'` and `navigator.clipboard` is unusable there, so everything goes through
+  `tauri-plugin-clipboard-manager` (permissions `clipboard-manager:allow-read-text` and
+  `allow-write-text`). Same `CLIPBOARD_ADAPTER` token and same degradation as
+  `PreferencesService`: outside Tauri the plugin rejects, and the service reports a `false`
+  rather than throwing — a copy that failed only has a visual acknowledgement to withhold.
+  It is in `core/` by the usual test: a hashing tool would inject it verbatim.
 
 ## i18n
 

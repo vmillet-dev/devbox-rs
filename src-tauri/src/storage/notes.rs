@@ -15,8 +15,8 @@ use uuid::Uuid;
 
 use super::{StorageError, spaces};
 use crate::domain::note::{Note, NoteDraft, NoteLifecycle, NotePatch};
-use crate::domain::rules;
 use crate::domain::view::{Facets, NoteFilter, NotesQuery};
+use crate::domain::{detect, rules};
 
 const NOTE_COLUMNS: &str = "id, space_id, title, language, content, source, pinned, \
                             created_at, updated_at, lifecycle_kind, lifecycle_expires_at";
@@ -346,6 +346,11 @@ pub fn update(
         return Err(StorageError::NoteNotFound(id.to_string()));
     };
 
+    // Décidé sur la note **avant** patch : c'est son état d'origine qui dit si
+    // elle reçoit là son premier contenu. La règle est dans le domaine, comme
+    // `normalize_tags` ; ici on ne fait que l'appliquer.
+    let detected = detect::language_after_patch(&note, patch);
+
     if let Some(space_id) = &patch.space_id {
         if !spaces::exists(&transaction, space_id)? {
             return Err(StorageError::SpaceNotFound(space_id.clone()));
@@ -360,6 +365,9 @@ pub fn update(
     }
     if let Some(content) = &patch.content {
         note.content = content.clone();
+    }
+    if let Some(language) = detected {
+        note.language = language;
     }
     if let Some(source) = &patch.source {
         note.source = source.clone();
@@ -555,6 +563,57 @@ mod tests {
 
         assert_eq!(updated.created_at, T0);
         assert_eq!(updated.updated_at, T1);
+    }
+
+    #[test]
+    fn pasting_into_a_freshly_created_note_settles_its_language() {
+        // End to end for the ordinary gesture: create empty, then paste. The
+        // rule is tested in `domain::detect`; here we check it actually reaches
+        // the stored row.
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        let empty = NoteDraft {
+            language: "txt".to_string(),
+            content: String::new(),
+            ..draft(&space_id)
+        };
+        let created = create(&mut connection, &empty, T0).unwrap();
+
+        let patch = NotePatch {
+            content: Some("interface Note { id: string }".to_string()),
+            ..NotePatch::default()
+        };
+        let updated = update(&mut connection, &created.id, &patch, T1).unwrap();
+
+        assert_eq!(updated.language, "ts");
+        assert_eq!(list(&connection).unwrap()[0].language, "ts");
+    }
+
+    #[test]
+    fn a_later_edit_does_not_move_the_language_again() {
+        let mut connection = open_in_memory().unwrap();
+        let space_id = space(&connection, "Perso");
+        let empty = NoteDraft {
+            language: "txt".to_string(),
+            content: String::new(),
+            ..draft(&space_id)
+        };
+        let created = create(&mut connection, &empty, T0).unwrap();
+
+        let first = NotePatch {
+            content: Some("SELECT 1".to_string()),
+            ..NotePatch::default()
+        };
+        update(&mut connection, &created.id, &first, T1).unwrap();
+
+        let second = NotePatch {
+            content: Some("interface Note { id: string }".to_string()),
+            ..NotePatch::default()
+        };
+        let updated = update(&mut connection, &created.id, &second, T1).unwrap();
+
+        // The note had an identity by then; only the first content decides.
+        assert_eq!(updated.language, "sql");
     }
 
     #[test]

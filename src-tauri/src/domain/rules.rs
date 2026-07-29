@@ -43,6 +43,11 @@ pub const LANGUAGES: [&str; 13] = [
     "json", "js", "ts", "py", "sql", "yml", "toml", "xml", "html", "css", "sh", "md", "txt",
 ];
 
+/// Langage par défaut, et **signal que le front n'a rien choisi** : c'est lui
+/// que `create_note` remplace par une détection. Miroir de `FALLBACK_LANGUAGE`
+/// côté front (`core/language/language.model.ts`).
+pub const FALLBACK_LANGUAGE: &str = "txt";
+
 pub fn validate_language(language: &str) -> Result<(), ValidationError> {
     if LANGUAGES.contains(&language) {
         return Ok(());

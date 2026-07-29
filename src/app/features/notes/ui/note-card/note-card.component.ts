@@ -7,6 +7,7 @@ import { ClockService } from '@core/time/clock.service';
 import { expiryRef, relativeTimeRef } from '@core/time/relative-time.util';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
 import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
+import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
 
 /** Le libellé du pied de carte est soit du texte brut (nom de source), soit une référence de traduction (temps). */
@@ -23,7 +24,13 @@ const MAX_VISIBLE_TAGS = 2;
 
 @Component({
   selector: 'app-note-card',
-  imports: [CodeViewerComponent, LanguageBadgeComponent, NoteCardMenuComponent, TranslocoPipe],
+  imports: [
+    CodeViewerComponent,
+    CopyButtonComponent,
+    LanguageBadgeComponent,
+    NoteCardMenuComponent,
+    TranslocoPipe,
+  ],
   templateUrl: './note-card.component.html',
   styleUrl: './note-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

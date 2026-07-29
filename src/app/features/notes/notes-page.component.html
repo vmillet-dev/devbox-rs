@@ -70,6 +70,7 @@
     (closed)="store.closeOverlay()"
     (titleChanged)="store.renameNote(note.id, $event)"
     (contentChanged)="store.updateContent(note.id, $event)"
+    (sourceChanged)="store.setSource(note.id, $event)"
     (languageChanged)="store.setLanguage(note.id, $event)"
     (tagAdded)="store.addTag(note.id, $event)"
     (tagRemoved)="store.removeTag(note.id, $event)"
