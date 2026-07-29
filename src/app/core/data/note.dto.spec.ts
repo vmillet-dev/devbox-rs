@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Note, NoteDraft } from '@core/models/note.model';
-import { NoteContractError, NoteDto, toNote, toNoteDraftDto, toNotePatchDto } from './note.dto';
+import { ContractError, NoteDto, toNote, toNoteDraftDto, toNotePatchDto } from './note.dto';
 
 const BASE_DTO: NoteDto = {
   id: 'note-1',
@@ -59,13 +59,11 @@ describe('toNote', () => {
   });
 
   it('throws a contract error on an unparseable date rather than yielding an Invalid Date', () => {
-    expect(() => toNote({ ...BASE_DTO, createdAt: 'not-a-date' })).toThrow(NoteContractError);
+    expect(() => toNote({ ...BASE_DTO, createdAt: 'not-a-date' })).toThrow(ContractError);
   });
 
   it('throws a contract error on an unparseable expiry date', () => {
-    expect(() => toNote({ ...BASE_DTO, lifecycle: { kind: 'expires', at: 'nope' } })).toThrow(
-      NoteContractError,
-    );
+    expect(() => toNote({ ...BASE_DTO, lifecycle: { kind: 'expires', at: 'nope' } })).toThrow(ContractError);
   });
 
   describe('footer', () => {
@@ -91,7 +89,7 @@ describe('toNote', () => {
       // A newer backend variant must be reported, not rendered as a blank footer.
       const unknown = { ...BASE_DTO, footer: { kind: 'weather', at: '2026-01-01' } } as unknown as NoteDto;
 
-      expect(() => toNote(unknown)).toThrow(NoteContractError);
+      expect(() => toNote(unknown)).toThrow(ContractError);
     });
 
     it('carries the expiry proximity the backend decided', () => {

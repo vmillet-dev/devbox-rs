@@ -17,30 +17,30 @@ import { Note, NoteLifecycle } from '@core/models/note.model';
 import { PreferencesService } from '@core/preferences/preferences.service';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/utils/relative-time.util';
+import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
 import { LifecycleBadgeComponent } from '@shared/ui/lifecycle-badge/lifecycle-badge.component';
 import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
 
-/** Instancié une seule fois : `TextEncoder` est sans état, en recréer un à chaque recalcul est gratuit mais inutile. */
+/** Sans état : en recréer un à chaque recalcul serait inutile. */
 const TEXT_ENCODER = new TextEncoder();
 
 const FULLSCREEN_STORAGE_KEY = 'devbox.editorFullscreen';
 
-/** Options du sélecteur de langage, dérivées de la table des libellés pour ne pas la dupliquer. */
+/** Dérivées de la table des libellés pour ne pas la dupliquer. */
 const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({
   value: value as LanguageTag,
   label,
 }));
 
 /**
- * Date d'un `<input type="date">` (`yyyy-MM-dd`) vers l'échéance correspondante.
+ * `yyyy-MM-dd` d'un `<input type="date">` vers l'échéance correspondante.
  *
- * L'heure est portée à la **fin de la journée locale**, pas à minuit : une note
- * datée d'aujourd'hui serait sinon déjà périmée au moment où on la saisit.
- *
- * La construction est explicite plutôt qu'un `new Date(value)`, qui interprète
- * `"2026-08-01"` en UTC — à l'ouest de Greenwich, l'échéance reculerait d'un jour.
+ * ⚠️ L'heure est portée à la **fin de la journée locale**, pas à minuit : une
+ * note datée d'aujourd'hui serait sinon périmée au moment de la saisir. Et la
+ * construction est explicite plutôt qu'un `new Date(value)`, qui interprète en
+ * UTC — à l'ouest de Greenwich l'échéance reculerait d'un jour.
  */
 function endOfLocalDay(value: string): Date | null {
   const [year, month, day] = value.split('-').map(Number);
@@ -56,23 +56,21 @@ function toDateInputValue(date: Date): string {
 }
 
 /**
- * Éditeur plein écran d'une note.
+ * Éditeur plein écran d'une note. Ne mute rien : il émet, `NotesStore` persiste.
  *
- * Le composant ne mute rien : il émet ce que l'utilisateur a demandé et c'est
- * `NotesStore` qui persiste. Il tient en revanche des **brouillons locaux** pour
- * le titre et le corps, parce que persister à chaque frappe signifierait un
- * aller-retour IPC par caractère. Ces brouillons sont confirmés au moment où
- * l'utilisateur quitte le champ, et — c'est le point délicat — avant chaque
- * chemin de fermeture (croix, Échap, clic sur le fond), aucun de ces trois ne
- * produisant de `blur`.
+ * Il tient des **brouillons locaux** pour le titre et le corps — persister à
+ * chaque frappe ferait un aller-retour IPC par caractère. Ils sont confirmés au
+ * blur et, point délicat, avant chaque chemin de fermeture (croix, Échap, clic
+ * sur le fond), aucun des trois ne produisant de `blur`.
  *
- * Les brouillons sont réinitialisés sur l'`id` de la note et non sur la note
- * elle-même : chaque enregistrement rafraîchit `updatedAt` et produit donc un
- * nouvel objet, qui écraserait la saisie en cours.
+ * ⚠️ Ils sont réinitialisés sur l'**`id`** de la note et non sur la note :
+ * chaque enregistrement rafraîchit `updatedAt` et produit un nouvel objet, qui
+ * écraserait la saisie en cours.
  */
 @Component({
   selector: 'app-note-editor-overlay',
   imports: [
+    DialogBackdropDirective,
     TagPillComponent,
     LifecycleBadgeComponent,
     CodeViewerComponent,
@@ -116,11 +114,7 @@ export class NoteEditorOverlayComponent {
     computation: () => untracked(() => this.note()?.content ?? ''),
   });
 
-  /**
-   * Suppression en deux temps plutôt qu'un `confirm()` natif : la WebView
-   * bloque tout pendant une boîte de dialogue système, et ce bouton doit rester
-   * dans le flux clavier de la modale.
-   */
+  /** Deux temps plutôt qu'un `confirm()` natif, qui bloque toute la WebView. */
   protected readonly confirmingDelete = linkedSignal({ source: this.noteId, computation: () => false });
 
   protected readonly tagInputValue = signal('');
@@ -128,7 +122,7 @@ export class NoteEditorOverlayComponent {
   /**
    * Préférence d'affichage et non état de note : un `signal` simple, pas un
    * `linkedSignal` sur `noteId`, pour qu'elle survive au passage d'une note à
-   * l'autre. Toute valeur stockée autre que `'true'` retombe sur le mode normal.
+   * l'autre.
    */
   protected readonly fullscreen = signal(this.preferences.read(FULLSCREEN_STORAGE_KEY) === 'true');
 
@@ -137,8 +131,7 @@ export class NoteEditorOverlayComponent {
   protected readonly languageLabel = computed(
     () => LANGUAGE_LABELS[this.note()?.language ?? FALLBACK_LANGUAGE],
   );
-  // Statistiques calculées sur le brouillon : elles suivent la frappe au lieu
-  // d'attendre l'enregistrement.
+  // Sur le brouillon : les stats suivent la frappe sans attendre la sauvegarde.
   protected readonly lineCount = computed(() => (this.note() ? this.draftContent().split('\n').length : 0));
   protected readonly byteSize = computed(() => TEXT_ENCODER.encode(this.draftContent()).length);
   protected readonly modifiedRef = computed(() => {
@@ -147,12 +140,8 @@ export class NoteEditorOverlayComponent {
   });
 
   /**
-   * Échéance telle que le champ date l'affiche — vide pour une note permanente.
-   *
-   * Une note éphémère est, dans le modèle du produit, une note dont on n'a pas
-   * encore décidé du sort : c'est **elle** que le filtre « À trier » retient et
-   * elle seule que la section signale comme « à trier bientôt ». Sans ce champ,
-   * ces deux affordances existaient sans que rien ne puisse les alimenter.
+   * Vide pour une note permanente. C'est ce champ, et lui seul, qui alimente le
+   * filtre « À trier » et l'indice « à trier bientôt » des sections.
    */
   protected readonly expiryInputValue = computed(() => {
     const lifecycle = this.note()?.lifecycle;
@@ -236,12 +225,6 @@ export class NoteEditorOverlayComponent {
       return;
     }
     this.requestClose();
-  }
-
-  protected onBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      this.requestClose();
-    }
   }
 
   /** Seul chemin de fermeture : il confirme les brouillons avant de sortir. */

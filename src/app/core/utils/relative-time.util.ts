@@ -1,4 +1,4 @@
-import { TranslationRef } from '../models/translation-ref.model';
+import { TranslationRef } from '../i18n/translation-ref';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 

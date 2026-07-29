@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AUTHOR_HANDLE, AUTHOR_NAME, REPOSITORY_URL } from '@core/app-info/app-info';
-import { AppInfoService } from '@core/app-info/app-info.service';
+import { AUTHOR_HANDLE, AUTHOR_NAME, AppInfoService, REPOSITORY_URL } from '@core/app-info/app-info.service';
+import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 
 /** Affichage du dépôt : l'URL sans son schéma, plus lisible et suffisante. */
@@ -15,7 +15,7 @@ const REPOSITORY_LABEL = REPOSITORY_URL.replace(/^https:\/\//, '');
  */
 @Component({
   selector: 'app-about-dialog',
-  imports: [FocusTrapDirective, TranslocoPipe],
+  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
   templateUrl: './about-dialog.component.html',
   styleUrl: './about-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -35,11 +35,5 @@ export class AboutDialogComponent {
 
   protected openRepository(): void {
     void this.appInfo.openRepository();
-  }
-
-  protected onBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      this.closed.emit();
-    }
   }
 }

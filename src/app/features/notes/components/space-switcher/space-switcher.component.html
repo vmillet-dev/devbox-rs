@@ -1,10 +1,10 @@
 <div class="space-switch-wrapper">
   <button
-    #trigger
+    appMenuAnchor
     type="button"
     class="space-switch"
     aria-haspopup="menu"
-    [attr.aria-expanded]="open()"
+    [attr.aria-expanded]="menu.open()"
     [attr.aria-label]="'notes.spaceSwitcherLabel' | transloco"
     (click)="toggle()"
   >
@@ -12,7 +12,7 @@
     {{ activeSpace()?.name ?? ('notes.allSpaces' | transloco) }}
     <span class="chev" aria-hidden="true">▾</span>
   </button>
-  @if (open()) {
+  @if (menu.open()) {
     <div class="space-dropdown">
       @if (editing(); as edited) {
         <!-- Panneau d'édition : il remplace le menu, comme le formulaire de
@@ -78,13 +78,9 @@
           </button>
         </form>
       } @else {
-        <!-- Écoute déléguée : le conteneur n'est jamais focusé, ce sont ses options
-             qui le sont, et l'événement remonte jusqu'ici. Le rendre focusable
-             ajouterait un arrêt de tabulation parasite dans le menu. -->
-        <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -->
-        <div class="space-menu" role="menu" (keydown)="onMenuKeydown($event)">
+        <div appMenuPanel class="space-menu">
           <button
-            #option
+            appMenuItem
             type="button"
             role="menuitemradio"
             class="space-option"
@@ -99,7 +95,7 @@
                  casserait la relation attendue par les lecteurs d'écran. -->
             <div class="space-row" role="none">
               <button
-                #option
+                appMenuItem
                 type="button"
                 role="menuitemradio"
                 class="space-option"
@@ -121,7 +117,7 @@
             </div>
           }
           <button
-            #option
+            appMenuItem
             type="button"
             role="menuitem"
             class="space-option space-create-trigger"

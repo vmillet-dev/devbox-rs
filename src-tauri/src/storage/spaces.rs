@@ -16,11 +16,8 @@ fn row_to_space(row: &Row<'_>) -> rusqlite::Result<Space> {
     })
 }
 
-/// Tous les espaces, triés par nom.
-///
-/// Une liste vide est une réponse valide : c'est l'état du premier lancement.
-/// Aucun espace « Tous » n'est fabriqué ici — c'est un mode d'affichage du
-/// front, pas une donnée ; en créer un ferait ranger des notes dedans.
+/// Tous les espaces, triés par nom. Une liste vide est valide : c'est l'état du
+/// premier lancement. Aucun espace « Tous » n'est fabriqué ici.
 pub fn list(connection: &Connection) -> Result<Vec<Space>, StorageError> {
     let mut statement =
         connection.prepare("SELECT id, name FROM spaces ORDER BY name COLLATE NOCASE")?;
@@ -31,9 +28,8 @@ pub fn list(connection: &Connection) -> Result<Vec<Space>, StorageError> {
     Ok(spaces)
 }
 
-/// Vérifie qu'un espace existe. Utilisé par `storage::notes` avant de ranger une
-/// note : la contrainte de clé étrangère l'attraperait aussi, mais avec un
-/// message SQLite illisible là où le front affiche l'erreur telle quelle.
+/// Vérifié avant de ranger une note : la clé étrangère l'attraperait aussi, mais
+/// avec un message SQLite illisible là où le front affiche l'erreur.
 pub fn exists(connection: &Connection, id: &str) -> Result<bool, StorageError> {
     let count: i64 =
         connection.query_row("SELECT COUNT(*) FROM spaces WHERE id = ?1", [id], |row| {
@@ -43,27 +39,47 @@ pub fn exists(connection: &Connection, id: &str) -> Result<bool, StorageError> {
     Ok(count > 0)
 }
 
-/// Crée un espace et renvoie sa version persistée : le front sélectionne
-/// aussitôt l'espace à partir de cette valeur de retour.
+/// Doublon détecté ici plutôt que laissé à l'index unique, pour remonter au
+/// front un code qu'il sait traduire.
 ///
-/// `name` est attendu **déjà validé** (voir `SpaceDraft::validated_name`) :
-/// détouré et non vide. Cette couche ne tranche que l'unicité.
+/// `except_id` exclut l'espace renommé : sans lui, corriger la casse d'un nom
+/// (« perso » → « Perso ») se ferait refuser comme un doublon de lui-même, la
+/// comparaison étant en `COLLATE NOCASE`.
+fn ensure_unique_name(
+    connection: &Connection,
+    name: &str,
+    except_id: Option<&str>,
+) -> Result<(), StorageError> {
+    let taken: i64 = match except_id {
+        Some(id) => connection.query_row(
+            "SELECT COUNT(*) FROM spaces WHERE name = ?1 COLLATE NOCASE AND id <> ?2",
+            (name, id),
+            |row| row.get(0),
+        ),
+        None => connection.query_row(
+            "SELECT COUNT(*) FROM spaces WHERE name = ?1 COLLATE NOCASE",
+            [name],
+            |row| row.get(0),
+        ),
+    }?;
+
+    if taken > 0 {
+        return Err(StorageError::DuplicateSpaceName(name.to_string()));
+    }
+
+    Ok(())
+}
+
+/// Renvoie la version persistée : le front sélectionne aussitôt l'espace à
+/// partir de cette valeur. `name` est attendu **déjà validé** (détouré, non
+/// vide) — cette couche ne tranche que l'unicité.
 pub fn create(connection: &Connection, name: &str) -> Result<Space, StorageError> {
+    ensure_unique_name(connection, name, None)?;
+
     let space = Space {
         id: Uuid::new_v4().to_string(),
         name: name.to_string(),
     };
-
-    // Le doublon est détecté ici plutôt que laissé à l'index unique, pour
-    // remonter au front un message qu'il peut afficher tel quel.
-    let taken: i64 = connection.query_row(
-        "SELECT COUNT(*) FROM spaces WHERE name = ?1 COLLATE NOCASE",
-        [&space.name],
-        |row| row.get(0),
-    )?;
-    if taken > 0 {
-        return Err(StorageError::DuplicateSpaceName(space.name));
-    }
 
     connection.execute(
         "INSERT INTO spaces (id, name) VALUES (?1, ?2)",
@@ -73,25 +89,13 @@ pub fn create(connection: &Connection, name: &str) -> Result<Space, StorageError
     Ok(space)
 }
 
-/// Renomme un espace et renvoie sa version persistée.
-///
-/// `name` est attendu **déjà validé** (voir `SpaceDraft::validated_name`).
-/// L'unicité exclut l'espace lui-même : sans le `id <> ?2`, corriger la casse
-/// d'un nom (« perso » → « Perso ») se ferait refuser comme un doublon de
-/// lui-même, la comparaison étant en `COLLATE NOCASE`.
+/// Renomme et renvoie la version persistée. `name` est attendu **déjà validé**.
 pub fn rename(connection: &Connection, id: &str, name: &str) -> Result<Space, StorageError> {
     if !exists(connection, id)? {
         return Err(StorageError::SpaceNotFound(id.to_string()));
     }
 
-    let taken: i64 = connection.query_row(
-        "SELECT COUNT(*) FROM spaces WHERE name = ?1 COLLATE NOCASE AND id <> ?2",
-        (name, id),
-        |row| row.get(0),
-    )?;
-    if taken > 0 {
-        return Err(StorageError::DuplicateSpaceName(name.to_string()));
-    }
+    ensure_unique_name(connection, name, Some(id))?;
 
     connection.execute("UPDATE spaces SET name = ?2 WHERE id = ?1", (id, name))?;
 
@@ -103,16 +107,14 @@ pub fn rename(connection: &Connection, id: &str, name: &str) -> Result<Space, St
 
 /// Supprime un espace après avoir déplacé ses notes vers `target_id`.
 ///
-/// Les deux opérations sont dans la **même transaction**, et dans cet ordre :
-/// `notes.space_id` porte un `ON DELETE CASCADE`, donc supprimer d'abord — ou
-/// échouer entre les deux — emporterait les notes au lieu de les déplacer.
+/// ⚠️ Même transaction et **cet ordre** : `notes.space_id` porte un
+/// `ON DELETE CASCADE`, donc supprimer d'abord — ou échouer entre les deux —
+/// emporterait les notes au lieu de les déplacer.
 ///
-/// `updated_at` n'est délibérément pas rafraîchi : le contenu des notes n'a pas
-/// changé, et le toucher ferait remonter tout l'espace absorbé en tête du
-/// canevas, qui trie sur cette colonne.
+/// `updated_at` n'est pas rafraîchi : le contenu n'a pas changé, et le toucher
+/// ferait remonter tout l'espace absorbé en tête du canevas, qui trie dessus.
 ///
-/// L'égalité `id == target_id` n'est pas vérifiée ici : c'est une règle du
-/// domaine (`space::validate_move_target`), appliquée avant d'ouvrir la connexion.
+/// `id == target_id` est refusé en amont par `space::validate_move_target`.
 pub fn delete(connection: &mut Connection, id: &str, target_id: &str) -> Result<(), StorageError> {
     let transaction = connection.transaction()?;
 

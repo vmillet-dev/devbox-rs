@@ -1,9 +1,5 @@
 @if (note(); as note) {
-  <!-- Le clic sur le fond est un confort souris ; l'équivalent clavier est
-       Échap, géré au niveau du composant. Rendre le fond focusable ajouterait
-       un arrêt de tabulation sans contenu juste devant la modale. -->
-  <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
-  <div class="overlay-backdrop" (click)="onBackdropClick($event)">
+  <div appDialogBackdrop class="overlay-backdrop" (dismissed)="requestClose()">
     <div
       appFocusTrap
       class="overlay-panel"

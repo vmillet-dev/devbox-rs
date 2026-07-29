@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { IpcError } from '@core/ipc/ipc.service';
-import { ipcNotice } from './ipc-notice';
+import { IpcError } from '@core/ipc/ipc-error';
+import { ipcNotice } from './error-notifier.service';
 
 const FALLBACK = { key: 'errors.noteSaveFailed' };
 

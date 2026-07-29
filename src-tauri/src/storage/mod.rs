@@ -1,34 +1,12 @@
-//! Couche de persistance : SQLite embarqué via `rusqlite`.
+//! Persistance : SQLite embarqué (`rusqlite`, feature `bundled`, base dans
+//! `app_data_dir()`). Ouverture, configuration et migrations ici ; les lectures
+//! et écritures dans `storage::notes` et `storage::spaces`, sous forme de
+//! fonctions prenant une `&Connection` — d'où des tests sur base en mémoire,
+//! sans lancer Tauri. **Aucune règle métier** : elles sont dans `crate::domain`.
 //!
-//! Le fichier de base vit dans `app_data_dir()` (voir `lib.rs`), la feature
-//! `bundled` de `rusqlite` compile SQLite depuis les sources et le lie en
-//! statique : rien à installer ni à distribuer à côté de l'exécutable.
-//!
-//! # Organisation
-//!
-//! Ce module ne contient que l'ouverture, la configuration et les migrations.
-//! Les lectures et écritures sont dans `storage::notes` et `storage::spaces`,
-//! sous forme de fonctions ordinaires prenant une `&Connection`. Les
-//! `#[tauri::command]` de `commands/` ne sont que des adaptateurs par-dessus :
-//! c'est ce qui permet de tester la persistance sur une base en mémoire, sans
-//! lancer Tauri.
-//!
-//! Cette couche ne porte **aucune règle métier** : elle lit et écrit le modèle
-//! défini dans `crate::domain`, dont elle dépend, et qui décide de tout le reste.
-//!
-//! # Concurrence
-//!
-//! Une `Connection` rusqlite n'est pas `Sync`. L'unique connexion est donc
-//! partagée via `tauri::State<Db>` (`Db = Mutex<Connection>`), enregistrée avec
-//! `.manage(...)` dans `lib.rs` — jamais par une variable globale. Deux commandes
-//! qui se chevauchent se sérialisent sur ce mutex.
-//!
-//! # Migrations
-//!
-//! Le schéma est versionné par `PRAGMA user_version`. Faire évoluer le modèle =
-//! ajouter une constante `MIGRATION_N` et une branche dans [`migrate`] ; ne
-//! jamais modifier une migration déjà livrée, elle a déjà tourné chez
-//! l'utilisateur. Chaque migration est atomique (DDL transactionnel).
+//! ⚠️ **Les migrations sont append-only.** Le schéma est versionné par
+//! `PRAGMA user_version` : faire évoluer le modèle = ajouter un `MIGRATION_N` et
+//! une branche dans [`migrate`], jamais modifier une migration déjà livrée.
 
 pub mod notes;
 pub mod spaces;
@@ -40,32 +18,25 @@ use std::sync::Mutex;
 use chrono::{SecondsFormat, Utc};
 use rusqlite::Connection;
 
-/// Horodatage courant dans le format attendu de l'autre côté du pont : ISO 8601
-/// / RFC 3339 UTC, ex. `2026-07-25T09:12:00.000Z`.
-///
-/// La milliseconde n'est pas décorative : deux notes modifiées dans la même
-/// seconde deviendraient impossibles à départager par le tri de [`notes::list`].
+/// Instant courant en ISO 8601 UTC, ex. `2026-07-25T09:12:00.000Z`. La
+/// milliseconde n'est pas décorative : sans elle, deux notes modifiées dans la
+/// même seconde seraient impossibles à départager au tri.
 pub fn now_iso() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-/// État partagé enregistré dans Tauri. Voir la section « Concurrence ».
+/// Connexion unique partagée via `tauri::State` : `Connection` n'est pas `Sync`,
+/// et deux commandes qui se chevauchent se sérialisent sur ce mutex.
 pub type Db = Mutex<Connection>;
 
-/// Nom du fichier de base, créé dans le répertoire de données de l'application.
 pub const DB_FILE_NAME: &str = "devbox.sqlite3";
 
 /// Version de schéma attendue par ce binaire.
 const SCHEMA_VERSION: i32 = 3;
 
-/// Schéma initial.
-///
-/// Deux choix structurants, qui ont permis au filtrage de descendre côté Rust
-/// sans re-migration (cf. `storage::notes::query`) :
-/// - `lifecycle` est éclaté en deux colonnes plutôt que stocké en JSON, sinon
-///   « ce qui expire avant telle date » ne serait pas requêtable ;
-/// - les tags sont dans leur propre table plutôt qu'en colonne sérialisée, sinon
-///   le filtre par tag imposerait de relire tout le corpus.
+/// Schéma initial. Deux choix rendent le filtrage requêtable : `lifecycle`
+/// éclaté en deux colonnes plutôt qu'en JSON, et les tags dans leur propre table
+/// plutôt qu'en colonne sérialisée.
 const MIGRATION_1: &str = r"
 BEGIN;
 
@@ -74,9 +45,8 @@ CREATE TABLE spaces (
     name TEXT NOT NULL
 );
 
--- L'unicité des noms est tranchée ici et nulle part ailleurs : `spaces::create`
--- la vérifie pour produire une erreur lisible, cet index la garantit même si
--- une écriture passait à côté. NOCASE ne replie que l'ASCII.
+-- `spaces::create` vérifie l'unicité pour produire une erreur lisible, cet index
+-- la garantit même si une écriture passait à côté. NOCASE ne replie que l'ASCII.
 CREATE UNIQUE INDEX spaces_name_unique ON spaces (name COLLATE NOCASE);
 
 CREATE TABLE notes (
@@ -91,8 +61,7 @@ CREATE TABLE notes (
     updated_at           TEXT NOT NULL,
     lifecycle_kind       TEXT NOT NULL CHECK (lifecycle_kind IN ('permanent', 'expires')),
     lifecycle_expires_at TEXT,
-    -- Une note « expires » a forcément une date, une note permanente n'en a
-    -- jamais : la lecture peut donc reconstruire l'enum sans cas ambigu.
+    -- Garantit que la lecture peut reconstruire l'enum sans cas ambigu.
     CHECK ((lifecycle_kind = 'expires') = (lifecycle_expires_at IS NOT NULL))
 );
 
@@ -112,15 +81,11 @@ PRAGMA user_version = 1;
 COMMIT;
 ";
 
-/// Replie la casse des tags au niveau du stockage.
+/// Replie la casse des tags **entre** notes, là où `rules::normalize_tags` ne la
+/// repliait qu'au sein d'une note : `Urgent` et `urgent` produisaient deux
+/// facettes dans le rail, dont `tag IN (…)` n'en retrouvait qu'une.
 ///
-/// `normalize_tags` dédoublonnait déjà sans tenir compte de la casse, mais
-/// **au sein d'une seule note** : sans collation, `Urgent` et `urgent` portés
-/// par deux notes différentes produisaient deux facettes dans le rail, dont
-/// `tag IN (…)` — en collation BINARY — n'en retrouvait qu'une, alors que la
-/// recherche texte, elle, les confondait. Trois comportements pour un concept.
-///
-/// La collation d'une colonne ne s'altère pas : la table est recréée.
+/// La collation d'une colonne ne s'altère pas, d'où la table recréée ;
 /// `INSERT OR IGNORE` absorbe les doublons que la nouvelle clé primaire fusionne.
 const MIGRATION_2: &str = r"
 BEGIN;
@@ -143,14 +108,11 @@ PRAGMA user_version = 2;
 COMMIT;
 ";
 
-/// Index sur le langage, devenu une facette de filtrage à part entière (rail
-/// « Format »). Sans lui, `language IN (…)` impose un balayage complet, et
-/// `SELECT DISTINCT language` — recalculé à chaque requête pour alimenter le
-/// rail — aussi.
+/// Index sur le langage, devenu une facette de filtrage. Sans lui,
+/// `language IN (…)` et le `SELECT DISTINCT` du rail balaient tout.
 ///
-/// Pas de contrainte `CHECK` sur la colonne : la liste des langages reconnus
-/// vit dans `domain::language` et bouge d'une version à l'autre. La figer dans
-/// le schéma obligerait à une migration pour chaque ajout.
+/// Pas de `CHECK` sur la colonne : la liste des langages vit dans le domaine et
+/// bouge d'une version à l'autre — la figer imposerait une migration par ajout.
 const MIGRATION_3: &str = r"
 BEGIN;
 
@@ -161,24 +123,19 @@ PRAGMA user_version = 3;
 COMMIT;
 ";
 
-/// Échecs de la couche de persistance.
-///
-/// Les commandes convertissent ces variantes en `AppError` (voir
-/// `commands/error.rs`) : la variante devient un **code** que le front traduit,
-/// et le `Display` ci-dessous n'est plus que le détail technique affiché en
-/// second plan. C'est pourquoi il peut rester en français.
+/// Les commandes convertissent ces variantes en `AppError` : la variante devient
+/// un **code** que le front traduit, et le `Display` ci-dessous n'est plus que
+/// le détail technique — c'est pourquoi il peut rester en français.
 #[derive(Debug)]
 pub enum StorageError {
-    /// Note introuvable — jamais un `Ok` silencieux, sinon le front croirait
-    /// avoir enregistré.
+    /// Jamais un `Ok` silencieux : le front croirait avoir enregistré.
     NoteNotFound(String),
-    /// Espace visé par une note inexistant : la note n'aurait nulle part où être rangée.
+    /// Espace visé inexistant : la note n'aurait nulle part où être rangée.
     SpaceNotFound(String),
-    /// Un espace porte déjà ce nom (comparaison insensible à la casse).
+    /// Nom déjà pris (comparaison insensible à la casse).
     DuplicateSpaceName(String),
-    /// La base a été écrite par une version plus récente de l'application.
+    /// Base écrite par une version plus récente de l'application.
     SchemaTooRecent(i32),
-    /// Panne de lecture ou d'écriture.
     Sqlite(rusqlite::Error),
 }
 
@@ -207,8 +164,7 @@ impl From<rusqlite::Error> for StorageError {
     }
 }
 
-/// Ouvre la base au chemin donné (en la créant au besoin), la configure et
-/// applique les migrations manquantes.
+/// Ouvre la base (en la créant au besoin), la configure, migre.
 pub fn open(path: &Path) -> Result<Connection, StorageError> {
     let connection = Connection::open(path)?;
     configure(&connection)?;
@@ -226,10 +182,9 @@ pub fn open_in_memory() -> Result<Connection, StorageError> {
 }
 
 fn configure(connection: &Connection) -> Result<(), StorageError> {
-    // `foreign_keys` est désactivé par défaut dans SQLite et se règle **par
-    // connexion** : sans lui, les `ON DELETE CASCADE` du schéma ne s'appliquent
-    // pas et les tags d'une note supprimée resteraient orphelins.
-    // WAL : un lecteur ne bloque plus un écrivain (sans effet sur une base en mémoire).
+    // ⚠️ `foreign_keys` se règle **par connexion** et est désactivé par défaut :
+    // sans lui les `ON DELETE CASCADE` sont inertes et les tags d'une note
+    // supprimée resteraient orphelins. WAL : un lecteur ne bloque plus un écrivain.
     connection.execute_batch(
         "PRAGMA foreign_keys = ON;
          PRAGMA journal_mode = WAL;",
@@ -240,15 +195,12 @@ fn configure(connection: &Connection) -> Result<(), StorageError> {
 fn migrate(connection: &Connection) -> Result<(), StorageError> {
     let version: i32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
 
-    // Base écrite par une version plus récente de l'application : ses tables ne
-    // sont pas celles que ce binaire sait lire. Refuser franchement vaut mieux
-    // que lire de travers et écraser des données.
+    // Refuser franchement vaut mieux que lire de travers et écraser des données.
     if version > SCHEMA_VERSION {
         return Err(StorageError::SchemaTooRecent(version));
     }
 
-    // Chaque migration manquante est appliquée dans l'ordre : une base neuve
-    // les traverse toutes, une base existante ne reprend qu'à partir de la sienne.
+    // Une base neuve les traverse toutes, une base existante reprend à la sienne.
     if version < 1 {
         connection.execute_batch(MIGRATION_1)?;
     }

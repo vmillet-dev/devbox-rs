@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteLifecycle } from '@core/models/note.model';
-import { TranslationRef } from '@core/models/translation-ref.model';
+import { TranslationRef } from '@core/i18n/translation-ref';
 import { ClockService } from '@core/time/clock.service';
 import { expiryRef } from '@core/utils/relative-time.util';
 
@@ -32,6 +32,4 @@ export class LifecycleBadgeComponent {
       ? { key: 'lifecycle.neverExpires' }
       : expiryRef(lifecycle.at, this.clock.now());
   });
-
-  protected readonly stale = this.expiringSoon;
 }

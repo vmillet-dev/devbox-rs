@@ -9,10 +9,11 @@ import {
   output,
   signal,
   viewChild,
-  viewChildren,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Space } from '@core/models/space.model';
+import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
+import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 
 /** Suppression d'un espace : ce qu'il faut savoir pour ne perdre aucune note. */
 export interface SpaceDeletion {
@@ -29,14 +30,11 @@ export interface SpaceRenaming {
 
 @Component({
   selector: 'app-space-switcher',
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, MenuPanelDirective],
+  hostDirectives: [MenuTriggerDirective],
   templateUrl: './space-switcher.component.html',
   styleUrl: './space-switcher.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:click)': 'onDocumentClick($event)',
-    '(keydown.escape)': 'onEscape()',
-  },
 })
 export class SpaceSwitcherComponent {
   readonly spaces = input.required<readonly Space[]>();
@@ -50,7 +48,8 @@ export class SpaceSwitcherComponent {
   readonly spaceRenamed = output<SpaceRenaming>();
   readonly spaceDeleted = output<SpaceDeletion>();
 
-  protected readonly open = signal(false);
+  protected readonly menu = inject(MenuTriggerDirective);
+
   protected readonly creating = signal(false);
 
   /**
@@ -63,17 +62,14 @@ export class SpaceSwitcherComponent {
   /** Suppression en deux temps : la WebView bloque tout pendant un `confirm()` natif. */
   protected readonly confirmingDelete = signal(false);
 
-  private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly trigger = viewChild.required<ElementRef<HTMLButtonElement>>('trigger');
-  private readonly options = viewChildren<ElementRef<HTMLButtonElement>>('option');
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
   private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
 
   /**
    * Refuges possibles pour les notes de l'espace édité. Un espace ne peut pas
-   * être le sien : la cascade du schéma emporterait les notes juste après le
-   * transfert. Liste vide ⇒ la suppression est impossible, et le panneau le dit
-   * plutôt que d'offrir un bouton qui échouerait.
+   * être le sien : la cascade emporterait les notes juste après le transfert.
+   * Liste vide ⇒ suppression impossible, et le panneau le dit plutôt que
+   * d'offrir un bouton qui échouerait.
    */
   protected readonly moveTargets = computed<readonly Space[]>(() => {
     const edited = this.editing();
@@ -81,29 +77,29 @@ export class SpaceSwitcherComponent {
   });
 
   constructor() {
-    // Ouvrir un menu sans y amener le focus le rend inatteignable au clavier.
-    // L'effet dépend aussi des requêtes de vue : au moment où `open` bascule,
-    // elles ne sont pas encore à jour, il se rejoue donc dès qu'elles le sont.
+    this.menu.escaped.subscribe(() => this.onEscape());
+    this.menu.closed.subscribe(() => this.resetPanels());
+
+    // Les panneaux remplacent le menu, dont `MenuPanelDirective` gère le focus :
+    // seuls leurs champs de saisie restent à cadrer ici.
     effect(() => {
-      if (!this.open()) return;
+      if (!this.menu.open()) return;
       if (this.editing()) {
         this.renameInput()?.nativeElement.focus();
       } else if (this.creating()) {
         this.nameInput()?.nativeElement.focus();
-      } else {
-        this.options()[0]?.nativeElement.focus();
       }
     });
   }
 
   protected toggle(): void {
-    this.open.update((value) => !value);
+    this.menu.toggle();
     this.resetPanels();
   }
 
   protected select(space: Space | null): void {
     this.spaceChanged.emit(space?.id ?? null);
-    this.closeAndRestoreFocus();
+    this.menu.close();
   }
 
   protected startCreating(): void {
@@ -124,7 +120,7 @@ export class SpaceSwitcherComponent {
     if (!name.trim()) return;
 
     this.spaceCreated.emit(name);
-    this.closeAndRestoreFocus();
+    this.menu.close();
   }
 
   protected submitRename(event: Event, name: string): void {
@@ -133,7 +129,7 @@ export class SpaceSwitcherComponent {
     if (!edited || !name.trim()) return;
 
     this.spaceRenamed.emit({ id: edited.id, name });
-    this.closeAndRestoreFocus();
+    this.menu.close();
   }
 
   protected onDeleteClick(targetSpaceId: string): void {
@@ -145,57 +141,16 @@ export class SpaceSwitcherComponent {
       return;
     }
     this.spaceDeleted.emit({ id: edited.id, targetSpaceId });
-    this.closeAndRestoreFocus();
+    this.menu.close();
   }
 
   /** Échap referme d'abord le panneau ouvert, puis le menu lui-même. */
-  protected onEscape(): void {
+  private onEscape(): void {
     if (this.editing() || this.creating()) {
       this.resetPanels();
       return;
     }
-    this.closeAndRestoreFocus();
-  }
-
-  protected closeAndRestoreFocus(): void {
-    if (!this.open()) return;
-    this.open.set(false);
-    this.resetPanels();
-    // Sans ça, le focus disparaît avec l'élément détruit et repart sur <body>.
-    this.trigger().nativeElement.focus();
-  }
-
-  protected onDocumentClick(event: MouseEvent): void {
-    if (this.open() && !this.elementRef.nativeElement.contains(event.target as Node)) {
-      this.open.set(false);
-      this.resetPanels();
-    }
-  }
-
-  protected onMenuKeydown(event: KeyboardEvent): void {
-    const items = this.options().map((ref) => ref.nativeElement);
-    if (items.length === 0) return;
-
-    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-    const focusAt = (index: number): void => {
-      event.preventDefault();
-      items[(index + items.length) % items.length].focus();
-    };
-
-    switch (event.key) {
-      case 'ArrowDown':
-        focusAt(currentIndex + 1);
-        break;
-      case 'ArrowUp':
-        focusAt(currentIndex - 1);
-        break;
-      case 'Home':
-        focusAt(0);
-        break;
-      case 'End':
-        focusAt(items.length - 1);
-        break;
-    }
+    this.menu.close();
   }
 
   private resetPanels(): void {

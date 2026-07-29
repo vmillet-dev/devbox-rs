@@ -1,9 +1,5 @@
 @if (store.update(); as update) {
-  <!-- Même arbitrage que l'éditeur de note : le clic sur le fond est un confort
-       souris, l'équivalent clavier est Échap. Rendre le fond focusable ajouterait
-       un arrêt de tabulation vide juste devant la modale. -->
-  <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
-  <div class="update-backdrop" (click)="onBackdropClick($event)">
+  <div appDialogBackdrop class="update-backdrop" (dismissed)="onEscape()">
     <div
       appFocusTrap
       class="update-panel"

@@ -1,7 +1,4 @@
-<!-- Même arbitrage que les autres modales : le clic sur le fond est un confort
-     souris, l'équivalent clavier est Échap. -->
-<!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
-<div class="about-backdrop" (click)="onBackdropClick($event)">
+<div appDialogBackdrop class="about-backdrop" (dismissed)="closed.emit()">
   <div appFocusTrap class="about-panel" role="dialog" aria-modal="true" aria-labelledby="about-dialog-title">
     <div class="about-header">
       <h2 id="about-dialog-title" class="about-name">{{ 'about.title' | transloco }}</h2>

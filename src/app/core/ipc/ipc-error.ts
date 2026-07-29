@@ -1,4 +1,4 @@
-import { IpcCommand } from './ipc-contract';
+import { IpcCommand } from './ipc.service';
 
 /**
  * Causes d'échec que le backend sait nommer, en miroir de `ErrorCode`

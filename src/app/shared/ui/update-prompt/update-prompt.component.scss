@@ -3,23 +3,11 @@
 // z-index au-dessus de l'éditeur de note (50) : une mise à jour proposée pendant
 // l'édition doit rester atteignable, sinon la modale se retrouve derrière.
 .update-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(var(--backdrop-rgb), 0.6);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 60;
+  @include backdrop(60);
 }
 
 .update-panel {
-  width: min(460px, 88vw);
-  @include surface(var(--bg-1), 14px, var(--line));
-  box-shadow: var(--shadow-overlay);
-  padding: 22px 24px;
-  display: flex;
-  flex-direction: column;
+  @include dialog-panel(460px);
   gap: 14px;
 }
 
@@ -66,7 +54,7 @@
   overflow-y: auto;
   @include surface(var(--bg-0), 7px);
   padding: 10px 12px;
-  font-family: var(--font-mono);
+  font-family: var(--font-mono), serif;
   font-size: 11.5px;
   line-height: 1.6;
   color: var(--text-1);
@@ -78,7 +66,7 @@
   margin: 0;
   font-size: 12px;
   color: var(--text-1);
-  font-family: var(--font-mono);
+  font-family: var(--font-mono), serif;
 }
 
 // `appearance: none` retire le rendu natif ; le fond de la piste et celui de la

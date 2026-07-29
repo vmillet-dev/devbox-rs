@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { NoteSection } from '@core/models/note-section.model';
+import { NoteSection } from '@core/models/note.model';
 import { Space } from '@core/models/space.model';
 import { NoteCardComponent, NoteMove } from '../note-card/note-card.component';
 

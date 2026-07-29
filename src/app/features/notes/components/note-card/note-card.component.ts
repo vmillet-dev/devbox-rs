@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Note } from '@core/models/note.model';
 import { Space } from '@core/models/space.model';
-import { TranslationRef } from '@core/models/translation-ref.model';
+import { TranslationRef } from '@core/i18n/translation-ref';
 import { ClockService } from '@core/time/clock.service';
 import { expiryRef, relativeTimeRef } from '@core/utils/relative-time.util';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { NotesQuery } from '@core/models/notes-query.model';
-import { NotesViewDto, toNotesQueryDto, toNotesView } from './note-view.dto';
+import { NotesQuery } from '@core/models/note.model';
+import { NotesViewDto, toNotesQueryDto, toNotesView } from './note.dto';
 
 const BASE_VIEW: NotesViewDto = {
   sections: [],

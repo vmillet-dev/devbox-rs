@@ -9,26 +9,28 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { NOTES_REPOSITORY } from '../data/notes-repository.token';
+import { NOTES_REPOSITORY } from '../data/notes.repository';
 import { ErrorNotifier } from '../errors/error-notifier.service';
-import { ipcNotice } from '../errors/ipc-notice';
 import { FALLBACK_LANGUAGE, LanguageTag } from '../models/language.model';
-import { NoteSection } from '../models/note-section.model';
-import { Note, NoteDraft, NoteLifecycle, NotePatch } from '../models/note.model';
-import { NoteFilter, NotesQuery, NotesView } from '../models/notes-query.model';
+import {
+  Note,
+  NoteDraft,
+  NoteFilter,
+  NoteLifecycle,
+  NotePatch,
+  NoteSection,
+  NotesQuery,
+  NotesView,
+} from '../models/note.model';
 import { ClockService } from '../time/clock.service';
 import { SpacesStore } from './spaces.store';
 
-export type { NoteFilter } from '../models/notes-query.model';
+export type { NoteFilter } from '../models/note.model';
 
-/**
- * Délai avant qu'une frappe ne parte en requête. Chaque caractère déclencherait
- * sinon un aller-retour IPC ; 150 ms couvrent une frappe continue tout en
- * restant sous le seuil de perception.
- */
+/** La recherche traverse le pont IPC : un appel par caractère serait gâché. */
 export const SEARCH_DEBOUNCE_MS = 150;
 
-/** Clé de journée **locale**, utilisée pour ne re-interroger qu'au changement de jour. */
+/** Journée **locale** : on ne re-interroge qu'au changement de jour. */
 function localDayKey(now: Date): string {
   return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 }
@@ -47,16 +49,15 @@ function sameFacets(a: readonly string[], b: readonly string[]): boolean {
 }
 
 /**
- * Égalité **par valeur** de deux cycles de vie : `Date` se compare par identité,
- * donc rejouer la même échéance déclencherait sinon une écriture inutile à
- * chaque passage dans le champ date.
+ * Par **valeur** : `Date` se compare par identité, donc rejouer la même échéance
+ * déclencherait une écriture à chaque passage dans le champ date.
  */
 function sameLifecycle(a: NoteLifecycle, b: NoteLifecycle): boolean {
   if (a.kind !== b.kind) return false;
   return a.kind !== 'expires' || a.at.getTime() === (b as { at: Date }).at.getTime();
 }
 
-/** Sélection de facettes avec `value` basculée. Un ensemble neuf, jamais muté. */
+/** Un ensemble neuf, jamais muté. */
 function toggled<T>(selection: ReadonlySet<T>, value: T): ReadonlySet<T> {
   const next = new Set(selection);
   if (!next.delete(value)) {
@@ -66,10 +67,8 @@ function toggled<T>(selection: ReadonlySet<T>, value: T): ReadonlySet<T> {
 }
 
 /**
- * Égalité **par valeur** des critères de requête.
- *
- * `resource` compare ses paramètres par identité (`===`) : sans ce comparateur,
- * le littéral neuf que produit `queryParams` à chaque battement d'horloge
+ * ⚠️ `resource` compare ses paramètres par identité : sans ce comparateur, le
+ * littéral neuf que produit `queryParams` à chaque battement d'horloge
  * relancerait une requête toutes les 30 s, masquée par le cache de vue.
  */
 function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
@@ -84,20 +83,12 @@ function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
 }
 
 /**
- * État des notes.
+ * État des notes. Ne filtre pas, ne trie pas, ne regroupe pas : décrit ce que
+ * l'utilisateur demande et affiche la **vue** que le backend renvoie.
  *
- * Ce store ne filtre pas, ne trie pas et ne regroupe pas : il décrit ce que
- * l'utilisateur demande (espace, recherche, filtre, tags, langages) et affiche la
- * **vue** que le backend renvoie. Toute la logique correspondante vit dans
- * `src-tauri/src/storage/` — voir `docs/architecture.md`.
- *
- * Deux principes structurent la classe :
- *
- * 1. **Les signaux inscriptibles restent privés**, exposés en lecture seule.
- *    Toute mutation passe donc par une méthode.
- * 2. **Le backend fait autorité.** Une écriture n'est pas appliquée localement :
- *    on persiste, puis on recharge la vue. Rien à annuler en cas d'échec, et
- *    aucun risque que l'écran diverge de la base.
+ * Deux principes : les signaux inscriptibles restent privés (toute mutation
+ * passe par une méthode), et **le backend fait autorité** — on persiste puis on
+ * recharge, donc rien à annuler en cas d'échec.
  */
 @Injectable({ providedIn: 'root' })
 export class NotesStore {
@@ -124,12 +115,9 @@ export class NotesStore {
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   /**
-   * Critères déclenchant une nouvelle requête. L'instant exact n'en fait pas
-   * partie — seule la **journée** compte pour le découpage en sections.
-   *
-   * ⚠️ Le comparateur `equal` est indispensable : `localDayKey` stabilise la
-   * *valeur* du jour, mais l'objet qui l'enveloppe est neuf à chaque battement
-   * d'horloge, et `resource` compare ses paramètres par identité.
+   * Critères déclenchant une requête. L'instant exact n'en fait pas partie :
+   * seule la **journée** compte pour le découpage en sections. Le comparateur
+   * `equal` est indispensable, voir `sameQueryParams`.
    */
   private readonly queryParams = computed<QueryParams>(
     () => ({
@@ -163,16 +151,12 @@ export class NotesStore {
   });
 
   /**
-   * Dernière vue obtenue, conservée pendant les rechargements.
+   * Dernière vue obtenue, conservée pendant les rechargements : sans ça, chaque
+   * frappe viderait le canevas et l'écran clignoterait.
    *
-   * Sans ça, chaque frappe viderait le canevas le temps de l'aller-retour et
-   * l'écran clignoterait entre « Chargement… » et les résultats. Une vue
-   * légèrement en retard vaut mieux qu'une vue absente.
-   *
-   * ⚠️ Un `linkedSignal` ne retient que ce qu'il a **vu passer** : sa valeur
-   * n'est recalculée qu'à la lecture. Tout ce que ce store expose lit donc
-   * `view()`, et sans court-circuit (cf. `isLoading`) — sans quoi une vue
-   * chargée puis remplacée entre deux lectures serait perdue.
+   * ⚠️ Un `linkedSignal` ne retient que ce qu'il a **vu passer**, sa valeur
+   * n'étant recalculée qu'à la lecture. Tout ce que ce store expose lit donc
+   * `view()`, et sans court-circuit (cf. `isLoading`).
    */
   private readonly view = linkedSignal<NotesView | undefined, NotesView | null>({
     source: () => (this.viewResource.hasValue() ? this.viewResource.value() : undefined),
@@ -191,12 +175,11 @@ export class NotesStore {
   });
 
   /**
-   * Vrai uniquement tant qu'aucune vue n'a jamais été obtenue : un rechargement
-   * ultérieur laisse les résultats précédents à l'écran.
+   * Vrai seulement tant qu'aucune vue n'a jamais été obtenue.
    *
-   * `view()` est lu **avant** l'état de la ressource, et non après : un `&&`
-   * dans l'autre sens court-circuiterait la lecture dès que le chargement est
-   * terminé, et la vue fraîchement chargée ne serait jamais retenue.
+   * ⚠️ `view()` est lu **avant** l'état de la ressource : un `&&` dans l'autre
+   * sens court-circuiterait la lecture dès le chargement terminé, et la vue
+   * fraîchement chargée ne serait jamais retenue.
    */
   readonly isLoading = computed(() => {
     const hasView = this.view() !== null;
@@ -213,10 +196,7 @@ export class NotesStore {
     this.viewResource.reload();
   }
 
-  /**
-   * Met le champ à jour immédiatement et diffère la requête : la recherche
-   * traverse le pont IPC, un appel par caractère serait gâché.
-   */
+  /** Met le champ à jour immédiatement, diffère la requête. */
   setSearchQuery(query: string): void {
     this._searchQuery.set(query);
     this.cancelPendingSearch();
@@ -246,88 +226,64 @@ export class NotesStore {
     this._selectedNote.set(null);
   }
 
-  async togglePinned(id: string): Promise<void> {
-    const target = this.find(id);
-    if (!target) return;
-
-    await this.persist(id, { pinned: !target.pinned });
-  }
-
-  async renameNote(id: string, title: string): Promise<void> {
-    const target = this.find(id);
-    // L'éditeur peut confirmer un titre inchangé (fermeture sans modification) :
-    // ne rien persister dans ce cas.
-    if (!target || target.title === title) return;
-
-    await this.persist(id, { title });
-  }
-
-  async updateContent(id: string, content: string): Promise<void> {
-    const target = this.find(id);
-    if (!target || target.content === content) return;
-
-    await this.persist(id, { content });
+  togglePinned(id: string): Promise<void> {
+    return this.edit(id, (note) => ({ pinned: !note.pinned }));
   }
 
   /**
-   * Range la note dans un autre espace. Le `spaceId` est le seul champ que le
-   * front pousse sans que l'utilisateur l'ait saisi : c'est aussi le seul dont
-   * le stockage refuse la valeur si l'espace n'existe plus (`spaceGone`).
+   * L'éditeur confirme aussi un titre inchangé (fermeture sans modification),
+   * d'où le `null` : rien à persister.
    */
-  async moveNote(id: string, spaceId: string): Promise<void> {
-    const target = this.find(id);
-    if (!target || target.spaceId === spaceId) return;
-
-    await this.persist(id, { spaceId });
+  renameNote(id: string, title: string): Promise<void> {
+    return this.edit(id, (note) => (note.title === title ? null : { title }));
   }
 
-  async setLanguage(id: string, language: LanguageTag): Promise<void> {
-    const target = this.find(id);
-    if (!target || target.language === language) return;
-
-    await this.persist(id, { language });
+  updateContent(id: string, content: string): Promise<void> {
+    return this.edit(id, (note) => (note.content === content ? null : { content }));
   }
 
   /**
-   * Pose ou retire l'échéance d'une note. Une note éphémère est celle dont on
-   * n'a pas encore décidé du sort : c'est cette écriture, et elle seule, qui
-   * alimente le filtre « À trier » et l'indice « à trier bientôt » des sections.
+   * `spaceId` est le seul champ que le front pousse sans saisie de
+   * l'utilisateur, et le seul dont le stockage refuse la valeur si l'espace
+   * n'existe plus.
    */
-  async setLifecycle(id: string, lifecycle: NoteLifecycle): Promise<void> {
-    const target = this.find(id);
-    if (!target || sameLifecycle(target.lifecycle, lifecycle)) return;
+  moveNote(id: string, spaceId: string): Promise<void> {
+    return this.edit(id, (note) => (note.spaceId === spaceId ? null : { spaceId }));
+  }
 
-    await this.persist(id, { lifecycle });
+  setLanguage(id: string, language: LanguageTag): Promise<void> {
+    return this.edit(id, (note) => (note.language === language ? null : { language }));
   }
 
   /**
-   * Ajoute un tag. Aucune normalisation ici : trim, `#` de tête et doublons sont
-   * tranchés par `domain::tags::normalize`, seul endroit où la règle
-   * vit. Le front envoie ce que l'utilisateur a tapé.
+   * Pose ou retire l'échéance. C'est cette écriture, et elle seule, qui alimente
+   * le filtre « À trier » et l'indice « à trier bientôt » des sections.
    */
-  async addTag(id: string, tag: string): Promise<void> {
-    const target = this.find(id);
-    if (!target) return;
-
-    await this.persist(id, { tags: [...target.tags, tag] });
-  }
-
-  async removeTag(id: string, tag: string): Promise<void> {
-    const target = this.find(id);
-    if (!target || !target.tags.includes(tag)) return;
-
-    await this.persist(id, { tags: target.tags.filter((existing) => existing !== tag) });
+  setLifecycle(id: string, lifecycle: NoteLifecycle): Promise<void> {
+    return this.edit(id, (note) => (sameLifecycle(note.lifecycle, lifecycle) ? null : { lifecycle }));
   }
 
   /**
-   * Crée une note vide dans l'espace actif et l'ouvre. L'identifiant est
-   * attribué par la persistance : afficher la note sous un identifiant
-   * provisoire obligerait à le corriger après coup, sélection comprise.
+   * Aucune normalisation ici : trim, `#` de tête et doublons sont tranchés par
+   * `domain::rules::normalize_tags`, seul endroit où la règle vit.
+   */
+  addTag(id: string, tag: string): Promise<void> {
+    return this.edit(id, (note) => ({ tags: [...note.tags, tag] }));
+  }
+
+  removeTag(id: string, tag: string): Promise<void> {
+    return this.edit(id, (note) =>
+      note.tags.includes(tag) ? { tags: note.tags.filter((existing) => existing !== tag) } : null,
+    );
+  }
+
+  /**
+   * Crée une note vide dans l'espace actif et l'ouvre ; l'identifiant est
+   * attribué par la persistance.
    *
-   * Sans espace actif (mode « tous les espaces »), la note part dans le premier
-   * espace : il faut bien en choisir un, et le premier est celui que le
-   * sélecteur montre en tête. S'il n'existe aucun espace, la création échoue —
-   * une note sans espace serait invisible dès qu'un filtre d'espace est posé.
+   * En mode « tous les espaces », la note part dans le premier — il faut bien en
+   * choisir un. Sans aucun espace la création échoue : une note sans espace
+   * serait invisible dès qu'un filtre d'espace est posé.
    */
   async createNote(): Promise<void> {
     const spaceId = this.spaces.activeSpaceId() ?? this.spaces.spaces()[0]?.id;
@@ -355,7 +311,7 @@ export class NotesStore {
       this._selectedNote.set(created);
       this.reload();
     } catch (error) {
-      this.reportFailure('errors.noteCreateFailed', error);
+      this.notifier.reportFailure('errors.noteCreateFailed', error);
     }
   }
 
@@ -369,18 +325,29 @@ export class NotesStore {
       }
       this.reload();
     } catch (error) {
-      this.reportFailure('errors.noteDeleteFailed', error);
+      this.notifier.reportFailure('errors.noteDeleteFailed', error);
     }
   }
 
   /**
-   * Persiste puis recharge. La note renvoyée fait autorité : elle est adoptée
-   * telle quelle dans l'éditeur, car elle porte ce que le backend a réellement
-   * écrit (`updatedAt`, tags normalisés, pied de carte).
+   * Squelette commun des huit écritures : retrouver la note, décider du patch,
+   * persister. `changes` renvoie `null` quand rien n'a bougé — une note
+   * introuvable et une modification nulle ne produisent aucun aller-retour.
+   */
+  private async edit(id: string, changes: (note: Note) => NotePatch | null): Promise<void> {
+    const target = this.find(id);
+    const patch = target && changes(target);
+    if (patch) {
+      await this.persist(id, patch);
+    }
+  }
+
+  /**
+   * Persiste puis recharge. La note renvoyée fait autorité : elle porte ce que
+   * le backend a réellement écrit (`updatedAt`, tags normalisés, pied de carte).
    *
-   * Le patch est typé `NotePatch` et non `Partial<Note>` : le second laisserait
-   * passer `id`, `createdAt` ou `footer` jusqu'à la frontière du dépôt, où seule
-   * la recopie manuelle de `toNotePatchDto` les arrêterait.
+   * `NotePatch` et non `Partial<Note>` : le second laisserait passer `id`,
+   * `createdAt` ou `footer` jusqu'à la frontière du dépôt.
    */
   private async persist(id: string, patch: NotePatch): Promise<void> {
     try {
@@ -390,14 +357,13 @@ export class NotesStore {
       }
       this.reload();
     } catch (error) {
-      this.reportFailure('errors.noteSaveFailed', error);
+      this.notifier.reportFailure('errors.noteSaveFailed', error);
     }
   }
 
   /**
-   * La note ouverte est consultée en premier : elle peut être sortie de la vue
-   * filtrée depuis son ouverture (retrait de son dernier tag filtrant) sans
-   * cesser d'être éditable.
+   * La note ouverte est consultée en premier : elle a pu sortir de la vue
+   * filtrée depuis son ouverture sans cesser d'être éditable.
    */
   private find(id: string): Note | null {
     const selected = this._selectedNote();
@@ -415,15 +381,5 @@ export class NotesStore {
       clearTimeout(this.searchTimeout);
       this.searchTimeout = null;
     }
-  }
-
-  /**
-   * `key` décrit l'action tentée ; si le back a nommé la cause, `ipcNotice` lui
-   * donne la priorité — « cette note n'existe plus » est plus utile que
-   * « impossible d'enregistrer ».
-   */
-  private reportFailure(key: string, error: unknown): void {
-    console.error(error);
-    this.notifier.notify(ipcNotice(error, { key }));
   }
 }

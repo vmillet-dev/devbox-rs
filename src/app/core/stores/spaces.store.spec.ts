@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
-import { IpcError } from '@core/ipc/ipc.service';
+import { IpcError } from '@core/ipc/ipc-error';
 import { Space } from '@core/models/space.model';
 import { FakeSpacesRepository } from '@testing/fake-spaces-repository';
 import { provideAppTesting } from '@testing/testing.providers';

@@ -1,17 +1,22 @@
-<app-notes-topbar
-  [spaces]="spaces.spaces()"
-  [activeSpace]="spaces.activeSpace()"
-  [searchQuery]="store.searchQuery()"
-  [activeFilter]="store.activeFilter()"
-  [searchShortcutEnabled]="searchShortcutEnabled()"
-  (spaceChanged)="spaces.selectSpace($event)"
-  (spaceCreated)="spaces.createSpace($event)"
-  (spaceRenamed)="onSpaceRenamed($event)"
-  (spaceDeleted)="onSpaceDeleted($event)"
-  (searchQueryChanged)="store.setSearchQuery($event)"
-  (filterChanged)="store.setFilter($event)"
-  (newNoteRequested)="store.createNote()"
-/>
+<div class="topbar">
+  <app-space-switcher
+    [spaces]="spaces.spaces()"
+    [activeSpace]="spaces.activeSpace()"
+    (spaceChanged)="spaces.selectSpace($event)"
+    (spaceCreated)="spaces.createSpace($event)"
+    (spaceRenamed)="onSpaceRenamed($event)"
+    (spaceDeleted)="onSpaceDeleted($event)"
+  />
+  <app-search-box
+    [query]="store.searchQuery()"
+    [shortcutEnabled]="searchShortcutEnabled()"
+    (queryChange)="store.setSearchQuery($event)"
+  />
+  <app-filter-chips [active]="store.activeFilter()" (filterChanged)="store.setFilter($event)" />
+  <button type="button" class="new-note-btn" (click)="store.createNote()">
+    {{ 'notes.newNote' | transloco }}
+  </button>
+</div>
 
 <app-tag-rail
   [tags]="store.allTags()"
@@ -25,29 +30,51 @@
   (languageToggled)="store.toggleLanguage($event)"
 />
 
-<app-note-canvas
-  [sections]="store.sections()"
-  [selectedNoteId]="store.selectedNoteId()"
-  [isLoading]="store.isLoading()"
-  [loadError]="store.loadError()"
-  [hasNoResults]="store.hasNoResults()"
-  [spaces]="spaces.spaces()"
-  (noteOpened)="store.openNote($event)"
-  (noteMoved)="store.moveNote($event.noteId, $event.spaceId)"
-  (noteDeleted)="store.deleteNote($event)"
-  (createRequested)="store.createNote()"
-  (reloadRequested)="store.reload()"
-/>
+@let error = store.loadError();
 
-<app-note-editor-overlay
-  [note]="store.selectedNote()"
-  (closed)="store.closeOverlay()"
-  (titleChanged)="onTitleChanged($event)"
-  (contentChanged)="onContentChanged($event)"
-  (languageChanged)="onLanguageChanged($event)"
-  (tagAdded)="onTagAdded($event)"
-  (tagRemoved)="onTagRemoved($event)"
-  (pinToggled)="onPinToggled()"
-  (lifecycleChanged)="onLifecycleChanged($event)"
-  (deleteRequested)="onDeleteRequested()"
-/>
+<div class="canvas" [attr.aria-busy]="store.isLoading()">
+  @if (error) {
+    <!-- Le chargement est la seule opération dont l'échec vide entièrement
+         l'écran : elle mérite sa propre reprise, pas seulement le bandeau global. -->
+    <div class="canvas-state" role="alert">
+      <p class="canvas-state-text">{{ 'errors.notesLoadFailed' | transloco }}</p>
+      <p class="canvas-state-detail">{{ error.message }}</p>
+      <button type="button" class="canvas-retry" (click)="store.reload()">
+        {{ 'errors.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (store.isLoading()) {
+    <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
+  } @else if (store.hasNoResults()) {
+    <p class="canvas-state-text">{{ 'notes.noResults' | transloco }}</p>
+  } @else {
+    @for (section of store.sections(); track section.key) {
+      <app-note-section
+        [section]="section"
+        [selectedNoteId]="store.selectedNoteId()"
+        [spaces]="spaces.spaces()"
+        (noteOpened)="store.openNote($event)"
+        (noteMoved)="store.moveNote($event.noteId, $event.spaceId)"
+        (noteDeleted)="store.deleteNote($event)"
+        (createRequested)="store.createNote()"
+      />
+    }
+  }
+</div>
+
+<!-- L'identifiant vient du store, jamais d'une émission de l'éditeur : c'est le
+     store qui décide de la note ouverte. -->
+@if (store.selectedNote(); as note) {
+  <app-note-editor-overlay
+    [note]="note"
+    (closed)="store.closeOverlay()"
+    (titleChanged)="store.renameNote(note.id, $event)"
+    (contentChanged)="store.updateContent(note.id, $event)"
+    (languageChanged)="store.setLanguage(note.id, $event)"
+    (tagAdded)="store.addTag(note.id, $event)"
+    (tagRemoved)="store.removeTag(note.id, $event)"
+    (pinToggled)="store.togglePinned(note.id)"
+    (lifecycleChanged)="store.setLifecycle(note.id, $event)"
+    (deleteRequested)="store.deleteNote(note.id)"
+  />
+}

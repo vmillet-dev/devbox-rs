@@ -1,14 +1,11 @@
 import { ErrorHandler, Injectable, inject } from '@angular/core';
-import { IpcError } from '../ipc/ipc.service';
-import { ErrorNotifier } from './error-notifier.service';
+import { IpcError } from '../ipc/ipc-error';
+import { ErrorNotifier, errorDetail } from './error-notifier.service';
 
 /**
- * Dernier filet de sécurité : toute exception non rattrapée est journalisée
- * *et* portée à l'écran via `ErrorNotifier`.
- *
- * Les échecs d'IPC reçoivent leur propre message : c'est le mode de panne
- * attendu en production (backend indisponible, commande non enregistrée), et
- * il mérite mieux qu'un « une erreur est survenue » générique.
+ * Dernier filet : toute exception non rattrapée est journalisée **et** portée à
+ * l'écran. Les échecs d'IPC reçoivent leur propre message — c'est le mode de
+ * panne attendu en production, il mérite mieux qu'un « erreur est survenue ».
  */
 @Injectable()
 export class AppErrorHandler implements ErrorHandler {
@@ -25,9 +22,6 @@ export class AppErrorHandler implements ErrorHandler {
       return;
     }
 
-    this.notifier.notify({
-      ref: { key: 'errors.unexpected' },
-      detail: error instanceof Error ? error.message : String(error),
-    });
+    this.notifier.notify({ ref: { key: 'errors.unexpected' }, detail: errorDetail(error) });
   }
 }

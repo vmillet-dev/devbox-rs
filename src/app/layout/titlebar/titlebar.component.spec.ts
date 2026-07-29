@@ -20,15 +20,8 @@ describe('TitlebarComponent', () => {
     fixture.autoDetectChanges();
   });
 
-  it('renders the default title when none is provided', () => {
+  it('renders the application name', () => {
     expect(fixture.nativeElement.querySelector('.titlebar-title').textContent.trim()).toBe('DevBox');
-  });
-
-  it('renders a custom title when provided', async () => {
-    fixture.componentRef.setInput('title', 'Custom title');
-    await fixture.whenStable();
-
-    expect(fixture.nativeElement.querySelector('.titlebar-title').textContent.trim()).toBe('Custom title');
   });
 
   it('renders the three window-control dots, hidden from assistive tech', () => {

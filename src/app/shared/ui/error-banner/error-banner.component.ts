@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ErrorNotifier } from '../../../core/errors/error-notifier.service';
+import { ErrorNotifier } from '@core/errors/error-notifier.service';
 
 /**
  * Bandeau d'erreur global. Sur une app de bureau, la console n'est pas une

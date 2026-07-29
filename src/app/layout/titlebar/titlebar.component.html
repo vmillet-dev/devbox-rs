@@ -2,7 +2,7 @@
   <div class="dots" aria-hidden="true">
     <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
   </div>
-  <div class="titlebar-title">{{ title() }}</div>
+  <div class="titlebar-title">{{ title }}</div>
   <app-about-menu />
   <div class="locale-switch" role="group" [attr.aria-label]="'locale.groupLabel' | transloco">
     @for (locale of locales; track locale) {

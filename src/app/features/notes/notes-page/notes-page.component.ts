@@ -1,23 +1,34 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { LanguageTag } from '@core/models/language.model';
-import { NoteLifecycle } from '@core/models/note.model';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { NotesStore } from '@core/stores/notes.store';
 import { SpacesStore } from '@core/stores/spaces.store';
-import { SpaceDeletion, SpaceRenaming } from '../components/space-switcher/space-switcher.component';
+import { FilterChipsComponent } from '../components/filter-chips/filter-chips.component';
 import { LanguageRailComponent } from '../components/language-rail/language-rail.component';
-import { NoteCanvasComponent } from '../components/note-canvas/note-canvas.component';
 import { NoteEditorOverlayComponent } from '../components/note-editor-overlay/note-editor-overlay.component';
-import { NotesTopbarComponent } from '../components/notes-topbar/notes-topbar.component';
+import { NoteSectionComponent } from '../components/note-section/note-section.component';
+import { SearchBoxComponent } from '../components/search-box/search-box.component';
+import {
+  SpaceDeletion,
+  SpaceRenaming,
+  SpaceSwitcherComponent,
+} from '../components/space-switcher/space-switcher.component';
 import { TagRailComponent } from '../components/tag-rail/tag-rail.component';
 
+/**
+ * Seule page de la feature : elle branche les deux stores sur les composants
+ * d'affichage. Les enfants restent purement dérivés de leurs entrées.
+ */
 @Component({
   selector: 'app-notes-page',
   imports: [
-    NotesTopbarComponent,
+    SpaceSwitcherComponent,
+    SearchBoxComponent,
+    FilterChipsComponent,
     TagRailComponent,
     LanguageRailComponent,
-    NoteCanvasComponent,
+    NoteSectionComponent,
     NoteEditorOverlayComponent,
+    TranslocoPipe,
   ],
   templateUrl: './notes-page.component.html',
   styleUrl: './notes-page.component.scss',
@@ -44,50 +55,6 @@ export class NotesPageComponent {
   protected async onSpaceDeleted({ id, targetSpaceId }: SpaceDeletion): Promise<void> {
     if (await this.spaces.deleteSpace(id, targetSpaceId)) {
       this.store.reload();
-    }
-  }
-
-  protected onTitleChanged(title: string): void {
-    this.withSelectedNote((id) => this.store.renameNote(id, title));
-  }
-
-  protected onContentChanged(content: string): void {
-    this.withSelectedNote((id) => this.store.updateContent(id, content));
-  }
-
-  protected onLanguageChanged(language: LanguageTag): void {
-    this.withSelectedNote((id) => this.store.setLanguage(id, language));
-  }
-
-  protected onTagAdded(tag: string): void {
-    this.withSelectedNote((id) => this.store.addTag(id, tag));
-  }
-
-  protected onTagRemoved(tag: string): void {
-    this.withSelectedNote((id) => this.store.removeTag(id, tag));
-  }
-
-  protected onPinToggled(): void {
-    this.withSelectedNote((id) => this.store.togglePinned(id));
-  }
-
-  protected onLifecycleChanged(lifecycle: NoteLifecycle): void {
-    this.withSelectedNote((id) => this.store.setLifecycle(id, lifecycle));
-  }
-
-  protected onDeleteRequested(): void {
-    this.withSelectedNote((id) => this.store.deleteNote(id));
-  }
-
-  /**
-   * L'éditeur n'émet jamais l'identifiant de la note qu'il affiche : c'est le
-   * store qui décide de la note ouverte, et le lui faire renvoyer ouvrirait la
-   * porte à une modification appliquée à une note qui n'est plus la bonne.
-   */
-  private withSelectedNote(action: (id: string) => Promise<void>): void {
-    const id = this.store.selectedNoteId();
-    if (id) {
-      void action(id);
     }
   }
 }

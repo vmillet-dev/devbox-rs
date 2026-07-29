@@ -1,6 +1,7 @@
-import { NotesRepository } from '@core/data/notes-repository.token';
+import { guard } from './fail-next';
+import { NotesRepository } from '@core/data/notes.repository';
 import { Note, NoteDraft, NotePatch } from '@core/models/note.model';
-import { NotesQuery, NotesView } from '@core/models/notes-query.model';
+import { NotesQuery, NotesView } from '@core/models/note.model';
 
 /**
  * In-memory `NotesRepository` test double.
@@ -30,6 +31,9 @@ export class FakeNotesRepository implements NotesRepository {
   lastQuery: NotesQuery | null = null;
   queryCount = 0;
 
+  private gate: Promise<void> | null = null;
+  private openGate: (() => void) | null = null;
+
   constructor(notes: readonly Note[] = []) {
     this.notes = notes;
   }
@@ -39,8 +43,24 @@ export class FakeNotesRepository implements NotesRepository {
     this.forcedView = { ...this.trivialView(), ...view };
   }
 
-  query(query: NotesQuery): Promise<NotesView> {
-    return this.guard(() => {
+  /**
+   * Suspends every query until `release()`. The store only reports loading
+   * before its first view lands, so observing that state needs a query that
+   * stays in flight.
+   */
+  hold(): void {
+    this.gate = new Promise<void>((resolve) => (this.openGate = resolve));
+  }
+
+  release(): void {
+    this.openGate?.();
+    this.gate = null;
+    this.openGate = null;
+  }
+
+  async query(query: NotesQuery): Promise<NotesView> {
+    await this.gate;
+    return guard(this, () => {
       this.lastQuery = query;
       this.queryCount += 1;
       return this.forcedView ?? this.trivialView();
@@ -48,7 +68,7 @@ export class FakeNotesRepository implements NotesRepository {
   }
 
   create(draft: NoteDraft): Promise<Note> {
-    return this.guard(() => {
+    return guard(this, () => {
       const now = new Date();
       const note: Note = {
         ...draft,
@@ -66,7 +86,7 @@ export class FakeNotesRepository implements NotesRepository {
   }
 
   update(id: string, patch: NotePatch): Promise<Note> {
-    return this.guard(() => {
+    return guard(this, () => {
       const existing = this.notes.find((note) => note.id === id);
       if (!existing) {
         throw new Error(`Unknown note: ${id}`);
@@ -78,7 +98,7 @@ export class FakeNotesRepository implements NotesRepository {
   }
 
   delete(id: string): Promise<void> {
-    return this.guard(() => {
+    return guard(this, () => {
       this.notes = this.notes.filter((note) => note.id !== id);
     });
   }
@@ -99,18 +119,5 @@ export class FakeNotesRepository implements NotesRepository {
       isFiltering: false,
       matched: this.notes.length,
     };
-  }
-
-  private guard<T>(operation: () => T): Promise<T> {
-    if (this.failNext) {
-      const error = this.failNext;
-      this.failNext = null;
-      return Promise.reject(error);
-    }
-    try {
-      return Promise.resolve(operation());
-    } catch (error) {
-      return Promise.reject(error);
-    }
   }
 }

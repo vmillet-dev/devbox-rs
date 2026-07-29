@@ -11,28 +11,23 @@ export type UpdateStatus = 'idle' | 'available' | 'installing' | 'installed';
 
 /**
  * Ce que la dernière vérification laisse à dire dans le menu, **distinct** de
- * `UpdateStatus` qui décrit le cycle d'installation. Les mélanger ferait dépendre
- * l'état de la pop-in du résultat d'une recherche sans suite.
- *
- * `idle` couvre les deux cas où le menu n'a rien à annoncer : avant toute
- * recherche, et après une recherche fructueuse — c'est alors la pop-in qui parle.
+ * `UpdateStatus` : les mélanger ferait dépendre l'état de la pop-in d'une
+ * recherche sans suite. `idle` couvre les deux cas muets — avant toute
+ * recherche, et après une recherche fructueuse, où c'est la pop-in qui parle.
  */
 export type CheckState = 'idle' | 'checking' | 'upToDate' | 'failed';
 
 /**
  * État de la mise à jour applicative.
  *
- * Rien ne s'installe sans un geste explicite de l'utilisateur : `check()`
- * n'expose qu'une proposition, et seul `accept()` télécharge. Une mise à jour
- * silencieuse redémarrerait l'application au milieu d'une note en cours de
- * frappe — les brouillons de l'éditeur ne sont confirmés qu'au blur.
+ * Rien ne s'installe sans geste explicite : une mise à jour silencieuse
+ * redémarrerait l'application au milieu d'une frappe, or les brouillons de
+ * l'éditeur ne sont confirmés qu'au blur.
  *
- * Un échec de vérification reste **muet** : hors ligne, derrière un proxy ou sur
- * une build de développement dont la clé publique est un gabarit, `check()`
- * échoue à chaque lancement. Un bandeau rouge y répondrait par un reproche
- * quotidien alors que l'application fonctionne et que l'utilisateur n'a rien à
- * corriger. Un échec d'**installation**, lui, fait suite à une action explicite
- * et doit donc se voir.
+ * Un échec de **vérification** reste muet : hors ligne ou sur une build de dev
+ * dont la clé publique est un gabarit, `check()` échoue à chaque lancement, et
+ * un bandeau rouge serait un reproche quotidien sans rien à corriger. Un échec
+ * d'**installation** fait suite à une action explicite et doit se voir.
  */
 @Injectable({ providedIn: 'root' })
 export class UpdateStore {

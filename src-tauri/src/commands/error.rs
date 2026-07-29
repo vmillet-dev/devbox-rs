@@ -1,35 +1,21 @@
-//! Erreur traversant le pont Tauri.
-//!
-//! # Pourquoi pas une `String`
-//!
-//! Les commandes renvoyaient `Result<_, String>`, et le front affichait la
-//! chaîne telle quelle. Deux conséquences, toutes deux gênantes maintenant que
-//! les règles métier vivent ici :
-//!
-//! - le message est rédigé en français **dans le binaire**, donc l'interface
-//!   anglaise affichait du français dès qu'une règle du back se déclenchait ;
-//! - pour réagir à une erreur précise (« ce nom d'espace est déjà pris »), le
-//!   front n'avait que l'analyse de la chaîne — qui casse au premier reformulage.
-//!
-//! D'où [`AppError`] : un **code** stable que le front mappe sur une clé de
-//! traduction, ses **paramètres** d'interpolation, et un **détail** technique
-//! affiché en second plan. Aucun texte destiné à l'utilisateur ne sort d'ici.
+//! Erreur traversant le pont Tauri : un **code** stable que le front mappe sur
+//! une clé de traduction, ses **paramètres** d'interpolation, et un **détail**
+//! technique. Aucun texte destiné à l'utilisateur ne sort d'ici — une `String`
+//! mettrait du français dans l'interface anglaise et forcerait le front à
+//! analyser de la prose pour réagir à une cause précise.
 
 use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use crate::domain::validation::ValidationError;
+use crate::domain::rules::ValidationError;
 use crate::storage::StorageError;
 
-/// Identifie la cause pour le front, qui la mappe sur une clé de traduction.
-/// Ajouter une variante = ajouter la variante en face (`IpcErrorCode` dans
-/// `src/app/core/ipc/ipc-error.ts`) **et** sa clé dans les deux locales.
+/// ⚠️ Ajouter une variante impose d'ajouter la sienne dans `IpcErrorCode`
+/// (`src/app/core/ipc/ipc-error.ts`) **et** sa clé dans les deux locales.
 ///
-/// Il n'y a pas de variante pour un schéma trop récent : cette panne n'est
-/// produite que par la migration, pendant le `setup()` de Tauri, où l'échec
-/// avorte le lancement. Aucune commande ne peut la renvoyer, donc lui donner un
-/// code laisserait croire au front qu'il a quelque chose à en faire.
+/// Pas de variante « schéma trop récent » : cette panne avorte le lancement
+/// pendant la migration, aucune commande ne peut la renvoyer.
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ErrorCode {
@@ -48,11 +34,10 @@ pub enum ErrorCode {
 #[serde(rename_all = "camelCase")]
 pub struct AppError {
     pub code: ErrorCode,
-    /// Valeurs à interpoler dans le message traduit, ex. `{ "name": "Perso" }`
-    /// pour `errors.spaceNameTaken`. Vide quand le message n'en attend pas.
+    /// Valeurs à interpoler dans le message traduit, ex. `{ "name": "Perso" }`.
     pub params: BTreeMap<String, String>,
-    /// Message technique. Le front l'affiche en second plan de la bannière : il
-    /// n'a pas à être traduit, mais il doit rester lisible.
+    /// Message technique, affiché en second plan de la bannière. Pas traduit,
+    /// mais lisible.
     pub detail: String,
 }
 
@@ -71,9 +56,8 @@ impl AppError {
         error
     }
 
-    /// Connexion inaccessible. Le mutex n'est empoisonné que si une commande a
-    /// paniqué en le tenant : la base peut alors être incohérente, autant le
-    /// dire au lieu de paniquer une seconde fois.
+    /// Mutex empoisonné : une commande a paniqué en le tenant, la base peut
+    /// être incohérente.
     pub fn storage_unavailable() -> Self {
         Self::new(
             ErrorCode::StorageUnavailable,
@@ -95,9 +79,6 @@ impl From<ValidationError> for AppError {
 
 impl From<StorageError> for AppError {
     fn from(error: StorageError) -> Self {
-        // `detail` reprend le `Display` de `StorageError` : ces messages
-        // existaient déjà et restent utiles — ils changent seulement de rôle,
-        // de texte principal à détail technique.
         let detail = error.to_string();
 
         match error {
@@ -107,14 +88,13 @@ impl From<StorageError> for AppError {
             StorageError::SpaceNotFound(id) => {
                 Self::with(ErrorCode::SpaceNotFound, detail, "id", &id)
             }
-            // Le nom voyage en paramètre : c'est lui que le front interpole
-            // dans `errors.spaceNameTaken`, sans jamais relire le message.
+            // Le nom voyage en paramètre : c'est lui que le front interpole,
+            // sans jamais relire le message.
             StorageError::DuplicateSpaceName(name) => {
                 Self::with(ErrorCode::DuplicateSpaceName, detail, "name", &name)
             }
-            // Inatteignable par le pont (voir [`ErrorCode`]) : si cette
-            // conversion arrivait quand même, `Storage` reste vrai, et le
-            // `detail` porte déjà le numéro de version en clair.
+            // Inatteignable par le pont (voir [`ErrorCode`]) ; `Storage` reste
+            // honnête et le `detail` porte déjà la version en clair.
             StorageError::SchemaTooRecent(_) | StorageError::Sqlite(_) => {
                 Self::new(ErrorCode::Storage, detail)
             }

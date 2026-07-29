@@ -1,24 +1,22 @@
-//! La note et ses formes d'écriture.
+//! La note : ce qui est persisté ([`Note`]) et ce qui est affiché
+//! ([`DisplayNote`]). La persistance ignore tout du second.
 //!
-//! # Contrat de sérialisation — à ne pas casser
+//! ⚠️ **Contrat de sérialisation.** Deux attributs sont indispensables, sinon le
+//! front reçoit des données qu'il ne sait pas relire :
+//! - `rename_all = "camelCase"`, sans quoi serde émet `space_id` là où le DTO
+//!   TypeScript attend `spaceId` ;
+//! - `tag = "kind"` sur les enums à données, dont la représentation serde par
+//!   défaut est `{"Expires":{…}}` alors que le front discrimine sur `kind`.
 //!
-//! Deux pièges, sinon le front reçoit des données qu'il ne sait pas relire :
+//! Les dates transitent en chaîne ISO 8601 UTC (JSON n'a pas de type date).
 //!
-//! - `#[serde(rename_all = "camelCase")]` sur [`Note`] : sans ça, serde émet
-//!   `space_id` / `created_at` alors que le DTO TypeScript attend `spaceId` /
-//!   `createdAt`.
-//! - `#[serde(tag = "kind", rename_all = "camelCase")]` sur [`NoteLifecycle`] :
-//!   la représentation serde par défaut d'une enum à données produit
-//!   `{"Expires":{"at":"…"}}`, alors que le front discrimine sur un champ
-//!   `kind` — il attend `{"kind":"expires","at":"…"}`.
-//!
-//! Les dates transitent en **chaîne ISO 8601 / RFC 3339 UTC** (JSON n'a pas de
-//! type date) ; elles sont produites par `storage::now_iso`.
+//! Les variantes de pied de carte portent une **date**, pas un libellé : « il y
+//! a 4 min » doit vieillir tout seul à l'écran. Le formatage reste au front.
 
+use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::language;
-use super::validation::ValidationError;
+use super::rules::{self, ValidationError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -83,7 +81,7 @@ pub struct NotePatch {
 
 impl NoteDraft {
     pub fn validate(&self) -> Result<(), ValidationError> {
-        language::validate(&self.language)
+        rules::validate_language(&self.language)
     }
 }
 
@@ -91,19 +89,125 @@ impl NotePatch {
     /// Un champ absent n'est pas validé : il ne sera pas écrit.
     pub fn validate(&self) -> Result<(), ValidationError> {
         match &self.language {
-            Some(language) => language::validate(language),
+            Some(language) => rules::validate_language(language),
             None => Ok(()),
         }
     }
 }
 
-/// Ces tests ne vérifient pas du code métier : ils figent la **forme JSON**
-/// traversant le pont, la seule chose que le compilateur ne peut pas contrôler
-/// et qui casse silencieusement le front (voir `src/app/core/data/note.dto.ts`).
+/// Au-delà de ce délai, une note éphémère n'est plus « bientôt à trier ».
+/// Seuil **unique** : le front en tenait un second, pour un libellé qui ne
+/// promet qu'une définition de « bientôt ».
+const EXPIRING_SOON_DAYS: i64 = 3;
+
+const MS_PER_DAY: i64 = 24 * 60 * 60 * 1000;
+
+/// Contenu du pied d'une carte — la **décision**, pas le rendu.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum NoteFooter {
+    /// Note épinglée portant un contexte : elle est là pour durer, savoir d'où
+    /// elle vient est plus utile que son âge.
+    Source { value: String },
+    /// Échéance d'une note éphémère.
+    Expiry { at: String },
+    /// Âge de la dernière modification — le cas ordinaire.
+    Age { at: String },
+}
+
+/// Note augmentée de ce que l'affichage doit savoir. `flatten` aplatit la note
+/// dans l'objet JSON : le front n'a qu'un seul type de note.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisplayNote {
+    #[serde(flatten)]
+    pub note: Note,
+    pub footer: NoteFooter,
+    pub expiring_soon: bool,
+}
+
+/// Lire `display_note.id` plutôt que `display_note.note.id` évite de faire
+/// remonter l'emballage chez l'appelant.
+impl std::ops::Deref for DisplayNote {
+    type Target = Note;
+
+    fn deref(&self) -> &Self::Target {
+        &self.note
+    }
+}
+
+pub fn decorate(note: Note, now: &DateTime<FixedOffset>) -> DisplayNote {
+    DisplayNote {
+        footer: footer_of(&note),
+        expiring_soon: expires_soon(&note, now),
+        note,
+    }
+}
+
+/// Pour une note qu'on vient d'écrire : `create_note` et `update_note` ne
+/// reçoivent pas d'instant de référence du front, contrairement à une requête.
+pub fn decorate_now(note: Note) -> DisplayNote {
+    decorate(note, &Utc::now().fixed_offset())
+}
+
+fn footer_of(note: &Note) -> NoteFooter {
+    if let NoteLifecycle::Expires { at } = &note.lifecycle {
+        return NoteFooter::Expiry { at: at.clone() };
+    }
+
+    // `source` est un fil d'Ariane ("API Gateway / Auth") : son premier segment
+    // situe la note sans déborder de la carte.
+    if note.pinned
+        && let Some(root) = note
+            .source
+            .split(" / ")
+            .next()
+            .filter(|root| !root.is_empty())
+    {
+        return NoteFooter::Source {
+            value: root.to_string(),
+        };
+    }
+
+    NoteFooter::Age {
+        at: note.updated_at.clone(),
+    }
+}
+
+/// Une échéance illisible ne rend pas la note urgente : ce serait un faux signal
+/// permanent.
+fn expires_soon(note: &Note, now: &DateTime<FixedOffset>) -> bool {
+    let NoteLifecycle::Expires { at } = &note.lifecycle else {
+        return false;
+    };
+    let Ok(deadline) = DateTime::parse_from_rfc3339(at) else {
+        return false;
+    };
+
+    // En millisecondes et non en jours entiers : à 3 jours et 1 heure, un
+    // arrondi basculerait la note en alerte un jour trop tôt.
+    deadline.signed_duration_since(*now).num_milliseconds() <= EXPIRING_SOON_DAYS * MS_PER_DAY
+}
+
+/// Ces tests figent la **forme JSON** traversant le pont : la seule chose que le
+/// compilateur ne peut pas contrôler et qui casse silencieusement le front.
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::domain::fixtures::note as sample;
+
+    const NOW: &str = "2026-07-25T09:00:00.000Z";
+
+    fn now() -> DateTime<FixedOffset> {
+        DateTime::parse_from_rfc3339(NOW).unwrap()
+    }
+
+    fn expiring(at: &str) -> Note {
+        Note {
+            lifecycle: NoteLifecycle::Expires { at: at.to_string() },
+            ..sample()
+        }
+    }
 
     #[test]
     fn a_note_serialises_with_camel_case_keys() {
@@ -180,5 +284,111 @@ mod tests {
         assert_eq!(draft.space_id, "s-1");
         assert!(draft.pinned);
         assert!(matches!(draft.lifecycle, NoteLifecycle::Expires { .. }));
+    }
+
+    #[test]
+    fn an_ordinary_note_shows_the_age_of_its_last_change() {
+        let footer = footer_of(&sample());
+
+        assert_eq!(
+            footer,
+            NoteFooter::Age {
+                at: "2026-07-25T09:00:00.000Z".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn a_pinned_note_shows_the_first_segment_of_its_context() {
+        let note = Note {
+            pinned: true,
+            source: "API Gateway / Auth / Tokens".to_string(),
+            ..sample()
+        };
+
+        assert_eq!(
+            footer_of(&note),
+            NoteFooter::Source {
+                value: "API Gateway".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn a_pinned_note_without_context_falls_back_to_its_age() {
+        let note = Note {
+            pinned: true,
+            source: String::new(),
+            ..sample()
+        };
+
+        assert!(matches!(footer_of(&note), NoteFooter::Age { .. }));
+    }
+
+    #[test]
+    fn an_expiring_note_shows_its_deadline_even_when_pinned() {
+        let note = Note {
+            pinned: true,
+            source: "API Gateway".to_string(),
+            ..expiring("2026-08-01T00:00:00.000Z")
+        };
+
+        // The deadline is the more urgent thing to know; the context can wait.
+        assert!(matches!(footer_of(&note), NoteFooter::Expiry { .. }));
+    }
+
+    #[test]
+    fn a_permanent_note_never_counts_as_expiring_soon() {
+        assert!(!expires_soon(&sample(), &now()));
+    }
+
+    #[test]
+    fn the_threshold_is_measured_in_fractions_of_a_day() {
+        // Three days and one hour is not "soon"; rounding to whole days would
+        // raise the alert a day early.
+        assert!(!expires_soon(&expiring("2026-07-28T10:00:00.000Z"), &now()));
+        assert!(expires_soon(&expiring("2026-07-28T08:00:00.000Z"), &now()));
+    }
+
+    #[test]
+    fn an_already_expired_note_counts_as_expiring_soon() {
+        assert!(expires_soon(&expiring("2026-07-01T00:00:00.000Z"), &now()));
+    }
+
+    #[test]
+    fn an_unreadable_deadline_does_not_raise_a_permanent_alert() {
+        assert!(!expires_soon(&expiring("pas une date"), &now()));
+    }
+
+    #[test]
+    fn a_decorated_note_serialises_flat_with_its_footer() {
+        let json = serde_json::to_value(decorate(sample(), &now())).unwrap();
+
+        // The front reads one object: the note's own fields sit alongside the
+        // display ones, not nested under a `note` key.
+        assert_eq!(json["id"], "n-1");
+        assert_eq!(json["spaceId"], "s-1");
+        assert_eq!(json["expiringSoon"], false);
+        assert_eq!(
+            json["footer"],
+            serde_json::json!({ "kind": "age", "at": "2026-07-25T09:00:00.000Z" })
+        );
+        assert!(json.get("note").is_none());
+    }
+
+    #[test]
+    fn a_source_footer_serialises_with_the_kind_the_front_discriminates_on() {
+        let note = Note {
+            pinned: true,
+            source: "API Gateway / Auth".to_string(),
+            ..sample()
+        };
+
+        let json = serde_json::to_value(decorate(note, &now())).unwrap();
+
+        assert_eq!(
+            json["footer"],
+            serde_json::json!({ "kind": "source", "value": "API Gateway" })
+        );
     }
 }

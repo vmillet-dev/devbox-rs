@@ -11,9 +11,9 @@ The two halves talk only through Tauri's `invoke()` bridge.
 
 Notes and spaces are complete end to end: the front-end has no in-memory dataset left, every
 read and write goes through `invoke()`, and the Rust commands persist to an embedded SQLite
-database. The remaining domains (`crypto`, `formatters`) are module files carrying their
-intended contract as documentation and no code — a placeholder implementation would ship dead
-in the binary and be thrown away anyway.
+database. The planned domains (crypto, formatters) have **no** module of their own yet: a
+placeholder would ship dead code in the binary, and an empty file documenting a contract
+drifts from whatever eventually gets written.
 
 **Where the work happens.** Data processing belongs to Rust. Filtering (space, full-text,
 tags, languages, quick filters), grouping into display sections, facet aggregation and tag
@@ -36,6 +36,7 @@ src/                Angular front-end
 └── testing/        test doubles, fixtures and shared providers
 src-tauri/          Rust back-end
 ├── src/domain/     model and business rules — knows neither SQLite nor Tauri
+│                   (note, view, sections, space, rules)
 ├── src/storage/    SQLite persistence: schema, migrations, SQL only
 ├── src/commands/   Tauri adapters: lock, delegate, translate the error
 ├── src/lib.rs      Tauri builder, database setup + command registration
@@ -60,9 +61,22 @@ The payoff is concrete: the domain tests run without opening a database. `cargo 
 covers section placement, timezone boundaries, tag normalisation, search folding, footer
 choice and expiry thresholds in a few milliseconds, with no fixture setup.
 
+`domain/` is five modules, grouped by what they answer rather than by function:
+
+| Module        | Holds                                                                                                                  |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `note.rs`     | what a note **is** (`Note`, lifecycle, draft, patch) and how it is **shown** (`NoteFooter`, `DisplayNote`, `decorate`) |
+| `view.rs`     | what is asked (`NotesQuery`, `NoteFilter`) and what comes back (`NotesView`, `NoteSection`), plus `build()`            |
+| `sections.rs` | chronological placement and the timezone arithmetic it needs                                                           |
+| `space.rs`    | the space and its move-target rule                                                                                     |
+| `rules.rs`    | validation and matching: `ValidationError`, languages, tag normalisation, search                                       |
+
+The split is deliberately coarse. A module per function meant four files wrapping one
+function each, four module headers, and a reader chasing `normalize` across the tree.
+
 Serde attributes sit on the domain types rather than on a separate DTO family. At this size a
 second set of types and their mapping would cost more than it protects; the wire shape is
-pinned by tests in `domain/note.rs`, `domain/query.rs` and `domain/space.rs` instead.
+pinned by tests in `domain/note.rs`, `domain/view.rs` and `domain/space.rs` instead.
 
 Imports use path aliases rather than deep relative paths: `@core/*`, `@shared/*`,
 `@features/*`, `@layout/*`, `@testing/*` (declared in `tsconfig.json`).
@@ -99,6 +113,41 @@ feature. Components specific to notes live under the feature's own `components/`
 Components never reach into each other imperatively. A keyboard shortcut belongs to the
 component that owns the affected element: `Ctrl/⌘+K` is handled inside `SearchBoxComponent`,
 which also renders the hint, rather than travelling down a chain of `viewChild` calls.
+
+A component that only relays inputs and outputs is not a component. The page composes
+`SpaceSwitcher`, `SearchBox`, `FilterChips` and `NoteSection` directly rather than through a
+topbar and a canvas wrapper, which added two files and eleven declarations without a single
+decision between them.
+
+### Shared behaviour lives in directives, not in copies
+
+Three menus (space switcher, card actions, about) and three modals (editor, about, update
+prompt) share their interaction rules. Those rules live in `shared/a11y/`, and are applied
+through `hostDirectives` so no wrapper element is needed:
+
+| Directive                 | Selector                                  | Owns                                                                              |
+| ------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------- |
+| `MenuTriggerDirective`    | `[appMenuTrigger]`, `exportAs: 'appMenu'` | open state, outside click, Escape, focus returned to `[appMenuAnchor]`            |
+| `MenuPanelDirective`      | `[appMenuPanel]`                          | `role="menu"`, focus on the first entry, arrows and Home/End over `[appMenuItem]` |
+| `DialogBackdropDirective` | `[appDialogBackdrop]`                     | dismissal when the click lands on the backdrop itself                             |
+| `FocusTrapDirective`      | `[appFocusTrap]`                          | keyboard focus confined to a dialog, restored on destroy                          |
+
+Two details are load-bearing:
+
+- `MenuPanelDirective` walks `[appMenuItem]` rather than every button, because a menu may
+  carry a secondary action deliberately outside the arrow cycle — the `⋯` that opens a
+  space's edit panel is reachable by Tab, not by arrows.
+- `MenuTriggerDirective` **emits** `escaped` instead of closing on Escape. A single-level menu
+  wires it straight to `close()`; the space switcher first collapses its create/edit panel and
+  only closes on the second press.
+
+Putting the click listener in a directive also removes the `click-events-have-key-events`
+suppressions the three modal templates used to carry: the keyboard equivalent exists, it is
+Escape, and the template no longer declares a bare `(click)` for the linter to flag.
+
+The matching CSS lives in `src/styles/_mixins.scss` as `backdrop($z-index)` and
+`dialog-panel($width)`. The z-index stays with the caller: the stacking order (editor 50,
+about 55, update 60) is a decision, not an implementation detail.
 
 ### Syntax highlighting
 
@@ -332,7 +381,7 @@ persists through `PreferencesService`.
 ### Data access
 
 Stores never talk to a data source directly. They inject `NOTES_REPOSITORY` /
-`SPACES_REPOSITORY`, and `core/data/data.providers.ts` binds those tokens — **the single
+`SPACES_REPOSITORY`, and `app.config.ts` binds those tokens — **the single
 place where the application's data source is chosen**. Both are bound to the `Tauri*`
 repositories; the only remaining doubles are the test ones in `src/testing/`, injected by
 `provideAppTesting()`.
@@ -357,7 +406,8 @@ Keep this seam intact: no component calls `invoke()`, and `IpcService` is its on
 
 All calls go through `IpcService` (`core/ipc/`) and every failure comes back as an `IpcError`.
 
-The command **and its arguments** are typed by `core/ipc/ipc-contract.ts`, a table mapping
+The command **and its arguments** are typed by the `IpcContract` table in
+`core/ipc/ipc.service.ts`, mapping
 each command name to its argument shape and return type. This matters more than it looks:
 Tauri matches arguments **by name**, so a misspelled key used to compile fine and fail at
 runtime as a serde rejection — an `IpcError` with no code, the most opaque failure the app
@@ -377,7 +427,7 @@ This exists because business rules live in Rust. A message written there would b
 an English UI, and branching on a cause would mean parsing a sentence that breaks at the
 first rewording.
 
-The mapping lives in **one** place, `core/errors/ipc-notice.ts`: `ipcNotice(error, fallback)`
+The mapping lives in **one** place, `core/errors/error-notifier.service.ts`: `ipcNotice(error, fallback)`
 turns a failure into the message that helps most. A named cause wins over the attempted
 action — "this note no longer exists" beats "could not save the note", which would leave the
 user retrying something that can never succeed. `fallback` is used when the cause adds
@@ -427,7 +477,7 @@ serialise to `null` and overwrite the stored value instead of leaving it untouch
 ### Rules
 
 - Argument names must match between the TS call site and the Rust signature — Tauri matches
-  by name, not position. Declare each command in `ipc-contract.ts` and the compiler enforces
+  by name, not position. Declare each command in `IpcContract` and the compiler enforces
   it. ⚠️ Tauri v2 applies `rename_all = "camelCase"` to arguments, so a Rust parameter
   `note_id` is `noteId` on the wire. No parameter is multi-word today, but the first one will
   hit this.
@@ -464,7 +514,7 @@ passes if it carries _at least one_ of the selected values), facets scoped to th
 than to the current filter, and a selection counts as `is_filtering` — which collapses the
 canvas into a single flat `results` section. The quick filters (pinned / untriaged) do not:
 they narrow a view that stays chronological. One asymmetry: selected tags go through
-`domain::tags::normalize` before hitting SQL, selected languages do not — a language is picked
+`domain::rules::normalize_tags` before hitting SQL, selected languages do not — a language is picked
 from a closed list, not typed, and `domain::language` compares it exactly.
 
 The serialisation contract is pinned by tests in `domain/note.rs`, `domain/query.rs`,
@@ -477,7 +527,7 @@ error code serialises to `"noteNotFound"`. A serde attribute deleted by accident
 ### Input validation
 
 The back validates what the front already constrains, because a rule held only by a form is
-not held at all. `domain/validation.rs` defines a `ValidationError` carrying the offending
+not held at all. `domain/rules.rs` defines a `ValidationError` carrying the offending
 `field`; commands call `draft.validate()` / `draft.validated_name()` before touching the
 connection, and `AppError` turns the refusal into `invalidInput` with `{{field}}`.
 
@@ -521,7 +571,7 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
   matching is done **in Rust** (`domain::search`), because SQLite's `LOWER()` only folds ASCII
   without ICU, so `Étape` would not match `étape`. Grouping is `domain::sections`, which
   touches no connection and is therefore testable without a database.
-- **Tag normalisation lives in `domain::tags::normalize`, and only there.** Trimming,
+- **Tag normalisation lives in `domain::rules::normalize_tags`, and only there.** Trimming,
   stripping leading `#`, dropping blanks and collapsing case-insensitive duplicates (first
   spelling wins) all happen on write, so the front sends what the user typed. The returned
   tags are sorted to match what a read gives back — otherwise a note's tags would reorder

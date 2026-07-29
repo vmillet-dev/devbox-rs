@@ -1,25 +1,23 @@
-//! L'espace : le classeur dans lequel les notes sont rangées.
+//! L'espace : le classeur dans lequel les notes sont rangées. C'est le
+//! `space_id` de la note qui porte la relation.
 //!
-//! Volontairement minimal — un identifiant, un nom. C'est le `space_id` de
-//! chaque note qui porte la relation. Il n'existe **aucune** entrée « Tous les
-//! espaces » côté données : c'est un mode d'affichage, pas un espace ; en créer
-//! un ferait ranger des notes dedans.
+//! Aucune entrée « Tous les espaces » côté données : c'est un mode d'affichage,
+//! et en créer un ferait ranger des notes dedans.
 
 use serde::{Deserialize, Serialize};
 
-use super::validation::ValidationError;
+use super::rules::ValidationError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Space {
     pub id: String,
-    /// Nom affiché dans le sélecteur. L'unicité, insensible à la casse, est
-    /// tranchée par la persistance : un doublon ressort en
-    /// `ErrorCode::DuplicateSpaceName`, que le front traduit.
+    /// L'unicité, insensible à la casse, est tranchée par la persistance : un
+    /// doublon ressort en `ErrorCode::DuplicateSpaceName`.
     pub name: String,
 }
 
-/// Création : pas d'identifiant, il est attribué par la persistance.
+/// Pas d'identifiant : il est attribué par la persistance.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceDraft {
@@ -27,12 +25,9 @@ pub struct SpaceDraft {
 }
 
 impl SpaceDraft {
-    /// Nom retenu : détouré et non vide.
-    ///
-    /// Le détourage n'est pas cosmétique. L'unicité est vérifiée en
-    /// `COLLATE NOCASE`, qui ne replie pas les espaces : sans lui, « Perso » et
-    /// « Perso » suivi d'une espace cohabiteraient dans le sélecteur, tous deux
-    /// affichés à l'identique.
+    /// Nom détouré et non vide. Le détourage n'est pas cosmétique :
+    /// `COLLATE NOCASE` ne replie pas les espaces, donc « Perso » et « Perso »
+    /// suivi d'une espace cohabiteraient, affichés à l'identique.
     pub fn validated_name(&self) -> Result<String, ValidationError> {
         let trimmed = self.name.trim();
         if trimmed.is_empty() {
@@ -46,12 +41,9 @@ impl SpaceDraft {
     }
 }
 
-/// Refuge acceptable pour les notes d'un espace supprimé.
-///
-/// Un espace ne peut pas être son propre refuge : le `DELETE` porte un
-/// `ON DELETE CASCADE`, donc les notes qu'on viendrait d'y « déplacer » seraient
-/// emportées juste après. La persistance ne peut pas trancher ça — des deux
-/// côtés, l'espace existe.
+/// Un espace ne peut pas être son propre refuge : le `ON DELETE CASCADE`
+/// emporterait les notes juste après le transfert. La persistance ne peut pas
+/// trancher — des deux côtés, l'espace existe.
 pub fn validate_move_target(id: &str, target_id: &str) -> Result<(), ValidationError> {
     if id == target_id {
         return Err(ValidationError::new(
@@ -63,10 +55,9 @@ pub fn validate_move_target(id: &str, target_id: &str) -> Result<(), ValidationE
     Ok(())
 }
 
-/// `rename_all` est sans effet tant que les champs tiennent en un mot — et c'est
-/// précisément pourquoi ces tests existent : ils échoueront le jour où un
-/// `created_at` s'ajoutera sans que l'attribut ait été porté, au lieu de laisser
-/// le front lire `undefined`.
+/// `rename_all` est sans effet tant que les champs tiennent en un mot : ces
+/// tests échoueront le jour où un `created_at` s'ajoutera sans l'attribut, au
+/// lieu de laisser le front lire `undefined`.
 #[cfg(test)]
 mod tests {
     use super::*;

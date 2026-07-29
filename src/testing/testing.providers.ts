@@ -1,6 +1,6 @@
 import { Provider } from '@angular/core';
-import { NOTES_REPOSITORY } from '@core/data/notes-repository.token';
-import { SPACES_REPOSITORY } from '@core/data/spaces-repository.token';
+import { NOTES_REPOSITORY } from '@core/data/notes.repository';
+import { SPACES_REPOSITORY } from '@core/data/spaces.repository';
 import { AppInfoService } from '@core/app-info/app-info.service';
 import { Note } from '@core/models/note.model';
 import { Space } from '@core/models/space.model';

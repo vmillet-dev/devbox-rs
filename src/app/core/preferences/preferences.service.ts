@@ -3,51 +3,37 @@ import { load } from '@tauri-apps/plugin-store';
 import type { Store, StoreOptions } from '@tauri-apps/plugin-store';
 
 /**
- * Tout ce que ce service attend du plugin : ouvrir un fichier.
- *
- * Passer par un jeton plutôt que d'appeler `load` directement suit la même règle
- * que `NOTES_REPOSITORY` — le seul point de contact avec l'extérieur est
- * remplaçable. Ici c'est aussi une nécessité pratique : le builder Angular
- * regroupe les modules avant que Vitest ne les voie, et `vi.mock` sur un paquet
- * externe n'intercepte alors qu'une fois sur deux.
+ * Tout ce que ce service attend du plugin : ouvrir un fichier. Un jeton plutôt
+ * qu'un appel direct à `load`, aussi par nécessité pratique — le builder
+ * Angular regroupe les modules avant que Vitest ne les voie, et `vi.mock` sur un
+ * paquet externe n'intercepte alors qu'une fois sur deux.
  */
-export type PreferencesStoreLoader = (path: string, options: StoreOptions) => Promise<Store>;
+type PreferencesStoreLoader = (path: string, options: StoreOptions) => Promise<Store>;
 
 export const PREFERENCES_STORE_LOADER = new InjectionToken<PreferencesStoreLoader>(
   'PREFERENCES_STORE_LOADER',
   { providedIn: 'root', factory: () => load },
 );
 
-/** Fichier créé dans `app_config_dir()` par le plugin — au même titre que la base SQLite. */
+/** Créé dans `app_config_dir()`, au même titre que la base SQLite. */
 const STORE_FILE = 'preferences.json';
 
-/**
- * Délai avant écriture sur disque. Une préférence bascule par clic, jamais en
- * rafale : quelques centaines de millisecondes suffisent à grouper un
- * aller-retour de bouton sans risquer de perdre le dernier état.
- */
+/** Une préférence bascule par clic, jamais en rafale. */
 const AUTO_SAVE_MS = 300;
 
 /**
- * Préférences locales de l'utilisateur (langue de l'UI, plein écran de l'éditeur).
+ * Préférences locales (langue de l'UI, plein écran de l'éditeur), adossées à
+ * `tauri-plugin-store` : un vrai fichier, insensible à un vidage du WebView
+ * contrairement au `localStorage` qu'il remplace.
  *
- * Adossé à `tauri-plugin-store` : un vrai fichier dans le répertoire de
- * configuration de l'application, lisible depuis Rust et insensible à un vidage
- * du WebView — contrairement au `localStorage` qu'il remplace.
+ * L'API reste **synchrone** alors que celle du plugin ne l'est pas : une
+ * préférence est lue à la construction d'un composant, et un `read` asynchrone
+ * ferait apparaître l'interface dans un état puis dans l'autre. Le fichier est
+ * donc chargé une fois par [`hydrate`], et les écritures partent sans être
+ * attendues — une préférence non persistée ne doit ni faire tomber
+ * l'application ni la faire patienter.
  *
- * # Pourquoi l'API reste synchrone
- *
- * Celle du plugin ne l'est pas. Mais une préférence est lue au moment où un
- * composant se construit (`fullscreen` dans l'éditeur, la langue avant le
- * premier rendu) : rendre `read` asynchrone ferait apparaître l'interface dans
- * un état puis dans l'autre. Le fichier est donc chargé **une fois** par
- * [`hydrate`], depuis un `provideAppInitializer`, et les lectures suivantes
- * tapent dans le cache mémoire. Les écritures sont appliquées au cache
- * immédiatement puis poussées sans être attendues : une préférence non
- * persistée ne doit jamais faire tomber l'application, ni la faire patienter.
- *
- * Hors Tauri (tests unitaires en jsdom), `load` échoue : le service dégrade
- * alors en cache purement mémoire, ce qui reste un comportement correct.
+ * Hors Tauri (jsdom), `load` échoue et le service dégrade en cache mémoire.
  */
 @Injectable({ providedIn: 'root' })
 export class PreferencesService {
@@ -57,11 +43,10 @@ export class PreferencesService {
 
   /**
    * Charge le fichier et remplit le cache. À appeler **avant** la première
-   * lecture — sans quoi elle rendrait `null` et la préférence serait perdue.
+   * lecture, qui rendrait sinon `null`.
    *
-   * Les valeurs déjà présentes dans le `localStorage` d'une version antérieure
-   * sont reprises quand le fichier ne les porte pas encore : sans cette reprise,
-   * la mise à jour réinitialiserait silencieusement la langue de l'interface.
+   * Les valeurs d'une version antérieure encore dans `localStorage` sont
+   * reprises : sans ça, la mise à jour réinitialiserait la langue de l'interface.
    */
   async hydrate(): Promise<void> {
     try {
@@ -74,9 +59,8 @@ export class PreferencesService {
       this.store = store;
       this.adoptLegacyValues();
     } catch {
-      // Plugin indisponible (hors Tauri, permission refusée) : le cache mémoire
-      // suffit à faire fonctionner la session, elle ne survivra simplement pas
-      // à un redémarrage.
+      // Plugin indisponible : le cache mémoire fait tourner la session, elle ne
+      // survivra simplement pas au redémarrage.
     }
   }
 
@@ -86,8 +70,7 @@ export class PreferencesService {
 
   write(key: string, value: string): void {
     this.cache.set(key, value);
-    // Volontairement non attendu : l'appelant bascule un état d'interface, il
-    // n'a rien à faire du moment où l'écriture touche le disque.
+    // Non attendu : l'appelant bascule un état d'interface.
     void this.store?.set(key, value).catch(() => undefined);
   }
 
@@ -96,9 +79,8 @@ export class PreferencesService {
     try {
       for (let index = 0; index < localStorage.length; index++) {
         const key = localStorage.key(index);
-        // Seules les clés de l'application sont reprises : le stockage du
-        // WebView peut porter autre chose, et tout y déverser polluerait le
-        // fichier de préférences durablement.
+        // Seules nos clés : le WebView peut en porter d'autres, et tout
+        // déverser polluerait durablement le fichier de préférences.
         if (!key?.startsWith('devbox.') || this.cache.has(key)) continue;
 
         const value = localStorage.getItem(key);

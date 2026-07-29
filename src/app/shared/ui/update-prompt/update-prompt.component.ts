@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { TranslationRef } from '@core/models/translation-ref.model';
+import { TranslationRef } from '@core/i18n/translation-ref';
 import { UpdateStore } from '@core/updates/update.store';
+import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 
 /**
@@ -15,7 +16,7 @@ import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
  */
 @Component({
   selector: 'app-update-prompt',
-  imports: [FocusTrapDirective, TranslocoPipe],
+  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
   templateUrl: './update-prompt.component.html',
   styleUrl: './update-prompt.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -47,14 +48,11 @@ export class UpdatePromptComponent {
     void this.store.dismiss();
   }
 
+  /** Échap et clic sur le fond : deux façons de reporter, refusées pendant
+   * l'installation — interrompre à mi-parcours laisserait un binaire à moitié
+   * remplacé. */
   protected onEscape(): void {
     if (this.store.update() && !this.busy()) {
-      this.later();
-    }
-  }
-
-  protected onBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget && !this.busy()) {
       this.later();
     }
   }
