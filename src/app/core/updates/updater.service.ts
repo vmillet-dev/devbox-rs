@@ -16,9 +16,8 @@ export type DownloadProgress = number | null;
 /**
  * Seul point de passage vers le plugin de mise à jour.
  *
- * `IpcService` couvre les commandes que nous écrivons ; celles-ci appartiennent
- * au plugin, ne figurent donc pas dans `IpcContract` et ne peuvent pas passer
- * par lui. Le principe reste le même : ni composant ni store n'importe
+ * `bindings.ts` couvre les commandes que nous écrivons ; celles-ci appartiennent
+ * au plugin et n'y figurent donc pas. Le principe reste le même : ni composant ni store n'importe
  * `@tauri-apps/plugin-updater`, ce qui rend le store testable en doublant cette
  * classe — sans quoi il faudrait un pont Tauri dans jsdom.
  *

@@ -17,6 +17,7 @@ use crate::domain::space::{self, Space, SpaceDraft};
 use crate::storage::{self, Db};
 
 #[tauri::command]
+#[specta::specta]
 pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, AppError> {
     let connection = lock(&db)?;
 
@@ -25,6 +26,7 @@ pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, AppError> {
 
 /// Le front sélectionne aussitôt l'espace à partir de la valeur renvoyée.
 #[tauri::command]
+#[specta::specta]
 pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppError> {
     // Nom déjà détouré et non vide : le stockage n'a plus qu'à trancher
     // l'unicité, la seule chose que lui seul peut voir.
@@ -37,6 +39,7 @@ pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppEr
 
 /// Même brouillon qu'à la création, donc même validation.
 #[tauri::command]
+#[specta::specta]
 pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppError> {
     let name = draft.validated_name()?;
 
@@ -47,9 +50,10 @@ pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<
 
 /// Supprime un espace après avoir transféré ses notes vers `target_space_id`.
 ///
-/// ⚠️ Tauri v2 renomme les arguments en camelCase : le front envoie
-/// `targetSpaceId`, pas `target_space_id` (cf. `IpcContract`).
+/// Tauri v2 renomme les arguments en camelCase ; c'est `bindings.ts` qui porte
+/// désormais le `targetSpaceId` correspondant, sans qu'on ait à l'orthographier.
 #[tauri::command]
+#[specta::specta]
 pub fn delete_space(
     id: String,
     target_space_id: String,

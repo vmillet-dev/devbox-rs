@@ -7,16 +7,19 @@
 use std::collections::BTreeMap;
 
 use serde::Serialize;
+use specta::Type;
 
 use crate::domain::rules::ValidationError;
 use crate::storage::StorageError;
 
-/// ⚠️ Ajouter une variante impose d'ajouter la sienne dans `IpcErrorCode`
-/// (`src/app/core/ipc/ipc-error.ts`) **et** sa clé dans les deux locales.
+/// Ajouter une variante la fait apparaître dans le `bindings.ts` généré, ce qui
+/// casse la compilation du front tant que `CODE_KEYS`
+/// (`core/errors/error-notifier.service.ts`) et les deux locales n'ont pas leur
+/// clé — le miroir n'est plus tenu à la main.
 ///
 /// Pas de variante « schéma trop récent » : cette panne avorte le lancement
 /// pendant la migration, aucune commande ne peut la renvoyer.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ErrorCode {
     NoteNotFound,
@@ -30,7 +33,7 @@ pub enum ErrorCode {
     Storage,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AppError {
     pub code: ErrorCode,

@@ -38,8 +38,9 @@ describe('toNotesView', () => {
   });
 
   it('drops a language this build does not know rather than failing', () => {
-    // A rail missing one facet stays usable; unlike an unknown section key,
-    // which makes a whole part of the canvas unreadable and does throw.
+    // A rail missing one facet stays usable. Languages are the only wire value
+    // still narrowed at runtime: Rust types them as a free string, so unlike a
+    // section key the generated bindings cannot rule an unknown one out.
     const view = toNotesView({ ...BASE_VIEW, availableLanguages: ['json', 'cobol'] });
 
     expect(view.availableLanguages).toEqual(['json']);

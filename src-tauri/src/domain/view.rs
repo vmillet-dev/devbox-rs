@@ -12,6 +12,7 @@
 use chrono::DateTime;
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use super::note::{DisplayNote, Note};
 use super::rules::{self, ValidationError};
@@ -19,7 +20,7 @@ use super::sections;
 
 /// Tout y est explicite : la requête ne lit ni horloge ni fuseau, ce qui la
 /// rend reproductible en test.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotesQuery {
     /// `None` = « tous les espaces » — un choix, pas une absence de choix : il
@@ -42,7 +43,7 @@ pub struct NotesQuery {
 
 /// Filtre rapide de la barre d'outils. `Untriaged` = notes portant une date
 /// d'expiration, c'est-à-dire celles dont on n'a pas encore décidé du sort.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum NoteFilter {
     All,
@@ -59,7 +60,7 @@ pub struct Facets {
 }
 
 /// Ce que le canevas affiche, tel quel.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotesView {
     pub sections: Vec<NoteSection>,
@@ -71,11 +72,13 @@ pub struct NotesView {
     /// Une recherche ou une facette est active. Le front distingue ainsi
     /// « aucun résultat » d'« espace vide ».
     pub is_filtering: bool,
-    /// Notes retenues, toutes sections confondues.
-    pub matched: usize,
+    /// Notes retenues, toutes sections confondues. `u32` et non `usize` : Specta
+    /// refuse d'exporter les types de la taille d'un `BigInt`, que JSON ne sait
+    /// pas rendre sans perte de précision.
+    pub matched: u32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteSection {
     pub key: NoteSectionKey,
@@ -88,7 +91,7 @@ pub struct NoteSection {
 
 /// Sert de **clé de traduction** côté front (`sections.<key>`) : aucun libellé
 /// lisible ne traverse le pont.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum NoteSectionKey {
     Pinned,
@@ -122,7 +125,9 @@ pub fn build(
     let is_filtering = !needle.is_empty()
         || !rules::normalize_tags(&request.tags).is_empty()
         || !request.languages.is_empty();
-    let matched = notes.len();
+    // Le nombre de notes d'un espace ne déborde pas d'un `u32`, et une saturation
+    // reste préférable à une panne : ce compteur ne sert qu'à un libellé.
+    let matched = u32::try_from(notes.len()).unwrap_or(u32::MAX);
 
     let offset = sections::offset_from_minutes(request.tz_offset_minutes);
     let now = DateTime::parse_from_rfc3339(&request.now)

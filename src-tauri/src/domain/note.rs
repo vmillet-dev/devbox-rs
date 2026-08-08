@@ -15,10 +15,11 @@
 
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use super::rules::{self, ValidationError};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
     pub id: String,
@@ -41,7 +42,7 @@ pub struct Note {
     pub lifecycle: NoteLifecycle,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum NoteLifecycle {
     /// Note permanente.
@@ -51,7 +52,7 @@ pub enum NoteLifecycle {
 }
 
 /// Création : ni identifiant ni horodatages — c'est la persistance qui les attribue.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteDraft {
     pub space_id: String,
@@ -65,17 +66,30 @@ pub struct NoteDraft {
 }
 
 /// Modification partielle : un champ à `None` reste **inchangé** en base.
-#[derive(Debug, Clone, Default, Deserialize)]
+///
+/// `#[specta(optional)]` génère `title?: string | null` plutôt que
+/// `title: string | null` : le front **omet** les clés qu'il ne touche pas, et
+/// un type qui les exigerait toutes l'obligerait à envoyer des `null`, c'est-à-dire
+/// à écraser ce qu'il voulait laisser intact.
+#[derive(Debug, Clone, Default, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotePatch {
     /// Renseigné uniquement lors d'un déplacement de note vers un autre espace.
+    #[specta(optional)]
     pub space_id: Option<String>,
+    #[specta(optional)]
     pub title: Option<String>,
+    #[specta(optional)]
     pub language: Option<String>,
+    #[specta(optional)]
     pub content: Option<String>,
+    #[specta(optional)]
     pub source: Option<String>,
+    #[specta(optional)]
     pub tags: Option<Vec<String>>,
+    #[specta(optional)]
     pub pinned: Option<bool>,
+    #[specta(optional)]
     pub lifecycle: Option<NoteLifecycle>,
 }
 
@@ -103,7 +117,7 @@ const EXPIRING_SOON_DAYS: i64 = 3;
 const MS_PER_DAY: i64 = 24 * 60 * 60 * 1000;
 
 /// Contenu du pied d'une carte — la **décision**, pas le rendu.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum NoteFooter {
     /// Note épinglée portant un contexte : elle est là pour durer, savoir d'où
@@ -117,7 +131,7 @@ pub enum NoteFooter {
 
 /// Note augmentée de ce que l'affichage doit savoir. `flatten` aplatit la note
 /// dans l'objet JSON : le front n'a qu'un seul type de note.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayNote {
     #[serde(flatten)]

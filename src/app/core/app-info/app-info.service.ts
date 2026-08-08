@@ -17,8 +17,8 @@ export const APP_NAME = 'DevBox';
 
 /**
  * Seam vers les API Tauri décrivant l'application. Même raison d'être que
- * `UpdaterService` : ce sont des commandes du cœur et d'un plugin, absentes
- * d'`IpcContract`, et un composant qui les importerait deviendrait intestable —
+ * `UpdaterService` : ce sont des commandes du cœur et d'un plugin, absentes de
+ * `bindings.ts`, et un composant qui les importerait deviendrait intestable —
  * jsdom n'a pas de pont Tauri.
  *
  * Pas de description ici : c'est du texte visible, donc une clé de traduction.

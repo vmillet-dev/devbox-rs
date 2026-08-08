@@ -1,18 +1,16 @@
 import { Injectable, inject } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { IpcService } from '@core/ipc/ipc.service';
+import { commands, type TrayLabels as WireTrayLabels } from '@core/ipc/bindings';
 
 /**
  * Libellés du menu de la barre système, **déjà traduits**. Le natif n'écrit
  * aucun texte visible : la langue est une préférence du front, et une table de
  * traductions en Rust serait une seconde source à tenir en phase.
+ *
+ * Réexporté depuis les bindings : un libellé ajouté au menu côté Rust manque
+ * ici à la compilation.
  */
-export interface TrayLabels {
-  readonly open: string;
-  readonly newNote: string;
-  readonly capture: string;
-  readonly quit: string;
-}
+export type TrayLabels = WireTrayLabels;
 
 const LABEL_KEYS = ['tray.open', 'tray.newNote', 'tray.capture', 'tray.quit'];
 
@@ -30,7 +28,6 @@ const LABEL_KEYS = ['tray.open', 'tray.newNote', 'tray.capture', 'tray.quit'];
  */
 @Injectable({ providedIn: 'root' })
 export class TrayService {
-  private readonly ipc = inject(IpcService);
   private readonly transloco = inject(TranslocoService);
 
   start(): void {
@@ -47,7 +44,9 @@ export class TrayService {
    */
   private async push(labels: TrayLabels): Promise<void> {
     try {
-      await this.ipc.invoke('sync_tray', { labels });
+      // Seule commande sans `Result` côté Rust, donc sans `unwrap` : elle lève
+      // directement si le pont est absent.
+      await commands.syncTray(labels);
     } catch {
       // Sans barre système, l'application vit dans sa fenêtre.
     }

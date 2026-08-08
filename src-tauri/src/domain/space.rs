@@ -5,10 +5,11 @@
 //! et en créer un ferait ranger des notes dedans.
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use super::rules::ValidationError;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Space {
     pub id: String,
@@ -18,7 +19,7 @@ pub struct Space {
 }
 
 /// Pas d'identifiant : il est attribué par la persistance.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceDraft {
     pub name: String,

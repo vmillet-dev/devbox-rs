@@ -13,7 +13,8 @@
     "lint:fix": "eslint . --fix && prettier --write .",
     "format": "prettier --write .",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev"
+    "tauri:dev": "tauri dev",
+    "bindings": "cargo run --manifest-path src-tauri/Cargo.toml --bin export-bindings"
   },
   "private": true,
   "dependencies": {

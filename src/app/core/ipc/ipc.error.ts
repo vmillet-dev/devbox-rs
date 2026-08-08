@@ -1,52 +1,45 @@
-import { IpcCommand } from './ipc.service';
+import type { AppError, ErrorCode } from './bindings';
 
 /**
- * Causes d'échec que le backend sait nommer, en miroir de `ErrorCode`
- * (`src-tauri/src/commands/error.rs`). Ajouter une variante d'un côté impose de
- * l'ajouter de l'autre — **et** de la déclarer dans `IPC_ERROR_CODES`, sinon
- * elle arrivera en `null`.
+ * Causes d'échec que le backend sait nommer. Simple alias de l'union **générée**
+ * depuis `ErrorCode` (`src-tauri/src/commands/error.rs`) : ce n'est plus un
+ * miroir tenu à la main, une variante ajoutée en Rust apparaît ici dès la
+ * régénération et casse la compilation partout où elle n'est pas traitée.
  *
  * Ce sont des **codes**, jamais du texte : c'est ce qui permet de réagir à une
  * cause précise et d'afficher un message traduit, là où une chaîne rédigée en
  * Rust imposerait sa langue à toute l'interface.
- *
- * `schemaTooRecent` n'y figure volontairement pas : il n'est produit que par la
- * migration, pendant le `setup()` de Tauri, où l'échec avorte le lancement. Il
- * ne peut pas traverser le pont, et le déclarer ici laisserait croire le contraire.
  */
-export type IpcErrorCode =
-  'noteNotFound' | 'spaceNotFound' | 'duplicateSpaceName' | 'invalidInput' | 'storageUnavailable' | 'storage';
+export type IpcErrorCode = ErrorCode;
 
-const IPC_ERROR_CODES: readonly IpcErrorCode[] = [
-  'noteNotFound',
-  'spaceNotFound',
-  'duplicateSpaceName',
-  'invalidInput',
-  'storageUnavailable',
-  'storage',
-];
+/**
+ * Forme d'un `Result` Rust vue du TypeScript, telle que `bindings.ts` la rend.
+ * Redéclarée plutôt qu'importée : le générateur l'écrit en ligne dans chaque
+ * signature, sans jamais la nommer.
+ */
+export type IpcResult<T> = { status: 'ok'; data: T } | { status: 'error'; error: AppError };
 
-function isIpcErrorCode(value: string): value is IpcErrorCode {
-  return (IPC_ERROR_CODES as readonly string[]).includes(value);
-}
+/**
+ * Exhaustif par construction : ajouter une variante à `ErrorCode` en Rust rend
+ * cet objet incomplet, donc la compilation échoue ici. Nécessaire malgré le
+ * typage parce que `bindings.ts` **annonce** un `AppError` là où Tauri peut
+ * avoir rejeté avec autre chose (voir [`IpcError`]).
+ */
+const IPC_ERROR_CODES: Record<IpcErrorCode, true> = {
+  noteNotFound: true,
+  spaceNotFound: true,
+  duplicateSpaceName: true,
+  invalidInput: true,
+  storageUnavailable: true,
+  storage: true,
+};
 
-/** Forme sérialisée d'un `AppError` Rust. */
-interface IpcErrorPayload {
-  readonly code: IpcErrorCode;
-  readonly params: Record<string, string>;
-  readonly detail: string;
-}
-
-function isIpcErrorPayload(cause: unknown): cause is IpcErrorPayload {
+function isAppError(cause: unknown): cause is AppError {
   if (typeof cause !== 'object' || cause === null) return false;
-  const candidate = cause as Partial<IpcErrorPayload>;
-  // `code` est confronté à la liste, pas seulement à son type : un back plus
-  // récent enverrait sinon une variante inconnue que `IpcErrorCode` prétendrait
-  // couvrir, et les appelants qui discriminent dessus tomberaient dans un cas
-  // qu'ils croient impossible.
+  const candidate = cause as Partial<AppError>;
   return (
     typeof candidate.code === 'string' &&
-    isIpcErrorCode(candidate.code) &&
+    candidate.code in IPC_ERROR_CODES &&
     typeof candidate.detail === 'string'
   );
 }
@@ -58,12 +51,13 @@ function describeCause(cause: unknown): string {
 }
 
 /**
- * Échec d'un appel `invoke()`.
+ * Échec d'une commande.
  *
  * `code` vaut `null` quand le rejet ne vient pas de nos commandes : Tauri
  * rejette lui-même avec une **chaîne** si la commande est inconnue ou si un
- * argument ne se désérialise pas. Ce cas doit rester lisible, d'où le repli sur
- * `describeCause`.
+ * argument ne se désérialise pas, et `bindings.ts` la range dans la branche
+ * `error` en la typant `AppError` qu'elle n'est pas. Ce cas doit rester lisible,
+ * d'où le repli sur `describeCause`.
  */
 export class IpcError extends Error {
   readonly code: IpcErrorCode | null;
@@ -71,13 +65,28 @@ export class IpcError extends Error {
   readonly params: Record<string, string>;
 
   constructor(
-    readonly command: IpcCommand,
+    readonly command: string,
     override readonly cause: unknown,
   ) {
-    const structured = isIpcErrorPayload(cause) ? cause : null;
+    const structured = isAppError(cause) ? cause : null;
     super(`La commande Tauri « ${command} » a échoué : ${structured?.detail ?? describeCause(cause)}`);
     this.name = 'IpcError';
     this.code = structured?.code ?? null;
     this.params = structured?.params ?? {};
   }
+}
+
+/**
+ * Convertit le `Result` discriminé des bindings en valeur ou en exception.
+ *
+ * Les dépôts lèvent plutôt que de propager le `status` : les stores et les
+ * composants réagissent déjà à un `catch`, et faire remonter le discriminant
+ * jusqu'aux appelants leur ferait porter une branche que `ErrorNotifier` traite
+ * en un seul endroit.
+ */
+export function unwrap<T>(command: string, result: IpcResult<T>): T {
+  if (result.status === 'error') {
+    throw new IpcError(command, result.error);
+  }
+  return result.data;
 }

@@ -17,6 +17,7 @@ use crate::storage::{self, Db};
 /// Notes filtrées **et** regroupées, prêtes à afficher. Aucune commande ne rend
 /// la liste brute : elle inviterait à refiltrer côté front.
 #[tauri::command]
+#[specta::specta]
 pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, AppError> {
     let connection = lock(&db)?;
     let (notes, facets) = storage::notes::fetch(&connection, &query)?;
@@ -25,6 +26,7 @@ pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, Ap
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<DisplayNote, AppError> {
     let draft = detect::with_detected_language(draft);
 
@@ -38,6 +40,7 @@ pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<DisplayNote, A
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn update_note(
     id: String,
     patch: NotePatch,
@@ -52,6 +55,7 @@ pub fn update_note(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
     let connection = lock(&db)?;
 
