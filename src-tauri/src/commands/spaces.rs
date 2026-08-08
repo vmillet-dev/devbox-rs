@@ -19,9 +19,9 @@ use crate::storage::{self, Db};
 #[tauri::command]
 #[specta::specta]
 pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, AppError> {
-    let connection = lock(&db)?;
+    let mut connection = lock(&db)?;
 
-    Ok(storage::spaces::list(&connection)?)
+    Ok(storage::spaces::list(&mut connection)?)
 }
 
 /// Le front sélectionne aussitôt l'espace à partir de la valeur renvoyée.
@@ -32,9 +32,9 @@ pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppEr
     // l'unicité, la seule chose que lui seul peut voir.
     let name = draft.validated_name()?;
 
-    let connection = lock(&db)?;
+    let mut connection = lock(&db)?;
 
-    Ok(storage::spaces::create(&connection, &name)?)
+    Ok(storage::spaces::create(&mut connection, &name)?)
 }
 
 /// Même brouillon qu'à la création, donc même validation.
@@ -43,9 +43,9 @@ pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppEr
 pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppError> {
     let name = draft.validated_name()?;
 
-    let connection = lock(&db)?;
+    let mut connection = lock(&db)?;
 
-    Ok(storage::spaces::rename(&connection, &id, &name)?)
+    Ok(storage::spaces::rename(&mut connection, &id, &name)?)
 }
 
 /// Supprime un espace après avoir transféré ses notes vers `target_space_id`.

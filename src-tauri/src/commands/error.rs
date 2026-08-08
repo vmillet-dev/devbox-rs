@@ -96,11 +96,12 @@ impl From<StorageError> for AppError {
             StorageError::DuplicateSpaceName(name) => {
                 Self::with(ErrorCode::DuplicateSpaceName, detail, "name", &name)
             }
-            // Inatteignable par le pont (voir [`ErrorCode`]) ; `Storage` reste
-            // honnête et le `detail` porte déjà la version en clair.
-            StorageError::SchemaTooRecent(_) | StorageError::Sqlite(_) => {
-                Self::new(ErrorCode::Storage, detail)
-            }
+            // Les deux premières sont inatteignables par le pont (voir
+            // [`ErrorCode`]) ; `Storage` reste honnête et le `detail` porte déjà
+            // la version en clair.
+            StorageError::SchemaTooRecent(_)
+            | StorageError::Migration(_)
+            | StorageError::Sqlite(_) => Self::new(ErrorCode::Storage, detail),
         }
     }
 }
@@ -140,7 +141,8 @@ mod tests {
             StorageError::NoteNotFound("n-1".to_string()),
             StorageError::SpaceNotFound("s-1".to_string()),
             StorageError::DuplicateSpaceName("Perso".to_string()),
-            StorageError::SchemaTooRecent(9),
+            StorageError::SchemaTooRecent("2099-01-01-000000".to_string()),
+            StorageError::Migration("base verrouillée".to_string()),
         ];
 
         for error in errors {
@@ -166,11 +168,13 @@ mod tests {
     fn a_schema_too_recent_degrades_to_storage_rather_than_leaking_a_dead_code() {
         // It cannot cross the bridge (it aborts startup), so the front has no
         // branch for it — `storage` is the honest code, and the detail carries
-        // the version in plain text.
-        let error = AppError::from(StorageError::SchemaTooRecent(9));
+        // the offending migration in plain text.
+        let error = AppError::from(StorageError::SchemaTooRecent(
+            "2099-01-01-000000".to_string(),
+        ));
 
         assert!(matches!(error.code, ErrorCode::Storage));
-        assert!(error.detail.contains('9'));
+        assert!(error.detail.contains("2099-01-01-000000"));
     }
 
     #[test]

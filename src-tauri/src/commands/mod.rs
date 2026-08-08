@@ -17,26 +17,34 @@ use error::AppError;
 
 /// Verrou sur la connexion partagée. Un mutex empoisonné signifie qu'une
 /// commande a paniqué en le tenant : mieux vaut le dire que paniquer à nouveau.
-fn lock(db: &Db) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, AppError> {
+///
+/// Le garde est rendu **mutable** : Diesel prend la connexion en exclusif à
+/// chaque requête, y compris en lecture.
+fn lock(db: &Db) -> Result<std::sync::MutexGuard<'_, diesel::SqliteConnection>, AppError> {
     db.lock().map_err(|_| AppError::storage_unavailable())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diesel::prelude::*;
     use error::ErrorCode;
     use std::sync::Mutex;
 
+    fn in_memory() -> Db {
+        Mutex::new(diesel::SqliteConnection::establish(":memory:").unwrap())
+    }
+
     #[test]
     fn a_healthy_connection_is_handed_over() {
-        let db: Db = Mutex::new(rusqlite::Connection::open_in_memory().unwrap());
+        let db = in_memory();
 
         assert!(lock(&db).is_ok());
     }
 
     #[test]
     fn a_poisoned_connection_is_reported_instead_of_panicking_again() {
-        let db: Db = Mutex::new(rusqlite::Connection::open_in_memory().unwrap());
+        let db = in_memory();
 
         // Poison it the way production would: a panic while the guard is held.
         // The hook is silenced so a deliberate panic does not look like a crash.
@@ -48,9 +56,13 @@ mod tests {
         }));
         std::panic::set_hook(hook);
 
-        let error = lock(&db).unwrap_err();
+        // `unwrap_err()` would need the guard to be `Debug`, which
+        // `SqliteConnection` is not; and `unwrap()` in `lock` itself would take
+        // the whole process down on the next command.
+        let Err(error) = lock(&db) else {
+            panic!("un mutex empoisonné doit être signalé, pas rendu");
+        };
 
-        // `unwrap()` here would take the whole process down on the next command.
         assert!(matches!(error.code, ErrorCode::StorageUnavailable));
     }
 }

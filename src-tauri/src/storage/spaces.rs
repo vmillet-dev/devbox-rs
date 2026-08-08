@@ -1,42 +1,48 @@
 //! Lecture et écriture des espaces.
 //!
-//! Fonctions ordinaires prenant une `&Connection` : les `#[tauri::command]` de
-//! `commands/spaces.rs` ne font que les appeler. Voir `storage/mod.rs`.
+//! Fonctions ordinaires prenant une `&mut SqliteConnection` : les
+//! `#[tauri::command]` de `commands/spaces.rs` ne font que les appeler. Voir
+//! `storage/mod.rs`.
+//!
+//! Pas de structure de ligne ici, contrairement aux notes : `Space` a deux
+//! champs et traverse tel quel. Une `SpaceRow` identique au type du domaine
+//! serait un mappeur d'identité, écrit pour la symétrie et pour rien d'autre.
 
-use rusqlite::{Connection, Row};
-use uuid::Uuid;
+use diesel::dsl::sql;
+use diesel::prelude::*;
+use diesel::sql_types::{Bool, Text};
 
 use super::StorageError;
+use super::schema::{notes, spaces};
 use crate::domain::space::Space;
-
-fn row_to_space(row: &Row<'_>) -> rusqlite::Result<Space> {
-    Ok(Space {
-        id: row.get("id")?,
-        name: row.get("name")?,
-    })
-}
+use uuid::Uuid;
 
 /// Tous les espaces, triés par nom. Une liste vide est valide : c'est l'état du
 /// premier lancement. Aucun espace « Tous » n'est fabriqué ici.
-pub fn list(connection: &Connection) -> Result<Vec<Space>, StorageError> {
-    let mut statement =
-        connection.prepare("SELECT id, name FROM spaces ORDER BY name COLLATE NOCASE")?;
-    let spaces = statement
-        .query_map([], row_to_space)?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
+pub fn list(connection: &mut SqliteConnection) -> Result<Vec<Space>, StorageError> {
+    let rows = spaces::table
+        .select((spaces::id, spaces::name))
+        // Fragment brut : Diesel ne modélise pas les collations, et trier en
+        // BINARY rangerait « perso » après « Veille ».
+        .order(sql::<Text>("name COLLATE NOCASE"))
+        .load::<(String, String)>(connection)?;
 
-    Ok(spaces)
+    Ok(rows
+        .into_iter()
+        .map(|(id, name)| Space { id, name })
+        .collect())
 }
 
 /// Vérifié avant de ranger une note : la clé étrangère l'attraperait aussi, mais
 /// avec un message SQLite illisible là où le front affiche l'erreur.
-pub fn exists(connection: &Connection, id: &str) -> Result<bool, StorageError> {
-    let count: i64 =
-        connection.query_row("SELECT COUNT(*) FROM spaces WHERE id = ?1", [id], |row| {
-            row.get(0)
-        })?;
+pub fn exists(connection: &mut SqliteConnection, id: &str) -> Result<bool, StorageError> {
+    let found = spaces::table
+        .find(id)
+        .select(spaces::id)
+        .first::<String>(connection)
+        .optional()?;
 
-    Ok(count > 0)
+    Ok(found.is_some())
 }
 
 /// Doublon détecté ici plutôt que laissé à l'index unique, pour remonter au
@@ -46,24 +52,26 @@ pub fn exists(connection: &Connection, id: &str) -> Result<bool, StorageError> {
 /// (« perso » → « Perso ») se ferait refuser comme un doublon de lui-même, la
 /// comparaison étant en `COLLATE NOCASE`.
 fn ensure_unique_name(
-    connection: &Connection,
+    connection: &mut SqliteConnection,
     name: &str,
     except_id: Option<&str>,
 ) -> Result<(), StorageError> {
-    let taken: i64 = match except_id {
-        Some(id) => connection.query_row(
-            "SELECT COUNT(*) FROM spaces WHERE name = ?1 COLLATE NOCASE AND id <> ?2",
-            (name, id),
-            |row| row.get(0),
-        ),
-        None => connection.query_row(
-            "SELECT COUNT(*) FROM spaces WHERE name = ?1 COLLATE NOCASE",
-            [name],
-            |row| row.get(0),
-        ),
-    }?;
+    // `spaces.name` n'est pas déclarée `NOCASE` — seul l'index unique l'est —
+    // donc la collation doit être posée sur la comparaison, faute de quoi elle
+    // se ferait en BINARY et laisserait passer « PERSO » à côté de « Perso ».
+    let mut query = spaces::table
+        .filter(
+            sql::<Bool>("name = ")
+                .bind::<Text, _>(name.to_string())
+                .sql(" COLLATE NOCASE"),
+        )
+        .into_boxed();
 
-    if taken > 0 {
+    if let Some(id) = except_id {
+        query = query.filter(spaces::id.ne(id.to_string()));
+    }
+
+    if query.count().get_result::<i64>(connection)? > 0 {
         return Err(StorageError::DuplicateSpaceName(name.to_string()));
     }
 
@@ -73,7 +81,7 @@ fn ensure_unique_name(
 /// Renvoie la version persistée : le front sélectionne aussitôt l'espace à
 /// partir de cette valeur. `name` est attendu **déjà validé** (détouré, non
 /// vide) — cette couche ne tranche que l'unicité.
-pub fn create(connection: &Connection, name: &str) -> Result<Space, StorageError> {
+pub fn create(connection: &mut SqliteConnection, name: &str) -> Result<Space, StorageError> {
     ensure_unique_name(connection, name, None)?;
 
     let space = Space {
@@ -81,23 +89,28 @@ pub fn create(connection: &Connection, name: &str) -> Result<Space, StorageError
         name: name.to_string(),
     };
 
-    connection.execute(
-        "INSERT INTO spaces (id, name) VALUES (?1, ?2)",
-        (&space.id, &space.name),
-    )?;
+    diesel::insert_into(spaces::table)
+        .values((spaces::id.eq(&space.id), spaces::name.eq(&space.name)))
+        .execute(connection)?;
 
     Ok(space)
 }
 
 /// Renomme et renvoie la version persistée. `name` est attendu **déjà validé**.
-pub fn rename(connection: &Connection, id: &str, name: &str) -> Result<Space, StorageError> {
+pub fn rename(
+    connection: &mut SqliteConnection,
+    id: &str,
+    name: &str,
+) -> Result<Space, StorageError> {
     if !exists(connection, id)? {
         return Err(StorageError::SpaceNotFound(id.to_string()));
     }
 
     ensure_unique_name(connection, name, Some(id))?;
 
-    connection.execute("UPDATE spaces SET name = ?2 WHERE id = ?1", (id, name))?;
+    diesel::update(spaces::table.find(id))
+        .set(spaces::name.eq(name))
+        .execute(connection)?;
 
     Ok(Space {
         id: id.to_string(),
@@ -115,25 +128,26 @@ pub fn rename(connection: &Connection, id: &str, name: &str) -> Result<Space, St
 /// ferait remonter tout l'espace absorbé en tête du canevas, qui trie dessus.
 ///
 /// `id == target_id` est refusé en amont par `space::validate_move_target`.
-pub fn delete(connection: &mut Connection, id: &str, target_id: &str) -> Result<(), StorageError> {
-    let transaction = connection.transaction()?;
+pub fn delete(
+    connection: &mut SqliteConnection,
+    id: &str,
+    target_id: &str,
+) -> Result<(), StorageError> {
+    connection.transaction(|connection| {
+        if !exists(connection, id)? {
+            return Err(StorageError::SpaceNotFound(id.to_string()));
+        }
+        if !exists(connection, target_id)? {
+            return Err(StorageError::SpaceNotFound(target_id.to_string()));
+        }
 
-    if !exists(&transaction, id)? {
-        return Err(StorageError::SpaceNotFound(id.to_string()));
-    }
-    if !exists(&transaction, target_id)? {
-        return Err(StorageError::SpaceNotFound(target_id.to_string()));
-    }
+        diesel::update(notes::table.filter(notes::space_id.eq(id)))
+            .set(notes::space_id.eq(target_id))
+            .execute(connection)?;
+        diesel::delete(spaces::table.find(id)).execute(connection)?;
 
-    transaction.execute(
-        "UPDATE notes SET space_id = ?2 WHERE space_id = ?1",
-        (id, target_id),
-    )?;
-    transaction.execute("DELETE FROM spaces WHERE id = ?1", [id])?;
-
-    transaction.commit()?;
-
-    Ok(())
+        Ok(())
+    })
 }
 
 #[cfg(test)]
@@ -141,12 +155,42 @@ mod tests {
     use super::*;
     use crate::storage::open_in_memory;
 
+    const T0: &str = "2026-07-25T09:00:00.000Z";
+
+    /// Note posée directement en base : ces tests portent sur les espaces, et
+    /// passer par `notes::create` y ferait entrer ses propres règles.
+    fn note_in(connection: &mut SqliteConnection, space_id: &str) {
+        diesel::insert_into(notes::table)
+            .values((
+                notes::id.eq("n-1"),
+                notes::space_id.eq(space_id),
+                notes::title.eq("A"),
+                notes::language.eq("txt"),
+                notes::content.eq(""),
+                notes::source.eq(""),
+                notes::pinned.eq(false),
+                notes::created_at.eq(T0),
+                notes::updated_at.eq(T0),
+                notes::lifecycle_kind.eq("permanent"),
+            ))
+            .execute(connection)
+            .unwrap();
+    }
+
+    fn names(connection: &mut SqliteConnection) -> Vec<String> {
+        list(connection)
+            .unwrap()
+            .into_iter()
+            .map(|space| space.name)
+            .collect()
+    }
+
     #[test]
     fn a_created_space_is_listed_back() {
-        let connection = open_in_memory().unwrap();
+        let mut connection = open_in_memory().unwrap();
 
-        let created = create(&connection, "Perso").unwrap();
-        let listed = list(&connection).unwrap();
+        let created = create(&mut connection, "Perso").unwrap();
+        let listed = list(&mut connection).unwrap();
 
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, created.id);
@@ -155,93 +199,88 @@ mod tests {
 
     #[test]
     fn each_space_gets_its_own_identifier() {
-        let connection = open_in_memory().unwrap();
+        let mut connection = open_in_memory().unwrap();
 
-        let first = create(&connection, "Perso").unwrap();
-        let second = create(&connection, "Boulot").unwrap();
+        let first = create(&mut connection, "Perso").unwrap();
+        let second = create(&mut connection, "Boulot").unwrap();
 
         assert_ne!(first.id, second.id);
     }
 
     #[test]
     fn spaces_are_listed_in_name_order() {
-        let connection = open_in_memory().unwrap();
+        let mut connection = open_in_memory().unwrap();
 
-        create(&connection, "Veille").unwrap();
-        create(&connection, "Boulot").unwrap();
-        create(&connection, "perso").unwrap();
+        create(&mut connection, "Veille").unwrap();
+        create(&mut connection, "Boulot").unwrap();
+        create(&mut connection, "perso").unwrap();
 
-        let names: Vec<String> = list(&connection)
-            .unwrap()
-            .into_iter()
-            .map(|s| s.name)
-            .collect();
-
-        assert_eq!(names, ["Boulot", "perso", "Veille"]);
+        // Case-insensitive: a BINARY sort would file "perso" after "Veille".
+        assert_eq!(names(&mut connection), ["Boulot", "perso", "Veille"]);
     }
 
     #[test]
     fn a_duplicate_name_is_refused_regardless_of_case() {
-        let connection = open_in_memory().unwrap();
-        create(&connection, "Perso").unwrap();
+        let mut connection = open_in_memory().unwrap();
+        create(&mut connection, "Perso").unwrap();
 
-        let error = create(&connection, "PERSO").unwrap_err();
+        let error = create(&mut connection, "PERSO").unwrap_err();
 
         assert!(matches!(error, StorageError::DuplicateSpaceName(_)));
-        assert_eq!(list(&connection).unwrap().len(), 1);
+        assert_eq!(list(&mut connection).unwrap().len(), 1);
     }
 
     #[test]
     fn exists_distinguishes_known_from_unknown_identifiers() {
-        let connection = open_in_memory().unwrap();
-        let space = create(&connection, "Perso").unwrap();
+        let mut connection = open_in_memory().unwrap();
+        let space = create(&mut connection, "Perso").unwrap();
 
-        assert!(exists(&connection, &space.id).unwrap());
-        assert!(!exists(&connection, "inconnu").unwrap());
+        assert!(exists(&mut connection, &space.id).unwrap());
+        assert!(!exists(&mut connection, "inconnu").unwrap());
     }
 
     #[test]
     fn a_renamed_space_keeps_its_identifier() {
-        let connection = open_in_memory().unwrap();
-        let space = create(&connection, "Perso").unwrap();
+        let mut connection = open_in_memory().unwrap();
+        let space = create(&mut connection, "Perso").unwrap();
 
-        let renamed = rename(&connection, &space.id, "Personnel").unwrap();
+        let renamed = rename(&mut connection, &space.id, "Personnel").unwrap();
 
         // The id is what the notes point at: changing it would orphan them.
         assert_eq!(renamed.id, space.id);
         assert_eq!(renamed.name, "Personnel");
-        assert_eq!(list(&connection).unwrap()[0].name, "Personnel");
+        assert_eq!(list(&mut connection).unwrap()[0].name, "Personnel");
     }
 
     #[test]
     fn a_space_can_be_renamed_to_a_different_case_of_its_own_name() {
-        let connection = open_in_memory().unwrap();
-        let space = create(&connection, "perso").unwrap();
+        let mut connection = open_in_memory().unwrap();
+        let space = create(&mut connection, "perso").unwrap();
 
         // The uniqueness check is COLLATE NOCASE: without excluding the row
         // being renamed, it would see the space as a duplicate of itself.
-        let renamed = rename(&connection, &space.id, "Perso").unwrap();
+        let renamed = rename(&mut connection, &space.id, "Perso").unwrap();
 
         assert_eq!(renamed.name, "Perso");
     }
 
     #[test]
     fn renaming_onto_another_space_name_is_refused() {
-        let connection = open_in_memory().unwrap();
-        create(&connection, "Boulot").unwrap();
-        let space = create(&connection, "Perso").unwrap();
+        let mut connection = open_in_memory().unwrap();
+        create(&mut connection, "Boulot").unwrap();
+        let space = create(&mut connection, "Perso").unwrap();
 
-        let error = rename(&connection, &space.id, "BOULOT").unwrap_err();
+        let error = rename(&mut connection, &space.id, "BOULOT").unwrap_err();
 
         assert!(matches!(error, StorageError::DuplicateSpaceName(_)));
-        assert_eq!(list(&connection).unwrap()[1].name, "Perso");
+        assert_eq!(list(&mut connection).unwrap()[1].name, "Perso");
     }
 
     #[test]
     fn renaming_an_unknown_space_reports_an_error() {
-        let connection = open_in_memory().unwrap();
+        let mut connection = open_in_memory().unwrap();
 
-        let error = rename(&connection, "inconnu", "Perso").unwrap_err();
+        let error = rename(&mut connection, "inconnu", "Perso").unwrap_err();
 
         assert!(matches!(error, StorageError::SpaceNotFound(_)));
     }
@@ -249,74 +288,57 @@ mod tests {
     #[test]
     fn deleting_a_space_moves_its_notes_to_the_target() {
         let mut connection = open_in_memory().unwrap();
-        let doomed = create(&connection, "Perso").unwrap();
-        let refuge = create(&connection, "Boulot").unwrap();
-        connection
-            .execute(
-                "INSERT INTO notes VALUES ('n-1', ?1, 'A', 'txt', '', '', 0, \
-                 '2026-07-25T09:00:00.000Z', '2026-07-25T09:00:00.000Z', 'permanent', NULL)",
-                [&doomed.id],
-            )
-            .unwrap();
+        let doomed = create(&mut connection, "Perso").unwrap();
+        let refuge = create(&mut connection, "Boulot").unwrap();
+        note_in(&mut connection, &doomed.id);
 
         delete(&mut connection, &doomed.id, &refuge.id).unwrap();
 
         // The schema cascades on space deletion; the move must happen first or
         // the note disappears with its space.
-        let space_id: String = connection
-            .query_row("SELECT space_id FROM notes WHERE id = 'n-1'", [], |row| {
-                row.get(0)
-            })
+        let space_id = notes::table
+            .find("n-1")
+            .select(notes::space_id)
+            .first::<String>(&mut connection)
             .unwrap();
         assert_eq!(space_id, refuge.id);
-        assert_eq!(list(&connection).unwrap().len(), 1);
+        assert_eq!(list(&mut connection).unwrap().len(), 1);
     }
 
     #[test]
     fn moving_notes_out_of_a_deleted_space_does_not_touch_their_timestamps() {
         let mut connection = open_in_memory().unwrap();
-        let doomed = create(&connection, "Perso").unwrap();
-        let refuge = create(&connection, "Boulot").unwrap();
-        connection
-            .execute(
-                "INSERT INTO notes VALUES ('n-1', ?1, 'A', 'txt', '', '', 0, \
-                 '2026-07-25T09:00:00.000Z', '2026-07-25T09:00:00.000Z', 'permanent', NULL)",
-                [&doomed.id],
-            )
-            .unwrap();
+        let doomed = create(&mut connection, "Perso").unwrap();
+        let refuge = create(&mut connection, "Boulot").unwrap();
+        note_in(&mut connection, &doomed.id);
 
         delete(&mut connection, &doomed.id, &refuge.id).unwrap();
 
         // The canvas orders on updated_at: refreshing it would float the whole
         // absorbed space to the top as if every note had just been edited.
-        let updated_at: String = connection
-            .query_row("SELECT updated_at FROM notes WHERE id = 'n-1'", [], |row| {
-                row.get(0)
-            })
+        let updated_at = notes::table
+            .find("n-1")
+            .select(notes::updated_at)
+            .first::<String>(&mut connection)
             .unwrap();
-        assert_eq!(updated_at, "2026-07-25T09:00:00.000Z");
+        assert_eq!(updated_at, T0);
     }
 
     #[test]
     fn deleting_an_empty_space_leaves_the_others_alone() {
         let mut connection = open_in_memory().unwrap();
-        let doomed = create(&connection, "Perso").unwrap();
-        let refuge = create(&connection, "Boulot").unwrap();
+        let doomed = create(&mut connection, "Perso").unwrap();
+        let refuge = create(&mut connection, "Boulot").unwrap();
 
         delete(&mut connection, &doomed.id, &refuge.id).unwrap();
 
-        let names: Vec<String> = list(&connection)
-            .unwrap()
-            .into_iter()
-            .map(|s| s.name)
-            .collect();
-        assert_eq!(names, ["Boulot"]);
+        assert_eq!(names(&mut connection), ["Boulot"]);
     }
 
     #[test]
     fn deleting_an_unknown_space_reports_an_error() {
         let mut connection = open_in_memory().unwrap();
-        let refuge = create(&connection, "Boulot").unwrap();
+        let refuge = create(&mut connection, "Boulot").unwrap();
 
         let error = delete(&mut connection, "inconnu", &refuge.id).unwrap_err();
 
@@ -326,24 +348,21 @@ mod tests {
     #[test]
     fn deleting_into_an_unknown_space_changes_nothing() {
         let mut connection = open_in_memory().unwrap();
-        let doomed = create(&connection, "Perso").unwrap();
-        connection
-            .execute(
-                "INSERT INTO notes VALUES ('n-1', ?1, 'A', 'txt', '', '', 0, \
-                 '2026-07-25T09:00:00.000Z', '2026-07-25T09:00:00.000Z', 'permanent', NULL)",
-                [&doomed.id],
-            )
-            .unwrap();
+        let doomed = create(&mut connection, "Perso").unwrap();
+        note_in(&mut connection, &doomed.id);
 
         let error = delete(&mut connection, &doomed.id, "inconnu").unwrap_err();
 
         // Rolling back matters here: a half-applied delete would have taken the
         // notes with it.
         assert!(matches!(error, StorageError::SpaceNotFound(_)));
-        assert_eq!(list(&connection).unwrap().len(), 1);
-        let remaining: i64 = connection
-            .query_row("SELECT COUNT(*) FROM notes", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(remaining, 1);
+        assert_eq!(list(&mut connection).unwrap().len(), 1);
+        assert_eq!(
+            notes::table
+                .count()
+                .get_result::<i64>(&mut connection)
+                .unwrap(),
+            1
+        );
     }
 }

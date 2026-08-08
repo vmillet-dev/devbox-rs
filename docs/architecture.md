@@ -54,7 +54,7 @@ neither one defines it. (Before the domain layer existed, the model lived in `co
 Two greps enforce it, and are worth running after any structural change:
 
 ```bash
-grep -rn "rusqlite\|tauri::" src-tauri/src/domain/    # must be empty
+grep -rn "diesel\|tauri::" src-tauri/src/domain/      # must be empty
 grep -rn "use crate::commands" src-tauri/src/storage/ # must be empty
 ```
 
@@ -79,7 +79,7 @@ Serde attributes sit on the domain types rather than on a separate DTO family. A
 second set of types and their mapping would cost more than it protects. Each of these types
 also derives `specta::Type`, which is what lets tauri-specta generate the front-end's
 `bindings.ts` from them — a derive from a plain library crate, so `domain/` still knows
-neither Tauri nor rusqlite and the direction grep stays clean.
+neither Tauri nor Diesel and the direction grep stays clean.
 
 ## Front-end
 
@@ -709,21 +709,37 @@ re-cut every section on a different day.
 
 ## Persistence (Rust)
 
-Storage is **SQLite**, embedded through `rusqlite` with the `bundled` feature — SQLite is
-compiled from source and statically linked, so nothing has to be installed or shipped
-alongside the executable. The database file lives in Tauri's `app_data_dir()`.
+Storage is **SQLite**, queried through **Diesel** and embedded via `libsqlite3-sys` with the
+`bundled` feature — SQLite is compiled from source and statically linked, so nothing has to be
+installed or shipped alongside the executable. The database file lives in Tauri's
+`app_data_dir()`.
 
 - **Layering.** `storage::notes` and `storage::spaces` are plain functions taking a
-  `&Connection`; the `#[tauri::command]`s sit on top. That is what makes persistence testable
-  against `Connection::open_in_memory()` without launching Tauri. This layer holds **no
-  business rule** — it reads and writes the model defined in `domain/`, which it depends on.
-- **Concurrency.** A rusqlite `Connection` is not `Sync`. A single connection is shared as
-  `tauri::State<Db>` (`Db = Mutex<Connection>`), registered with `.manage()` in `lib.rs` —
-  never a global. Overlapping commands serialise on that mutex.
-- **Migrations.** The schema is versioned by `PRAGMA user_version`. Evolving the model means
-  adding a `MIGRATION_N` constant and a branch in `migrate` — never editing a shipped
-  migration, it has already run on user machines. Each migration is atomic. A database written
-  by a newer build is refused rather than misread.
+  `&mut SqliteConnection`; the `#[tauri::command]`s sit on top. That is what makes persistence
+  testable against `SqliteConnection::establish(":memory:")` without launching Tauri. This
+  layer holds **no business rule** — it reads and writes the model defined in `domain/`, which
+  it depends on.
+- **`storage/schema.rs` is the typed mirror of the schema**, written by hand rather than
+  produced by `diesel print-schema`, which would make `cargo check` depend on an up-to-date
+  database sitting outside the repository. What it deliberately does not model — `CHECK`
+  constraints, `ON DELETE CASCADE`, and the `NOCASE` collation on `note_tags.tag` — stays in
+  the migration SQL. Diesel obeys those; it does not own them.
+- **Concurrency.** A `SqliteConnection` is not `Sync`, and Diesel takes it exclusively for
+  every query, reads included. A single connection is shared as `tauri::State<Db>`
+  (`Db = Mutex<SqliteConnection>`), registered with `.manage()` in `lib.rs` — never a global.
+  Overlapping commands serialise on that mutex, as they already did; the `&mut` changes the
+  signatures, not the concurrency.
+- **Migrations.** They live as SQL files in `src-tauri/migrations/`, are compiled into the
+  binary by `embed_migrations!`, and are tracked in the `__diesel_schema_migrations` table.
+  Evolving the model means adding a `YYYY-MM-DD-HHMMSS_name/` directory — never editing a
+  shipped migration, it has already run on user machines. Each migration is atomic. A database
+  carrying a migration this binary does not know is refused rather than misread.
+- **The legacy `PRAGMA user_version` history is adopted, not replayed.** The schema used to be
+  versioned by that pragma (values 1 to 3). `storage::adopt_legacy_history` marks the matching
+  embedded migrations as already applied and zeroes the pragma, so an existing install neither
+  re-runs `CREATE TABLE spaces` nor keeps a second, drifting source of truth. A pre-Diesel
+  binary reopening such a database now fails loudly at startup instead of writing into a schema
+  it believes it understands.
 - **Schema choices that made filtering movable to the back-end.** `lifecycle` is split into
   `lifecycle_kind` + `lifecycle_expires_at` columns rather than stored as JSON, and tags live
   in their own `note_tags` table rather than in a serialised column. Both exist so that
@@ -736,7 +752,10 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
   `created_at`. The section answers "when was this note born", the order within it answers
   "which did I touch last", so an old note reopened today tops the "older" section.
 - **Querying splits the work by what each tool does well.** SQL handles what it indexes —
-  space, pin state, lifecycle, language, and tag membership through `EXISTS` on `note_tags`.
+  space, pin state, lifecycle, language, and tag membership through a `note_tags` subquery
+  (`notes::id.eq_any(...)`). The conditional criteria are assembled on a Diesel `into_boxed()`
+  query, which is what replaced hand-numbered `?N` placeholders and their bound-parameter
+  bookkeeping.
   Full-text
   matching is done **in Rust** (`domain::search`), because SQLite's `LOWER()` only folds ASCII
   without ICU, so `Étape` would not match `étape`. Grouping is `domain::sections`, which
@@ -747,11 +766,11 @@ alongside the executable. The database file lives in Tauri's `app_data_dir()`.
   tags are sorted to match what a read gives back — otherwise a note's tags would reorder
   themselves on the next reload.
 - **Tag case folds at the storage level too.** `note_tags.tag` is `COLLATE NOCASE`
-  (migration 2). Without it `normalize` only deduplicated _within_ one note: `Urgent` and
+  (the `fold_tag_case` migration). Without it `normalize` only deduplicated _within_ one note: `Urgent` and
   `urgent` carried by two different notes produced two facets in the rail, of which
   `tag IN (…)` — running in BINARY — matched only one, while the text search confused them.
   Three behaviours for one concept.
-- **`notes.language` is indexed** (migration 3), since it became a filtering facet: both
+- **`notes.language` is indexed** (the `index_language` migration), since it became a filtering facet: both
   `language IN (…)` and the `SELECT DISTINCT language` that feeds the rail would otherwise
   scan the table on every query. No `CHECK` constraint on the column, though — the list of
   known languages lives in `domain::language` and moves between versions; freezing it in the

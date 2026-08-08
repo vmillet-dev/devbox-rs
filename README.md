@@ -9,7 +9,7 @@ A developer's Swiss Army knife for the desktop: a notes/snippets manager, plus u
 > **Status** — the notes feature is complete end to end. The UI has no mock data left, every
 > read and write crosses the `invoke()` bridge, and the Rust side persists to an embedded
 > SQLite database. Business rules live in `src-tauri/src/domain/`, which depends on neither
-> rusqlite nor Tauri. `crypto` and `formatters` are documented placeholders, not yet built.
+> Diesel nor Tauri. `crypto` and `formatters` are documented placeholders, not yet built.
 
 ## Prerequisites
 
@@ -60,7 +60,7 @@ docs/             Architecture notes and UI mockup
 ```
 
 Dependencies point one way: `commands/ → domain/ ← storage/`. Two greps keep it honest —
-`grep -rn "rusqlite\|tauri::" src-tauri/src/domain/` and
+`grep -rn "diesel\|tauri::" src-tauri/src/domain/` and
 `grep -rn "use crate::commands" src-tauri/src/storage/` must both come back empty.
 
 ## Documentation
@@ -80,8 +80,8 @@ Dependencies point one way: `commands/ → domain/ ← storage/`. Two greps keep
 - [x] Full note editing: content, format, tags, pin, deletion
 - [x] Spaces: notes carry a `spaceId`, the switcher filters on it and can create a space
 - [x] ESLint + Prettier, with template accessibility rules
-- [x] Persistence: embedded SQLite (`rusqlite`, `bundled`) with versioned, append-only
-      migrations
+- [x] Persistence: embedded SQLite through Diesel (`libsqlite3-sys` `bundled`) with
+      append-only, embedded migrations
 - [x] Business rules isolated in `src-tauri/src/domain/`, testable without a database
 - [x] Rust tests, clippy (`deny(clippy::all)`) and rustfmt
 - [ ] Renaming and deleting a space — needs a decision on what happens to its notes

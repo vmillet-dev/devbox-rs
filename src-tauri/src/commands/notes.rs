@@ -19,8 +19,8 @@ use crate::storage::{self, Db};
 #[tauri::command]
 #[specta::specta]
 pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, AppError> {
-    let connection = lock(&db)?;
-    let (notes, facets) = storage::notes::fetch(&connection, &query)?;
+    let mut connection = lock(&db)?;
+    let (notes, facets) = storage::notes::fetch(&mut connection, &query)?;
 
     Ok(view::build(notes, facets, &query)?)
 }
@@ -57,7 +57,7 @@ pub fn update_note(
 #[tauri::command]
 #[specta::specta]
 pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
-    let connection = lock(&db)?;
+    let mut connection = lock(&db)?;
 
-    Ok(storage::notes::delete(&connection, &id)?)
+    Ok(storage::notes::delete(&mut connection, &id)?)
 }

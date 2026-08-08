@@ -30,13 +30,19 @@ specta = "=2.0.0-rc.25"
 specta-typescript = "=0.0.12"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.151"
-rusqlite = { version = "0.40.1", features = ["bundled"] }
+diesel = { version = "2.3.12", features = ["sqlite"] }
+diesel_migrations = { version = "2.3.2", features = ["sqlite"] }
+# Dépendance directe uniquement pour `bundled` : diesel tire `libsqlite3-sys`
+# sans l'activer, et sans elle il faudrait un SQLite système sur la machine de
+# build comme sur celle de l'utilisateur.
+libsqlite3-sys = { version = "0.38.1", features = ["bundled"] }
 uuid = { version = "1.24.0", features = ["v4"] }
 chrono = "0.4.45"
 tauri-plugin-process = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-clipboard-manager = "2"
+
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-global-shortcut = "2"
