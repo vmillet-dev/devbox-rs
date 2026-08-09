@@ -1,5 +1,6 @@
-import { Injectable, inject } from '@angular/core';
-import { IpcService } from '@core/ipc/ipc.service';
+import { Injectable } from '@angular/core';
+import { commands } from '@core/ipc/bindings';
+import { unwrap } from '@core/ipc/ipc.error';
 import { Space, SpaceDraft } from '../model/space.model';
 
 /**
@@ -14,22 +15,20 @@ import { Space, SpaceDraft } from '../model/space.model';
  */
 @Injectable({ providedIn: 'root' })
 export class SpacesRepository {
-  private readonly ipc = inject(IpcService);
-
   async loadAll(): Promise<readonly Space[]> {
-    return this.ipc.invoke('list_spaces');
+    return unwrap('list_spaces', await commands.listSpaces());
   }
 
   async create(draft: SpaceDraft): Promise<Space> {
-    return this.ipc.invoke('create_space', { draft });
+    return unwrap('create_space', await commands.createSpace(draft));
   }
 
   async rename(id: string, draft: SpaceDraft): Promise<Space> {
-    return this.ipc.invoke('rename_space', { id, draft });
+    return unwrap('rename_space', await commands.renameSpace(id, draft));
   }
 
   /** `targetSpaceId` recueille les notes de l'espace supprimé. */
   async delete(id: string, targetSpaceId: string): Promise<void> {
-    await this.ipc.invoke('delete_space', { id, targetSpaceId });
+    unwrap('delete_space', await commands.deleteSpace(id, targetSpaceId));
   }
 }

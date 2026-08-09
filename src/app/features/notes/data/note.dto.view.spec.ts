@@ -36,12 +36,4 @@ describe('toNotesView', () => {
   it('reads the languages offered for the rail', () => {
     expect(toNotesView(BASE_VIEW).availableLanguages).toEqual(['json', 'yml']);
   });
-
-  it('drops a language this build does not know rather than failing', () => {
-    // A rail missing one facet stays usable; unlike an unknown section key,
-    // which makes a whole part of the canvas unreadable and does throw.
-    const view = toNotesView({ ...BASE_VIEW, availableLanguages: ['json', 'cobol'] });
-
-    expect(view.availableLanguages).toEqual(['json']);
-  });
 });

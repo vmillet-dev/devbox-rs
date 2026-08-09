@@ -1,53 +1,117 @@
-//! Devine le langage d'un contenu collé.
+//! A note's language: the recognized list, and detection from pasted content.
 //!
-//! Sans ça toute note naît en `txt` et le rail des formats ne sert qu'à ceux qui
-//! pensent à renseigner le sélecteur — un rail vide de valeur.
-//!
-//! Les heuristiques sont volontairement bon marché et faillibles : le résultat
-//! n'est qu'une **valeur initiale**, que l'éditeur laisse changer. Une erreur
-//! coûte un clic.
-//!
-//! Deux points d'entrée, pour le même instant — celui où une note reçoit son
-//! premier contenu : [`with_detected_language`] à la création (le raccourci de
-//! capture, qui colle et crée d'un coup) et [`language_after_patch`] quand un
-//! patch remplit une note encore vide (« + Nouvelle note » puis coller). Passé
-//! ce moment, plus rien n'est deviné.
+//! Detection heuristics are deliberately cheap and fallible: the result is
+//! only an **initial value**, which the editor allows to be changed.
+//! An error costs one click. They only play when a note receives its
+//! first content — [`for_draft`] at creation, [`after_patch`] upon the first
+//! paste. After this point, nothing is guessed anymore.
 
-use super::note::{Note, NoteDraft, NotePatch};
-use super::rules::FALLBACK_LANGUAGE;
+use std::fmt;
+use std::str::FromStr;
 
-/// Complète le langage d'un brouillon **uniquement** si le front n'en a pas
-/// choisi, `txt` faisant office de « rien choisi ».
-///
-/// La règle vit ici et non dans la commande : appliquée aussi à `update_note`,
-/// elle écraserait à la frappe suivante le langage posé au sélecteur.
-pub fn with_detected_language(draft: NoteDraft) -> NoteDraft {
-    if draft.language != FALLBACK_LANGUAGE {
-        return draft;
-    }
+use serde::{Deserialize, Serialize};
+use specta::Type;
 
-    NoteDraft {
-        language: detect_language(&draft.content).to_string(),
-        ..draft
+use super::model::{Note, NoteDraft, NotePatch};
+
+/// **Closed** list, which is the whole point: the front end receives it as a
+/// generated TypeScript union, so an unknown value no longer compiles there
+/// instead of being refused at runtime.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    Json,
+    Js,
+    Ts,
+    Py,
+    Sql,
+    Yml,
+    Toml,
+    Xml,
+    Html,
+    Css,
+    Sh,
+    Md,
+    /// Default, and a **signal that the front end hasn't chosen anything**:
+    /// creation replaces it with a detection.
+    #[default]
+    Txt,
+}
+
+impl Language {
+    pub const ALL: [Self; 13] = [
+        Self::Json,
+        Self::Js,
+        Self::Ts,
+        Self::Py,
+        Self::Sql,
+        Self::Yml,
+        Self::Toml,
+        Self::Xml,
+        Self::Html,
+        Self::Css,
+        Self::Sh,
+        Self::Md,
+        Self::Txt,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::Js => "js",
+            Self::Ts => "ts",
+            Self::Py => "py",
+            Self::Sql => "sql",
+            Self::Yml => "yml",
+            Self::Toml => "toml",
+            Self::Xml => "xml",
+            Self::Html => "html",
+            Self::Css => "css",
+            Self::Sh => "sh",
+            Self::Md => "md",
+            Self::Txt => "txt",
+        }
     }
 }
 
-/// Langage à écrire quand un patch donne à une note son **premier** contenu,
-/// `None` quand il n'y a rien à deviner.
+impl fmt::Display for Language {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// `notes.language` carries no `CHECK` (migration 3): a database written by
+/// a newer version may contain a language unknown to this version.
+impl FromStr for Language {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .into_iter()
+            .find(|language| language.as_str() == value)
+            .ok_or(())
+    }
+}
+
+/// The front end's choice if it made one, otherwise a detection — `txt` acting
+/// as "nothing chosen".
+pub fn for_draft(draft: &NoteDraft) -> Language {
+    if draft.language == Language::default() {
+        from_content(&draft.content)
+    } else {
+        draft.language
+    }
+}
+
+/// The usual gesture: "+ New note" creates an empty note, then we paste.
+/// Since creation sees no content, without this the note would remain in `txt`.
 ///
-/// C'est le geste ordinaire : « + Nouvelle note » crée une note vide, puis on
-/// colle dans l'éditeur. La création ne voit alors aucun contenu, et sans cette
-/// règle la note resterait en `txt` quoi qu'on y mette.
-///
-/// Trois refus, qui sont ce qui empêche la détection de devenir une correction
-/// permanente :
-/// - le patch pose lui-même un langage — l'utilisateur vient de choisir ;
-/// - la note en portait déjà un autre que `txt` — un choix ne se corrige pas ;
-/// - la note avait déjà du contenu — elle a son identité, et re-détecter à
-///   chaque frappe reprendrait à l'utilisateur le sélecteur qu'on lui offre.
-pub fn language_after_patch(before: &Note, patch: &NotePatch) -> Option<String> {
+/// The three refusals are what prevent detection from becoming a permanent
+/// correction: a language set via the selector, a language already other than `txt`,
+/// or a note that already had content.
+pub fn after_patch(before: &Note, patch: &NotePatch) -> Option<Language> {
     if patch.language.is_some()
-        || before.language != FALLBACK_LANGUAGE
+        || before.language != Language::default()
         || !before.content.trim().is_empty()
     {
         return None;
@@ -58,24 +122,21 @@ pub fn language_after_patch(before: &Note, patch: &NotePatch) -> Option<String> 
         return None;
     }
 
-    Some(detect_language(content).to_string())
+    Some(from_content(content))
 }
 
-/// Renvoie toujours une valeur de [`super::rules::LANGUAGES`].
-///
-/// L'ordre des essais va du signal le plus discriminant au plus vague : une
-/// accolade ouvrante est un indice bien plus sûr qu'un `clé: valeur`.
-pub fn detect_language(content: &str) -> &'static str {
+/// L'ordre des essais va du signal le plus discriminant au plus vague.
+pub fn from_content(content: &str) -> Language {
     let trimmed = content.trim();
     if trimmed.is_empty() {
-        return FALLBACK_LANGUAGE;
+        return Language::default();
     }
 
     if trimmed.starts_with("#!") {
-        return "sh";
+        return Language::Sh;
     }
     if is_json(trimmed) {
-        return "json";
+        return Language::Json;
     }
 
     let lower = trimmed.to_lowercase();
@@ -83,37 +144,36 @@ pub fn detect_language(content: &str) -> &'static str {
         return markup;
     }
     if is_sql(&lower) {
-        return "sql";
+        return Language::Sql;
     }
     if is_toml(trimmed) {
-        return "toml";
+        return Language::Toml;
     }
     if is_python(trimmed) {
-        return "py";
+        return Language::Py;
     }
     if is_typescript(trimmed) {
-        return "ts";
+        return Language::Ts;
     }
     if is_javascript(trimmed) {
-        return "js";
+        return Language::Js;
     }
     if is_css(trimmed) {
-        return "css";
+        return Language::Css;
     }
     if is_yaml(trimmed) {
-        return "yml";
+        return Language::Yml;
     }
     if is_markdown(trimmed) {
-        return "md";
+        return Language::Md;
     }
     if is_shell(trimmed) {
-        return "sh";
+        return Language::Sh;
     }
 
-    FALLBACK_LANGUAGE
+    Language::default()
 }
 
-/// Lignes désindentées : toutes les règles raisonnent sur le début utile.
 fn any_line(content: &str, predicate: impl Fn(&str) -> bool) -> bool {
     content.lines().map(str::trim).any(predicate)
 }
@@ -123,7 +183,7 @@ fn starts_with_any(line: &str, prefixes: &[&str]) -> bool {
 }
 
 /// Le guillemet écarte un bloc de code dont l'accolade serait celle d'un corps
-/// de fonction ; un tableau se reconnaît à ses crochets seuls.
+/// de fonction.
 fn is_json(content: &str) -> bool {
     let wrapped = (content.starts_with('{') && content.ends_with('}'))
         || (content.starts_with('[') && content.ends_with(']'));
@@ -131,24 +191,25 @@ fn is_json(content: &str) -> bool {
     wrapped && (content.contains('"') || content.starts_with('['))
 }
 
-fn markup_kind(lower: &str) -> Option<&'static str> {
+fn markup_kind(lower: &str) -> Option<Language> {
+    const HTML_TAGS: [&str; 8] = [
+        "<div", "<span", "<p>", "<body", "<head", "<a ", "<ul", "<table",
+    ];
+
     if !lower.starts_with('<') {
         return None;
     }
     if lower.starts_with("<?xml") {
-        return Some("xml");
+        return Some(Language::Xml);
     }
     if lower.starts_with("<!doctype html") || lower.starts_with("<html") {
-        return Some("html");
+        return Some(Language::Html);
     }
 
-    const HTML_TAGS: [&str; 8] = [
-        "<div", "<span", "<p>", "<body", "<head", "<a ", "<ul", "<table",
-    ];
     if HTML_TAGS.iter().any(|tag| lower.contains(tag)) {
-        Some("html")
+        Some(Language::Html)
     } else {
-        Some("xml")
+        Some(Language::Xml)
     }
 }
 
@@ -168,7 +229,7 @@ fn is_sql(lower: &str) -> bool {
 }
 
 /// Une section **et** une affectation : `[…]` seul se confondrait avec un
-/// tableau posé sur sa propre ligne dans n'importe quel langage.
+/// tableau sur sa propre ligne dans n'importe quel langage.
 fn is_toml(content: &str) -> bool {
     any_line(content, is_toml_section) && any_line(content, is_assignment)
 }
@@ -231,15 +292,14 @@ fn is_javascript(content: &str) -> bool {
         || any_line(content, |line| starts_with_any(line, &KEYWORDS))
 }
 
-/// Un sélecteur suivi d'au moins une déclaration : l'accolade seule ne
-/// distinguerait pas une feuille de style d'un corps de fonction.
+/// Un sélecteur **et** une déclaration : l'accolade seule ne distinguerait pas
+/// une feuille de style d'un corps de fonction.
 fn is_css(content: &str) -> bool {
     if !content.contains('{') || !content.contains('}') {
         return false;
     }
 
-    // Un `propriété: valeur;` où qu'il soit dans la ligne, et pas seulement en
-    // fin : une règle compacte (`a { color: #000; }`) tient sur une seule.
+    // Où qu'il soit dans la ligne : une règle compacte tient sur une seule.
     let has_declaration = any_line(content, |line| {
         line.find(':')
             .zip(line.find(';'))
@@ -256,8 +316,8 @@ fn is_css(content: &str) -> bool {
 }
 
 fn is_yaml(content: &str) -> bool {
-    // Le point-virgule et l'accolade appartiennent aux langages déjà écartés
-    // plus haut ; les revoir ici signifie qu'on s'est trompé de piste.
+    // Ils appartiennent aux langages déjà écartés plus haut : les revoir ici
+    // signifie qu'on s'est trompé de piste.
     if content.contains(';') || content.contains('{') {
         return false;
     }
@@ -266,8 +326,8 @@ fn is_yaml(content: &str) -> bool {
         || any_line(content, |line| line.starts_with("- ") || is_mapping(line))
 }
 
-/// `clé:` ou `clé: valeur`. L'espace exigé après le deux-points écarte une URL,
-/// dont le `http://…` passerait sinon pour une clé.
+/// L'espace exigé après le deux-points écarte une URL, dont le `http://…`
+/// passerait sinon pour une clé.
 fn is_mapping(line: &str) -> bool {
     let Some((key, value)) = line.split_once(':') else {
         return false;
@@ -286,8 +346,7 @@ fn is_markdown(content: &str) -> bool {
         || any_line(content, |line| starts_with_any(line, &LINE_MARKERS))
 }
 
-/// Dernier recours : quelques commandes en tête de ligne. Volontairement pauvre,
-/// une liste large attraperait de la prose.
+/// Volontairement pauvre : une liste large attraperait de la prose.
 fn is_shell(content: &str) -> bool {
     const COMMANDS: [&str; 10] = [
         "echo ", "cd ", "ls ", "cat ", "grep ", "sudo ", "npm ", "git ", "docker ", "curl ",
@@ -299,14 +358,43 @@ fn is_shell(content: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::note::NoteLifecycle;
-    use crate::domain::rules::LANGUAGES;
+    use crate::notes::model::NoteLifecycle;
 
-    fn draft(language: &str, content: &str) -> NoteDraft {
+    #[test]
+    fn every_variant_round_trips_through_its_stored_form() {
+        for language in Language::ALL {
+            assert_eq!(language.as_str().parse(), Ok(language));
+        }
+    }
+
+    #[test]
+    fn an_unknown_value_is_refused_rather_than_guessed() {
+        // A database written by a newer binary can hold one; the caller decides
+        // whether to fall back, and it does so in one place.
+        assert_eq!("rust".parse::<Language>(), Err(()));
+        assert_eq!("JSON".parse::<Language>(), Err(()));
+    }
+
+    #[test]
+    fn the_default_is_the_one_detection_replaces() {
+        assert_eq!(Language::default(), Language::Txt);
+    }
+
+    #[test]
+    fn the_serialised_form_matches_the_stored_one() {
+        // The bindings export this spelling as a TS union; the column holds the
+        // same string. One vocabulary, two consumers.
+        for language in Language::ALL {
+            let json = serde_json::to_value(language).unwrap();
+            assert_eq!(json, serde_json::json!(language.as_str()));
+        }
+    }
+
+    fn draft(language: Language, content: &str) -> NoteDraft {
         NoteDraft {
             space_id: "s-1".to_string(),
             title: String::new(),
-            language: language.to_string(),
+            language,
             content: content.to_string(),
             source: String::new(),
             tags: Vec::new(),
@@ -317,32 +405,26 @@ mod tests {
 
     #[test]
     fn a_draft_with_no_chosen_language_gets_the_detected_one() {
-        let filled = with_detected_language(draft("txt", "SELECT 1"));
-
-        assert_eq!(filled.language, "sql");
+        assert_eq!(for_draft(&draft(Language::Txt, "SELECT 1")), Language::Sql);
     }
 
     #[test]
     fn a_chosen_language_is_never_overwritten() {
         // The editor's select is a decision; re-detecting on every write would
         // undo it the moment the content stops looking like that language.
-        let filled = with_detected_language(draft("md", "SELECT 1"));
-
-        assert_eq!(filled.language, "md");
+        assert_eq!(for_draft(&draft(Language::Md, "SELECT 1")), Language::Md);
     }
 
     #[test]
     fn an_empty_draft_stays_plain_text() {
-        let filled = with_detected_language(draft("txt", ""));
-
-        assert_eq!(filled.language, "txt");
+        assert_eq!(for_draft(&draft(Language::Txt, "")), Language::Txt);
     }
 
     fn blank_note() -> Note {
         Note {
-            language: "txt".to_string(),
+            language: Language::Txt,
             content: String::new(),
-            ..crate::domain::fixtures::note()
+            ..crate::notes::fixtures::note()
         }
     }
 
@@ -358,10 +440,9 @@ mod tests {
         // The ordinary gesture: "+ New note" creates an empty note, and the
         // paste lands through `update_note`. Without this the note would stay
         // `txt` whatever is put in it.
-        let detected =
-            language_after_patch(&blank_note(), &content_patch("interface A { id: string }"));
+        let detected = after_patch(&blank_note(), &content_patch("interface A { id: string }"));
 
-        assert_eq!(detected.as_deref(), Some("ts"));
+        assert_eq!(detected, Some(Language::Ts));
     }
 
     #[test]
@@ -373,28 +454,28 @@ mod tests {
             ..blank_note()
         };
 
-        assert!(language_after_patch(&note, &content_patch("SELECT 1")).is_none());
+        assert!(after_patch(&note, &content_patch("SELECT 1")).is_none());
     }
 
     #[test]
     fn a_chosen_language_is_never_corrected_by_a_later_paste() {
         let note = Note {
-            language: "md".to_string(),
+            language: Language::Md,
             ..blank_note()
         };
 
-        assert!(language_after_patch(&note, &content_patch("SELECT 1")).is_none());
+        assert!(after_patch(&note, &content_patch("SELECT 1")).is_none());
     }
 
     #[test]
     fn a_patch_setting_the_language_itself_is_left_alone() {
         // The user just picked from the select, in the same write.
         let patch = NotePatch {
-            language: Some("md".to_string()),
+            language: Some(Language::Md),
             ..content_patch("SELECT 1")
         };
 
-        assert!(language_after_patch(&blank_note(), &patch).is_none());
+        assert!(after_patch(&blank_note(), &patch).is_none());
     }
 
     #[test]
@@ -404,26 +485,17 @@ mod tests {
             ..NotePatch::default()
         };
 
-        assert!(language_after_patch(&blank_note(), &patch).is_none());
+        assert!(after_patch(&blank_note(), &patch).is_none());
     }
 
     #[test]
     fn clearing_the_content_does_not_detect() {
-        assert!(language_after_patch(&blank_note(), &content_patch("   ")).is_none());
-    }
-
-    #[test]
-    fn filling_the_language_leaves_the_rest_of_the_draft_alone() {
-        let filled = with_detected_language(draft("txt", "{\"a\": 1}"));
-
-        assert_eq!(filled.language, "json");
-        assert_eq!(filled.content, "{\"a\": 1}");
-        assert_eq!(filled.space_id, "s-1");
+        assert!(after_patch(&blank_note(), &content_patch("   ")).is_none());
     }
 
     #[test]
     fn every_detected_language_is_one_the_editor_accepts() {
-        // A value outside this list would be refused by `validate_language`, so
+        // A value outside this list would be refused by `language::validate`, so
         // detection would turn a paste into a failed creation.
         let samples = [
             "",
@@ -445,7 +517,7 @@ mod tests {
 
         for sample in samples {
             assert!(
-                LANGUAGES.contains(&detect_language(sample)),
+                Language::ALL.contains(&from_content(sample)),
                 "sample: {sample}"
             );
         }
@@ -453,107 +525,116 @@ mod tests {
 
     #[test]
     fn an_empty_or_blank_content_stays_plain_text() {
-        assert_eq!(detect_language(""), "txt");
-        assert_eq!(detect_language("   \n  "), "txt");
+        assert_eq!(from_content(""), Language::Txt);
+        assert_eq!(from_content("   \n  "), Language::Txt);
     }
 
     #[test]
     fn prose_stays_plain_text() {
         // The common case of a scratch note: it must not be dressed up as code.
         assert_eq!(
-            detect_language("Penser à relancer Marc au sujet du certificat"),
-            "txt"
+            from_content("Penser à relancer Marc au sujet du certificat"),
+            Language::Txt
         );
     }
 
     #[test]
     fn a_json_object_or_array_is_recognised() {
-        assert_eq!(detect_language("{\n  \"id\": 42\n}"), "json");
-        assert_eq!(detect_language("[1, 2, 3]"), "json");
-        assert_eq!(detect_language("  {\"a\": [1]}  "), "json");
+        assert_eq!(from_content("{\n  \"id\": 42\n}"), Language::Json);
+        assert_eq!(from_content("[1, 2, 3]"), Language::Json);
+        assert_eq!(from_content("  {\"a\": [1]}  "), Language::Json);
     }
 
     #[test]
     fn a_shebang_wins_over_everything_that_follows() {
-        assert_eq!(detect_language("#!/usr/bin/env python\nimport os"), "sh");
+        assert_eq!(
+            from_content("#!/usr/bin/env python\nimport os"),
+            Language::Sh
+        );
     }
 
     #[test]
     fn markup_splits_between_html_and_xml() {
-        assert_eq!(detect_language("<!DOCTYPE html>\n<html></html>"), "html");
-        assert_eq!(detect_language("<div class=\"x\">hi</div>"), "html");
-        assert_eq!(detect_language("<?xml version=\"1.0\"?>\n<root/>"), "xml");
-        assert_eq!(detect_language("<config><item/></config>"), "xml");
+        assert_eq!(
+            from_content("<!DOCTYPE html>\n<html></html>"),
+            Language::Html
+        );
+        assert_eq!(from_content("<div class=\"x\">hi</div>"), Language::Html);
+        assert_eq!(
+            from_content("<?xml version=\"1.0\"?>\n<root/>"),
+            Language::Xml
+        );
+        assert_eq!(from_content("<config><item/></config>"), Language::Xml);
     }
 
     #[test]
     fn sql_is_recognised_whatever_its_case() {
-        assert_eq!(detect_language("SELECT * FROM notes"), "sql");
-        assert_eq!(detect_language("select 1"), "sql");
+        assert_eq!(from_content("SELECT * FROM notes"), Language::Sql);
+        assert_eq!(from_content("select 1"), Language::Sql);
         assert_eq!(
-            detect_language("CREATE TABLE notes (id TEXT PRIMARY KEY)"),
-            "sql"
+            from_content("CREATE TABLE notes (id TEXT PRIMARY KEY)"),
+            Language::Sql
         );
     }
 
     #[test]
     fn toml_needs_both_a_section_and_an_assignment() {
-        assert_eq!(detect_language("[package]\nname = \"devbox\""), "toml");
+        assert_eq!(from_content("[package]\nname = \"devbox\""), Language::Toml);
         // A bare list on its own line is not a section header.
-        assert_ne!(detect_language("[1, 2]\nx = 3"), "toml");
+        assert_ne!(from_content("[1, 2]\nx = 3"), Language::Toml);
     }
 
     #[test]
     fn python_is_told_apart_from_typescript_by_its_colon() {
-        assert_eq!(detect_language("def run():\n    return 1"), "py");
-        assert_eq!(detect_language("class Note:\n    pass"), "py");
-        assert_eq!(detect_language("from os import path"), "py");
+        assert_eq!(from_content("def run():\n    return 1"), Language::Py);
+        assert_eq!(from_content("class Note:\n    pass"), Language::Py);
+        assert_eq!(from_content("from os import path"), Language::Py);
         // Same keyword, brace instead of colon.
-        assert_eq!(detect_language("class Note { }"), "js");
+        assert_eq!(from_content("class Note { }"), Language::Js);
     }
 
     #[test]
     fn typescript_wins_over_javascript_on_its_own_markers() {
-        assert_eq!(detect_language("interface Note { id: string }"), "ts");
-        assert_eq!(detect_language("export type Id = string"), "ts");
-        assert_eq!(detect_language("const a: number = 1"), "ts");
+        assert_eq!(from_content("interface Note { id: string }"), Language::Ts);
+        assert_eq!(from_content("export type Id = string"), Language::Ts);
+        assert_eq!(from_content("const a: number = 1"), Language::Ts);
         // Nothing type-specific: plain JavaScript.
-        assert_eq!(detect_language("const add = (a, b) => a + b"), "js");
-        assert_eq!(detect_language("console.log('hi')"), "js");
+        assert_eq!(from_content("const add = (a, b) => a + b"), Language::Js);
+        assert_eq!(from_content("console.log('hi')"), Language::Js);
     }
 
     #[test]
     fn css_needs_a_selector_and_a_declaration() {
-        assert_eq!(detect_language(".card {\n  color: red;\n}"), "css");
+        assert_eq!(from_content(".card {\n  color: red;\n}"), Language::Css);
         assert_eq!(
-            detect_language("@media print {\n  a { color: #000; }\n}"),
-            "css"
+            from_content("@media print {\n  a { color: #000; }\n}"),
+            Language::Css
         );
     }
 
     #[test]
     fn yaml_is_recognised_by_its_mappings_and_lists() {
-        assert_eq!(detect_language("name: devbox\nversion: 1"), "yml");
-        assert_eq!(detect_language("---\nsteps:\n  - build"), "yml");
+        assert_eq!(from_content("name: devbox\nversion: 1"), Language::Yml);
+        assert_eq!(from_content("---\nsteps:\n  - build"), Language::Yml);
     }
 
     #[test]
     fn a_bare_url_is_not_read_as_a_yaml_mapping() {
         // "https://example.com" splits on ':' with a value that has no space;
         // without that rule every pasted link would come back as YAML.
-        assert_ne!(detect_language("https://example.com/a/b"), "yml");
+        assert_ne!(from_content("https://example.com/a/b"), Language::Yml);
     }
 
     #[test]
     fn markdown_is_recognised_by_its_headings_and_fences() {
-        assert_eq!(detect_language("# Titre\n\nUn paragraphe."), "md");
-        assert_eq!(detect_language("Voir ```code``` ici"), "md");
-        assert_eq!(detect_language("Un [lien](https://x.dev)"), "md");
+        assert_eq!(from_content("# Titre\n\nUn paragraphe."), Language::Md);
+        assert_eq!(from_content("Voir ```code``` ici"), Language::Md);
+        assert_eq!(from_content("Un [lien](https://x.dev)"), Language::Md);
     }
 
     #[test]
     fn shell_commands_are_the_last_resort() {
-        assert_eq!(detect_language("git status\ngit push"), "sh");
-        assert_eq!(detect_language("docker run -p 8080:80 nginx"), "sh");
+        assert_eq!(from_content("git status\ngit push"), Language::Sh);
+        assert_eq!(from_content("docker run -p 8080:80 nginx"), Language::Sh);
     }
 }

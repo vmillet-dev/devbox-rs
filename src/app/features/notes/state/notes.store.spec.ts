@@ -16,7 +16,7 @@ import { NotesStore, SEARCH_DEBOUNCE_MS } from './notes.store';
 
 /**
  * Filtering, grouping and tag normalisation are the backend's job now and are
- * tested in `src-tauri/src/storage/`. What is left here is what the front still
+ * tested in `src-tauri/src/notes/store.rs`. What is left here is what the front still
  * owns: assembling the query, pacing it, adopting what comes back, and
  * surviving a failure.
  */

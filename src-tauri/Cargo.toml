@@ -1,11 +1,15 @@
 [package]
 name = "devbox"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Couteau suisse de développeur : prise de notes, hachage, encodage"
+authors = ["Valentin MILLET"]
 edition = "2024"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# Version des let-chains (`if x && let Some(y) = …`), utilisées dans le domaine.
+rust-version = "1.88"
+repository = "https://github.com/vmillet-dev/devbox-rs"
+# Le binaire `export-bindings` en fait un second : sans cette clé, le `cargo run`
+# nu que lance `tauri dev` ne sait plus lequel démarrer.
+default-run = "devbox"
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
@@ -18,49 +22,69 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# `tray-icon` : DevBox reste résidente dans la zone de notification, d'où on la
-# rappelle et d'où on la quitte — la croix de la fenêtre ne fait plus que cacher.
 tauri = { version = "2", features = ["tray-icon"] }
-# Sérialisation des structures échangées avec le front (voir domain/note.rs).
+# Génération des types et des appels TypeScript à partir des signatures Rust
+# (voir lib.rs). Versions figées par `=` : Specta v2 est en release candidate et
+# ne garantit pas la compatibilité entre deux rc.
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+# `chrono` : sans elle, un `DateTime<Utc>` du domaine n'a pas d'impl `Type` et
+# rien ne s'exporte. Avec, il traverse en `string`, comme la chaîne ISO d'avant.
+specta = { version = "=2.0.0-rc.25", features = ["chrono"] }
+specta-typescript = "=0.0.12"
 serde = { version = "1", features = ["derive"] }
-# Exigé par `generate_context!` depuis que tauri.conf.json porte une section
-# `plugins` : la macro embarque cette configuration sous forme de JSON. Sert
-# aussi aux tests, qui verrouillent la forme traversant le pont (domain/note.rs).
+# Requis à la compilation par l'expansion de `tauri::generate_context!`, en plus
+# des tests qui figent la forme JSON traversant le pont.
 serde_json = "1.0.151"
-# Stockage : SQLite embarqué (voir storage/mod.rs). La feature `bundled` compile
-# SQLite depuis les sources et le lie en statique — aucune DLL à distribuer.
-rusqlite = { version = "0.40.1", features = ["bundled"] }
-# Identifiants des notes et des espaces : le front n'en fabrique jamais.
+diesel = { version = "2.3.12", features = ["sqlite"] }
+diesel_migrations = { version = "2.3.2", features = ["sqlite"] }
+# Dépendance directe uniquement pour `bundled` : diesel tire `libsqlite3-sys`
+# sans l'activer, et sans elle il faudrait un SQLite système sur la machine de
+# build comme sur celle de l'utilisateur.
+libsqlite3-sys = { version = "0.38.1", features = ["bundled"] }
 uuid = { version = "1.24.0", features = ["v4"] }
-# Horodatages ISO 8601 / RFC 3339 UTC, le format attendu par le pont Tauri.
-chrono = "0.4.45"
-# Redémarrage de l'application après l'installation d'une mise à jour.
+# `serde` : c'est chrono qui sérialise les `DateTime<Utc>` du domaine, en RFC 3339.
+chrono = { version = "0.4.45", features = ["serde"] }
 tauri-plugin-process = "2"
-# Ouverture du dépôt dans le navigateur système. Le CSP est verrouillé sur
-# `'self'` : un lien ordinaire ne mène nulle part depuis la WebView.
 tauri-plugin-opener = "2"
-# Préférences d'interface (langue, plein écran) dans un vrai fichier sur disque
-# plutôt que dans le `localStorage` de la WebView, qu'un vidage de cache efface
-# et que Rust ne sait pas relire. Voir core/preferences/preferences.service.ts.
 tauri-plugin-store = "2"
-# Presse-papier : sortir un snippet de DevBox, et y entrer celui d'une autre
-# application. La WebView ne donne pas accès au presse-papier système sous CSP.
 tauri-plugin-clipboard-manager = "2"
+# Les pannes non fatales (barre système, raccourci déjà pris) sont signalées ici.
+# `eprintln!` ne convenait pas : `windows_subsystem = "windows"` n'alloue pas de
+# console en release, donc le diagnostic se perdait là où il sert.
+tauri-plugin-log = "2"
+log = "0.4"
+thiserror = "2.0.20"
 
-# L'updater n'existe pas sur mobile — les magasins d'applications s'en chargent —
-# et le déclarer inconditionnellement casserait une compilation Android/iOS.
-# Les raccourcis globaux non plus : un système mobile ne laisse pas une
-# application écouter le clavier hors de sa fenêtre.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-global-shortcut = "2"
 
-# Le Rust n'avait ni linter ni garde-fou : `cargo clippy -- -D warnings` échouait
-# sur rien, donc rien n'empêchait une régression d'entrer.
+# Pas de `panic = "abort"` : la détection de mutex empoisonné de `commands::lock`
+# repose sur le déroulement de pile, et l'abandon la rendrait inatteignable.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
 [lints.rust]
 unsafe_code = "forbid"
+rust_2018_idioms = { level = "warn", priority = -1 }
+# Signale les `pub` que rien n'atteint depuis l'extérieur du crate.
+unreachable_pub = "warn"
 
 [lints.clippy]
-# `priority = -1` laisse la possibilité de rétrograder une lint précise ensuite.
 all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Ces deux-là réclament une section `# Errors` / `# Panics` sur chaque fonction
+# publique qui renvoie un `Result` ou peut paniquer. Le crate n'est publié nulle
+# part et sa documentation tient dans `docs/architecture.md` : ce serait des
+# dizaines de sections à écrire, et à tenir à jour, pour personne.
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# Même raison : `#[must_use]` protège les appelants d'un crate publié. Ici chaque
+# fonction a son unique appelant, dans le même dépôt.
+must_use_candidate = "allow"
+# `storage::notes::…` ou `domain::note::Note` : la répétition vient du découpage
+# par sujet, elle est voulue.
+module_name_repetitions = "allow"
 

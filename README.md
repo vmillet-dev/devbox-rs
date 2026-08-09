@@ -8,8 +8,8 @@ A developer's Swiss Army knife for the desktop: a notes/snippets manager, plus u
 
 > **Status** — the notes feature is complete end to end. The UI has no mock data left, every
 > read and write crosses the `invoke()` bridge, and the Rust side persists to an embedded
-> SQLite database. Business rules live in `src-tauri/src/domain/`, which depends on neither
-> rusqlite nor Tauri. `crypto` and `formatters` are documented placeholders, not yet built.
+> SQLite database. Business rules live in each feature's `model.rs`, which depends on neither
+> Diesel nor Tauri. `crypto` and `formatters` are documented placeholders, not yet built.
 
 ## Prerequisites
 
@@ -53,15 +53,18 @@ For Rust-only iteration, `cargo check` from `src-tauri/` is much faster than a f
 ```
 src/              Angular front-end (core/ state & data, features/ screens, layout/, shared/)
 src-tauri/src/
-  domain/         Model and business rules — knows neither SQLite nor Tauri
-  storage/        SQLite persistence: SQL only, depends on domain/
-  commands/       Tauri adapters: lock, delegate, translate the error
+  notes/          The notes feature: model.rs, language.rs, view.rs, store.rs
+  spaces/         The spaces feature: model.rs, store.rs
+  db.rs           Connection, migrations, schema, stored-instant format
+  error.rs        The three errors and the translation between them
+  desktop.rs      Tray and global shortcuts — native glue, not a feature
 docs/             Architecture notes and UI mockup
 ```
 
-Dependencies point one way: `commands/ → domain/ ← storage/`. Two greps keep it honest —
-`grep -rn "rusqlite\|tauri::" src-tauri/src/domain/` and
-`grep -rn "use crate::commands" src-tauri/src/storage/` must both come back empty.
+Both halves are filed by **subject**, not by technical nature. On the Rust side each feature
+owns its model, its SQL and the commands that expose it: `<feature>.rs` holds the
+`#[tauri::command]`s, `<feature>/model.rs` the rules, `<feature>/store.rs` the SQL. Deleting
+`src-tauri/src/notes/` deletes the feature.
 
 ## Documentation
 
@@ -80,9 +83,9 @@ Dependencies point one way: `commands/ → domain/ ← storage/`. Two greps keep
 - [x] Full note editing: content, format, tags, pin, deletion
 - [x] Spaces: notes carry a `spaceId`, the switcher filters on it and can create a space
 - [x] ESLint + Prettier, with template accessibility rules
-- [x] Persistence: embedded SQLite (`rusqlite`, `bundled`) with versioned, append-only
-      migrations
-- [x] Business rules isolated in `src-tauri/src/domain/`, testable without a database
+- [x] Persistence: embedded SQLite through Diesel (`libsqlite3-sys` `bundled`) with
+      append-only, embedded migrations
+- [x] Business rules isolated in each feature's `model.rs`, testable without a database
 - [x] Rust tests, clippy (`deny(clippy::all)`) and rustfmt
 - [ ] Renaming and deleting a space — needs a decision on what happens to its notes
 - [ ] Moving a note between spaces (already expressible: `spaceId` is part of `NotePatch`)

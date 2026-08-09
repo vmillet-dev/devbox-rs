@@ -15,6 +15,9 @@ export default tseslint.config(
       'coverage/**',
       // Maquette statique de référence, ni compilée ni importée.
       'docs/**',
+      // Bindings générés par tauri-specta : leur forme est décidée par le
+      // générateur, pas par nos règles de style.
+      'src/app/core/ipc/bindings.ts',
     ],
   },
   {

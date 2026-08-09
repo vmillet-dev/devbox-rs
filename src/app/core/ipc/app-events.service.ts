@@ -19,8 +19,8 @@ export const EVENT_SUBSCRIBER = new InjectionToken<EventSubscriber>('EVENT_SUBSC
 });
 
 /**
- * Sens **descendant** du pont : le natif prévient, le front réagit. `IpcService`
- * garde le sens montant et reste l'unique appelant d'`invoke()`.
+ * Sens **descendant** du pont : le natif prévient, le front réagit. Le sens
+ * montant passe par les commandes générées dans `bindings.ts`.
  *
  * Hors Tauri (jsdom), `listen` échoue : l'abonnement est alors inerte plutôt que
  * fatal, comme pour les préférences et le presse-papier.

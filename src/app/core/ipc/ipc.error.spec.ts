@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IpcError } from './ipc.error';
+import { IpcError, unwrap } from './ipc.error';
 
 describe('IpcError', () => {
   it('keeps the failing command and the raw cause', () => {
@@ -71,5 +71,35 @@ describe('IpcError', () => {
 
       expect(error.code).toBeNull();
     });
+  });
+});
+
+describe('unwrap', () => {
+  it('returns the data of a successful result', () => {
+    expect(unwrap('list_spaces', { status: 'ok', data: [{ id: 's-1', name: 'Perso' }] })).toEqual([
+      { id: 's-1', name: 'Perso' },
+    ]);
+  });
+
+  it('throws an IpcError carrying the backend code, so callers keep using try/catch', () => {
+    // The generated bindings return a discriminated result; turning it back into
+    // an exception is what keeps ErrorNotifier the single place that branches.
+    const failing = () =>
+      unwrap('create_space', {
+        status: 'error',
+        error: { code: 'duplicateSpaceName', params: { name: 'Perso' }, detail: 'déjà pris' },
+      });
+
+    expect(failing).toThrow(IpcError);
+    try {
+      failing();
+    } catch (error) {
+      expect((error as IpcError).code).toBe('duplicateSpaceName');
+      expect((error as IpcError).params['name']).toBe('Perso');
+    }
+  });
+
+  it('keeps a null data payload, which is what a void command returns', () => {
+    expect(unwrap('delete_note', { status: 'ok', data: null })).toBeNull();
   });
 });
