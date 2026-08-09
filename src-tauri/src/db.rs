@@ -1,8 +1,8 @@
-//! La base : ouverture, configuration, migrations, et l'accès partagé que les
-//! commandes verrouillent.
+//! The database: opening, configuration, migrations, and the shared access the
+//! commands lock.
 //!
-//! **Aucune règle métier** : elles vivent dans `notes::model`, `notes::view` et
-//! `spaces::model`, qui se testent sans ouvrir de base.
+//! **No business rule**: those live in `notes::model`, `notes::view` and
+//! `spaces::model`, which are tested without opening a database.
 
 pub mod migration;
 pub mod schema;
@@ -17,17 +17,17 @@ use crate::error::{AppError, StorageError};
 
 pub const DB_FILE_NAME: &str = "devbox.sqlite3";
 
-/// `SqliteConnection` n'est pas `Sync` : deux commandes qui se chevauchent se
-/// sérialisent sur ce mutex.
+/// `SqliteConnection` is not `Sync`: two overlapping commands serialise on this
+/// mutex.
 pub type Db = Mutex<SqliteConnection>;
 
-/// Un mutex empoisonné signifie qu'une commande a paniqué en le tenant : mieux
-/// vaut le dire que paniquer à nouveau.
+/// A poisoned mutex means a command panicked while holding it: better to say so
+/// than to panic again.
 pub(crate) fn lock(db: &Db) -> Result<MutexGuard<'_, SqliteConnection>, AppError> {
     db.lock().map_err(|_| AppError::storage_unavailable())
 }
 
-/// Ouvre la base (en la créant au besoin), la configure, migre.
+/// Opens the database (creating it if needed), configures it, migrates it.
 pub fn open(path: &Path) -> Result<SqliteConnection, StorageError> {
     let mut connection = SqliteConnection::establish(&path.to_string_lossy())
         .map_err(|error| StorageError::Migration(error.to_string()))?;
@@ -37,8 +37,8 @@ pub fn open(path: &Path) -> Result<SqliteConnection, StorageError> {
     Ok(connection)
 }
 
-/// Base éphémère. Publique pour les tests d'intégration, qui ne voient du crate
-/// que son API.
+/// Ephemeral database. Public for the integration tests, which see nothing of
+/// the crate but its API.
 pub fn open_in_memory() -> Result<SqliteConnection, StorageError> {
     let mut connection = SqliteConnection::establish(":memory:")
         .map_err(|error| StorageError::Migration(error.to_string()))?;
@@ -49,9 +49,9 @@ pub fn open_in_memory() -> Result<SqliteConnection, StorageError> {
 }
 
 fn configure(connection: &mut SqliteConnection) -> Result<(), StorageError> {
-    // ⚠️ `foreign_keys` se règle **par connexion** et est désactivé par défaut :
-    // sans lui les `ON DELETE CASCADE` sont inertes et les tags d'une note
-    // supprimée resteraient orphelins. WAL : un lecteur ne bloque plus un écrivain.
+    // ⚠️ `foreign_keys` is set **per connection** and is off by default: without
+    // it the `ON DELETE CASCADE` clauses are inert and the tags of a deleted
+    // note would be left orphaned. WAL: a reader no longer blocks a writer.
     connection.batch_execute(
         "PRAGMA foreign_keys = ON;
          PRAGMA journal_mode = WAL;",
@@ -60,15 +60,15 @@ fn configure(connection: &mut SqliteConnection) -> Result<(), StorageError> {
     Ok(())
 }
 
-/// Format des instants **stockés**, et sa lecture.
+/// The format of **stored** instants, and how they are read back.
 ///
-/// ⚠️ Les millisecondes sont toujours écrites, même nulles. `created_at` et
-/// `updated_at` sont des colonnes TEXT triées lexicographiquement, et le canevas
-/// s'ordonne dessus : `.` (0x2E) précédant `Z` (0x5A), un `09:00:00.500Z`
-/// passerait **avant** un `09:00:00Z`. `SecondsFormat::AutoSi`, le défaut de
-/// chrono, tombe précisément dans ce piège.
+/// ⚠️ Milliseconds are always written, even when zero. `created_at` and
+/// `updated_at` are TEXT columns sorted lexicographically, and the canvas orders
+/// on them: `.` (0x2E) precedes `Z` (0x5A), so `09:00:00.500Z` would sort
+/// **before** `09:00:00Z`. `SecondsFormat::AutoSi`, chrono's default, falls into
+/// exactly that trap.
 ///
-/// Le fil, lui, n'en dépend pas : le front convertit en `Date` à la frontière.
+/// The wire does not depend on it: the front converts to `Date` at the boundary.
 pub mod iso8601 {
     use chrono::{DateTime, SecondsFormat, Utc};
 
@@ -131,7 +131,7 @@ mod tests {
         Mutex::new(SqliteConnection::establish(":memory:").unwrap())
     }
 
-    /// Reste ici plutôt que dans `tests/` : `configure` est privée.
+    /// Stays here rather than in `tests/`: `configure` is private.
     #[test]
     fn foreign_keys_are_enforced() {
         #[derive(QueryableByName)]
@@ -167,7 +167,7 @@ mod tests {
         std::panic::set_hook(Box::new(|_| {}));
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let _guard = db.lock().unwrap();
-            panic!("une commande a paniqué en tenant la connexion");
+            panic!("a command panicked while holding the connection");
         }));
         std::panic::set_hook(hook);
 
@@ -175,7 +175,7 @@ mod tests {
         // `SqliteConnection` is not; and `unwrap()` in `lock` itself would take
         // the whole process down on the next command.
         let Err(error) = lock(&db) else {
-            panic!("un mutex empoisonné doit être signalé, pas rendu");
+            panic!("a poisoned mutex must be reported, not returned");
         };
 
         assert!(matches!(error.code, ErrorCode::StorageUnavailable));

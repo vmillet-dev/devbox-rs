@@ -1,7 +1,8 @@
-//! Application des migrations embarquées, et adoption des bases héritées.
+//! Applying the embedded migrations, and adopting legacy databases.
 //!
-//! ⚠️ **Append-only.** Faire évoluer le modèle = ajouter un dossier
-//! `migrations/AAAA-MM-JJ-HHMMSS_nom/`, jamais modifier une migration livrée.
+//! ⚠️ **Append-only.** Evolving the model means adding a
+//! `migrations/YYYY-MM-DD-HHMMSS_name/` directory, never editing a shipped
+//! migration.
 
 use diesel::migration::MigrationSource;
 use diesel::prelude::*;
@@ -13,8 +14,8 @@ use crate::error::StorageError;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
-/// Valeur maximale qu'a livrée l'ancien `PRAGMA user_version`. Ne bouge plus :
-/// une migration ajoutée aujourd'hui n'a jamais existé sous l'ancien schéma.
+/// The highest value the old `PRAGMA user_version` ever shipped. It never moves
+/// again: a migration added today never existed under the old scheme.
 const LEGACY_MIGRATION_COUNT: usize = 3;
 
 #[derive(QueryableByName)]
@@ -34,12 +35,12 @@ fn embedded_versions() -> Result<Vec<String>, StorageError> {
     Ok(versions)
 }
 
-/// Fait adopter par Diesel l'historique qu'écrivait l'ancien `PRAGMA user_version`.
+/// Makes Diesel adopt the history the old `PRAGMA user_version` used to write.
 ///
-/// Sans elle, une base déjà installée rejouerait la migration initiale sur des
-/// tables existantes. Les `n` premières sont donc marquées appliquées sans être
-/// exécutées, et le pragma remis à zéro — deux sources de vérité sur l'état du
-/// schéma finiraient par diverger.
+/// Without it, an already installed database would replay the initial migration
+/// over existing tables. The first `n` are therefore marked as applied without
+/// being executed, and the pragma is zeroed — two sources of truth on the schema
+/// state would end up drifting apart.
 fn adopt_legacy_history(
     connection: &mut SqliteConnection,
     embedded: &[String],
@@ -48,12 +49,12 @@ fn adopt_legacy_history(
         .get_result::<UserVersion>(connection)?
         .user_version;
 
-    // Zéro : base neuve, ou passée par ici lors d'une ouverture précédente.
+    // Zero: a fresh database, or one that came through here on an earlier open.
     if legacy <= 0 {
         return Ok(());
     }
 
-    // Crée `__diesel_schema_migrations` si elle manque — l'insertion suit.
+    // Creates `__diesel_schema_migrations` if it is missing — the insert follows.
     connection
         .applied_migrations()
         .map_err(|error| StorageError::Migration(error.to_string()))?;
@@ -82,8 +83,8 @@ pub fn run(connection: &mut SqliteConnection) -> Result<(), StorageError> {
 
     adopt_legacy_history(connection, &embedded)?;
 
-    // Une migration appliquée qu'on ne connaît pas signale une base écrite par
-    // une version plus récente : refuser vaut mieux qu'écraser ses données.
+    // An applied migration we do not know about signals a database written by a
+    // newer version: refusing beats overwriting its data.
     let applied = connection
         .applied_migrations()
         .map_err(|error| StorageError::Migration(error.to_string()))?;
@@ -111,9 +112,9 @@ mod tests {
     use crate::db::{DB_FILE_NAME, configure, open, open_in_memory, schema};
     use crate::error::StorageError;
 
-    /// Le SQL de la migration initiale tel qu'il a été livré. Rejoué à la main,
-    /// il fabrique une base « héritée » : schéma en place, `user_version` posé,
-    /// aucune trace côté Diesel.
+    /// The SQL of the initial migration exactly as it shipped. Replayed by hand,
+    /// it builds a "legacy" database: schema in place, `user_version` set, no
+    /// trace on the Diesel side.
     const LEGACY_SCHEMA: &str = include_str!("../../migrations/2026-07-25-000001_initial/up.sql");
     const LEGACY_FOLD_TAG_CASE: &str =
         include_str!("../../migrations/2026-07-25-000002_fold_tag_case/up.sql");
@@ -138,7 +139,7 @@ mod tests {
             .user_version
     }
 
-    /// Base au schéma d'origine, versionnée comme l'ancien code le faisait.
+    /// A database on the original schema, versioned the way the old code did it.
     fn legacy_database(sql: &[&str], version: i32) -> SqliteConnection {
         let mut connection = SqliteConnection::establish(":memory:").unwrap();
         configure(&mut connection).unwrap();

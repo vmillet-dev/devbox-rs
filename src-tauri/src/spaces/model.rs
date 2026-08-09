@@ -1,7 +1,7 @@
-//! L'espace : le classeur dans lequel les notes sont rangées.
+//! Spaces: the folders where notes are stored.
 //!
-//! Aucune entrée « Tous les espaces » côté données : c'est un mode d'affichage,
-//! et en créer un ferait ranger des notes dedans.
+//! No "All spaces" entry on the data side: it's a display mode,
+//! and creating one would cause notes to be filed into it.
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -12,11 +12,11 @@ use crate::error::ValidationError;
 #[serde(rename_all = "camelCase")]
 pub struct Space {
     pub id: String,
-    /// Unicité insensible à la casse, tranchée par la persistance.
+    /// Uniqueness is case-insensitive, decided by persistence.
     pub name: String,
 }
 
-/// Pas d'identifiant : la persistance l'attribue.
+/// No identifier: persistence assigns it.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceDraft {
@@ -24,14 +24,14 @@ pub struct SpaceDraft {
 }
 
 impl SpaceDraft {
-    /// ⚠️ Le détourage n'est pas cosmétique : `COLLATE NOCASE` ne replie pas les
-    /// espaces, donc « Perso » et « Perso » cohabiteraient, identiques à l'écran.
+    /// ⚠️ Trimming is not cosmetic: `COLLATE NOCASE` does not collapse
+    /// spaces, so "Perso" and " Perso " would coexist, identical on screen.
     pub fn validated_name(&self) -> Result<String, ValidationError> {
         let trimmed = self.name.trim();
         if trimmed.is_empty() {
             return Err(ValidationError::new(
                 "name",
-                "un espace doit porter un nom lisible",
+                "a space must have a readable name",
             ));
         }
 
@@ -39,14 +39,14 @@ impl SpaceDraft {
     }
 }
 
-/// Un espace ne peut pas être son propre refuge : le `ON DELETE CASCADE`
-/// emporterait les notes juste après le transfert. La persistance ne peut pas
-/// trancher — des deux côtés, l'espace existe.
+/// A space cannot be its own refuge: the `ON DELETE CASCADE`
+/// would sweep away the notes right after the transfer. Persistence cannot
+/// decide — from both sides, the space exists.
 pub fn validate_move_target(id: &str, target_id: &str) -> Result<(), ValidationError> {
     if id == target_id {
         return Err(ValidationError::new(
             "targetSpaceId",
-            "les notes doivent être déplacées vers un autre espace",
+            "notes must be moved to another space",
         ));
     }
 

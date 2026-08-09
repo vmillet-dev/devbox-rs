@@ -1,15 +1,15 @@
-//! Commandes « Prise de notes ».
+//! "Notes taking" commands.
 //!
-//! Trois garanties dont le front dépend : [`create_note`] et [`update_note`]
-//! renvoient la note **telle que persistée** (c'est elle que l'éditeur adopte) ;
-//! un identifiant inconnu renvoie `Err`, jamais un `Ok` silencieux ; et dans un
-//! `NotePatch` un champ absent signifie « ne pas toucher ».
+//! Three guarantees the front-end depends on: [`create_note`] and [`update_note`]
+//! return the note **as persisted** (which the editor then adopts);
+//! an unknown identifier returns an `Err`, never a silent `Ok`; and in a
+//! `NotePatch`, an absent field means "do not touch".
 //!
-//! Plus rien à valider ici : le langage est un enum, donc une valeur inconnue ne
-//! passe plus la désérialisation — et ne compile plus côté front.
+//! Nothing left to validate here: the language is an enum, so an unknown value
+//! no longer passes deserialization — and no longer compiles on the front-end side.
 
-// Une commande reçoit ses arguments désérialisés depuis la charge utile IPC :
-// ils arrivent possédés, qu'elle les consomme ou non.
+// A command receives its arguments deserialized from the IPC payload:
+// they arrive owned, whether it consumes them or not.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod language;
@@ -17,8 +17,8 @@ pub mod model;
 pub mod store;
 pub mod view;
 
-/// Note de référence partagée par les tests de la feature : un champ ajouté à
-/// [`model::Note`] se déclare ici plutôt que dans chaque module qui en construit une.
+/// Reference note shared by the feature tests: a field added to
+/// [`model::Note`] is declared here rather than in every module that builds one.
 #[cfg(test)]
 pub(crate) mod fixtures {
     use chrono::{DateTime, Utc};
@@ -30,16 +30,16 @@ pub(crate) mod fixtures {
     pub(crate) const NOW: &str = "2026-07-25T09:00:00.000Z";
 
     pub(crate) fn at(iso: &str) -> DateTime<Utc> {
-        iso8601::parse(iso).expect("les tests écrivent des instants valides")
+        iso8601::parse(iso).expect("tests write valid instants")
     }
 
     pub(crate) fn note() -> Note {
         Note {
             id: "n-1".to_string(),
             space_id: "s-1".to_string(),
-            title: "Titre".to_string(),
+            title: "Title".to_string(),
             language: Language::Txt,
-            content: "Contenu".to_string(),
+            content: "Content".to_string(),
             source: String::new(),
             tags: vec!["auth".to_string()],
             pinned: false,
@@ -58,8 +58,8 @@ use crate::error::AppError;
 use model::{DisplayNote, NoteDraft, NotePatch};
 use view::{NotesQuery, NotesView};
 
-/// Notes filtrées **et** regroupées, prêtes à afficher. Aucune commande ne rend
-/// la liste brute : elle inviterait à refiltrer côté front.
+/// Filtered **and** grouped notes, ready to display. No command returns
+/// the raw list: it would invite re-filtering on the front-end side.
 #[tauri::command]
 #[specta::specta]
 pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, AppError> {

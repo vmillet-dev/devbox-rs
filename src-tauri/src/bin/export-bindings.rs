@@ -1,7 +1,8 @@
-//! Régénère `bindings.ts` sans ouvrir de fenêtre — `npm run tauri dev` le fait
-//! déjà au lancement, mais travailler côté front sans démarrer l'app est courant.
+//! Regenerates `bindings.ts` without opening a window — `npm run tauri dev`
+//! already does it at launch, but working on the front end without starting the
+//! app is common.
 
 fn main() {
-    devbox_lib::export_bindings().expect("échec de la génération des bindings TypeScript");
-    println!("bindings.ts régénéré");
+    devbox_lib::export_bindings().expect("failed to generate TypeScript bindings");
+    println!("bindings.ts regenerated");
 }

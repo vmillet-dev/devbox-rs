@@ -1,4 +1,4 @@
-// Publics : `tests/` est un crate à part, qui ne voit du binaire que son API.
+// Public: `tests/` is a separate crate, and sees nothing of the binary but its API.
 pub mod db;
 pub mod error;
 pub mod notes;
@@ -14,25 +14,25 @@ use desktop::sync_tray;
 use notes::{create_note, delete_note, query_notes, update_note};
 use spaces::{create_space, delete_space, list_spaces, rename_space};
 
-/// Résolu depuis le manifeste et non du répertoire courant : ni `tauri dev` ni
-/// `cargo run --manifest-path` ne garantissent lequel c'est, et un chemin relatif
-/// écrivait le fichier à côté du dépôt sans rien signaler.
+/// Resolved from the manifest and not from the current directory: neither `tauri dev`
+/// nor `cargo run --manifest-path` guarantees which one that is, and a relative path
+/// used to write the file next to the repository without saying a word.
 const BINDINGS_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../src/app/core/ipc/bindings.ts"
 );
 
-/// Réécrit `bindings.ts` sans lancer l'application.
+/// Rewrites `bindings.ts` without launching the application.
 ///
-/// ⚠️ Pas un `#[cfg(test)]` : sous Windows l'exécutable de test vit dans
-/// `target/debug/deps/`, sans le `WebView2Loader.dll` que lier `export` exige —
-/// le binaire de test n'y démarre plus du tout.
+/// ⚠️ Not a `#[cfg(test)]`: on Windows the test executable lives in
+/// `target/debug/deps/`, without the `WebView2Loader.dll` that linking `export`
+/// then requires — the test binary no longer starts at all.
 pub fn export_bindings() -> Result<(), specta_typescript::Error> {
     ipc_builder().export(specta_typescript::Typescript::default(), BINDINGS_PATH)
 }
 
-/// Source **unique** des signatures : cette liste enregistre auprès de Tauri
-/// *et* écrit `bindings.ts`. Une commande qui n'y est pas n'existe nulle part.
+/// The **single** source of the signatures: this list registers with Tauri
+/// *and* writes `bindings.ts`. A command absent from it exists nowhere.
 fn ipc_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new().commands(collect_commands![
         query_notes,
@@ -51,12 +51,12 @@ fn ipc_builder() -> Builder<tauri::Wry> {
 pub fn run() {
     let builder = ipc_builder();
 
-    // Pas en release : le `src/` du front n'existe pas à côté d'un binaire installé.
+    // Not in release: the front-end `src/` does not exist next to an installed binary.
     #[cfg(debug_assertions)]
-    export_bindings().expect("échec de la génération des bindings TypeScript");
+    export_bindings().expect("failed to generate TypeScript bindings");
 
     tauri::Builder::default()
-        // En premier : les plugins suivants journalisent déjà.
+        // First: the plugins that follow already log.
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(tauri_plugin_log::Target::new(
@@ -73,17 +73,17 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
-            // Absent des cibles mobiles (voir Cargo.toml).
+            // Absent from the mobile targets (see Cargo.toml).
             #[cfg(desktop)]
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
 
-            // Idem. La barre système, elle, n'est pas créée ici : elle attend
-            // du front ses libellés traduits.
+            // Same. The tray itself is not created here: it waits for its
+            // translated labels to arrive from the front end.
             #[cfg(desktop)]
             desktop::register_shortcuts(app.handle())?;
 
-            // Seul emplacement inscriptible garanti une fois l'app installée.
+            // The only writable location guaranteed once the app is installed.
             let directory = app.path().app_data_dir()?;
             std::fs::create_dir_all(&directory)?;
 
@@ -92,13 +92,13 @@ pub fn run() {
 
             Ok(())
         })
-        // Fermer range dans la barre système au lieu de quitter — l'application
-        // est faite pour rester à portée de raccourci.
+        // Closing files the window away in the tray instead of quitting — the
+        // application is meant to stay within reach of a shortcut.
         //
-        // ⚠️ Uniquement s'il y a une barre système où la retrouver : sans elle,
-        // cacher la fenêtre laisserait un processus que plus rien ne rappelle.
+        // ⚠️ Only when there is a tray to find it in: without one, hiding the
+        // window would leave a process that nothing can call back.
         .on_window_event(
-            // Le préfixe `_` garde la compilation mobile silencieuse.
+            // The `_` prefix keeps the mobile build quiet.
             #[allow(clippy::used_underscore_binding)]
             |_window, _event| {
                 #[cfg(desktop)]
@@ -112,5 +112,5 @@ pub fn run() {
         )
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
-        .expect("erreur au lancement de l'application Tauri");
+        .expect("error while launching the Tauri application");
 }

@@ -1,11 +1,11 @@
-//! La note : ce qui est persisté ([`Note`]) et ce qui est affiché ([`DisplayNote`]).
+//! The note: what is persisted ([`Note`]) and what is displayed ([`DisplayNote`]).
 //!
-//! [`normalize_tags`] vit ici et **seulement ici** : l'écriture comme la requête
-//! y passent, sinon un `#urgent` saisi ne retrouverait pas le `urgent` stocké.
+//! [`normalize_tags`] lives here and **only here**: both writing and querying
+//! pass through it, otherwise a typed `#urgent` would not find the stored `urgent`.
 //!
-//! ⚠️ `rename_all` et `tag = "kind"` sont load-bearing — sans eux serde émet
-//! `space_id` et `{"Expires":{…}}`, que le front ne sait pas relire.
-//! `tests/ipc_contract.rs` les fige.
+//! ⚠️ `rename_all` and `tag = "kind"` are load-bearing — without them serde emits
+//! `space_id` and `{"Expires":{…}}`, which the front end cannot read back.
+//! `tests/ipc_contract.rs` freezes them.
 
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
@@ -18,11 +18,11 @@ use super::language::{self, Language};
 pub struct Note {
     pub id: String,
     pub space_id: String,
-    /// Peut être vide : l'interface affiche alors un libellé traduit.
+    /// Can be empty: the interface then displays a translated label.
     pub title: String,
     pub language: Language,
     pub content: String,
-    /// Fil d'Ariane libre, ex. "API Gateway / Auth". Peut être vide.
+    /// Breadcrumb, e.g. "API Gateway / Auth". Can be empty.
     pub source: String,
     pub tags: Vec<String>,
     pub pinned: bool,
@@ -35,13 +35,13 @@ pub struct Note {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum NoteLifecycle {
     Permanent,
-    /// « À trier » jusqu'à cette date.
+    /// "Untriaged" until this date.
     Expires {
         at: DateTime<Utc>,
     },
 }
 
-/// Ni identifiant ni horodatages : la persistance les attribue.
+/// Neither identifier nor timestamps: persistence assigns them.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteDraft {
@@ -55,11 +55,11 @@ pub struct NoteDraft {
     pub lifecycle: NoteLifecycle,
 }
 
-/// Un champ à `None` reste **inchangé** en base.
+/// A field set to `None` remains **unchanged** in the database.
 ///
-/// `#[specta(optional)]` rend les clés omissibles côté TypeScript. Sans lui le
-/// front devrait envoyer des `null` pour les champs qu'il ne touche pas — donc
-/// écraser ce qu'il voulait laisser intact.
+/// `#[specta(optional)]` makes keys omissible on the TypeScript side. Without it, the
+/// front end would have to send `null` for fields it doesn't touch — thus
+/// overwriting what it wanted to leave intact.
 #[derive(Debug, Clone, Default, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotePatch {
@@ -82,8 +82,8 @@ pub struct NotePatch {
 }
 
 impl NoteDraft {
-    /// Langage deviné si le front n'en a pas choisi, tags normalisés : ces deux
-    /// règles vivent ici, pas dans le SQL.
+    /// Language guessed if the front end didn't choose one, normalized tags: these two
+    /// rules live here, not in the SQL.
     pub fn into_note(self, id: String, now: DateTime<Utc>) -> Note {
         let language = language::for_draft(&self);
         let tags = normalize_tags(&self.tags);
@@ -105,14 +105,14 @@ impl NoteDraft {
 }
 
 impl NotePatch {
-    /// Applique les champs renseignés et rafraîchit `updated_at` ; un `None`
-    /// laisse la note intacte.
+    /// Applies the provided fields and refreshes `updated_at`; a `None`
+    /// leaves the note intact.
     ///
-    /// La détection de langage est décidée sur l'état **d'avant** patch : c'est
-    /// lui qui dit si la note reçoit là son premier contenu.
+    /// Language detection is decided on the **pre-patch** state: it is
+    /// it who says if the note receives there its first content.
     ///
-    /// ⚠️ Ne vérifie pas que `space_id` existe — seule la persistance peut le
-    /// voir, et elle le fait avant d'appeler.
+    /// ⚠️ Does not check that `space_id` exists — only persistence can
+    /// see it, and it does so before calling.
     pub fn apply(&self, note: &mut Note, now: DateTime<Utc>) {
         let detected = language::after_patch(note, self);
 
@@ -148,12 +148,12 @@ impl NotePatch {
     }
 }
 
-/// Seuil **unique** de « bientôt à trier » : le front en tenait un second.
+/// **Single** "untriaged soon" threshold: the front end had a second one.
 const EXPIRING_SOON: TimeDelta = TimeDelta::days(3);
 
-/// Pied d'une carte : la **décision**, pas le rendu. Les variantes datées
-/// portent une date et non un libellé — « il y a 4 min » doit vieillir tout seul
-/// à l'écran, donc le formatage reste au front.
+/// Card footer: the **decision**, not the rendering. The dated variants
+/// carry a date and not a label — "4 min ago" must age by itself
+/// on the screen, so formatting remains on the front end.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum NoteFooter {
@@ -162,8 +162,8 @@ pub enum NoteFooter {
     Age { at: DateTime<Utc> },
 }
 
-/// `flatten` aplatit la note dans le même objet JSON : le front n'a qu'un seul
-/// type de note.
+/// `flatten` flattens the note into the same JSON object: the front end only has a single
+/// note type.
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayNote {
@@ -173,7 +173,7 @@ pub struct DisplayNote {
     pub expiring_soon: bool,
 }
 
-/// Pour lire `note.id` plutôt que `note.note.id`.
+/// To read `note.id` instead of `note.note.id`.
 impl std::ops::Deref for DisplayNote {
     type Target = Note;
 
@@ -190,8 +190,8 @@ pub fn decorate(note: Note, now: DateTime<Utc>) -> DisplayNote {
     }
 }
 
-/// Contrairement à une requête, la création et la mise à jour ne reçoivent pas
-/// d'instant de référence du front.
+/// Unlike a query, creation and update do not receive a reference
+/// instant from the front end.
 pub fn decorate_now(note: Note) -> DisplayNote {
     decorate(note, Utc::now())
 }
@@ -201,7 +201,7 @@ fn footer_of(note: &Note) -> NoteFooter {
         return NoteFooter::Expiry { at };
     }
 
-    // Le premier segment situe la note sans déborder de la carte.
+    // The first segment locates the note without overflowing the card.
     if note.pinned
         && let Some(root) = note
             .source
@@ -224,17 +224,17 @@ fn expires_soon(note: &Note, now: DateTime<Utc>) -> bool {
         return false;
     };
 
-    // Une durée, pas un nombre de jours entiers : à 3 jours et 1 heure, un
-    // arrondi basculerait la note en alerte un jour trop tôt.
+    // A duration, not a number of whole days: at 3 days and 1 hour,
+    // rounding down would switch the note to alert one day too early.
     at.signed_duration_since(now) <= EXPIRING_SOON
 }
 
-/// Trim, `#` de tête, vides et doublons.
+/// Trim, leading `#`, blanks, and duplicates.
 ///
-/// Règle unique : le front envoie ce que l'utilisateur a tapé, l'écriture comme
-/// la requête passent par ici — sinon un `#urgent` saisi ne retrouverait pas le
-/// `urgent` stocké. La déduplication est insensible à la casse et garde la
-/// première graphie ; `COLLATE NOCASE` (migration 2) prolonge la règle au corpus.
+/// Single rule: the front end sends what the user typed, both writing
+/// and querying go through here — otherwise a typed `#urgent` would not find the
+/// stored `urgent`. De-duplication is case-insensitive and keeps the
+/// first spelling; `COLLATE NOCASE` (migration 2) extends the rule to the corpus.
 pub fn normalize_tags(tags: &[String]) -> Vec<String> {
     let mut seen: Vec<String> = Vec::new();
     let mut normalized: Vec<String> = Vec::new();
@@ -369,7 +369,7 @@ mod tests {
         patch.apply(&mut note, at("2026-07-25T10:00:00.000Z"));
 
         assert_eq!(note.title, "Nouveau");
-        assert_eq!(note.content, "Contenu");
+        assert_eq!(note.content, "Content");
         assert_eq!(note.tags, ["auth"]);
         assert_eq!(note.updated_at, at("2026-07-25T10:00:00.000Z"));
         // `created_at` is the one stamp nothing may move.

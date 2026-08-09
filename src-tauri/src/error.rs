@@ -1,12 +1,11 @@
-//! Les trois erreurs du crate, et la traduction des deux premières vers la
-//! troisième.
+//! The crate's three errors, and the translation of the first two into the
+//! third.
 //!
-//! [`ValidationError`] refuse une donnée reçue, [`StorageError`] signale une
-//! panne de persistance, [`AppError`] est ce qui traverse le pont : un **code**
-//! stable que le front mappe sur une clé de traduction, ses paramètres
-//! d'interpolation, et un détail technique. Aucun texte destiné à l'utilisateur
-//! ne sort d'ici — une `String` mettrait du français dans l'interface anglaise,
-//! et forcerait le front à analyser de la prose.
+//! [`ValidationError`] refuses an incoming value, [`StorageError`] reports a
+//! persistence failure, [`AppError`] is what crosses the bridge: a stable
+//! **code** the front maps onto a translation key, its interpolation parameters,
+//! and a technical detail. No user-facing text leaves this module — a `String`
+//! would put French in the English UI, and force callers to parse prose.
 
 use std::collections::BTreeMap;
 
@@ -14,14 +13,14 @@ use serde::Serialize;
 use specta::Type;
 use thiserror::Error;
 
-/// Voyage comme les autres : un code et un paramètre `field`, jamais une phrase
-/// rédigée.
+/// Travels like the others: a code and a `field` parameter, never a written
+/// sentence.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("Champ « {field} » invalide : {detail}")]
+#[error("Invalid field \"{field}\": {detail}")]
 pub struct ValidationError {
-    /// Champ en cause, tel que le front le nomme.
+    /// The offending field, spelled the way the front names it.
     pub field: &'static str,
-    /// Détail technique, affiché en second plan.
+    /// Technical detail, shown in the background.
     pub detail: String,
 }
 
@@ -34,51 +33,51 @@ impl ValidationError {
     }
 }
 
-/// Chaque variante devient un **code** que le front traduit, et le `Display`
-/// n'est plus que le détail technique — c'est pourquoi il peut rester en français.
+/// Each variant becomes a **code** the front translates, and `Display` is now
+/// only the technical detail — which is why it may stay in French if it comes
+/// from a system or external error.
 #[derive(Debug, Error)]
 pub enum StorageError {
-    /// Jamais un `Ok` silencieux : le front croirait avoir enregistré.
-    #[error("Note introuvable : {0}")]
+    /// Never a silent `Ok`: the front would believe the write went through.
+    #[error("Note not found: {0}")]
     NoteNotFound(String),
-    /// Espace visé inexistant : la note n'aurait nulle part où être rangée.
-    #[error("Espace introuvable : {0}")]
+    /// The target space does not exist: the note would have nowhere to be filed.
+    #[error("Space not found: {0}")]
     SpaceNotFound(String),
-    /// Nom déjà pris (comparaison insensible à la casse).
-    #[error("Un espace nommé « {0} » existe déjà")]
+    /// Name already taken (case-insensitive comparison).
+    #[error("A space named \"{0}\" already exists")]
     DuplicateSpaceName(String),
-    /// Colonne qu'aucune écriture de ce code n'aurait pu produire.
-    #[error("Note « {id} » illisible : le champ « {field} » est hors format")]
+    /// A column no write from this code could have produced.
+    #[error("Note \"{id}\" unreadable: field \"{field}\" is out of format")]
     CorruptRow { id: String, field: &'static str },
-    /// Base portant une migration que ce binaire ne connaît pas : elle a été
-    /// écrite par une version plus récente de l'application.
-    #[error("Base de données portant la migration « {0} », inconnue de cette version de DevBox")]
+    /// A database carrying a migration this binary does not know: it was
+    /// written by a newer version of the application.
+    #[error("Database carrying migration \"{0}\", unknown to this version of DevBox")]
     SchemaTooRecent(String),
-    /// Ouverture ou migration impossible — panne d'avant le premier `SELECT`.
-    #[error("Migration impossible : {0}")]
+    /// Opening or migrating failed — a breakdown before the first `SELECT`.
+    #[error("Migration failed: {0}")]
     Migration(String),
-    /// `#[from]` : requis par `Connection::transaction`, qui exige de savoir
-    /// absorber l'erreur de Diesel dans celle de l'appelant. `#[source]` en
-    /// prime, là où un `impl Display` écrasé perdait la chaîne de causes.
-    #[error("Erreur de stockage : {0}")]
+    /// `#[from]`: required by `Connection::transaction`, which needs to know how
+    /// to absorb Diesel's error into the caller's. `#[source]` comes along for
+    /// free, where an overridden `impl Display` used to lose the cause chain.
+    #[error("Storage error: {0}")]
     Sqlite(#[from] diesel::result::Error),
 }
 
-/// Ajouter une variante casse la compilation du front tant que `CODE_KEYS`
-/// (`core/errors/error-notifier.service.ts`) et les deux locales n'ont pas leur
-/// clé.
+/// Adding a variant breaks the front-end build until `CODE_KEYS`
+/// (`core/errors/error-notifier.service.ts`) and both locales have their key.
 ///
-/// Pas de variante « schéma trop récent » : cette panne avorte le lancement
-/// pendant la migration, aucune commande ne peut la renvoyer.
+/// No "schema too recent" variant: that failure aborts startup during the
+/// migration, so no command can ever return it.
 #[derive(Debug, Clone, Copy, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ErrorCode {
     NoteNotFound,
     SpaceNotFound,
     DuplicateSpaceName,
-    /// Le paramètre `field` nomme le champ en cause.
+    /// The `field` parameter names the offending field.
     InvalidInput,
-    /// Mutex empoisonné : une commande a paniqué en tenant la connexion.
+    /// Poisoned mutex: a command panicked while holding the connection.
     StorageUnavailable,
     Storage,
 }
@@ -87,9 +86,9 @@ pub enum ErrorCode {
 #[serde(rename_all = "camelCase")]
 pub struct AppError {
     pub code: ErrorCode,
-    /// Valeurs à interpoler dans le message traduit, ex. `{ "name": "Perso" }`.
+    /// Values to interpolate into the translated message, e.g. `{ "name": "Perso" }`.
     pub params: BTreeMap<String, String>,
-    /// Affiché en second plan de la bannière. Pas traduit, mais lisible.
+    /// Shown in the background of the banner. Not translated, but readable.
     pub detail: String,
 }
 
@@ -111,7 +110,7 @@ impl AppError {
     pub fn storage_unavailable() -> Self {
         Self::new(
             ErrorCode::StorageUnavailable,
-            "Stockage indisponible : une opération précédente a échoué".to_string(),
+            "Storage unavailable: a previous operation failed".to_string(),
         )
     }
 }
@@ -138,12 +137,12 @@ impl From<StorageError> for AppError {
             StorageError::SpaceNotFound(id) => {
                 Self::with(ErrorCode::SpaceNotFound, detail, "id", &id)
             }
-            // Le nom voyage en paramètre : c'est lui que le front interpole.
+            // The name travels as a parameter: that is what the front interpolates.
             StorageError::DuplicateSpaceName(name) => {
                 Self::with(ErrorCode::DuplicateSpaceName, detail, "name", &name)
             }
-            // Aucune de ces causes ne donne au front autre chose à faire que
-            // signaler la panne ; le `detail` porte le reste en clair.
+            // None of these causes gives the front anything to do beyond
+            // reporting the failure; `detail` carries the rest in plain text.
             StorageError::SchemaTooRecent(_)
             | StorageError::Migration(_)
             | StorageError::CorruptRow { .. }

@@ -1,10 +1,10 @@
-//! Le langage d'une note : la liste reconnue, et la détection d'un contenu collé.
+//! A note's language: the recognized list, and detection from pasted content.
 //!
-//! Les heuristiques de détection sont volontairement bon marché et faillibles :
-//! le résultat n'est qu'une **valeur initiale**, que l'éditeur laisse changer.
-//! Une erreur coûte un clic. Elles ne jouent qu'au moment où une note reçoit son
-//! premier contenu — [`for_draft`] à la création, [`after_patch`] au premier
-//! collage. Passé ce moment, plus rien n'est deviné.
+//! Detection heuristics are deliberately cheap and fallible: the result is
+//! only an **initial value**, which the editor allows to be changed.
+//! An error costs one click. They only play when a note receives its
+//! first content — [`for_draft`] at creation, [`after_patch`] upon the first
+//! paste. After this point, nothing is guessed anymore.
 
 use std::fmt;
 use std::str::FromStr;
@@ -14,9 +14,9 @@ use specta::Type;
 
 use super::model::{Note, NoteDraft, NotePatch};
 
-/// Liste **fermée**, et c'est tout l'intérêt : le front la reçoit en union
-/// TypeScript générée, donc une valeur inconnue ne compile plus chez lui au lieu
-/// d'être refusée à l'exécution.
+/// **Closed** list, which is the whole point: the front end receives it as a
+/// generated TypeScript union, so an unknown value no longer compiles there
+/// instead of being refused at runtime.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
@@ -32,8 +32,8 @@ pub enum Language {
     Css,
     Sh,
     Md,
-    /// Défaut, et **signal que le front n'a rien choisi** : c'est lui que la
-    /// création remplace par une détection.
+    /// Default, and a **signal that the front end hasn't chosen anything**:
+    /// creation replaces it with a detection.
     #[default]
     Txt,
 }
@@ -80,8 +80,8 @@ impl fmt::Display for Language {
     }
 }
 
-/// `notes.language` ne porte aucun `CHECK` (migration 3) : une base écrite par
-/// une version plus récente peut contenir un langage inconnu d'ici.
+/// `notes.language` carries no `CHECK` (migration 3): a database written by
+/// a newer version may contain a language unknown to this version.
 impl FromStr for Language {
     type Err = ();
 
@@ -93,8 +93,8 @@ impl FromStr for Language {
     }
 }
 
-/// Celui du front s'il en a choisi un, sinon une détection — `txt` faisant
-/// office de « rien choisi ».
+/// The front end's choice if it made one, otherwise a detection — `txt` acting
+/// as "nothing chosen".
 pub fn for_draft(draft: &NoteDraft) -> Language {
     if draft.language == Language::default() {
         from_content(&draft.content)
@@ -103,12 +103,12 @@ pub fn for_draft(draft: &NoteDraft) -> Language {
     }
 }
 
-/// Le geste ordinaire : « + Nouvelle note » crée une note vide, puis on colle.
-/// La création ne voyant aucun contenu, sans ça la note resterait en `txt`.
+/// The usual gesture: "+ New note" creates an empty note, then we paste.
+/// Since creation sees no content, without this the note would remain in `txt`.
 ///
-/// Les trois refus sont ce qui empêche la détection de devenir une correction
-/// permanente : un langage posé au sélecteur, un langage déjà autre que `txt`,
-/// ou une note qui avait déjà du contenu.
+/// The three refusals are what prevent detection from becoming a permanent
+/// correction: a language set via the selector, a language already other than `txt`,
+/// or a note that already had content.
 pub fn after_patch(before: &Note, patch: &NotePatch) -> Option<Language> {
     if patch.language.is_some()
         || before.language != Language::default()

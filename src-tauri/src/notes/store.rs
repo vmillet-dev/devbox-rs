@@ -1,7 +1,7 @@
-//! Lecture et écriture des notes : **du SQL, et rien d'autre**.
+//! Reading and writing notes: **SQL, and nothing else**.
 //!
-//! Ne descend dans le `WHERE` que ce que SQLite indexe. Recherche texte,
-//! sections et normalisation des tags sont des règles : `super::view` et
+//! Only what SQLite indexes goes down into the `WHERE` clause. Text search,
+//! sections and tag normalization are rules: `super::view` and
 //! `super::model`.
 
 use std::collections::HashMap;
@@ -18,8 +18,8 @@ use crate::db::schema::{note_tags, notes};
 use crate::error::StorageError;
 use crate::spaces::store as spaces;
 
-/// `lifecycle` y est éclaté en deux colonnes, et les tags en sont absents : ils
-/// vivent dans `note_tags`, rattachés ensuite en une requête pour toute la liste.
+/// `lifecycle` is split into two columns here, and tags are absent: they
+/// live in `note_tags`, then attached in a single query for the whole list.
 #[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = notes)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -37,13 +37,13 @@ struct NoteRow {
     lifecycle_expires_at: Option<String>,
 }
 
-/// Une date illisible fait **échouer la lecture** : ces colonnes ne sont écrites
-/// que par [`iso8601::format`], donc une valeur hors format signale une base
-/// corrompue, et deviner y rangerait la note à une date arbitraire sans rien dire.
+/// An unreadable date makes the **read fail**: these columns are only written
+/// by [`iso8601::format`], so an out-of-format value signals a corrupted
+/// database, and guessing would place the note at an arbitrary date without saying anything.
 ///
-/// Le langage, lui, se replie sur son défaut : `notes.language` ne porte aucun
-/// `CHECK` (migration 3), une version plus récente peut y avoir écrit un langage
-/// légitime qu'ignore celle-ci. La note reste lisible, sans sa coloration.
+/// The language, however, falls back to its default: `notes.language` carries no
+/// `CHECK` (migration 3), a newer version may have written a legitimate language
+/// that this one ignores. The note remains readable, without its highlighting.
 impl TryFrom<NoteRow> for Note {
     type Error = StorageError;
 
@@ -55,7 +55,7 @@ impl TryFrom<NoteRow> for Note {
             })
         };
 
-        // Le `CHECK` du schéma rend `("expires", None)` inatteignable.
+        // The schema `CHECK` makes `("expires", None)` unreachable.
         let lifecycle = match (row.lifecycle_kind.as_str(), &row.lifecycle_expires_at) {
             ("expires", Some(at)) => NoteLifecycle::Expires {
                 at: instant("lifecycleExpiresAt", at)?,
@@ -102,8 +102,8 @@ impl From<&Note> for NoteRow {
     }
 }
 
-/// Une requête pour toute la liste : une par note coûterait cher dès quelques
-/// centaines.
+/// One query for the whole list: one per note would be expensive from a few
+/// hundred onwards.
 fn all_tags(
     connection: &mut SqliteConnection,
 ) -> Result<HashMap<String, Vec<String>>, StorageError> {

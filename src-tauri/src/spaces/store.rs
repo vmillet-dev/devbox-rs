@@ -1,7 +1,7 @@
-//! Lecture et écriture des espaces.
+//! Reading and writing spaces.
 //!
-//! Pas de structure de ligne ici, contrairement aux notes : `Space` a deux champs
-//! et traverse tel quel.
+//! No row structure here, unlike notes: `Space` has two fields
+//! and crosses as-is.
 
 use diesel::dsl::sql;
 use diesel::prelude::*;
@@ -12,13 +12,13 @@ use crate::db::schema::{notes, spaces};
 use crate::error::StorageError;
 use uuid::Uuid;
 
-/// Une liste vide est valide : c'est l'état du premier lancement. Aucun espace
-/// « Tous » n'est fabriqué ici.
+/// An empty list is valid: it's the state of the first launch. No "All" space
+/// is manufactured here.
 pub fn list(connection: &mut SqliteConnection) -> Result<Vec<Space>, StorageError> {
     let rows = spaces::table
         .select((spaces::id, spaces::name))
-        // Fragment brut : Diesel ne modélise pas les collations, et trier en
-        // BINARY rangerait « perso » après « Veille ».
+        // Raw fragment: Diesel does not model collations, and sorting as
+        // BINARY would place "perso" after "Zebra".
         .order(sql::<Text>("name COLLATE NOCASE"))
         .load::<(String, String)>(connection)?;
 
@@ -28,8 +28,8 @@ pub fn list(connection: &mut SqliteConnection) -> Result<Vec<Space>, StorageErro
         .collect())
 }
 
-/// La clé étrangère l'attraperait aussi, mais avec un message SQLite illisible
-/// là où le front affiche l'erreur.
+/// The foreign key would catch it too, but with an unreadable SQLite message
+/// whereas the front end displays the error.
 pub fn exists(connection: &mut SqliteConnection, id: &str) -> Result<bool, StorageError> {
     let found = spaces::table
         .find(id)
@@ -40,19 +40,19 @@ pub fn exists(connection: &mut SqliteConnection, id: &str) -> Result<bool, Stora
     Ok(found.is_some())
 }
 
-/// Détecté ici plutôt que laissé à l'index unique, pour remonter au front un
-/// code qu'il sait traduire.
+/// Detected here rather than left to the unique index, to return a code to the
+/// front end that it knows how to translate.
 ///
-/// `except_id` exclut l'espace renommé : sans lui, corriger la casse d'un nom
-/// se ferait refuser comme un doublon de lui-même, la comparaison étant `NOCASE`.
+/// `except_id` excludes the renamed space: without it, correcting the case of a name
+/// would be refused as a duplicate of itself, the comparison being `NOCASE`.
 fn ensure_unique_name(
     connection: &mut SqliteConnection,
     name: &str,
     except_id: Option<&str>,
 ) -> Result<(), StorageError> {
-    // ⚠️ `spaces.name` n'est pas déclarée `NOCASE` — seul l'index unique l'est —
-    // donc la collation doit être posée sur la comparaison, sans quoi « PERSO »
-    // passerait à côté de « Perso ».
+    // ⚠️ `spaces.name` is not declared `NOCASE` — only the unique index is —
+    // so the collation must be set on the comparison, otherwise "PERSO"
+    // would miss "Perso".
     let mut query = spaces::table
         .filter(
             sql::<Bool>("name = ")
@@ -72,7 +72,7 @@ fn ensure_unique_name(
     Ok(())
 }
 
-/// `name` est attendu **déjà validé** : cette couche ne tranche que l'unicité.
+/// `name` is expected **already validated**: this layer only decides uniqueness.
 pub fn create(connection: &mut SqliteConnection, name: &str) -> Result<Space, StorageError> {
     ensure_unique_name(connection, name, None)?;
 
@@ -88,7 +88,7 @@ pub fn create(connection: &mut SqliteConnection, name: &str) -> Result<Space, St
     Ok(space)
 }
 
-/// `name` est attendu **déjà validé**.
+/// `name` is expected **already validated**.
 pub fn rename(
     connection: &mut SqliteConnection,
     id: &str,
@@ -110,14 +110,14 @@ pub fn rename(
     })
 }
 
-/// Supprime un espace après avoir déplacé ses notes vers `target_id`.
+/// Deletes a space after moving its notes to `target_id`.
 ///
-/// ⚠️ Même transaction et **cet ordre** : `notes.space_id` porte un
-/// `ON DELETE CASCADE`, donc supprimer d'abord — ou échouer entre les deux —
-/// emporterait les notes au lieu de les déplacer.
+/// ⚠️ Same transaction and **this order**: `notes.space_id` has an
+/// `ON DELETE CASCADE`, so deleting first — or failing between the two —
+/// would sweep away the notes instead of moving them.
 ///
-/// `updated_at` n'est pas rafraîchi : le toucher ferait remonter tout l'espace
-/// absorbé en tête du canevas, qui trie dessus.
+/// `updated_at` is not refreshed: touching it would float the whole absorbed
+/// space to the top of the canvas, which sorts on it.
 pub fn delete(
     connection: &mut SqliteConnection,
     id: &str,

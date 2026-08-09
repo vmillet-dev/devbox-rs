@@ -1,13 +1,13 @@
-//! Ce que l'utilisateur demande à voir ([`NotesQuery`]) et ce que le canevas
-//! affiche en retour ([`NotesView`]) : filtrage texte, regroupement en sections,
-//! facettes.
+//! What the user asks to see ([`NotesQuery`]) and what the canvas
+//! displays in return ([`NotesView`]): text filtering, grouping into sections,
+//! facets.
 //!
-//! Aucun type intermédiaire « liste de notes » n'est exposé au front : il
-//! inviterait à refiltrer côté interface.
+//! No intermediate "note list" type is exposed to the front end: it
+//! would invite re-filtering on the interface side.
 //!
-//! ⚠️ **L'exhaustivité des sections est une garantie.** Hors épinglées, chaque
-//! note tombe dans exactement une section : une note sans section serait
-//! introuvable dans l'interface, recherche comprise.
+//! ⚠️ **Exhaustiveness of sections is a guarantee.** Outside of pinned ones, each
+//! note falls into exactly one section: a note without a section would be
+//! unreachable in the interface, including search.
 
 use chrono::{DateTime, Datelike, FixedOffset, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
@@ -16,28 +16,28 @@ use specta::Type;
 use super::language::Language;
 use super::model::{self, DisplayNote, Note};
 
-/// Ni horloge ni fuseau lus ici : tout est explicite, donc reproductible en test.
+/// Neither clock nor time zone read here: everything is explicit, thus reproducible in tests.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotesQuery {
-    /// `None` = « tous les espaces » — un choix, pas une absence de choix : il
-    /// n'existe aucun espace « Tous » côté données.
+    /// `None` = "all spaces" — a choice, not an absence of choice: there
+    /// is no "All" space on the data side.
     pub space_id: Option<String>,
-    /// Vide = pas de recherche.
+    /// Empty = no search.
     pub search: String,
     pub filter: NoteFilter,
-    /// Une note passe si elle porte **au moins un** de ces tags.
+    /// A note passes if it carries **at least one** of these tags.
     pub tags: Vec<String>,
-    /// Même sémantique d'union. Vide = tous.
+    /// Same union semantics. Empty = all.
     pub languages: Vec<Language>,
     pub now: DateTime<Utc>,
-    /// ⚠️ `Date#getTimezoneOffset()`, dont la valeur est l'**opposé** du décalage
-    /// (UTC+2 donne −120). Les sections raisonnent en jours locaux : à 23 h à
-    /// Paris, `now` en UTC est déjà demain.
+    /// ⚠️ `Date#getTimezoneOffset()`, whose value is the **opposite** of the offset
+    /// (UTC+2 gives −120). Sections reason in local days: at 11 PM in
+    /// Paris, `now` in UTC is already tomorrow.
     pub tz_offset_minutes: i32,
 }
 
-/// `Untriaged` = notes portant une échéance, celles dont le sort n'est pas décidé.
+/// `Untriaged` = notes with a deadline, those whose fate is not decided.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum NoteFilter {
@@ -46,7 +46,7 @@ pub enum NoteFilter {
     Untriaged,
 }
 
-/// Ce que les rails ont à proposer. Ne traverse pas le pont.
+/// What the rails have to offer. Does not cross the bridge.
 #[derive(Debug, Clone, Default)]
 pub struct Facets {
     pub tags: Vec<String>,
@@ -57,14 +57,14 @@ pub struct Facets {
 #[serde(rename_all = "camelCase")]
 pub struct NotesView {
     pub sections: Vec<NoteSection>,
-    /// Portées à l'**espace**, pas au filtre courant : n'offrir que les facettes
-    /// des notes déjà filtrées viderait le rail dès la 1re sélection.
+    /// Attached to the **space**, not the current filter: only offering facets
+    /// from already filtered notes would empty the rail upon the 1st selection.
     pub available_tags: Vec<String>,
     pub available_languages: Vec<Language>,
-    /// Distingue « aucun résultat » d'« espace vide ».
+    /// Distinguishes "no result" from "empty space".
     pub is_filtering: bool,
-    /// `u32` et non `usize` : Specta refuse d'exporter un type de la taille d'un
-    /// `BigInt`, que JSON ne rend pas sans perte de précision.
+    /// `u32` and not `usize`: Specta refuses to export a type the size of a
+    /// `BigInt`, which JSON does not render without loss of precision.
     pub matched: u32,
 }
 
@@ -77,8 +77,8 @@ pub struct NoteSection {
     pub show_create_ghost: bool,
 }
 
-/// **Clé de traduction** côté front (`sections.<key>`) : aucun libellé lisible
-/// ne traverse le pont.
+/// **Translation key** on the front-end side (`sections.<key>`): no readable label
+/// crosses the bridge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum NoteSectionKey {
@@ -89,8 +89,8 @@ pub enum NoteSectionKey {
     Results,
 }
 
-/// Une vue vide est une réponse valide : premier lancement, ou recherche
-/// infructueuse — `is_filtering` distingue les deux.
+/// An empty view is a valid response: first launch, or unsuccessful
+/// search — `is_filtering` distinguishes the two.
 pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesView {
     let mut notes = notes;
 
@@ -99,12 +99,12 @@ pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesVie
         notes.retain(|note| matches_search(note, &needle));
     }
 
-    // Un filtre rapide restreint une vue qui reste chronologique ; une recherche
-    // ou une facette, elle, bascule en liste plate.
+    // A quick filter restricts a view that remains chronological; a search
+    // or a facet, on the other hand, switches to a flat list.
     let is_filtering = !needle.is_empty()
         || !model::normalize_tags(&request.tags).is_empty()
         || !request.languages.is_empty();
-    // Saturer vaut mieux que paniquer : ce compteur ne sert qu'à un libellé.
+    // Saturating is better than panicking: this counter is only used for a label.
     let matched = u32::try_from(notes.len()).unwrap_or(u32::MAX);
 
     let offset = offset_from_minutes(request.tz_offset_minutes);

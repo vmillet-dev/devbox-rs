@@ -1,13 +1,13 @@
-//! L'espace : le classeur dans lequel les notes sont rangées.
+//! Spaces: the folders where notes are stored.
 //!
-//! Ce fichier porte les commandes ; [`model`] les règles, [`store`] le SQL.
+//! This file holds the commands; [`model`] holds the rules, [`store`] holds the SQL.
 //!
-//! `notes.space_id` porte un `ON DELETE CASCADE`, donc un `DELETE` nu emporterait
-//! les notes : [`delete_space`] exige un espace **refuge**, et il n'existe
-//! volontairement aucune variante sans.
+//! `notes.space_id` has an `ON DELETE CASCADE`, so a bare `DELETE` would sweep away
+//! the notes: [`delete_space`] requires a **refuge** space, and there is
+//! deliberately no variant without one.
 
-// Une commande reçoit ses arguments désérialisés depuis la charge utile IPC :
-// ils arrivent possédés, qu'elle les consomme ou non.
+// A command receives its arguments deserialized from the IPC payload:
+// they arrive owned, whether it consumes them or not.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod model;
@@ -30,7 +30,7 @@ pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, AppError> {
 #[tauri::command]
 #[specta::specta]
 pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppError> {
-    // Détouré et non vide ici ; le stockage ne tranche plus que l'unicité.
+    // Trimmed and non-empty here; storage only handles uniqueness.
     let name = draft.validated_name()?;
 
     let mut connection = lock(&db)?;
@@ -48,7 +48,7 @@ pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<
     Ok(store::rename(&mut connection, &id, &name)?)
 }
 
-/// Transfère les notes vers `target_space_id` avant de supprimer.
+/// Transfers notes to `target_space_id` before deleting.
 #[tauri::command]
 #[specta::specta]
 pub fn delete_space(
@@ -56,8 +56,8 @@ pub fn delete_space(
     target_space_id: String,
     db: State<'_, Db>,
 ) -> Result<(), AppError> {
-    // Un espace son propre refuge verrait ses notes emportées par la cascade
-    // juste après le transfert.
+    // A space as its own refuge would see its notes swept away by the
+    // cascade right after the transfer.
     model::validate_move_target(&id, &target_space_id)?;
 
     let mut connection = lock(&db)?;

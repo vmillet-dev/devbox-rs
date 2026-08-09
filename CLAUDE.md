@@ -24,7 +24,7 @@ The two features are not fully independent, and that is deliberate rather than h
 
 **The front-end is filed by subject, not by technical nature.** A feature owns its `data/`, `model/`, `state/` and `ui/` — `features/notes/` holds the DTOs, the repositories, the models, both stores and every notes component, so deleting the folder deletes the feature. `core/` is only what a second, unrelated tool would inject verbatim (`ipc`, `i18n`, `errors`, `time`, `preferences`, `updates`, `app-info`, `language`), one folder per subject with a service and its store together — there is no `core/stores/`. `shared/` is a presentation kit whose components **inject nothing**; anything that injects and frames the app belongs to `layout/`. Adding the hashing tool must not add a file under `core/`.
 
-Primary language for code comments, docstrings, and UI strings in this repo is **French**. Match that convention when editing existing files. Test descriptions and test comments are the deliberate exception: they're written in **English**.
+Primary language for code comments, docstrings, and UI strings in this repo is **English**.
 
 `docs/architecture.md` is the detailed architecture reference (front-end structure, state and data-access patterns, i18n, theming, IPC boundary, testing conventions). Read it before making structural changes, and keep it in sync when you make them — it's the canonical place for that documentation, not this file and not the README.
 

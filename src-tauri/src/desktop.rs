@@ -1,7 +1,7 @@
-//! Barre système et raccourcis globaux : de la glu Tauri, pas une feature.
+//! Tray and global shortcuts: Tauri glue, not a feature.
 //!
-//! **Rien de ce qui est visible par l'utilisateur n'est écrit ici** : les libellés
-//! du menu arrivent du front déjà traduits.
+//! **Nothing user-visible is written here**: the menu labels arrive from the
+//! front end already translated.
 
 use serde::Deserialize;
 use specta::Type;
@@ -10,13 +10,13 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-/// Miroirs de `core/ipc/app-events.service.ts` : une faute de frappe y produirait
-/// un abonnement silencieusement inerte.
+/// Mirrors of `core/ipc/app-events.service.ts`: a typo here would produce a
+/// silently inert subscription.
 const CAPTURE_EVENT: &str = "devbox:capture";
 const NEW_NOTE_EVENT: &str = "devbox:new-note";
 
-/// `unminimize` d'abord : une fenêtre réduite qu'on se contente de montrer reste
-/// dans la barre des tâches.
+/// `unminimize` first: a minimised window that is merely shown stays in the
+/// taskbar.
 pub(crate) fn reveal(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -25,19 +25,20 @@ pub(crate) fn reveal(app: &AppHandle) {
     }
 }
 
-/// Montre la fenêtre **puis** demande l'action au front : le natif ne crée jamais
-/// la note lui-même, ce qui lui évite de dupliquer la détection de langage.
+/// Shows the window **then** asks the front for the action: the native side
+/// never creates the note itself, which spares it from duplicating language
+/// detection.
 fn reveal_and_emit(app: &AppHandle, topic: &str) {
     reveal(app);
     let _ = app.emit(topic, ());
 }
 
-// --- Raccourcis actifs hors de la fenêtre -----------------------------------
+// --- Shortcuts active outside the window ------------------------------------
 
 const CONTROL_ALT: Modifiers = Modifiers::CONTROL.union(Modifiers::ALT);
 
-/// Un raccourci déjà pris par une autre application est journalisé mais **non
-/// fatal** : DevBox doit démarrer sans.
+/// A shortcut already taken by another application is logged but **not fatal**:
+/// DevBox must start without it.
 pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
     let capture = Shortcut::new(Some(CONTROL_ALT), Code::KeyV);
     let new_note = Shortcut::new(Some(CONTROL_ALT), Code::KeyN);
@@ -45,7 +46,7 @@ pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
     app.plugin(
         tauri_plugin_global_shortcut::Builder::new()
             .with_handler(move |app, shortcut, event| {
-                // Sans ce filtre le relâchement rejouerait l'action.
+                // Without this filter the key release would replay the action.
                 if event.state() != ShortcutState::Pressed {
                     return;
                 }
@@ -65,14 +66,14 @@ pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
 
     for shortcut in [capture, new_note] {
         if let Err(error) = app.global_shortcut().register(shortcut) {
-            log::warn!("Raccourci global {shortcut:?} indisponible : {error}");
+            log::warn!("Global shortcut {shortcut:?} unavailable: {error}");
         }
     }
 
     Ok(())
 }
 
-// --- Barre système : l'icône, son menu, et ce que ses entrées déclenchent ----
+// --- System tray: icon, menu, and item actions --------------------------------
 
 const TRAY_ID: &str = "devbox";
 
@@ -81,9 +82,9 @@ const NEW_NOTE_ITEM: &str = "new-note";
 const CAPTURE_ITEM: &str = "capture";
 const QUIT_ITEM: &str = "quit";
 
-/// Les libellés traversent le pont **déjà traduits** : la langue de l'interface
-/// est une préférence du front, et une table de traductions en Rust en ferait une
-/// seconde à tenir.
+/// Labels cross the bridge **already translated**: the interface language
+/// is a front-end preference, and keeping a translation table in Rust would
+/// mean maintaining a second one.
 #[derive(Debug, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TrayLabels {
@@ -93,37 +94,37 @@ pub struct TrayLabels {
     pub quit: String,
 }
 
-/// Crée l'icône, ou remplace seulement son menu si elle existe déjà — un
-/// changement de langue la retraduit ainsi sans la faire clignoter.
+/// Creates the icon, or replaces only its menu if it already exists — a
+/// language change thus re-translates it without making it flicker.
 ///
-/// Ne renvoie **pas** de `Result` : une barre système absente n'est pas une panne
-/// que le front puisse traiter, et lui inventer un code ajouterait une branche
-/// que rien n'afficherait. L'échec est journalisé côté natif, et [`tray_exists`]
-/// empêche alors la fermeture de cacher la fenêtre là où plus rien ne saurait la
-/// rappeler.
+/// Does **not** return a `Result`: an absent system tray is not a failure
+/// the front end can handle, and inventing a code for it would add a branch
+/// that nothing would display. The failure is logged on the native side, and
+/// [`tray_exists`] then prevents closing from hiding the window where nothing
+/// could call it back.
 #[tauri::command]
 #[specta::specta]
-// Une commande reçoit ses arguments désérialisés depuis la charge utile IPC :
-// ils arrivent possédés, qu'elle les consomme ou non.
+// A command receives its arguments deserialized from the IPC payload:
+// they arrive owned, whether it consumes them or not.
 #[allow(clippy::needless_pass_by_value)]
 pub fn sync_tray(labels: TrayLabels, app: AppHandle) {
     let menu = match build_menu(&app, &labels) {
         Ok(menu) => menu,
         Err(error) => {
-            log::warn!("Menu de la barre système indisponible : {error}");
+            log::warn!("System tray menu unavailable: {error}");
             return;
         }
     };
 
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         if let Err(error) = tray.set_menu(Some(menu)) {
-            log::warn!("Menu de la barre système non mis à jour : {error}");
+            log::warn!("System tray menu not updated: {error}");
         }
         return;
     }
 
     if let Err(error) = build_tray(&app, &menu) {
-        log::warn!("Barre système indisponible : {error}");
+        log::warn!("System tray unavailable: {error}");
     }
 }
 
@@ -150,16 +151,16 @@ fn build_tray(app: &AppHandle, menu: &Menu<Wry>) -> tauri::Result<()> {
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .tooltip("DevBox")
-        // Le clic gauche montre la fenêtre ; le menu reste au clic droit, où
-        // Windows l'attend.
+        // Left click shows the window; the menu remains on right click, where
+        // Windows expects it.
         .show_menu_on_left_click(false)
         .menu(menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             OPEN_ITEM => reveal(app),
             NEW_NOTE_ITEM => reveal_and_emit(app, NEW_NOTE_EVENT),
             CAPTURE_ITEM => reveal_and_emit(app, CAPTURE_EVENT),
-            // Le seul chemin qui termine réellement le processus : la croix de
-            // la fenêtre ne fait que la cacher.
+            // The only path that actually terminates the process: the window's
+            // close button only hides it.
             QUIT_ITEM => app.exit(0),
             _ => {}
         })
