@@ -5,14 +5,14 @@
 
 use chrono::{DateTime, Utc};
 
-use devbox_lib::commands::error::{AppError, ErrorCode};
-use devbox_lib::domain::error::ValidationError;
-use devbox_lib::domain::iso8601;
-use devbox_lib::domain::language::Language;
-use devbox_lib::domain::note::{DisplayNote, Note, NoteDraft, NoteLifecycle, NotePatch, decorate};
-use devbox_lib::domain::space::{Space, SpaceDraft};
-use devbox_lib::domain::view::{NoteFilter, NoteSection, NoteSectionKey, NotesQuery, NotesView};
-use devbox_lib::storage::StorageError;
+use devbox_lib::db::iso8601;
+use devbox_lib::error::StorageError;
+use devbox_lib::error::ValidationError;
+use devbox_lib::error::{AppError, ErrorCode};
+use devbox_lib::notes::language::Language;
+use devbox_lib::notes::model::{DisplayNote, Note, NoteDraft, NoteLifecycle, NotePatch, decorate};
+use devbox_lib::notes::view::{NoteFilter, NoteSection, NoteSectionKey, NotesQuery, NotesView};
+use devbox_lib::spaces::model::{Space, SpaceDraft};
 
 const NOW: &str = "2026-07-25T09:00:00.000Z";
 

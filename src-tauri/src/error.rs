@@ -1,15 +1,68 @@
-//! Un **code** stable que le front mappe sur une clé de traduction, ses
-//! paramètres d'interpolation, et un détail technique. Aucun texte destiné à
-//! l'utilisateur ne sort d'ici : une `String` mettrait du français dans
-//! l'interface anglaise, et forcerait le front à analyser de la prose.
+//! Les trois erreurs du crate, et la traduction des deux premières vers la
+//! troisième.
+//!
+//! [`ValidationError`] refuse une donnée reçue, [`StorageError`] signale une
+//! panne de persistance, [`AppError`] est ce qui traverse le pont : un **code**
+//! stable que le front mappe sur une clé de traduction, ses paramètres
+//! d'interpolation, et un détail technique. Aucun texte destiné à l'utilisateur
+//! ne sort d'ici — une `String` mettrait du français dans l'interface anglaise,
+//! et forcerait le front à analyser de la prose.
 
 use std::collections::BTreeMap;
 
 use serde::Serialize;
 use specta::Type;
+use thiserror::Error;
 
-use crate::domain::error::ValidationError;
-use crate::storage::StorageError;
+/// Voyage comme les autres : un code et un paramètre `field`, jamais une phrase
+/// rédigée.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("Champ « {field} » invalide : {detail}")]
+pub struct ValidationError {
+    /// Champ en cause, tel que le front le nomme.
+    pub field: &'static str,
+    /// Détail technique, affiché en second plan.
+    pub detail: String,
+}
+
+impl ValidationError {
+    pub fn new(field: &'static str, detail: impl Into<String>) -> Self {
+        Self {
+            field,
+            detail: detail.into(),
+        }
+    }
+}
+
+/// Chaque variante devient un **code** que le front traduit, et le `Display`
+/// n'est plus que le détail technique — c'est pourquoi il peut rester en français.
+#[derive(Debug, Error)]
+pub enum StorageError {
+    /// Jamais un `Ok` silencieux : le front croirait avoir enregistré.
+    #[error("Note introuvable : {0}")]
+    NoteNotFound(String),
+    /// Espace visé inexistant : la note n'aurait nulle part où être rangée.
+    #[error("Espace introuvable : {0}")]
+    SpaceNotFound(String),
+    /// Nom déjà pris (comparaison insensible à la casse).
+    #[error("Un espace nommé « {0} » existe déjà")]
+    DuplicateSpaceName(String),
+    /// Colonne qu'aucune écriture de ce code n'aurait pu produire.
+    #[error("Note « {id} » illisible : le champ « {field} » est hors format")]
+    CorruptRow { id: String, field: &'static str },
+    /// Base portant une migration que ce binaire ne connaît pas : elle a été
+    /// écrite par une version plus récente de l'application.
+    #[error("Base de données portant la migration « {0} », inconnue de cette version de DevBox")]
+    SchemaTooRecent(String),
+    /// Ouverture ou migration impossible — panne d'avant le premier `SELECT`.
+    #[error("Migration impossible : {0}")]
+    Migration(String),
+    /// `#[from]` : requis par `Connection::transaction`, qui exige de savoir
+    /// absorber l'erreur de Diesel dans celle de l'appelant. `#[source]` en
+    /// prime, là où un `impl Display` écrasé perdait la chaîne de causes.
+    #[error("Erreur de stockage : {0}")]
+    Sqlite(#[from] diesel::result::Error),
+}
 
 /// Ajouter une variante casse la compilation du front tant que `CODE_KEYS`
 /// (`core/errors/error-notifier.service.ts`) et les deux locales n'ont pas leur

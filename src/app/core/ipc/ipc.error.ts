@@ -2,7 +2,7 @@ import type { AppError, ErrorCode } from './bindings';
 
 /**
  * Causes d'échec que le backend sait nommer. Simple alias de l'union **générée**
- * depuis `ErrorCode` (`src-tauri/src/commands/error.rs`) : ce n'est plus un
+ * depuis `ErrorCode` (`src-tauri/src/error.rs`) : ce n'est plus un
  * miroir tenu à la main, une variante ajoutée en Rust apparaît ici dès la
  * régénération et casse la compilation partout où elle n'est pas traitée.
  *

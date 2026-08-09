@@ -8,7 +8,7 @@ import { NotesQuery, NotesView } from '@features/notes/model/note.model';
  *
  * It deliberately does **not** reimplement filtering, grouping or tag
  * normalisation: those now live in Rust and are tested there
- * (`src-tauri/src/storage/`). Duplicating them here would let a front-end spec
+ * (`src-tauri/src/notes/store.rs`). Duplicating them here would let a front-end spec
  * pass against rules the real backend does not apply.
  *
  * What it does emulate is persistence — it owns the notes, assigns ids and

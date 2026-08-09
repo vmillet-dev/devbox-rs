@@ -1,17 +1,18 @@
 // Publics : `tests/` est un crate à part, qui ne voit du binaire que son API.
-pub mod commands;
-pub mod domain;
-pub mod storage;
+pub mod db;
+pub mod error;
+pub mod notes;
+pub mod spaces;
 
 #[cfg(desktop)]
-mod desktop;
+pub mod desktop;
 
 use tauri::Manager;
 use tauri_specta::{Builder, collect_commands};
 
-use commands::notes::{create_note, delete_note, query_notes, update_note};
-use commands::spaces::{create_space, delete_space, list_spaces, rename_space};
-use commands::tray::sync_tray;
+use desktop::tray::sync_tray;
+use notes::{create_note, delete_note, query_notes, update_note};
+use spaces::{create_space, delete_space, list_spaces, rename_space};
 
 /// Résolu depuis le manifeste et non du répertoire courant : ni `tauri dev` ni
 /// `cargo run --manifest-path` ne garantissent lequel c'est, et un chemin relatif
@@ -86,8 +87,8 @@ pub fn run() {
             let directory = app.path().app_data_dir()?;
             std::fs::create_dir_all(&directory)?;
 
-            let connection = storage::open(&directory.join(storage::DB_FILE_NAME))?;
-            app.manage(commands::Db::new(connection));
+            let connection = db::open(&directory.join(db::DB_FILE_NAME))?;
+            app.manage(db::Db::new(connection));
 
             Ok(())
         })

@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::error::ValidationError;
+use crate::error::ValidationError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

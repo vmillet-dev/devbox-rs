@@ -1,6 +1,35 @@
 use super::*;
-use crate::domain::language::Language;
-use crate::domain::note::NoteLifecycle;
+use crate::notes::model::NoteLifecycle;
+
+#[test]
+fn every_variant_round_trips_through_its_stored_form() {
+    for language in Language::ALL {
+        assert_eq!(language.as_str().parse(), Ok(language));
+    }
+}
+
+#[test]
+fn an_unknown_value_is_refused_rather_than_guessed() {
+    // A database written by a newer binary can hold one; the caller decides
+    // whether to fall back, and it does so in one place.
+    assert_eq!("rust".parse::<Language>(), Err(()));
+    assert_eq!("JSON".parse::<Language>(), Err(()));
+}
+
+#[test]
+fn the_default_is_the_one_detection_replaces() {
+    assert_eq!(Language::default(), Language::Txt);
+}
+
+#[test]
+fn the_serialised_form_matches_the_stored_one() {
+    // The bindings export this spelling as a TS union; the column holds the
+    // same string. One vocabulary, two consumers.
+    for language in Language::ALL {
+        let json = serde_json::to_value(language).unwrap();
+        assert_eq!(json, serde_json::json!(language.as_str()));
+    }
+}
 
 fn draft(language: Language, content: &str) -> NoteDraft {
     NoteDraft {
@@ -36,7 +65,7 @@ fn blank_note() -> Note {
     Note {
         language: Language::Txt,
         content: String::new(),
-        ..crate::domain::fixtures::note()
+        ..crate::notes::fixtures::note()
     }
 }
 

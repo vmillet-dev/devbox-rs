@@ -4,9 +4,10 @@
 use diesel::SqliteConnection;
 use diesel::prelude::*;
 
-use devbox_lib::storage::schema::notes;
-use devbox_lib::storage::spaces::{create, delete, exists, list, rename};
-use devbox_lib::storage::{StorageError, open_in_memory};
+use devbox_lib::db::open_in_memory;
+use devbox_lib::db::schema::notes;
+use devbox_lib::error::StorageError;
+use devbox_lib::spaces::store::{create, delete, exists, list, rename};
 
 const T0: &str = "2026-07-25T09:00:00.000Z";
 

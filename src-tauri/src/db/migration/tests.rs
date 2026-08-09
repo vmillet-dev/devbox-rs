@@ -2,7 +2,8 @@ use diesel::connection::SimpleConnection;
 use diesel::sql_types::BigInt;
 
 use super::*;
-use crate::storage::{self, DB_FILE_NAME, configure, open, open_in_memory, schema};
+use crate::db::{DB_FILE_NAME, configure, open, open_in_memory, schema};
+use crate::error::StorageError;
 
 /// Le SQL de la migration initiale tel qu'il a été livré. Rejoué à la main,
 /// il fabrique une base « héritée » : schéma en place, `user_version` posé,
@@ -167,5 +168,5 @@ fn a_migration_this_binary_does_not_know_is_refused() {
 
     // Reading a newer schema with older code would silently write rows the
     // newer version cannot make sense of.
-    assert!(matches!(error, storage::StorageError::SchemaTooRecent(_)));
+    assert!(matches!(error, StorageError::SchemaTooRecent(_)));
 }

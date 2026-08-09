@@ -3,7 +3,7 @@ import type { Language } from '@core/ipc/bindings';
 /**
  * Langages reconnus pour la coloration des badges et du corps des notes. Simple
  * alias de l'union **générée** depuis l'enum `Language` de
- * `src-tauri/src/domain/language.rs` : ce n'est plus un miroir tenu à la main,
+ * `src-tauri/src/notes/language.rs` : ce n'est plus un miroir tenu à la main,
  * une variante ajoutée en Rust apparaît ici dès la régénération et casse la
  * compilation partout où elle n'est pas traitée — à commencer par
  * `LANGUAGE_LABELS`, qui doit rester exhaustif.

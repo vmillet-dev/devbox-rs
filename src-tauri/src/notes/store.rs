@@ -1,7 +1,8 @@
 //! Lecture et écriture des notes : **du SQL, et rien d'autre**.
 //!
 //! Ne descend dans le `WHERE` que ce que SQLite indexe. Recherche texte,
-//! sections et normalisation des tags sont des règles : `crate::domain`.
+//! sections et normalisation des tags sont des règles : `super::view` et
+//! `super::model`.
 
 use std::collections::HashMap;
 
@@ -10,12 +11,12 @@ use uuid::Uuid;
 
 use chrono::{DateTime, Utc};
 
-use super::schema::{note_tags, notes};
-use super::{StorageError, spaces};
-use crate::domain::iso8601;
-use crate::domain::note::{Note, NoteDraft, NoteLifecycle, NotePatch};
-use crate::domain::tag;
-use crate::domain::view::{Facets, NoteFilter, NotesQuery};
+use super::model::{self, Note, NoteDraft, NoteLifecycle, NotePatch};
+use super::view::{Facets, NoteFilter, NotesQuery};
+use crate::db::iso8601;
+use crate::db::schema::{note_tags, notes};
+use crate::error::StorageError;
+use crate::spaces::store as spaces;
 
 /// `lifecycle` y est éclaté en deux colonnes, et les tags en sont absents : ils
 /// vivent dans `note_tags`, rattachés ensuite en une requête pour toute la liste.
@@ -191,7 +192,7 @@ fn facets(
     })
 }
 
-/// Critères **grossiers** seulement ; `domain::view::build` prend le relais pour
+/// Critères **grossiers** seulement ; `view::build` prend le relais pour
 /// la recherche texte et les sections.
 pub fn fetch(
     connection: &mut SqliteConnection,
@@ -217,7 +218,7 @@ pub fn fetch(
 
     // Même normalisation qu'à l'écriture, sinon un `#urgent` saisi au clavier ne
     // retrouverait pas le `urgent` stocké.
-    let selected_tags = tag::normalize(&request.tags);
+    let selected_tags = model::normalize_tags(&request.tags);
     if !selected_tags.is_empty() {
         // « au moins un tag », pas « tous » : comportement d'un rail de facettes.
         query = query.filter(
@@ -339,7 +340,7 @@ pub fn update(
 }
 
 /// Ses tags partent par cascade — d'où le `PRAGMA foreign_keys` de
-/// `storage::configure`. Identifiant inconnu ⇒ `Err`.
+/// `db::configure`. Identifiant inconnu ⇒ `Err`.
 pub fn delete(connection: &mut SqliteConnection, id: &str) -> Result<(), StorageError> {
     let deleted = diesel::delete(notes::table.find(id)).execute(connection)?;
 

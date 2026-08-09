@@ -1,13 +1,97 @@
-//! Devine le langage d'un contenu collé.
+//! Le langage d'une note : la liste reconnue, et la détection d'un contenu collé.
 //!
-//! Heuristiques volontairement bon marché et faillibles : le résultat n'est
-//! qu'une **valeur initiale**, que l'éditeur laisse changer. Une erreur coûte un
-//! clic. Elles ne jouent qu'au moment où une note reçoit son premier contenu —
-//! [`for_draft`] à la création, [`after_patch`] au premier collage. Passé ce
-//! moment, plus rien n'est deviné.
+//! Les heuristiques de détection sont volontairement bon marché et faillibles :
+//! le résultat n'est qu'une **valeur initiale**, que l'éditeur laisse changer.
+//! Une erreur coûte un clic. Elles ne jouent qu'au moment où une note reçoit son
+//! premier contenu — [`for_draft`] à la création, [`after_patch`] au premier
+//! collage. Passé ce moment, plus rien n'est deviné.
 
-use super::Language;
-use crate::domain::note::{Note, NoteDraft, NotePatch};
+use std::fmt;
+use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
+use specta::Type;
+
+use super::model::{Note, NoteDraft, NotePatch};
+
+/// Liste **fermée**, et c'est tout l'intérêt : le front la reçoit en union
+/// TypeScript générée, donc une valeur inconnue ne compile plus chez lui au lieu
+/// d'être refusée à l'exécution.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    Json,
+    Js,
+    Ts,
+    Py,
+    Sql,
+    Yml,
+    Toml,
+    Xml,
+    Html,
+    Css,
+    Sh,
+    Md,
+    /// Défaut, et **signal que le front n'a rien choisi** : c'est lui que la
+    /// création remplace par une détection.
+    #[default]
+    Txt,
+}
+
+impl Language {
+    pub const ALL: [Self; 13] = [
+        Self::Json,
+        Self::Js,
+        Self::Ts,
+        Self::Py,
+        Self::Sql,
+        Self::Yml,
+        Self::Toml,
+        Self::Xml,
+        Self::Html,
+        Self::Css,
+        Self::Sh,
+        Self::Md,
+        Self::Txt,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::Js => "js",
+            Self::Ts => "ts",
+            Self::Py => "py",
+            Self::Sql => "sql",
+            Self::Yml => "yml",
+            Self::Toml => "toml",
+            Self::Xml => "xml",
+            Self::Html => "html",
+            Self::Css => "css",
+            Self::Sh => "sh",
+            Self::Md => "md",
+            Self::Txt => "txt",
+        }
+    }
+}
+
+impl fmt::Display for Language {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// `notes.language` ne porte aucun `CHECK` (migration 3) : une base écrite par
+/// une version plus récente peut contenir un langage inconnu d'ici.
+impl FromStr for Language {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .into_iter()
+            .find(|language| language.as_str() == value)
+            .ok_or(())
+    }
+}
 
 /// Celui du front s'il en a choisi un, sinon une détection — `txt` faisant
 /// office de « rien choisi ».

@@ -9,13 +9,15 @@ use diesel::prelude::*;
 
 use chrono::{DateTime, Utc};
 
-use devbox_lib::domain::iso8601;
-use devbox_lib::domain::language::Language;
-use devbox_lib::domain::note::{Note, NoteDraft, NoteLifecycle, NotePatch};
-use devbox_lib::domain::view::{self, NoteFilter, NotesQuery, NotesView};
-use devbox_lib::storage::notes::{create, delete, fetch, update};
-use devbox_lib::storage::schema::{note_tags, spaces as spaces_table};
-use devbox_lib::storage::{StorageError, open_in_memory, spaces};
+use devbox_lib::db::iso8601;
+use devbox_lib::db::open_in_memory;
+use devbox_lib::db::schema::{note_tags, spaces as spaces_table};
+use devbox_lib::error::StorageError;
+use devbox_lib::notes::language::Language;
+use devbox_lib::notes::model::{Note, NoteDraft, NoteLifecycle, NotePatch};
+use devbox_lib::notes::store::{create, delete, fetch, update};
+use devbox_lib::notes::view::{self, NoteFilter, NotesQuery, NotesView};
+use devbox_lib::spaces::store as spaces;
 
 /// Un tel raccourci n'existe pas dans le code de production : il inviterait à
 /// refiltrer côté front.
@@ -1043,8 +1045,8 @@ fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
     let space_id = space(&mut connection, "Perso");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    diesel::update(devbox_lib::storage::schema::notes::table.find(&created.id))
-        .set(devbox_lib::storage::schema::notes::created_at.eq("pas une date"))
+    diesel::update(devbox_lib::db::schema::notes::table.find(&created.id))
+        .set(devbox_lib::db::schema::notes::created_at.eq("pas une date"))
         .execute(&mut connection)
         .unwrap();
 
@@ -1069,9 +1071,9 @@ fn a_stored_date_always_carries_its_milliseconds() {
 
     let created = create(&mut connection, draft(&space_id), round_second).unwrap();
 
-    let stored: String = devbox_lib::storage::schema::notes::table
+    let stored: String = devbox_lib::db::schema::notes::table
         .find(&created.id)
-        .select(devbox_lib::storage::schema::notes::updated_at)
+        .select(devbox_lib::db::schema::notes::updated_at)
         .first(&mut connection)
         .unwrap();
 

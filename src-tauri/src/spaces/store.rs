@@ -7,9 +7,9 @@ use diesel::dsl::sql;
 use diesel::prelude::*;
 use diesel::sql_types::{Bool, Text};
 
-use super::StorageError;
-use super::schema::{notes, spaces};
-use crate::domain::space::Space;
+use super::model::Space;
+use crate::db::schema::{notes, spaces};
+use crate::error::StorageError;
 use uuid::Uuid;
 
 /// Une liste vide est valide : c'est l'état du premier lancement. Aucun espace

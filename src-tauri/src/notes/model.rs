@@ -1,5 +1,8 @@
 //! La note : ce qui est persisté ([`Note`]) et ce qui est affiché ([`DisplayNote`]).
 //!
+//! [`normalize_tags`] vit ici et **seulement ici** : l'écriture comme la requête
+//! y passent, sinon un `#urgent` saisi ne retrouverait pas le `urgent` stocké.
+//!
 //! ⚠️ `rename_all` et `tag = "kind"` sont load-bearing — sans eux serde émet
 //! `space_id` et `{"Expires":{…}}`, que le front ne sait pas relire.
 //! `tests/ipc_contract.rs` les fige.
@@ -8,8 +11,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::language::{Language, detect};
-use super::tag;
+use super::language::{self, Language};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -83,8 +85,8 @@ impl NoteDraft {
     /// Langage deviné si le front n'en a pas choisi, tags normalisés : ces deux
     /// règles vivent ici, pas dans le SQL.
     pub fn into_note(self, id: String, now: DateTime<Utc>) -> Note {
-        let language = detect::for_draft(&self);
-        let tags = tag::normalize(&self.tags);
+        let language = language::for_draft(&self);
+        let tags = normalize_tags(&self.tags);
 
         Note {
             id,
@@ -112,7 +114,7 @@ impl NotePatch {
     /// ⚠️ Ne vérifie pas que `space_id` existe — seule la persistance peut le
     /// voir, et elle le fait avant d'appeler.
     pub fn apply(&self, note: &mut Note, now: DateTime<Utc>) {
-        let detected = detect::after_patch(note, self);
+        let detected = language::after_patch(note, self);
 
         if let Some(space_id) = &self.space_id {
             note.space_id.clone_from(space_id);
@@ -136,7 +138,7 @@ impl NotePatch {
             note.pinned = pinned;
         }
         if let Some(tags) = &self.tags {
-            note.tags = tag::normalize(tags);
+            note.tags = normalize_tags(tags);
         }
         if let Some(lifecycle) = &self.lifecycle {
             note.lifecycle = lifecycle.clone();
@@ -225,6 +227,34 @@ fn expires_soon(note: &Note, now: DateTime<Utc>) -> bool {
     // Une durée, pas un nombre de jours entiers : à 3 jours et 1 heure, un
     // arrondi basculerait la note en alerte un jour trop tôt.
     at.signed_duration_since(now) <= EXPIRING_SOON
+}
+
+/// Trim, `#` de tête, vides et doublons.
+///
+/// Règle unique : le front envoie ce que l'utilisateur a tapé, l'écriture comme
+/// la requête passent par ici — sinon un `#urgent` saisi ne retrouverait pas le
+/// `urgent` stocké. La déduplication est insensible à la casse et garde la
+/// première graphie ; `COLLATE NOCASE` (migration 2) prolonge la règle au corpus.
+pub fn normalize_tags(tags: &[String]) -> Vec<String> {
+    let mut seen: Vec<String> = Vec::new();
+    let mut normalized: Vec<String> = Vec::new();
+
+    for tag in tags {
+        let cleaned = tag.trim().trim_start_matches('#').trim();
+        if cleaned.is_empty() {
+            continue;
+        }
+
+        let folded = cleaned.to_lowercase();
+        if seen.contains(&folded) {
+            continue;
+        }
+
+        seen.push(folded);
+        normalized.push(cleaned.to_string());
+    }
+
+    normalized
 }
 
 #[cfg(test)]

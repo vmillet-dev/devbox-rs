@@ -1,11 +1,11 @@
-//! Note de référence partagée par les tests du domaine : un champ ajouté à
+//! Note de référence partagée par les tests de la feature : un champ ajouté à
 //! [`Note`] se déclare ici plutôt que dans chaque module qui en construit une.
 
 use chrono::{DateTime, Utc};
 
-use super::iso8601;
 use super::language::Language;
-use super::note::{Note, NoteLifecycle};
+use super::model::{Note, NoteLifecycle};
+use crate::db::iso8601;
 
 pub(crate) const NOW: &str = "2026-07-25T09:00:00.000Z";
 

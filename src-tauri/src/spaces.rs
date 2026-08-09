@@ -1,23 +1,30 @@
-//! Commandes « Espaces ».
+//! L'espace : le classeur dans lequel les notes sont rangées.
+//!
+//! Ce fichier porte les commandes ; [`model`] les règles, [`store`] le SQL.
 //!
 //! `notes.space_id` porte un `ON DELETE CASCADE`, donc un `DELETE` nu emporterait
 //! les notes : [`delete_space`] exige un espace **refuge**, et il n'existe
 //! volontairement aucune variante sans.
 
+// Une commande reçoit ses arguments désérialisés depuis la charge utile IPC :
+// ils arrivent possédés, qu'elle les consomme ou non.
+#![allow(clippy::needless_pass_by_value)]
+
+pub mod model;
+pub mod store;
+
 use tauri::State;
 
-use super::Db;
-use super::error::AppError;
-use super::lock;
-use crate::domain::space::{self, Space, SpaceDraft};
-use crate::storage;
+use crate::db::{Db, lock};
+use crate::error::AppError;
+use model::{Space, SpaceDraft};
 
 #[tauri::command]
 #[specta::specta]
 pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, AppError> {
     let mut connection = lock(&db)?;
 
-    Ok(storage::spaces::list(&mut connection)?)
+    Ok(store::list(&mut connection)?)
 }
 
 #[tauri::command]
@@ -28,7 +35,7 @@ pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppEr
 
     let mut connection = lock(&db)?;
 
-    Ok(storage::spaces::create(&mut connection, &name)?)
+    Ok(store::create(&mut connection, &name)?)
 }
 
 #[tauri::command]
@@ -38,7 +45,7 @@ pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<
 
     let mut connection = lock(&db)?;
 
-    Ok(storage::spaces::rename(&mut connection, &id, &name)?)
+    Ok(store::rename(&mut connection, &id, &name)?)
 }
 
 /// Transfère les notes vers `target_space_id` avant de supprimer.
@@ -51,13 +58,9 @@ pub fn delete_space(
 ) -> Result<(), AppError> {
     // Un espace son propre refuge verrait ses notes emportées par la cascade
     // juste après le transfert.
-    space::validate_move_target(&id, &target_space_id)?;
+    model::validate_move_target(&id, &target_space_id)?;
 
     let mut connection = lock(&db)?;
 
-    Ok(storage::spaces::delete(
-        &mut connection,
-        &id,
-        &target_space_id,
-    )?)
+    Ok(store::delete(&mut connection, &id, &target_space_id)?)
 }

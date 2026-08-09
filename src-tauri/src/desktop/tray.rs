@@ -1,5 +1,11 @@
 //! Barre système : l'icône, son menu, et ce que ses entrées déclenchent.
+//!
+//! Les libellés traversent le pont **déjà traduits** : la langue de l'interface
+//! est une préférence du front, et une table de traductions en Rust en ferait une
+//! seconde à tenir.
 
+use serde::Deserialize;
+use specta::Type;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Wry};
@@ -13,13 +19,25 @@ const NEW_NOTE_ITEM: &str = "new-note";
 const CAPTURE_ITEM: &str = "capture";
 const QUIT_ITEM: &str = "quit";
 
-/// Type propre à ce module plutôt que le DTO de `commands::tray` : c'est ce qui
-/// garde la dépendance à sens unique.
-pub(crate) struct MenuLabels<'a> {
-    pub open: &'a str,
-    pub new_note: &'a str,
-    pub capture: &'a str,
-    pub quit: &'a str,
+#[derive(Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TrayLabels {
+    pub open: String,
+    pub new_note: String,
+    pub capture: String,
+    pub quit: String,
+}
+
+/// Ne renvoie **pas** de `Result` : une barre système absente n'est pas une panne
+/// que le front puisse traiter, et lui inventer un code ajouterait une branche
+/// que rien n'afficherait. L'échec est journalisé côté natif.
+#[tauri::command]
+#[specta::specta]
+// Une commande reçoit ses arguments désérialisés depuis la charge utile IPC :
+// ils arrivent possédés, qu'elle les consomme ou non.
+#[allow(clippy::needless_pass_by_value)]
+pub fn sync_tray(labels: TrayLabels, app: AppHandle) {
+    sync(&app, &labels);
 }
 
 pub(crate) fn exists(app: &AppHandle) -> bool {
@@ -32,7 +50,7 @@ pub(crate) fn exists(app: &AppHandle) -> bool {
 /// Best effort : une barre système absente est journalisée et ignorée.
 /// [`exists`] empêche alors la fermeture de cacher la fenêtre là où plus rien ne
 /// saurait la rappeler.
-pub(crate) fn sync(app: &AppHandle, labels: &MenuLabels<'_>) {
+pub(crate) fn sync(app: &AppHandle, labels: &TrayLabels) {
     let menu = match build_menu(app, labels) {
         Ok(menu) => menu,
         Err(error) => {
@@ -53,12 +71,12 @@ pub(crate) fn sync(app: &AppHandle, labels: &MenuLabels<'_>) {
     }
 }
 
-fn build_menu(app: &AppHandle, labels: &MenuLabels<'_>) -> tauri::Result<Menu<Wry>> {
-    let open = MenuItem::with_id(app, OPEN_ITEM, labels.open, true, None::<&str>)?;
-    let new_note = MenuItem::with_id(app, NEW_NOTE_ITEM, labels.new_note, true, None::<&str>)?;
-    let capture = MenuItem::with_id(app, CAPTURE_ITEM, labels.capture, true, None::<&str>)?;
+fn build_menu(app: &AppHandle, labels: &TrayLabels) -> tauri::Result<Menu<Wry>> {
+    let open = MenuItem::with_id(app, OPEN_ITEM, &labels.open, true, None::<&str>)?;
+    let new_note = MenuItem::with_id(app, NEW_NOTE_ITEM, &labels.new_note, true, None::<&str>)?;
+    let capture = MenuItem::with_id(app, CAPTURE_ITEM, &labels.capture, true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, QUIT_ITEM, labels.quit, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, QUIT_ITEM, &labels.quit, true, None::<&str>)?;
 
     Menu::with_items(app, &[&open, &new_note, &capture, &separator, &quit])
 }

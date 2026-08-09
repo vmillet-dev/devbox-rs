@@ -5,7 +5,7 @@
 //! du menu arrivent du front déjà traduits.
 
 pub(crate) mod shortcut;
-pub(crate) mod tray;
+pub mod tray;
 
 use tauri::{AppHandle, Emitter, Manager};
 
