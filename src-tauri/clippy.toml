@@ -1,0 +1,3 @@
+# `clippy::doc_markdown` prend ces noms de produit pour des identifiants et réclame
+# des backticks. `".."` prolonge la liste par défaut au lieu de la remplacer.
+doc-valid-idents = ["SQLite", "DevBox", ".."]

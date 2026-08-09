@@ -1,14 +1,14 @@
 //! Commande « barre système ».
 //!
 //! Les libellés traversent le pont **déjà traduits** : la langue de l'interface
-//! est une préférence du front, et une table de traductions en Rust en ferait
-//! une seconde à tenir en phase. Le natif ne fait que les afficher.
+//! est une préférence du front, et une table de traductions en Rust en ferait une
+//! seconde à tenir.
 
 use serde::Deserialize;
 use specta::Type;
 use tauri::AppHandle;
 
-use crate::desktop;
+use crate::desktop::tray::{self, MenuLabels};
 
 #[derive(Debug, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -19,12 +19,22 @@ pub struct TrayLabels {
     pub quit: String,
 }
 
-/// Ne renvoie **pas** de `Result` : une barre système absente n'est pas une
-/// panne que le front puisse traiter, et lui inventer un code d'erreur
-/// ajouterait une branche que rien n'afficherait jamais. L'échec est journalisé
-/// côté natif, comme pour un raccourci global indisponible.
+impl TrayLabels {
+    fn as_menu_labels(&self) -> MenuLabels<'_> {
+        MenuLabels {
+            open: &self.open,
+            new_note: &self.new_note,
+            capture: &self.capture,
+            quit: &self.quit,
+        }
+    }
+}
+
+/// Ne renvoie **pas** de `Result` : une barre système absente n'est pas une panne
+/// que le front puisse traiter, et lui inventer un code ajouterait une branche
+/// que rien n'afficherait. L'échec est journalisé côté natif.
 #[tauri::command]
 #[specta::specta]
 pub fn sync_tray(labels: TrayLabels, app: AppHandle) {
-    desktop::sync_tray(&app, &labels);
+    tray::sync(&app, &labels.as_menu_labels());
 }

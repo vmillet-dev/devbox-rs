@@ -13,22 +13,14 @@ export const commands = {
 	updateNote: (id: string, patch: NotePatch) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("update_note", { id, patch })),
 	deleteNote: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_note", { id })),
 	listSpaces: () => typedError<Space[], AppError>(__TAURI_INVOKE("list_spaces")),
-	/**  Le front sélectionne aussitôt l'espace à partir de la valeur renvoyée. */
 	createSpace: (draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("create_space", { draft })),
-	/**  Même brouillon qu'à la création, donc même validation. */
 	renameSpace: (id: string, draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("rename_space", { id, draft })),
-	/**
-	 *  Supprime un espace après avoir transféré ses notes vers `target_space_id`.
-	 * 
-	 *  Tauri v2 renomme les arguments en camelCase ; c'est `bindings.ts` qui porte
-	 *  désormais le `targetSpaceId` correspondant, sans qu'on ait à l'orthographier.
-	 */
+	/**  Transfère les notes vers `target_space_id` avant de supprimer. */
 	deleteSpace: (id: string, targetSpaceId: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_space", { id, targetSpaceId })),
 	/**
-	 *  Ne renvoie **pas** de `Result` : une barre système absente n'est pas une
-	 *  panne que le front puisse traiter, et lui inventer un code d'erreur
-	 *  ajouterait une branche que rien n'afficherait jamais. L'échec est journalisé
-	 *  côté natif, comme pour un raccourci global indisponible.
+	 *  Ne renvoie **pas** de `Result` : une barre système absente n'est pas une panne
+	 *  que le front puisse traiter, et lui inventer un code ajouterait une branche
+	 *  que rien n'afficherait. L'échec est journalisé côté natif.
 	 */
 	syncTray: (labels: TrayLabels) => __TAURI_INVOKE<void>("sync_tray", { labels }),
 };
@@ -38,16 +30,13 @@ export type AppError = {
 	code: ErrorCode,
 	/**  Valeurs à interpoler dans le message traduit, ex. `{ "name": "Perso" }`. */
 	params: { [key in string]: string },
-	/**
-	 *  Message technique, affiché en second plan de la bannière. Pas traduit,
-	 *  mais lisible.
-	 */
+	/**  Affiché en second plan de la bannière. Pas traduit, mais lisible. */
 	detail: string,
 };
 
 /**
- *  Note augmentée de ce que l'affichage doit savoir. `flatten` aplatit la note
- *  dans l'objet JSON : le front n'a qu'un seul type de note.
+ *  `flatten` aplatit la note dans le même objet JSON : le front n'a qu'un seul
+ *  type de note.
  */
 export type DisplayNote = {
 	footer: NoteFooter,
@@ -55,52 +44,52 @@ export type DisplayNote = {
 } & Note;
 
 /**
- *  Ajouter une variante la fait apparaître dans le `bindings.ts` généré, ce qui
- *  casse la compilation du front tant que `CODE_KEYS`
+ *  Ajouter une variante casse la compilation du front tant que `CODE_KEYS`
  *  (`core/errors/error-notifier.service.ts`) et les deux locales n'ont pas leur
- *  clé — le miroir n'est plus tenu à la main.
+ *  clé.
  * 
  *  Pas de variante « schéma trop récent » : cette panne avorte le lancement
  *  pendant la migration, aucune commande ne peut la renvoyer.
  */
 export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" | 
-/**  Donnée reçue non conforme. Le paramètre `field` nomme le champ en cause. */
+/**  Le paramètre `field` nomme le champ en cause. */
 "invalidInput" | 
 /**  Mutex empoisonné : une commande a paniqué en tenant la connexion. */
-"storageUnavailable" | 
-/**  Panne de lecture ou d'écriture SQLite. */
-"storage";
+"storageUnavailable" | "storage";
+
+/**
+ *  Liste **fermée**, et c'est tout l'intérêt : le front la reçoit en union
+ *  TypeScript générée, donc une valeur inconnue ne compile plus chez lui au lieu
+ *  d'être refusée à l'exécution.
+ */
+export type Language = "json" | "js" | "ts" | "py" | "sql" | "yml" | "toml" | "xml" | "html" | "css" | "sh" | "md" | 
+/**
+ *  Défaut, et **signal que le front n'a rien choisi** : c'est lui que la
+ *  création remplace par une détection.
+ */
+"txt";
 
 export type Note = {
 	id: string,
-	/**
-	 *  Espace de rangement. C'est la requête qui filtre dessus ; le stockage
-	 *  refuse de créer une note dans un espace inconnu.
-	 */
 	spaceId: string,
-	/**
-	 *  Peut être vide : une note fraîchement créée n'a pas encore de titre,
-	 *  l'interface affiche un libellé traduit à la place.
-	 */
+	/**  Peut être vide : l'interface affiche alors un libellé traduit. */
 	title: string,
-	/**  "json" | "js" | "py" | "sql" | "yml" | "txt". */
-	language: string,
+	language: Language,
 	content: string,
-	/**  Chemin de contexte libre, ex. "API Gateway / Auth". Peut être vide. */
+	/**  Fil d'Ariane libre, ex. "API Gateway / Auth". Peut être vide. */
 	source: string,
 	tags: string[],
 	pinned: boolean,
-	/**  ISO 8601, ex. "2026-07-25T09:12:00.000Z". */
 	createdAt: string,
 	updatedAt: string,
 	lifecycle: NoteLifecycle,
 };
 
-/**  Création : ni identifiant ni horodatages — c'est la persistance qui les attribue. */
+/**  Ni identifiant ni horodatages : la persistance les attribue. */
 export type NoteDraft = {
 	spaceId: string,
 	title: string,
-	language: string,
+	language: Language,
 	content: string,
 	source: string,
 	tags: string[],
@@ -108,43 +97,31 @@ export type NoteDraft = {
 	lifecycle: NoteLifecycle,
 };
 
-/**
- *  Filtre rapide de la barre d'outils. `Untriaged` = notes portant une date
- *  d'expiration, c'est-à-dire celles dont on n'a pas encore décidé du sort.
- */
+/**  `Untriaged` = notes portant une échéance, celles dont le sort n'est pas décidé. */
 export type NoteFilter = "all" | "pinned" | "untriaged";
 
-/**  Contenu du pied d'une carte — la **décision**, pas le rendu. */
-export type NoteFooter = 
 /**
- *  Note épinglée portant un contexte : elle est là pour durer, savoir d'où
- *  elle vient est plus utile que son âge.
+ *  Pied d'une carte : la **décision**, pas le rendu. Les variantes datées
+ *  portent une date et non un libellé — « il y a 4 min » doit vieillir tout seul
+ *  à l'écran, donc le formatage reste au front.
  */
-{ kind: "source"; value: string } | 
-/**  Échéance d'une note éphémère. */
-{ kind: "expiry"; at: string } | 
-/**  Âge de la dernière modification — le cas ordinaire. */
-{ kind: "age"; at: string };
+export type NoteFooter = { kind: "source"; value: string } | { kind: "expiry"; at: string } | { kind: "age"; at: string };
 
-export type NoteLifecycle = 
-/**  Note permanente. */
-{ kind: "permanent" } | 
-/**  Note éphémère : elle est « à trier » jusqu'à cette date. */
+export type NoteLifecycle = { kind: "permanent" } | 
+/**  « À trier » jusqu'à cette date. */
 { kind: "expires"; at: string };
 
 /**
- *  Modification partielle : un champ à `None` reste **inchangé** en base.
+ *  Un champ à `None` reste **inchangé** en base.
  * 
- *  `#[specta(optional)]` génère `title?: string | null` plutôt que
- *  `title: string | null` : le front **omet** les clés qu'il ne touche pas, et
- *  un type qui les exigerait toutes l'obligerait à envoyer des `null`, c'est-à-dire
- *  à écraser ce qu'il voulait laisser intact.
+ *  `#[specta(optional)]` rend les clés omissibles côté TypeScript. Sans lui le
+ *  front devrait envoyer des `null` pour les champs qu'il ne touche pas — donc
+ *  écraser ce qu'il voulait laisser intact.
  */
 export type NotePatch = {
-	/**  Renseigné uniquement lors d'un déplacement de note vers un autre espace. */
 	spaceId?: string | null,
 	title?: string | null,
-	language?: string | null,
+	language?: Language | null,
 	content?: string | null,
 	source?: string | null,
 	tags?: string[] | null,
@@ -154,79 +131,64 @@ export type NotePatch = {
 
 export type NoteSection = {
 	key: NoteSectionKey,
-	/**  Au moins une note arrive à échéance, au sens du seuil unique de `note`. */
 	hasExpiringNotes: boolean,
 	notes: DisplayNote[],
-	/**  Affiche la carte fantôme « coller ou créer » en fin de section. */
 	showCreateGhost: boolean,
 };
 
 /**
- *  Sert de **clé de traduction** côté front (`sections.<key>`) : aucun libellé
- *  lisible ne traverse le pont.
+ *  **Clé de traduction** côté front (`sections.<key>`) : aucun libellé lisible
+ *  ne traverse le pont.
  */
 export type NoteSectionKey = "pinned" | "today" | "week" | "older" | "results";
 
-/**
- *  Tout y est explicite : la requête ne lit ni horloge ni fuseau, ce qui la
- *  rend reproductible en test.
- */
+/**  Ni horloge ni fuseau lus ici : tout est explicite, donc reproductible en test. */
 export type NotesQuery = {
 	/**
 	 *  `None` = « tous les espaces » — un choix, pas une absence de choix : il
 	 *  n'existe aucun espace « Tous » côté données.
 	 */
 	spaceId: string | null,
-	/**  Cherché dans le titre, les tags et le contenu. Vide = pas de recherche. */
+	/**  Vide = pas de recherche. */
 	search: string,
 	filter: NoteFilter,
-	/**  Tags du rail. Une note passe si elle en porte **au moins un**. */
+	/**  Une note passe si elle porte **au moins un** de ces tags. */
 	tags: string[],
-	/**  Langages du rail, même sémantique d'union. Vide = tous. */
-	languages: string[],
-	/**  Instant de référence ISO 8601 UTC, fourni par `ClockService`. */
+	/**  Même sémantique d'union. Vide = tous. */
+	languages: Language[],
 	now: string,
 	/**
 	 *  ⚠️ `Date#getTimezoneOffset()`, dont la valeur est l'**opposé** du décalage
-	 *  (UTC+2 donne −120). Nécessaire parce que les sections raisonnent en jours
-	 *  locaux : à 23 h à Paris, `now` en UTC est déjà demain.
+	 *  (UTC+2 donne −120). Les sections raisonnent en jours locaux : à 23 h à
+	 *  Paris, `now` en UTC est déjà demain.
 	 */
 	tzOffsetMinutes: number,
 };
 
-/**  Ce que le canevas affiche, tel quel. */
 export type NotesView = {
 	sections: NoteSection[],
 	/**
-	 *  Portés à l'**espace**, pas au filtre courant : n'afficher que les tags des
-	 *  notes déjà filtrées rendrait le rail inutilisable dès la 1re sélection.
+	 *  Portées à l'**espace**, pas au filtre courant : n'offrir que les facettes
+	 *  des notes déjà filtrées viderait le rail dès la 1re sélection.
 	 */
 	availableTags: string[],
-	/**  Portés à l'espace, même raison. */
-	availableLanguages: string[],
-	/**
-	 *  Une recherche ou une facette est active. Le front distingue ainsi
-	 *  « aucun résultat » d'« espace vide ».
-	 */
+	availableLanguages: Language[],
+	/**  Distingue « aucun résultat » d'« espace vide ». */
 	isFiltering: boolean,
 	/**
-	 *  Notes retenues, toutes sections confondues. `u32` et non `usize` : Specta
-	 *  refuse d'exporter les types de la taille d'un `BigInt`, que JSON ne sait
-	 *  pas rendre sans perte de précision.
+	 *  `u32` et non `usize` : Specta refuse d'exporter un type de la taille d'un
+	 *  `BigInt`, que JSON ne rend pas sans perte de précision.
 	 */
 	matched: number,
 };
 
 export type Space = {
 	id: string,
-	/**
-	 *  L'unicité, insensible à la casse, est tranchée par la persistance : un
-	 *  doublon ressort en `ErrorCode::DuplicateSpaceName`.
-	 */
+	/**  Unicité insensible à la casse, tranchée par la persistance. */
 	name: string,
 };
 
-/**  Pas d'identifiant : il est attribué par la persistance. */
+/**  Pas d'identifiant : la persistance l'attribue. */
 export type SpaceDraft = {
 	name: string,
 };

@@ -60,12 +60,10 @@ jobs:
 
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
 
-      # Les deux gardes de direction des dépendances documentées dans CLAUDE.md :
-      # domain/ ne connaît ni rusqlite ni Tauri, storage/ ne remonte pas vers commands/.
+      # Le backend tient en un seul crate : ce script est ce qui tient la direction
+      # des dépendances entre couches. Exécutable en local, d'où le fichier.
       - name: Garde des dépendances entre couches
-        run: |
-          ! grep -rn "rusqlite\|tauri::" src-tauri/src/domain/
-          ! grep -rn "use crate::commands" src-tauri/src/storage/
+        run: bash scripts/check-layers.sh
 
   build-front:
     name: Build front
@@ -173,8 +171,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Restaure le target/ de `build-rust` — dont la compilation de SQLite (rusqlite
-      # `bundled` compile les sources C), qui est l'essentiel du temps de ce job.
+      # Restaure le target/ de `build-rust` — dont la compilation de SQLite
+      # (`libsqlite3-sys` en `bundled` compile les sources C), qui est l'essentiel
+      # du temps de ce job.
       - uses: ./.github/actions/setup-rust
         with:
           shared-key: rust-ubuntu

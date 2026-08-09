@@ -1,20 +1,16 @@
-//! Commandes « Espaces » : les classeurs dans lesquels les notes sont rangées.
+//! Commandes « Espaces ».
 //!
-//! `notes.space_id` porte un `ON DELETE CASCADE`, donc un `DELETE` nu
-//! emporterait les notes. [`delete_space`] exige un espace **refuge** et y
-//! transfère les notes dans la même transaction — il n'existe volontairement
-//! aucune variante sans refuge.
-//!
-//! À décider : `list_spaces` renvoie une liste vide au premier lancement, et
-//! l'application refuse alors de créer une note. Créer un espace initial est un
-//! choix produit, pas une contrainte technique.
+//! `notes.space_id` porte un `ON DELETE CASCADE`, donc un `DELETE` nu emporterait
+//! les notes : [`delete_space`] exige un espace **refuge**, et il n'existe
+//! volontairement aucune variante sans.
 
 use tauri::State;
 
+use super::Db;
 use super::error::AppError;
 use super::lock;
 use crate::domain::space::{self, Space, SpaceDraft};
-use crate::storage::{self, Db};
+use crate::storage;
 
 #[tauri::command]
 #[specta::specta]
@@ -24,12 +20,10 @@ pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, AppError> {
     Ok(storage::spaces::list(&mut connection)?)
 }
 
-/// Le front sélectionne aussitôt l'espace à partir de la valeur renvoyée.
 #[tauri::command]
 #[specta::specta]
 pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppError> {
-    // Nom déjà détouré et non vide : le stockage n'a plus qu'à trancher
-    // l'unicité, la seule chose que lui seul peut voir.
+    // Détouré et non vide ici ; le stockage ne tranche plus que l'unicité.
     let name = draft.validated_name()?;
 
     let mut connection = lock(&db)?;
@@ -37,7 +31,6 @@ pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppEr
     Ok(storage::spaces::create(&mut connection, &name)?)
 }
 
-/// Même brouillon qu'à la création, donc même validation.
 #[tauri::command]
 #[specta::specta]
 pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppError> {
@@ -48,10 +41,7 @@ pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<
     Ok(storage::spaces::rename(&mut connection, &id, &name)?)
 }
 
-/// Supprime un espace après avoir transféré ses notes vers `target_space_id`.
-///
-/// Tauri v2 renomme les arguments en camelCase ; c'est `bindings.ts` qui porte
-/// désormais le `targetSpaceId` correspondant, sans qu'on ait à l'orthographier.
+/// Transfère les notes vers `target_space_id` avant de supprimer.
 #[tauri::command]
 #[specta::specta]
 pub fn delete_space(
@@ -60,7 +50,7 @@ pub fn delete_space(
     db: State<'_, Db>,
 ) -> Result<(), AppError> {
     // Un espace son propre refuge verrait ses notes emportées par la cascade
-    // juste après le transfert : refusé avant même de verrouiller.
+    // juste après le transfert.
     space::validate_move_target(&id, &target_space_id)?;
 
     let mut connection = lock(&db)?;

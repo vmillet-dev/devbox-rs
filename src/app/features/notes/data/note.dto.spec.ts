@@ -50,12 +50,13 @@ describe('toNote', () => {
     });
   });
 
-  it('falls back to the default language when the backend reports an unknown one', () => {
-    // A newer backend may know a language this front-end build does not; that
-    // degrades the badge, it must not break the load.
-    const note = toNote({ ...BASE_DTO, language: 'rust' });
+  it('takes the language straight from the wire, with no narrowing left to do', () => {
+    // `language` used to be a free string in Rust, narrowed here at runtime. It
+    // is an enum now, so the generated bindings rule an unknown value out at
+    // compile time — `{ ...BASE_DTO, language: 'rust' }` no longer type-checks.
+    const note = toNote({ ...BASE_DTO, language: 'sql' });
 
-    expect(note.language).toBe('txt');
+    expect(note.language).toBe('sql');
   });
 
   it('throws a contract error on an unparseable date rather than yielding an Invalid Date', () => {

@@ -1,10 +1,10 @@
-mod commands;
+// Publics : `tests/` est un crate à part, qui ne voit du binaire que son API.
+pub mod commands;
+pub mod domain;
+pub mod storage;
+
 #[cfg(desktop)]
 mod desktop;
-mod domain;
-mod storage;
-
-use std::sync::Mutex;
 
 use tauri::Manager;
 use tauri_specta::{Builder, collect_commands};
@@ -13,31 +13,25 @@ use commands::notes::{create_note, delete_note, query_notes, update_note};
 use commands::spaces::{create_space, delete_space, list_spaces, rename_space};
 use commands::tray::sync_tray;
 
-/// Destination du `bindings.ts` généré. Il est versionné : le front ne compile
-/// pas sans lui.
-///
-/// Résolu depuis le manifeste et non depuis le répertoire courant : ni `tauri dev`
-/// ni `cargo run --manifest-path` ne garantissent lequel c'est, et un chemin
-/// relatif écrivait le fichier à côté du dépôt sans rien signaler.
+/// Résolu depuis le manifeste et non du répertoire courant : ni `tauri dev` ni
+/// `cargo run --manifest-path` ne garantissent lequel c'est, et un chemin relatif
+/// écrivait le fichier à côté du dépôt sans rien signaler.
 const BINDINGS_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../src/app/core/ipc/bindings.ts"
 );
 
-/// Réécrit `bindings.ts` sans lancer l'application — c'est ce qu'appelle le
-/// binaire `export-bindings`, et donc `npm run bindings`.
+/// Réécrit `bindings.ts` sans lancer l'application.
 ///
-/// Volontairement pas un `#[cfg(test)]` : sous Windows l'exécutable de test vit
-/// dans `target/debug/deps/`, où le `WebView2Loader.dll` posé par `tauri-build`
-/// est absent, et le seul fait de lier `export` y empêche le binaire de démarrer.
+/// ⚠️ Pas un `#[cfg(test)]` : sous Windows l'exécutable de test vit dans
+/// `target/debug/deps/`, sans le `WebView2Loader.dll` que lier `export` exige —
+/// le binaire de test n'y démarre plus du tout.
 pub fn export_bindings() -> Result<(), specta_typescript::Error> {
     ipc_builder().export(specta_typescript::Typescript::default(), BINDINGS_PATH)
 }
 
-/// Source **unique** des signatures : ce qui est collecté ici est à la fois
-/// enregistré auprès de Tauri et écrit dans le `bindings.ts` du front. Une
-/// commande absente de cette liste n'existe donc plus côté TypeScript non plus,
-/// là où l'ancien `generate_handler!` laissait les deux dériver l'un de l'autre.
+/// Source **unique** des signatures : cette liste enregistre auprès de Tauri
+/// *et* écrit `bindings.ts`. Une commande qui n'y est pas n'existe nulle part.
 fn ipc_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new().commands(collect_commands![
         query_notes,
@@ -52,61 +46,69 @@ fn ipc_builder() -> Builder<tauri::Wry> {
     ])
 }
 
-/// Point d'entrée de l'application, natif sur mobile via `mobile_entry_point`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = ipc_builder();
 
-    // Régénéré à chaque lancement de `npm run tauri dev`, pour qu'une signature
-    // Rust modifiée casse le front tout de suite. Pas en release : le `src/` du
-    // front n'existe pas à côté d'un binaire installé.
+    // Pas en release : le `src/` du front n'existe pas à côté d'un binaire installé.
     #[cfg(debug_assertions)]
     export_bindings().expect("échec de la génération des bindings TypeScript");
 
     tauri::Builder::default()
+        // En premier : les plugins suivants journalisent déjà.
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::LogDir { file_name: None },
+                ))
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stdout,
+                ))
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
-            // L'updater est absent des cibles mobiles (voir Cargo.toml), sinon
-            // la compilation Android/iOS bute sur un crate inconnu.
+            // Absent des cibles mobiles (voir Cargo.toml).
             #[cfg(desktop)]
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
 
-            // Idem : un système mobile ne laisse pas une application écouter le
-            // clavier hors de sa fenêtre. La barre système, elle, n'est pas
-            // créée ici — elle attend du front ses libellés traduits.
+            // Idem. La barre système, elle, n'est pas créée ici : elle attend
+            // du front ses libellés traduits.
             #[cfg(desktop)]
-            desktop::register_shortcuts(app.handle())?;
+            desktop::shortcut::register(app.handle())?;
 
             // Seul emplacement inscriptible garanti une fois l'app installée.
             let directory = app.path().app_data_dir()?;
             std::fs::create_dir_all(&directory)?;
 
-            // Connexion unique derrière un mutex : `Connection` n'est pas
-            // `Sync`, et deux commandes peuvent se chevaucher.
             let connection = storage::open(&directory.join(storage::DB_FILE_NAME))?;
-            app.manage(Mutex::new(connection));
+            app.manage(commands::Db::new(connection));
 
             Ok(())
         })
-        // Fermer range dans la barre système au lieu de quitter : l'application
-        // est faite pour rester à portée de raccourci, et la quitter à chaque
-        // fois rendrait `Ctrl+Alt+V` inutile.
+        // Fermer range dans la barre système au lieu de quitter — l'application
+        // est faite pour rester à portée de raccourci.
         //
-        // ⚠️ Uniquement s'il y a une barre système où la retrouver. Sans elle,
+        // ⚠️ Uniquement s'il y a une barre système où la retrouver : sans elle,
         // cacher la fenêtre laisserait un processus que plus rien ne rappelle.
-        .on_window_event(|_window, _event| {
-            #[cfg(desktop)]
-            if let tauri::WindowEvent::CloseRequested { api, .. } = _event
-                && desktop::has_tray(_window.app_handle())
-            {
-                api.prevent_close();
-                let _ = _window.hide();
-            }
-        })
+        .on_window_event(
+            // Le préfixe `_` garde la compilation mobile silencieuse.
+            #[allow(clippy::used_underscore_binding)]
+            |_window, _event| {
+                #[cfg(desktop)]
+                if let tauri::WindowEvent::CloseRequested { api, .. } = _event
+                    && desktop::tray::exists(_window.app_handle())
+                {
+                    api.prevent_close();
+                    let _ = _window.hide();
+                }
+            },
+        )
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");

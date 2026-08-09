@@ -1,5 +1,4 @@
-//! L'espace : le classeur dans lequel les notes sont rangées. C'est le
-//! `space_id` de la note qui porte la relation.
+//! L'espace : le classeur dans lequel les notes sont rangées.
 //!
 //! Aucune entrée « Tous les espaces » côté données : c'est un mode d'affichage,
 //! et en créer un ferait ranger des notes dedans.
@@ -7,18 +6,17 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::rules::ValidationError;
+use super::error::ValidationError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Space {
     pub id: String,
-    /// L'unicité, insensible à la casse, est tranchée par la persistance : un
-    /// doublon ressort en `ErrorCode::DuplicateSpaceName`.
+    /// Unicité insensible à la casse, tranchée par la persistance.
     pub name: String,
 }
 
-/// Pas d'identifiant : il est attribué par la persistance.
+/// Pas d'identifiant : la persistance l'attribue.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceDraft {
@@ -26,9 +24,8 @@ pub struct SpaceDraft {
 }
 
 impl SpaceDraft {
-    /// Nom détouré et non vide. Le détourage n'est pas cosmétique :
-    /// `COLLATE NOCASE` ne replie pas les espaces, donc « Perso » et « Perso »
-    /// suivi d'une espace cohabiteraient, affichés à l'identique.
+    /// ⚠️ Le détourage n'est pas cosmétique : `COLLATE NOCASE` ne replie pas les
+    /// espaces, donc « Perso » et « Perso » cohabiteraient, identiques à l'écran.
     pub fn validated_name(&self) -> Result<String, ValidationError> {
         let trimmed = self.name.trim();
         if trimmed.is_empty() {
@@ -56,31 +53,9 @@ pub fn validate_move_target(id: &str, target_id: &str) -> Result<(), ValidationE
     Ok(())
 }
 
-/// `rename_all` est sans effet tant que les champs tiennent en un mot : ces
-/// tests échoueront le jour où un `created_at` s'ajoutera sans l'attribut, au
-/// lieu de laisser le front lire `undefined`.
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_space_serialises_with_the_keys_the_front_reads() {
-        let json = serde_json::to_value(Space {
-            id: "s-1".to_string(),
-            name: "Perso".to_string(),
-        })
-        .unwrap();
-
-        assert_eq!(json, serde_json::json!({ "id": "s-1", "name": "Perso" }));
-    }
-
-    #[test]
-    fn a_draft_is_read_from_the_payload_the_front_sends() {
-        let draft: SpaceDraft =
-            serde_json::from_value(serde_json::json!({ "name": "Boulot" })).unwrap();
-
-        assert_eq!(draft.name, "Boulot");
-    }
 
     fn draft(name: &str) -> SpaceDraft {
         SpaceDraft {

@@ -4,15 +4,18 @@
 //! renvoient la note **telle que persistée** (c'est elle que l'éditeur adopte) ;
 //! un identifiant inconnu renvoie `Err`, jamais un `Ok` silencieux ; et dans un
 //! `NotePatch` un champ absent signifie « ne pas toucher ».
+//!
+//! Plus rien à valider ici : le langage est un enum, donc une valeur inconnue ne
+//! passe plus la désérialisation — et ne compile plus côté front.
 
+use chrono::Utc;
 use tauri::State;
 
 use super::error::AppError;
-use super::lock;
-use crate::domain::detect;
+use super::{Db, lock};
 use crate::domain::note::{self, DisplayNote, NoteDraft, NotePatch};
 use crate::domain::view::{self, NotesQuery, NotesView};
-use crate::storage::{self, Db};
+use crate::storage;
 
 /// Notes filtrées **et** regroupées, prêtes à afficher. Aucune commande ne rend
 /// la liste brute : elle inviterait à refiltrer côté front.
@@ -22,19 +25,14 @@ pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, Ap
     let mut connection = lock(&db)?;
     let (notes, facets) = storage::notes::fetch(&mut connection, &query)?;
 
-    Ok(view::build(notes, facets, &query)?)
+    Ok(view::build(notes, facets, &query))
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<DisplayNote, AppError> {
-    let draft = detect::with_detected_language(draft);
-
-    // Validé avant de verrouiller : inutile de prendre le verrou pour un refus.
-    draft.validate()?;
-
     let mut connection = lock(&db)?;
-    let note = storage::notes::create(&mut connection, &draft, &storage::now_iso())?;
+    let note = storage::notes::create(&mut connection, draft, Utc::now())?;
 
     Ok(note::decorate_now(note))
 }
@@ -46,10 +44,8 @@ pub fn update_note(
     patch: NotePatch,
     db: State<'_, Db>,
 ) -> Result<DisplayNote, AppError> {
-    patch.validate()?;
-
     let mut connection = lock(&db)?;
-    let note = storage::notes::update(&mut connection, &id, &patch, &storage::now_iso())?;
+    let note = storage::notes::update(&mut connection, &id, &patch, Utc::now())?;
 
     Ok(note::decorate_now(note))
 }

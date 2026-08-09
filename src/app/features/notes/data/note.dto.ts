@@ -8,7 +8,6 @@ import type {
   NotesQuery as WireNotesQuery,
   NotesView as WireNotesView,
 } from '@core/ipc/bindings';
-import { FALLBACK_LANGUAGE, LanguageTag, isLanguageTag } from '@core/language/language.model';
 import {
   Note,
   NoteDraft,
@@ -28,8 +27,8 @@ import {
  *
  * Ce qui subsiste malgré la génération, c'est ce que le générateur ne peut pas
  * savoir : **JSON n'a pas de type date**, donc toute `Date` arrive et repart en
- * chaîne ISO 8601 ; un `language` est une chaîne libre côté Rust que le front
- * restreint à un `LanguageTag`.
+ * chaîne ISO 8601. Le `language`, lui, ne demande plus rien : l'enum Rust en
+ * fait une union générée que le front reçoit déjà restreinte.
  *
  * `footer` et `expiringSoon` sont aplatis dans le même objet (le `#[serde(flatten)]`
  * de `DisplayNote`) : un seul type de note côté front.
@@ -96,8 +95,7 @@ export function toNote(dto: NoteDto): Note {
     id: dto.id,
     spaceId: dto.spaceId,
     title: dto.title,
-    // Un langage inconnu dégrade l'affichage, il ne casse pas le chargement.
-    language: isLanguageTag(dto.language) ? dto.language : FALLBACK_LANGUAGE,
+    language: dto.language,
     content: dto.content,
     source: dto.source,
     tags: [...dto.tags],
@@ -169,12 +167,7 @@ export function toNotesView(dto: NotesViewDto): NotesView {
   return {
     sections: dto.sections.map(toSection),
     availableTags: [...dto.availableTags],
-    // Une facette inconnue est écartée là où une section inconnue fait échouer :
-    // un rail auquel il manque un choix reste utilisable, un canevas dont une
-    // section est illisible ne l'est pas.
-    availableLanguages: dto.availableLanguages.filter((language): language is LanguageTag =>
-      isLanguageTag(language),
-    ),
+    availableLanguages: [...dto.availableLanguages],
     isFiltering: dto.isFiltering,
     matched: dto.matched,
   };

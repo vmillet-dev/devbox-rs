@@ -1,16 +1,12 @@
-//! Table Diesel de chaque table SQLite : le miroir typé du schéma que
-//! `migrations/` construit.
+//! Miroir typé du schéma que `migrations/` construit.
 //!
-//! Écrit à la main plutôt que généré par `diesel print-schema`, qui exigerait
-//! une base à jour sur la machine de build et rendrait `cargo check` dépendant
-//! d'un fichier hors du dépôt. La contrepartie est de le tenir en phase avec les
-//! migrations ; `check_for_backend` sur les structures de ligne et les tests de
-//! `storage::` échouent bruyamment si les deux divergent.
+//! Écrit à la main plutôt que par `diesel print-schema`, qui rendrait
+//! `cargo check` dépendant d'une base à jour hors du dépôt. La contrepartie est
+//! de le tenir en phase ; `check_for_backend` sur `NoteRow` fait échouer la
+//! compilation si les deux divergent.
 //!
-//! Ce qui **n'apparaît pas** ici et vit uniquement dans le SQL des migrations :
-//! les `CHECK`, les `ON DELETE CASCADE` et la collation `NOCASE` de
-//! `note_tags.tag`. Diesel ne les modélise pas — il les subit, ce qui est le bon
-//! sens de la dépendance.
+//! Les `CHECK`, les `ON DELETE CASCADE` et la collation `NOCASE` n'apparaissent
+//! **pas** ici : Diesel ne les modélise pas, il les subit.
 
 diesel::table! {
     spaces (id) {

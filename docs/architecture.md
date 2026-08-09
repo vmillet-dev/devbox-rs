@@ -36,8 +36,8 @@ src/                Angular front-end
 ├── styles/         global theme (styles.scss) and SCSS partials
 └── testing/        test doubles, fixtures and shared providers
 src-tauri/          Rust back-end
-├── src/domain/     model and business rules — knows neither SQLite nor Tauri
-│                   (note, view, sections, space, rules)
+├── src/domain/     model and business rules — knows neither Diesel nor Tauri
+│                   (note, view, section, space, language, tag, search, error, iso8601)
 ├── src/storage/    SQLite persistence: schema, migrations, SQL only
 ├── src/commands/   Tauri adapters: lock, delegate, translate the error
 ├── src/lib.rs      Tauri builder, database setup + command registration
@@ -51,7 +51,7 @@ knows how to read and write the model, the transport layer knows how to serialis
 neither one defines it. (Before the domain layer existed, the model lived in `commands/` and
 `storage/` imported it from there, which pointed persistence at transport.)
 
-Two greps enforce it, and are worth running after any structural change:
+`bash scripts/check-layers.sh` enforces it — CI runs the same script, and in a single crate nothing in the language does. Worth running after any structural change:
 
 ```bash
 grep -rn "diesel\|tauri::" src-tauri/src/domain/      # must be empty
@@ -68,9 +68,13 @@ choice and expiry thresholds in a few milliseconds, with no fixture setup.
 | ------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `note.rs`     | what a note **is** (`Note`, lifecycle, draft, patch) and how it is **shown** (`NoteFooter`, `DisplayNote`, `decorate`) |
 | `view.rs`     | what is asked (`NotesQuery`, `NoteFilter`) and what comes back (`NotesView`, `NoteSection`), plus `build()`            |
-| `sections.rs` | chronological placement and the timezone arithmetic it needs                                                           |
+| `section.rs`  | chronological placement and the timezone arithmetic it needs                                                           |
 | `space.rs`    | the space and its move-target rule                                                                                     |
-| `rules.rs`    | validation and matching: `ValidationError`, languages, tag normalisation, search                                       |
+| `error.rs`    | `ValidationError`                                                                                                      |
+| `language.rs` | the closed `Language` enum, and `language/detect.rs` which guesses one from pasted content                             |
+| `tag.rs`      | tag normalisation                                                                                                      |
+| `search.rs`   | full-text matching                                                                                                     |
+| `iso8601.rs`  | the stored-instant format — millisecond-exact, because the canvas sorts on a TEXT column                               |
 
 The split is deliberately coarse. A module per function meant four files wrapping one
 function each, four module headers, and a reader chasing `normalize` across the tree.
@@ -292,7 +296,7 @@ Rules of the house:
 
 ### Display sections
 
-Sections are built in Rust (`src-tauri/src/domain/sections.rs`) and arrive ready to render.
+Sections are built in Rust (`src-tauri/src/domain/section.rs`) and arrive ready to render.
 The front-end preserves the order it receives and never drops or merges a section.
 
 The classification into `pinned`, `today`, `week` and `older` is **exhaustive**: apart from
@@ -544,7 +548,7 @@ biggest file in `data/`:
   The mapper parses it into a `Date` and throws a `ContractError` on an unparseable value,
   rather than letting an `Invalid Date` propagate and resurface as `NaN` in a relative-time
   label. The reverse direction (`toIsoString`) guards the same way.
-- **The front narrows what Rust leaves wide.** `language` is a free `String` in the domain;
+- **The front no longer narrows the language.** It was a free `String` in the domain;
   the front restricts it to a `LanguageTag`.
 - **A patch omits what it does not touch.** The Rust fields carry `#[specta(optional)]`, so
   the generated `NotePatch` has optional keys and `toNotePatchDto` can copy field by field —
@@ -561,7 +565,7 @@ this front-end build does not — and since Rust types it as a plain string, the
 rule it out. A section key needs no such guard any more: `NoteSectionKey` is generated, so a
 variant added in Rust breaks the assignment at compile time instead of throwing at runtime.
 
-The known list is `domain/rules.rs` (`LANGUAGES`), mirrored by `core/language/language.model.ts`
+The known list is `domain/language.rs` (`Language`), aliased by `core/language/language.model.ts`
 (`LanguageTag` + `LANGUAGE_LABELS`). Adding a language means editing both, plus a `.lang-*`
 rule in `language-badge.component.scss` and, if it should be coloured, an entry in `GRAMMARS`.
 Nothing compares the two lists, so a drift only surfaces at runtime as a fallback to `txt`.
@@ -577,7 +581,7 @@ who remember to touch the select. Three things keep it honest:
   - `language_after_patch` when a patch gives a **still-empty** note its content — the ordinary
     "+ New note, then paste", where creation sees no content at all. Applied from
     `storage::notes::update`, which calls into the domain for the rule the same way it calls
-    `rules::normalize_tags`.
+    `domain::tag::normalize`.
 - It **never replays afterwards**. Once a note has content, or carries a language other than
   `txt`, or the patch sets a language itself, nothing is guessed: re-detecting on every write
   would take the select back from the user, and there would be no way to overrule a bad guess.
@@ -684,7 +688,7 @@ passes if it carries _at least one_ of the selected values), facets scoped to th
 than to the current filter, and a selection counts as `is_filtering` — which collapses the
 canvas into a single flat `results` section. The quick filters (pinned / untriaged) do not:
 they narrow a view that stays chronological. One asymmetry: selected tags go through
-`domain::rules::normalize_tags` before hitting SQL, selected languages do not — a language is picked
+`domain::tag::normalize` before hitting SQL, selected languages do not — a language is picked
 from a closed list, not typed, and `domain::language` compares it exactly.
 
 The serialisation contract is pinned by tests in `domain/note.rs`, `domain/query.rs`,
@@ -697,7 +701,7 @@ error code serialises to `"noteNotFound"`. A serde attribute deleted by accident
 ### Input validation
 
 The back validates what the front already constrains, because a rule held only by a form is
-not held at all. `domain/rules.rs` defines a `ValidationError` carrying the offending
+not held at all. `domain/error.rs` defines a `ValidationError` carrying the offending
 `field`; commands call `draft.validate()` / `draft.validated_name()` before touching the
 connection, and `AppError` turns the refusal into `invalidInput` with `{{field}}`.
 
@@ -760,7 +764,7 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   matching is done **in Rust** (`domain::search`), because SQLite's `LOWER()` only folds ASCII
   without ICU, so `Étape` would not match `étape`. Grouping is `domain::sections`, which
   touches no connection and is therefore testable without a database.
-- **Tag normalisation lives in `domain::rules::normalize_tags`, and only there.** Trimming,
+- **Tag normalisation lives in `domain::tag::normalize`, and only there.** Trimming,
   stripping leading `#`, dropping blanks and collapsing case-insensitive duplicates (first
   spelling wins) all happen on write, so the front sends what the user typed. The returned
   tags are sorted to match what a read gives back — otherwise a note's tags would reorder

@@ -1,14 +1,15 @@
 [package]
 name = "devbox"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Couteau suisse de développeur : prise de notes, hachage, encodage"
+authors = ["Valentin MILLET"]
 edition = "2024"
+# Version des let-chains (`if x && let Some(y) = …`), utilisées dans le domaine.
+rust-version = "1.88"
+repository = "https://github.com/vmillet-dev/devbox-rs"
 # Le binaire `export-bindings` en fait un second : sans cette clé, le `cargo run`
 # nu que lance `tauri dev` ne sait plus lequel démarrer.
 default-run = "devbox"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
@@ -26,9 +27,13 @@ tauri = { version = "2", features = ["tray-icon"] }
 # (voir lib.rs). Versions figées par `=` : Specta v2 est en release candidate et
 # ne garantit pas la compatibilité entre deux rc.
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
-specta = "=2.0.0-rc.25"
+# `chrono` : sans elle, un `DateTime<Utc>` du domaine n'a pas d'impl `Type` et
+# rien ne s'exporte. Avec, il traverse en `string`, comme la chaîne ISO d'avant.
+specta = { version = "=2.0.0-rc.25", features = ["chrono"] }
 specta-typescript = "=0.0.12"
 serde = { version = "1", features = ["derive"] }
+# Requis à la compilation par l'expansion de `tauri::generate_context!`, en plus
+# des tests qui figent la forme JSON traversant le pont.
 serde_json = "1.0.151"
 diesel = { version = "2.3.12", features = ["sqlite"] }
 diesel_migrations = { version = "2.3.2", features = ["sqlite"] }
@@ -37,19 +42,49 @@ diesel_migrations = { version = "2.3.2", features = ["sqlite"] }
 # build comme sur celle de l'utilisateur.
 libsqlite3-sys = { version = "0.38.1", features = ["bundled"] }
 uuid = { version = "1.24.0", features = ["v4"] }
-chrono = "0.4.45"
+# `serde` : c'est chrono qui sérialise les `DateTime<Utc>` du domaine, en RFC 3339.
+chrono = { version = "0.4.45", features = ["serde"] }
 tauri-plugin-process = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-clipboard-manager = "2"
+# Les pannes non fatales (barre système, raccourci déjà pris) sont signalées ici.
+# `eprintln!` ne convenait pas : `windows_subsystem = "windows"` n'alloue pas de
+# console en release, donc le diagnostic se perdait là où il sert.
+tauri-plugin-log = "2"
+log = "0.4"
+thiserror = "2.0.20"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-global-shortcut = "2"
 
+# Pas de `panic = "abort"` : la détection de mutex empoisonné de `commands::lock`
+# repose sur le déroulement de pile, et l'abandon la rendrait inatteignable.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
 [lints.rust]
 unsafe_code = "forbid"
+rust_2018_idioms = { level = "warn", priority = -1 }
+# Signale les `pub` que rien n'atteint depuis l'extérieur du crate.
+unreachable_pub = "warn"
 
 [lints.clippy]
 all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Ces deux-là réclament une section `# Errors` / `# Panics` sur chaque fonction
+# publique qui renvoie un `Result` ou peut paniquer. Le crate n'est publié nulle
+# part et sa documentation tient dans `docs/architecture.md` : ce serait des
+# dizaines de sections à écrire, et à tenir à jour, pour personne.
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# Même raison : `#[must_use]` protège les appelants d'un crate publié. Ici chaque
+# fonction a son unique appelant, dans le même dépôt.
+must_use_candidate = "allow"
+# `storage::notes::…` ou `domain::note::Note` : la répétition vient du découpage
+# par sujet, elle est voulue.
+module_name_repetitions = "allow"
 
