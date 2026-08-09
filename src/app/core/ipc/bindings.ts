@@ -18,9 +18,14 @@ export const commands = {
 	/**  Transfère les notes vers `target_space_id` avant de supprimer. */
 	deleteSpace: (id: string, targetSpaceId: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_space", { id, targetSpaceId })),
 	/**
+	 *  Crée l'icône, ou remplace seulement son menu si elle existe déjà — un
+	 *  changement de langue la retraduit ainsi sans la faire clignoter.
+	 * 
 	 *  Ne renvoie **pas** de `Result` : une barre système absente n'est pas une panne
 	 *  que le front puisse traiter, et lui inventer un code ajouterait une branche
-	 *  que rien n'afficherait. L'échec est journalisé côté natif.
+	 *  que rien n'afficherait. L'échec est journalisé côté natif, et [`tray_exists`]
+	 *  empêche alors la fermeture de cacher la fenêtre là où plus rien ne saurait la
+	 *  rappeler.
 	 */
 	syncTray: (labels: TrayLabels) => __TAURI_INVOKE<void>("sync_tray", { labels }),
 };
@@ -193,6 +198,11 @@ export type SpaceDraft = {
 	name: string,
 };
 
+/**
+ *  Les libellés traversent le pont **déjà traduits** : la langue de l'interface
+ *  est une préférence du front, et une table de traductions en Rust en ferait une
+ *  seconde à tenir.
+ */
 export type TrayLabels = {
 	open: string,
 	newNote: string,

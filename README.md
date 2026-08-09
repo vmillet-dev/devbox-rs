@@ -57,7 +57,7 @@ src-tauri/src/
   spaces/         The spaces feature: model.rs, store.rs
   db.rs           Connection, migrations, schema, stored-instant format
   error.rs        The three errors and the translation between them
-  desktop/        Tray and global shortcuts — native glue, not a feature
+  desktop.rs      Tray and global shortcuts — native glue, not a feature
 docs/             Architecture notes and UI mockup
 ```
 

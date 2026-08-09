@@ -10,7 +10,7 @@ pub mod desktop;
 use tauri::Manager;
 use tauri_specta::{Builder, collect_commands};
 
-use desktop::tray::sync_tray;
+use desktop::sync_tray;
 use notes::{create_note, delete_note, query_notes, update_note};
 use spaces::{create_space, delete_space, list_spaces, rename_space};
 
@@ -81,7 +81,7 @@ pub fn run() {
             // Idem. La barre système, elle, n'est pas créée ici : elle attend
             // du front ses libellés traduits.
             #[cfg(desktop)]
-            desktop::shortcut::register(app.handle())?;
+            desktop::register_shortcuts(app.handle())?;
 
             // Seul emplacement inscriptible garanti une fois l'app installée.
             let directory = app.path().app_data_dir()?;
@@ -103,7 +103,7 @@ pub fn run() {
             |_window, _event| {
                 #[cfg(desktop)]
                 if let tauri::WindowEvent::CloseRequested { api, .. } = _event
-                    && desktop::tray::exists(_window.app_handle())
+                    && desktop::tray_exists(_window.app_handle())
                 {
                     api.prevent_close();
                     let _ = _window.hide();

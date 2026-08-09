@@ -40,7 +40,7 @@ src-tauri/          Rust back-end
 ├── src/spaces/     the spaces feature: model, SQL
 ├── src/db.rs       connection, migrations, schema, stored-instant format
 ├── src/error.rs    the three errors and the translation between them
-├── src/desktop/    tray and global shortcuts — native glue, not a feature
+├── src/desktop.rs  tray and global shortcuts — native glue, not a feature
 ├── src/lib.rs      Tauri builder, database setup + command registration
 └── capabilities/   Tauri v2 permission manifests
 ```
@@ -71,7 +71,7 @@ What is left at the root is what belongs to no single feature:
 | `error.rs`    | `ValidationError`, `StorageError`, and the `AppError` that crosses the bridge                  |
 | `db.rs`       | the connection and its `Mutex`, `open`/`open_in_memory`, plus `db::schema` and `db::migration` |
 | `db::iso8601` | the stored-instant format — millisecond-exact, because the canvas sorts on a TEXT column       |
-| `desktop/`    | tray and global shortcuts, including the `sync_tray` command that feeds the tray its labels    |
+| `desktop.rs`  | tray and global shortcuts, including the `sync_tray` command that feeds the tray its labels    |
 
 This replaces an earlier split into three technical layers (`commands/ → domain/ ← storage/`),
 which cost three files and three modules per subject and a `check-layers.sh` script in CI to
@@ -661,7 +661,7 @@ if closing it killed the shortcut.
   interface language is a front-end preference, and a translation table in Rust would be a
   second source to keep in step. The subscription re-emits on every language change, so the
   menu re-translates itself.
-- **Closing only hides when a tray exists** (`desktop::has_tray`). Without that guard, a
+- **Closing only hides when a tray exists** (`desktop::tray_exists`). Without that guard, a
   desktop with no notification area would leave a hidden window and a process nothing could
   bring back.
 - `sync_tray` is the one command that returns no `Result`. A missing tray is not a failure the
@@ -1026,6 +1026,11 @@ Component specs follow one consistent pattern:
 `cargo test` from `src-tauri/` runs everything. `cargo clippy -- -D warnings` and
 `cargo fmt --check` gate the code; `Cargo.toml` sets `unsafe_code = "forbid"` and
 `deny(clippy::all)`.
+
+Unit tests are inline `#[cfg(test)] mod tests` blocks at the bottom of the file they cover —
+the idiomatic Rust form, and the one that keeps a test next to what it asserts. Shared
+fixtures for the notes tests live in `notes::fixtures`, a `#[cfg(test)]` module in `notes.rs`.
+`src-tauri/tests/` holds the integration binaries, which see only the crate's public API.
 
 The tests split by what they need in order to run:
 

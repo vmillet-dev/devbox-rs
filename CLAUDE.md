@@ -18,7 +18,7 @@ The **notes feature is complete end to end**: front-end (spaces with creation, r
 
 `notes/` carries two extra modules of notes-specific vocabulary: `language.rs` (the closed `Language` enum plus the heuristics that guess one from pasted content) and `view.rs` (`NotesQuery`/`NotesView`, search matching, section placement).
 
-What belongs to no single feature stays at the root: `error.rs` (`ValidationError`, `StorageError`, `AppError`), `db.rs` (connection and its `Mutex`, `open`/`open_in_memory`, plus `db::schema`, `db::migration` and `db::iso8601`; `libsqlite3-sys` `bundled`, database in `app_data_dir()`), and `desktop/` (tray and global shortcuts — native glue, not a feature).
+What belongs to no single feature stays at the root: `error.rs` (`ValidationError`, `StorageError`, `AppError`), `db.rs` (connection and its `Mutex`, `open`/`open_in_memory`, plus `db::schema`, `db::migration` and `db::iso8601`; `libsqlite3-sys` `bundled`, database in `app_data_dir()`), and `desktop.rs` (tray and global shortcuts — native glue, not a feature).
 
 The two features are not fully independent, and that is deliberate rather than hidden: `notes/store.rs` calls `spaces::store::exists` before filing a note, and `spaces/store.rs` moves notes out before dropping a space — hence the shared `db/schema.rs`. `docs/architecture.md` has the details.
 
@@ -41,7 +41,7 @@ Run all commands from the repo root (`package.json` there wraps both Angular and
 - `npm test` — Angular unit tests via the `@angular/build:unit-test` builder with **Vitest** (jsdom, no browser required). `npm run test:watch` re-runs on change; `npm run test:coverage` adds a v8 coverage report with 80% thresholds.
 - `npm run lint` — ESLint (with `angular-eslint`, including its template accessibility rules) plus a Prettier format check. `npm run lint:fix` fixes what it can; `npm run format` runs Prettier alone.
 
-- `cargo test` from `src-tauri/` — unit tests live beside the code in sibling `tests.rs` files; `src-tauri/tests/` holds the three integration binaries (`notes`, `spaces`, `ipc_contract`), which see only the crate's public API. No extra setup: they run against an in-memory SQLite database.
+- `cargo test` from `src-tauri/` — unit tests are inline `#[cfg(test)] mod tests` blocks at the bottom of the file they cover; `src-tauri/tests/` holds the three integration binaries (`notes`, `spaces`, `ipc_contract`), which see only the crate's public API. No extra setup: they run against an in-memory SQLite database.
 
 - `npm run bindings` — regenerates `src/app/core/ipc/bindings.ts` from the Rust signatures without launching the app. `npm run tauri dev` does it too, at every launch.
 
