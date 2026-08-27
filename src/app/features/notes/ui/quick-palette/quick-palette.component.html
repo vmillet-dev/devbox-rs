@@ -34,7 +34,11 @@
         >
           <!-- Le clic remonte le choix ; le clavier passe par le champ, qui ne
                perd jamais le focus. -->
-          <button type="button" class="palette-option-button" (click)="highlightSet.emit(index); chosen.emit()">
+          <button
+            type="button"
+            class="palette-option-button"
+            (click)="highlightSet.emit(index); chosen.emit()"
+          >
             <span class="palette-option-head">
               <app-language-badge [language]="note.language" />
               <span class="palette-option-title">

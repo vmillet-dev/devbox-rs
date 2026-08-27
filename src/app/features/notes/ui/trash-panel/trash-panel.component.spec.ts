@@ -65,18 +65,14 @@ describe('TrashPanelComponent', () => {
 
   it('counts the last day as still the user’s', async () => {
     // Arrondi au supérieur : « effacée dans 1 j » tant qu'il reste du temps.
-    fixture.componentRef.setInput('notes', [
-      trashed({ purgeAt: new Date('2026-08-27T23:00:00Z') }),
-    ]);
+    fixture.componentRef.setInput('notes', [trashed({ purgeAt: new Date('2026-08-27T23:00:00Z') })]);
     await fixture.whenStable();
 
     expect(rows()[0].querySelector('.trash-row-meta')?.textContent).toContain('1 j');
   });
 
   it('says a note is erased today once its deadline has passed', async () => {
-    fixture.componentRef.setInput('notes', [
-      trashed({ purgeAt: new Date('2026-08-27T08:59:00Z') }),
-    ]);
+    fixture.componentRef.setInput('notes', [trashed({ purgeAt: new Date('2026-08-27T08:59:00Z') })]);
     await fixture.whenStable();
 
     expect(rows()[0].querySelector('.trash-row-meta')?.textContent).toContain("aujourd'hui");

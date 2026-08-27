@@ -36,10 +36,7 @@ export class AppMenuRegistry {
   /** Réinscrire un identifiant remplace l'entrée plutôt que de la doubler. */
   register(entries: readonly AppMenuEntry[]): void {
     const ids = new Set(entries.map((entry) => entry.id));
-    this._entries.update((current) => [
-      ...current.filter((entry) => !ids.has(entry.id)),
-      ...entries,
-    ]);
+    this._entries.update((current) => [...current.filter((entry) => !ids.has(entry.id)), ...entries]);
   }
 
   unregister(ids: readonly string[]): void {

@@ -1,11 +1,5 @@
 <div appDialogBackdrop class="trash-backdrop" (dismissed)="closed.emit()">
-  <div
-    appFocusTrap
-    class="trash-panel"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="trash-panel-title"
-  >
+  <div appFocusTrap class="trash-panel" role="dialog" aria-modal="true" aria-labelledby="trash-panel-title">
     <div class="trash-header">
       <h2 id="trash-panel-title" class="trash-title">{{ 'trash.title' | transloco }}</h2>
       <button
@@ -34,17 +28,16 @@
               </span>
               <pre class="trash-row-snippet">{{ row.snippet }}</pre>
               <span class="trash-row-meta">
-                {{ 'trash.deletedAt' | transloco: { when: row.deletedRef.key | transloco: row.deletedRef.params } }}
+                {{
+                  'trash.deletedAt'
+                    | transloco: { when: row.deletedRef.key | transloco: row.deletedRef.params }
+                }}
                 ·
                 {{ row.purgeRef.key | transloco: row.purgeRef.params }}
               </span>
             </div>
             <div class="trash-row-actions">
-              <button
-                type="button"
-                class="trash-action"
-                (click)="restoreRequested.emit(row.note.id)"
-              >
+              <button type="button" class="trash-action" (click)="restoreRequested.emit(row.note.id)">
                 {{ 'trash.restore' | transloco }}
               </button>
               <button

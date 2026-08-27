@@ -160,9 +160,7 @@ describe('QuickPaletteComponent', () => {
       fixture.componentInstance.highlightSet.subscribe((value) => (index = value));
       fixture.componentInstance.chosen.subscribe(() => (chosen += 1));
 
-      (
-        fixture.nativeElement.querySelector('.palette-create button') as HTMLButtonElement
-      ).click();
+      (fixture.nativeElement.querySelector('.palette-create button') as HTMLButtonElement).click();
       await fixture.whenStable();
 
       expect(index).toBe(2);

@@ -33,9 +33,7 @@ describe('ImageLightboxComponent', () => {
   });
 
   it('names the file, in the header and for assistive tech', () => {
-    expect(fixture.nativeElement.querySelector('.lightbox-name').textContent).toContain(
-      'capture.png',
-    );
+    expect(fixture.nativeElement.querySelector('.lightbox-name').textContent).toContain('capture.png');
     expect(image().getAttribute('alt')).toContain('capture.png');
   });
 

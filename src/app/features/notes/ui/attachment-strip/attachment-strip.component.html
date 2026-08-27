@@ -53,12 +53,7 @@
     <span class="strip-empty">{{ 'attachments.dropHint' | transloco }}</span>
   }
 
-  <button
-    type="button"
-    class="strip-add"
-    [attr.aria-disabled]="isBusy()"
-    (click)="addRequested.emit()"
-  >
+  <button type="button" class="strip-add" [attr.aria-disabled]="isBusy()" (click)="addRequested.emit()">
     {{ (isBusy() ? 'attachments.adding' : 'attachments.add') | transloco }}
   </button>
 </div>

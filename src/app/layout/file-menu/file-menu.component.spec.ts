@@ -74,9 +74,7 @@ describe('FileMenuComponent', () => {
     // Un sélecteur de fichiers natif passe devant : rouvrir le menu pour lire le
     // résultat serait absurde, d'où le bandeau sous la barre de titre.
     let ran = 0;
-    registry.register([
-      { id: 'a', labelKey: 'file.import', order: 10, run: () => (ran += 1) },
-    ]);
+    registry.register([{ id: 'a', labelKey: 'file.import', order: 10, run: () => (ran += 1) }]);
     await openMenu();
 
     optionLabelled('Importer').click();

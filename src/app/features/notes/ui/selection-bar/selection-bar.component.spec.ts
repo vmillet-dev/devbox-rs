@@ -76,7 +76,9 @@ describe('SelectionBarComponent', () => {
     input.dispatchEvent(new Event('input'));
     await fixture.whenStable();
 
-    fixture.debugElement.query(By.css('.selection-tag-form')).triggerEventHandler('submit', new Event('submit'));
+    fixture.debugElement
+      .query(By.css('.selection-tag-form'))
+      .triggerEventHandler('submit', new Event('submit'));
     await fixture.whenStable();
 
     expect(emitted).toBe('urgent');
@@ -87,7 +89,9 @@ describe('SelectionBarComponent', () => {
     let emitted = 0;
     fixture.componentInstance.tagRequested.subscribe(() => (emitted += 1));
 
-    fixture.debugElement.query(By.css('.selection-tag-form')).triggerEventHandler('submit', new Event('submit'));
+    fixture.debugElement
+      .query(By.css('.selection-tag-form'))
+      .triggerEventHandler('submit', new Event('submit'));
     await fixture.whenStable();
 
     expect(emitted).toBe(0);
