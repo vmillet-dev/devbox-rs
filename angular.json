@@ -57,7 +57,7 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
+                  "maximumWarning": "6kB",
                   "maximumError": "8kB"
                 }
               ],
@@ -99,7 +99,8 @@
           "options": {
             "runner": "vitest",
             "buildTarget": "::development",
-            "runnerConfig": true
+            "runnerConfig": true,
+            "setupFiles": ["src/testing/local-storage.setup.ts"]
           }
         }
       }

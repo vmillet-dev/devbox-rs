@@ -5,5 +5,8 @@
     "outDir": "./out-tsc/spec",
     "types": []
   },
-  "include": ["src/**/*.spec.ts", "src/**/*.d.ts"]
+  // `src/testing` is otherwise only reachable through the specs that import it;
+  // a setup file, which nothing imports, would be bundled without being
+  // type-checked — and the builder warns about exactly that.
+  "include": ["src/**/*.spec.ts", "src/**/*.d.ts", "src/testing/**/*.ts"]
 }

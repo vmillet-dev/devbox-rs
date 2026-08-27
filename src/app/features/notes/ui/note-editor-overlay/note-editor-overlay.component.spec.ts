@@ -325,6 +325,69 @@ describe('NoteEditorOverlayComponent', () => {
     });
   });
 
+  describe('pasting an image', () => {
+    /**
+     * Only the *types* are populated: the component reads nothing else, and the
+     * bytes are re-read natively, where the system clipboard hands them over
+     * already decoded.
+     */
+    function pasteEvent(types: string[], files: File[] = []): Event {
+      const event = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: { types, files } });
+      return event;
+    }
+
+    async function openNote(): Promise<string[]> {
+      fixture.componentRef.setInput('note', createNote({ content: '' }));
+      await fixture.whenStable();
+      const pasted: string[] = [];
+      fixture.componentInstance.imagePasted.subscribe(() => pasted.push('image'));
+      return pasted;
+    }
+
+    it('turns an image into an attachment request, since a textarea cannot hold one', async () => {
+      const pasted = await openNote();
+      const event = pasteEvent(['Files'], [new File([], 'shot.png', { type: 'image/png' })]);
+
+      bodyEditor().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(pasted).toEqual(['image']);
+      // Letting the paste through would drop it on the floor: the field is text.
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('recognises an image announced by type alone', async () => {
+      const pasted = await openNote();
+
+      bodyEditor().dispatchEvent(pasteEvent(['image/png']));
+      await fixture.whenStable();
+
+      expect(pasted).toEqual(['image']);
+    });
+
+    it('leaves a paste carrying text to the field, which handles it natively', async () => {
+      const pasted = await openNote();
+      // A screenshot copied from a browser carries both: the text wins.
+      const event = pasteEvent(['text/plain', 'image/png']);
+
+      bodyEditor().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(pasted).toEqual([]);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it('ignores a paste that carries neither text nor an image', async () => {
+      const pasted = await openNote();
+
+      bodyEditor().dispatchEvent(pasteEvent(['application/pdf']));
+      await fixture.whenStable();
+
+      expect(pasted).toEqual([]);
+    });
+  });
+
   describe('source editing', () => {
     function sourceInput(): HTMLInputElement {
       return fixture.nativeElement.querySelector('.overlay-source-input');

@@ -5,8 +5,9 @@ import { Space } from '@features/notes/model/space.model';
 import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
+import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
-import { NoteCardComponent, NoteMove } from './note-card.component';
+import { NoteActivation, NoteCardComponent, NoteMove } from './note-card.component';
 
 describe('NoteCardComponent', () => {
   let fixture: ComponentFixture<NoteCardComponent>;
@@ -158,6 +159,61 @@ describe('NoteCardComponent', () => {
     fixture.debugElement.query(By.css('.card')).triggerEventHandler('click', new MouseEvent('click'));
 
     expect(emitted).toBe('note-42');
+  });
+
+  it('reports the click modifiers instead of deciding what they mean', async () => {
+    // Ctrl checks, Shift extends the range, a bare click opens — the file-list
+    // convention. Which store call that becomes is the page's business.
+    fixture.componentRef.setInput('note', createNote({ id: 'note-42' }));
+    await fixture.whenStable();
+    const activations: NoteActivation[] = [];
+    fixture.componentInstance.opened.subscribe((activation) => activations.push(activation));
+    const card = fixture.debugElement.query(By.css('.card'));
+
+    card.triggerEventHandler('click', new MouseEvent('click', { ctrlKey: true }));
+    card.triggerEventHandler('click', new MouseEvent('click', { shiftKey: true }));
+
+    expect(activations).toEqual([
+      { noteId: 'note-42', toggleChecked: true, extendRange: false },
+      { noteId: 'note-42', toggleChecked: false, extendRange: true },
+    ]);
+  });
+
+  it('checks the note without opening it', async () => {
+    // The checkbox is a control of its own, sitting on a card that is a button.
+    fixture.componentRef.setInput('note', createNote({ id: 'note-42' }));
+    await fixture.whenStable();
+    let checked: string | undefined;
+    let opened = 0;
+    fixture.componentInstance.checkToggled.subscribe((id) => (checked = id));
+    fixture.componentInstance.opened.subscribe(() => (opened += 1));
+
+    fixture.debugElement.query(By.css('.card-check')).triggerEventHandler('click', new MouseEvent('click'));
+
+    expect(checked).toBe('note-42');
+    expect(opened).toBe(0);
+  });
+
+  describe('{{fields}}', () => {
+    it('offers the form instead of a copy, which would paste the raw snippet', async () => {
+      fixture.componentRef.setInput(
+        'note',
+        createNote({ id: 'note-42', placeholders: [{ name: 'host', defaultValue: '' }] }),
+      );
+      await fixture.whenStable();
+      let filled: string | undefined;
+      fixture.componentInstance.fillRequested.subscribe((id) => (filled = id));
+
+      expect(fixture.debugElement.query(By.directive(CopyButtonComponent))).toBeNull();
+      fixture.debugElement.query(By.css('.card-fill')).triggerEventHandler('click', new MouseEvent('click'));
+
+      expect(filled).toBe('note-42');
+    });
+
+    it('falls back to a plain copy button for a note without fields', () => {
+      expect(fixture.debugElement.query(By.css('.card-fill'))).toBeNull();
+      expect(fixture.debugElement.query(By.directive(CopyButtonComponent))).not.toBeNull();
+    });
   });
 
   describe('actions menu', () => {

@@ -127,4 +127,33 @@ describe('TrashPanelComponent', () => {
 
     expect(actionsOf(1)[1].textContent).not.toContain('Confirmer');
   });
+
+  describe('emptying the whole trash', () => {
+    function emptyButton(): HTMLButtonElement {
+      return fixture.nativeElement.querySelector('.trash-footer .trash-action');
+    }
+
+    it('asks for a confirmation too, since it takes every note at once', async () => {
+      let emitted = 0;
+      fixture.componentInstance.emptyRequested.subscribe(() => (emitted += 1));
+
+      emptyButton().click();
+      await fixture.whenStable();
+      expect(emitted).toBe(0);
+      expect(emptyButton().textContent).toContain('Tout effacer ?');
+
+      emptyButton().click();
+      await fixture.whenStable();
+      expect(emitted).toBe(1);
+      // The confirmation is spent: the next click starts the two steps over.
+      expect(emptyButton().textContent).toContain('Vider la corbeille');
+    });
+
+    it('is not offered when there is nothing to erase', async () => {
+      fixture.componentRef.setInput('notes', []);
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.querySelector('.trash-footer')).toBeNull();
+    });
+  });
 });

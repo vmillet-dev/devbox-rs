@@ -86,6 +86,32 @@ describe('NoteSectionComponent', () => {
     expect(emitted).toBe('a');
   });
 
+  it('forwards the remaining card events untouched, deciding nothing itself', async () => {
+    // The section is a pass-through: it owns the heading and the grid, and the
+    // page is what turns each of these into a store call.
+    fixture.componentRef.setInput('section', createSection('today', [createNote({ id: 'a' })]));
+    await fixture.whenStable();
+    const emitted: unknown[] = [];
+    fixture.componentInstance.noteChecked.subscribe((id) => emitted.push(['checked', id]));
+    fixture.componentInstance.noteMoved.subscribe((move) => emitted.push(['moved', move]));
+    fixture.componentInstance.noteDeleted.subscribe((id) => emitted.push(['deleted', id]));
+    fixture.componentInstance.fillRequested.subscribe((id) => emitted.push(['fill', id]));
+
+    const card = fixture.debugElement.query(By.directive(NoteCardComponent))
+      .componentInstance as NoteCardComponent;
+    card.checkToggled.emit('a');
+    card.moveRequested.emit({ noteId: 'a', spaceId: 'work' });
+    card.deleteRequested.emit('a');
+    card.fillRequested.emit('a');
+
+    expect(emitted).toEqual([
+      ['checked', 'a'],
+      ['moved', { noteId: 'a', spaceId: 'work' }],
+      ['deleted', 'a'],
+      ['fill', 'a'],
+    ]);
+  });
+
   it('does not show the create-ghost button unless requested by the section', () => {
     expect(fixture.debugElement.query(By.css('.ghost'))).toBeNull();
   });

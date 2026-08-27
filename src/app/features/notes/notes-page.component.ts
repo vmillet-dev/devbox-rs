@@ -283,15 +283,30 @@ export class NotesPageComponent {
   /**
    * Joindre exige une note **en base** : le brouillon est donc enregistré au
    * passage. Une note à laquelle on attache un fichier n'est plus vide.
+   *
+   * Le magasin de pièces jointes est rebranché **ici**, sans attendre l'effet
+   * qui suit `persistedNoteId` : celui-ci ne s'exécute qu'au prochain cycle de
+   * détection, soit après l'écriture qui suit — qui, sans note courante,
+   * n'attacherait rien et ne le dirait pas. `openFor` est idempotent, le
+   * rebranchement est donc sans effet quand la note existait déjà.
    */
+  private async noteToAttachTo(): Promise<string | null> {
+    const noteId = await this.store.materialiseDraft();
+    if (noteId) {
+      await this.attachments.openFor(noteId);
+    }
+
+    return noteId;
+  }
+
   protected async onAttachRequested(): Promise<void> {
-    if (await this.store.materialiseDraft()) {
+    if (await this.noteToAttachTo()) {
       await this.attachments.attach();
     }
   }
 
   protected async onImagePasted(): Promise<void> {
-    if (!(await this.store.materialiseDraft())) return;
+    if (!(await this.noteToAttachTo())) return;
 
     if (!(await this.attachments.attachClipboardImage(this.clock.now()))) {
       this.notifier.notify({ ref: { key: 'attachments.pasteEmpty' } });
@@ -317,7 +332,7 @@ export class NotesPageComponent {
   /** Un dépôt ne vise quelque chose que si une note est ouverte pour le recevoir. */
   private async onFilesDropped(paths: readonly string[]): Promise<void> {
     if (this.store.selectedNote() === null || paths.length === 0) return;
-    if (!(await this.store.materialiseDraft())) return;
+    if (!(await this.noteToAttachTo())) return;
 
     for (const path of paths) {
       await this.attachments.attachPath(path);
