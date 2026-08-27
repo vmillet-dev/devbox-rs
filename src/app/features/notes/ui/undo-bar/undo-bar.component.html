@@ -1,0 +1,14 @@
+<div class="undo-bar" role="status">
+  <span class="undo-text">{{ 'undo.deleted' | transloco: { count: count() } }}</span>
+  <button type="button" class="undo-action" (click)="undone.emit()">
+    {{ 'undo.restore' | transloco }}
+  </button>
+  <button
+    type="button"
+    class="undo-dismiss"
+    [attr.aria-label]="'undo.dismiss' | transloco"
+    (click)="dismissed.emit()"
+  >
+    <span aria-hidden="true">✕</span>
+  </button>
+</div>

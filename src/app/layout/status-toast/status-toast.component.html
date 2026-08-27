@@ -1,0 +1,15 @@
+@if (notifier.status(); as status) {
+  <!-- role="status" et non "alert" : une réussite ne justifie pas de couper la
+       parole à un lecteur d'écran. -->
+  <div class="status-toast" role="status">
+    <span class="status-text">{{ status.key | transloco: status.params }}</span>
+    <button
+      type="button"
+      class="status-dismiss"
+      [attr.aria-label]="'errors.dismiss' | transloco"
+      (click)="notifier.dismiss()"
+    >
+      <span aria-hidden="true">✕</span>
+    </button>
+  </div>
+}

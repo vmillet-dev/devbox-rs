@@ -28,7 +28,13 @@
     "untitled": "Untitled",
     "pinnedState": "Pinned note",
     "loading": "Loading notes…",
-    "noResults": "No note matches this search."
+    "noResults": "No note matches this search.",
+    "attachmentsCount": "{{count}} attachment(s)",
+    "placeholdersCount": "{{count}} field(s) to fill",
+    "selectNote": "Select note {{title}}",
+    "keyboardHint": "↑↓←→ move · Enter open · C copy · X select · Del trash",
+    "trash": "Trash",
+    "manageTags": "Manage"
   },
   "filters": {
     "groupLabel": "Filter notes",
@@ -96,13 +102,31 @@
     "invalidInput": "The engine rejected this value: {{field}}.",
     "storageUnavailable": "Storage is unavailable. Restart DevBox.",
     "updateFailed": "The update failed. DevBox remains usable on its current version.",
-    "updateCheckFailed": "The update check failed. Try again later."
+    "updateCheckFailed": "The update check failed. Try again later.",
+    "attachmentGone": "This attachment no longer exists.",
+    "fileAccess": "The file cannot be reached.",
+    "importFormat": "This file is not a DevBox export this version can read.",
+    "trashLoadFailed": "Could not load the trash.",
+    "trashActionFailed": "The trash operation failed.",
+    "tagsLoadFailed": "Could not load tags.",
+    "tagActionFailed": "The tag operation failed.",
+    "bulkActionFailed": "The action on the selection failed.",
+    "exportFailed": "The export failed. Nothing was written.",
+    "importFailed": "The import failed.",
+    "shareFailed": "Could not prepare the share.",
+    "attachFailed": "Could not add the attachment.",
+    "attachmentReadFailed": "Could not read the attachment.",
+    "attachmentDeleteFailed": "Could not remove the attachment.",
+    "copyFailed": "Copying to the clipboard failed.",
+    "attachmentOpenFailed": "Could not open the attachment with an application.",
+    "attachmentSaveFailed": "Could not save the attachment to that location."
   },
   "tray": {
     "open": "Open DevBox",
     "newNote": "New note",
     "capture": "Paste from clipboard",
-    "quit": "Quit DevBox"
+    "quit": "Quit DevBox",
+    "palette": "Quick paste"
   },
   "locale": {
     "groupLabel": "Interface language",
@@ -134,5 +158,107 @@
     "developedBy": "Developed by",
     "repository": "Repository",
     "close": "Close"
+  },
+  "trash": {
+    "title": "Trash",
+    "close": "Close trash",
+    "empty": "The trash is empty.",
+    "loading": "Loading…",
+    "retentionHint": "Deleted notes are kept for 30 days, then erased.",
+    "restore": "Restore",
+    "purge": "Delete for good",
+    "purgeConfirm": "Confirm?",
+    "emptyTrash": "Empty the trash",
+    "emptyTrashConfirm": "Erase everything?",
+    "deletedAt": "deleted {{when}}",
+    "purgesIn": "erased in {{count}}d",
+    "purgesToday": "erased today",
+    "untitled": "Untitled"
+  },
+  "tagManager": {
+    "title": "Manage tags",
+    "close": "Close tag management",
+    "empty": "No tags yet.",
+    "loading": "Loading…",
+    "noteCount": "{{count}} note(s)",
+    "selectLabel": "Select tag {{tag}}",
+    "targetLabel": "Target name",
+    "targetPlaceholder": "tag name",
+    "rename": "Rename",
+    "merge": "Merge",
+    "delete": "Delete",
+    "deleteConfirm": "Confirm?",
+    "hint": "Renaming onto an existing tag merges the two.",
+    "selectionHint": "Select the tags to merge, then type their common name."
+  },
+  "selection": {
+    "label": "Selection actions",
+    "count": "{{count}} selected",
+    "clear": "Clear selection",
+    "moveTo": "Move to",
+    "addTagLabel": "Add a tag to the selection",
+    "addTagPlaceholder": "+ tag",
+    "delete": "Move to trash",
+    "deleteConfirm": "Confirm?"
+  },
+  "palette": {
+    "title": "Quick paste",
+    "placeholder": "Search a snippet…",
+    "searchLabel": "Search a snippet to paste",
+    "resultsLabel": "Matching snippets",
+    "empty": "No snippet matches.",
+    "hint": "↑↓ move · Enter copy or create · Tab open · Esc close",
+    "close": "Close the palette",
+    "createNote": "+ Create a note “{{query}}”"
+  },
+  "placeholders": {
+    "title": "Fill the fields",
+    "hint": "This snippet expects {{count}} value(s).",
+    "fieldLabel": "Value for {{name}}",
+    "copy": "Copy filled",
+    "copyRaw": "Copy as is",
+    "cancel": "Cancel"
+  },
+  "attachments": {
+    "title": "Attachments",
+    "add": "+ File",
+    "adding": "Adding…",
+    "remove": "Remove {{name}}",
+    "preview": "Preview of {{name}}",
+    "size": "{{size}} KB",
+    "openPreview": "Show {{name}}",
+    "closePreview": "Close preview",
+    "open": "Open {{name}}",
+    "save": "Save {{name}} as…",
+    "saved": "Attachment saved to {{path}}.",
+    "added": "“{{name}}” attached to the note.",
+    "dropHint": "Drop a file, or paste an image (Ctrl+V), to attach it.",
+    "pasteEmpty": "The clipboard holds no image.",
+    "zoom": "Enlarge {{name}}",
+    "closeZoom": "Close the image"
+  },
+  "undo": {
+    "deleted": "{{count}} note(s) moved to trash",
+    "restore": "Undo",
+    "dismiss": "Dismiss"
+  },
+  "file": {
+    "menuLabel": "File",
+    "import": "Import…",
+    "exportAll": "Export everything…",
+    "exportSpace": "Export active space…",
+    "exportSelection": "Export selection…",
+    "copyMarkdown": "Copy selection as Markdown",
+    "quit": "Quit DevBox",
+    "quitConfirm": "Confirm?",
+    "imported": "{{notes}} note(s) imported from {{path}}, {{skipped}} skipped.",
+    "importedNothing": "Nothing to import: those {{skipped}} note(s) are already in your library.",
+    "exported": "{{notes}} note(s) exported to {{path}}.",
+    "copied": "{{notes}} note(s) copied as Markdown to the clipboard.",
+    "needsSelection": "Select at least one note.",
+    "emptyLibrary": "Nothing to export: this library has no notes."
+  },
+  "shortcuts": {
+    "unavailable": "Global shortcut(s) unavailable: {{list}}. Another application is already using them."
   }
 }

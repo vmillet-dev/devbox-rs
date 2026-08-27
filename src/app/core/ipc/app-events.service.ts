@@ -6,7 +6,7 @@ import { listen } from '@tauri-apps/api/event';
  * `src-tauri/src/lib.rs` : une faute de frappe d'un côté produit un abonnement
  * silencieusement inerte, que rien ne signale.
  */
-export type AppEventTopic = 'devbox:capture' | 'devbox:new-note';
+export type AppEventTopic = 'devbox:capture' | 'devbox:new-note' | 'devbox:palette';
 
 /** Se désabonne. Rien à faire si l'abonnement n'a jamais abouti. */
 export type Unlisten = () => void;

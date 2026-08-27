@@ -5,14 +5,20 @@
 
 use chrono::{DateTime, Utc};
 
+use devbox_lib::attachments::model::Attachment;
 use devbox_lib::db::iso8601;
 use devbox_lib::error::StorageError;
 use devbox_lib::error::ValidationError;
 use devbox_lib::error::{AppError, ErrorCode};
 use devbox_lib::notes::language::Language;
-use devbox_lib::notes::model::{DisplayNote, Note, NoteDraft, NoteLifecycle, NotePatch, decorate};
+use devbox_lib::notes::model::{
+    DisplayNote, Note, NoteDraft, NoteLifecycle, NotePatch, TagUsage, decorate,
+};
+use devbox_lib::notes::trash;
 use devbox_lib::notes::view::{NoteFilter, NoteSection, NoteSectionKey, NotesQuery, NotesView};
 use devbox_lib::spaces::model::{Space, SpaceDraft};
+use devbox_lib::transfer;
+use devbox_lib::transfer::model::{Bundle, ImportReport};
 
 const NOW: &str = "2026-07-25T09:00:00.000Z";
 
@@ -378,4 +384,118 @@ fn an_instant_crosses_as_a_string_the_front_can_read_as_a_date() {
 
     let updated_at = json["updatedAt"].as_str().unwrap();
     assert!(iso8601::parse(updated_at).is_ok());
+}
+
+// --- Corbeille, pièces jointes, échange -------------------------------------
+
+#[test]
+fn a_trashed_note_is_a_note_with_two_dates_more() {
+    // `flatten` : le panneau de corbeille lit une note ordinaire, pas un objet
+    // imbriqué qu'il faudrait déballer.
+    let json = serde_json::to_value(trash::trashed(sample(), at(NOW))).unwrap();
+
+    assert_eq!(json["id"], "n-1");
+    // Les deux dates traversent en chaîne, comme les autres : c'est la colonne
+    // qui exige un format précis, pas le pont.
+    assert!(iso8601::parse(json["deletedAt"].as_str().unwrap()).is_ok());
+    assert!(iso8601::parse(json["purgeAt"].as_str().unwrap()).is_ok());
+}
+
+#[test]
+fn a_decorated_note_announces_its_fields_and_its_attachments() {
+    let mut note = sample();
+    note.content = "psql -h {{host}} -p {{port=5432}}".to_string();
+
+    let json = serde_json::to_value(displayed(note)).unwrap();
+
+    assert_eq!(json["placeholders"][0]["name"], "host");
+    assert_eq!(json["placeholders"][1]["defaultValue"], "5432");
+    // Renseigné par ce qui tient la connexion ; zéro par défaut.
+    assert_eq!(json["attachmentCount"], 0);
+}
+
+#[test]
+fn an_attachment_serialises_with_camel_case_keys() {
+    let json = serde_json::to_value(Attachment {
+        id: "a-1".to_string(),
+        note_id: "n-1".to_string(),
+        file_name: "capture.png".to_string(),
+        mime_type: "image/png".to_string(),
+        byte_size: 42,
+        created_at: at(NOW),
+    })
+    .unwrap();
+
+    assert_eq!(json["noteId"], "n-1");
+    assert_eq!(json["fileName"], "capture.png");
+    assert_eq!(json["mimeType"], "image/png");
+    assert_eq!(json["byteSize"], 42);
+    assert!(json.get("note_id").is_none());
+}
+
+#[test]
+fn a_tag_usage_carries_its_count_under_a_camel_case_key() {
+    let json = serde_json::to_value(TagUsage {
+        tag: "auth".to_string(),
+        note_count: 3,
+    })
+    .unwrap();
+
+    assert_eq!(json["tag"], "auth");
+    assert_eq!(json["noteCount"], 3);
+}
+
+#[test]
+fn an_import_report_names_what_it_skipped() {
+    let json = serde_json::to_value(ImportReport {
+        spaces_created: 1,
+        notes_imported: 2,
+        notes_skipped: 3,
+    })
+    .unwrap();
+
+    assert_eq!(json["spacesCreated"], 1);
+    assert_eq!(json["notesImported"], 2);
+    assert_eq!(json["notesSkipped"], 3);
+}
+
+#[test]
+fn an_export_bundle_reads_back_the_notes_it_wrote() {
+    // Le fichier est le contrat entre deux versions de DevBox, pas seulement
+    // entre le Rust et le front.
+    let bundle = Bundle {
+        version: transfer::model::FORMAT_VERSION,
+        exported_at: at(NOW),
+        spaces: vec![Space {
+            id: "s-1".to_string(),
+            name: "Perso".to_string(),
+        }],
+        notes: vec![sample()],
+    };
+    let json = serde_json::to_string(&bundle).unwrap();
+
+    assert!(json.contains("\"exportedAt\""));
+    let read = transfer::model::read_bundle(&json).unwrap();
+    assert_eq!(read.notes[0].id, "n-1");
+}
+
+#[test]
+fn every_error_code_crosses_as_a_camel_case_string() {
+    // La table `CODE_KEYS` du front est indexée dessus : un `snake_case` ici
+    // n'y trouverait aucune clé de traduction.
+    for (error, expected) in [
+        (
+            StorageError::AttachmentNotFound("a-1".to_string()),
+            "attachmentNotFound",
+        ),
+        (StorageError::File("disk".to_string()), "fileAccess"),
+        (
+            StorageError::ImportFormat("nope".to_string()),
+            "importFormat",
+        ),
+    ] {
+        let json = serde_json::to_value(AppError::from(error)).unwrap();
+
+        assert_eq!(json["code"], expected);
+    }
 }

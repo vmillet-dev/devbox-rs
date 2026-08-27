@@ -3,10 +3,11 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { APP_NAME } from '@core/app-info/app-info.service';
 import { APP_LOCALES, LocaleService } from '@core/i18n/locale.service';
 import { AboutMenuComponent } from '../about-menu/about-menu.component';
+import { FileMenuComponent } from '../file-menu/file-menu.component';
 
 @Component({
   selector: 'app-titlebar',
-  imports: [TranslocoPipe, AboutMenuComponent],
+  imports: [TranslocoPipe, FileMenuComponent, AboutMenuComponent],
   templateUrl: './titlebar.component.html',
   styleUrl: './titlebar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

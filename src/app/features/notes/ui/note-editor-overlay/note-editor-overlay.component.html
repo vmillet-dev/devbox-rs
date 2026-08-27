@@ -130,6 +130,19 @@
         </span>
       </div>
 
+      <app-attachment-strip
+        [attachments]="attachments()"
+        [isBusy]="attachmentsBusy()"
+        [previewId]="attachmentPreviewId()"
+        [previewData]="attachmentPreviewData()"
+        (addRequested)="attachmentAddRequested.emit()"
+        (removeRequested)="attachmentRemoveRequested.emit($event)"
+        (previewToggled)="attachmentPreviewToggled.emit($event)"
+        (openRequested)="attachmentOpenRequested.emit($event)"
+        (saveRequested)="attachmentSaveRequested.emit($event)"
+        (zoomRequested)="imageZoomRequested.emit()"
+      />
+
       <!-- Deux couches superposées plutôt qu'une bascule aperçu/édition : le
            visualiseur colorie le brouillon en dessous, le <textarea> reçoit la
            frappe par-dessus avec un texte transparent et un curseur visible.
@@ -146,6 +159,7 @@
             [placeholder]="'editor.emptyBody' | transloco"
             [value]="draftContent()"
             (input)="onBodyInput($event, bodyEditor.value)"
+            (paste)="onPaste($event)"
             (blur)="commitContent()"
           ></textarea>
         </div>

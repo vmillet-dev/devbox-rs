@@ -11,12 +11,96 @@ export const commands = {
 	queryNotes: (query: NotesQuery) => typedError<NotesView, AppError>(__TAURI_INVOKE("query_notes", { query })),
 	createNote: (draft: NoteDraft) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("create_note", { draft })),
 	updateNote: (id: string, patch: NotePatch) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("update_note", { id, patch })),
+	/**
+	 *  **Met à la corbeille** : la note revient par [`restore_notes`] pendant
+	 *  [`trash::RETENTION`]. Rien ne supprime définitivement sans passer par là.
+	 */
 	deleteNote: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_note", { id })),
+	/**
+	 *  Renvoie le nombre de notes réellement mises à la corbeille : c'est ce que
+	 *  l'annulation propose de reprendre.
+	 */
+	deleteNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("delete_notes", { ids })),
+	restoreNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("restore_notes", { ids })),
+	/**
+	 *  Purge d'abord ce que la rétention a rattrapé : la corbeille ne doit jamais
+	 *  montrer une note qu'un redémarrage effacerait.
+	 */
+	listTrash: () => typedError<TrashedNote[], AppError>(__TAURI_INVOKE("list_trash")),
+	purgeNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("purge_notes", { ids })),
+	emptyTrash: () => typedError<number, AppError>(__TAURI_INVOKE("empty_trash")),
+	moveNotes: (ids: string[], spaceId: string) => typedError<number, AppError>(__TAURI_INVOKE("move_notes", { ids, spaceId })),
+	/**
+	 *  Ajoute des tags à toute une sélection. Normalisés ici comme partout ailleurs,
+	 *  sinon un `#urgent` saisi dans la barre d'actions ne rejoindrait pas le
+	 *  `urgent` déjà en base.
+	 */
+	tagNotes: (ids: string[], tags: string[]) => typedError<number, AppError>(__TAURI_INVOKE("tag_notes", { ids, tags })),
+	listTags: () => typedError<TagUsage[], AppError>(__TAURI_INVOKE("list_tags")),
+	/**
+	 *  Un renommage vers un tag déjà existant **est** une fusion : la base ne peut
+	 *  pas porter deux fois le même tag sur une note.
+	 */
+	renameTag: (tag: string, into: string) => typedError<number, AppError>(__TAURI_INVOKE("rename_tag", { tag, into })),
+	mergeTags: (tags: string[], into: string) => typedError<number, AppError>(__TAURI_INVOKE("merge_tags", { tags, into })),
+	/**  Retire l'étiquette du corpus ; les notes, elles, restent. */
+	deleteTag: (tag: string) => typedError<number, AppError>(__TAURI_INVOKE("delete_tag", { tag })),
+	/**
+	 *  Remplit les `{{champs}}` d'un contenu. Pas de base ici : la palette remplit
+	 *  aussi bien un brouillon non enregistré que la note qu'elle vient d'ouvrir.
+	 */
+	fillPlaceholders: (content: string, values: { [key in string]: string }) => __TAURI_INVOKE<string>("fill_placeholders", { content, values }),
 	listSpaces: () => typedError<Space[], AppError>(__TAURI_INVOKE("list_spaces")),
 	createSpace: (draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("create_space", { draft })),
 	renameSpace: (id: string, draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("rename_space", { id, draft })),
 	/**  Transfers notes to `target_space_id` before deleting. */
 	deleteSpace: (id: string, targetSpaceId: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_space", { id, targetSpaceId })),
+	attachFile: (noteId: string, path: string) => typedError<Attachment, AppError>(__TAURI_INVOKE("attach_file", { noteId, path })),
+	/**
+	 *  Attache l'image du presse-papier.
+	 * 
+	 *  Les octets ne traversent **pas** le pont : le presse-papier est lu côté
+	 *  natif, où l'image arrive en RGBA brut, puis encodée en PNG. La faire monter
+	 *  jusqu'au front pour la redescendre coûterait deux conversions et plusieurs
+	 *  mégaoctets de JSON.
+	 */
+	attachClipboardImage: (noteId: string, fileName: string) => typedError<Attachment, AppError>(__TAURI_INVOKE("attach_clipboard_image", { noteId, fileName })),
+	listAttachments: (noteId: string) => typedError<Attachment[], AppError>(__TAURI_INVOKE("list_attachments", { noteId })),
+	/**
+	 *  `data:<mime>;base64,…`, directement affichable dans un `<img>` ou
+	 *  téléchargeable par le front.
+	 */
+	readAttachment: (id: string) => typedError<string, AppError>(__TAURI_INVOKE("read_attachment", { id })),
+	/**
+	 *  Ouvre la pièce jointe avec l'application par défaut du système.
+	 * 
+	 *  L'appel part du **Rust**, pas de la `WebView` : les capacités contrôlent
+	 *  l'API que la `WebView` invoque, et ouvrir un chemin depuis le front aurait
+	 *  demandé d'autoriser `opener:allow-open-path` sur un dossier entier.
+	 */
+	openAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("open_attachment", { id })),
+	/**
+	 *  Recopie la pièce jointe là où l'utilisateur l'a demandé. Le chemin vient d'un
+	 *  sélecteur natif ; l'écriture reste ici, seul endroit qui connaît le dossier.
+	 */
+	saveAttachment: (id: string, path: string) => typedError<null, AppError>(__TAURI_INVOKE("save_attachment", { id, path })),
+	deleteAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_attachment", { id })),
+	/**
+	 *  Tout le corpus, ou le seul espace actif. Les espaces voyagent avec les notes :
+	 *  sans eux, l'import n'aurait qu'un identifiant à ranger nulle part.
+	 */
+	exportNotes: (path: string, spaceId: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_notes", { path, spaceId })),
+	/**
+	 *  Même fichier, mêmes règles, mais restreint aux notes désignées : c'est ce
+	 *  qu'on envoie à quelqu'un plutôt que toute sa bibliothèque.
+	 */
+	exportSelection: (path: string, ids: string[]) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_selection", { path, ids })),
+	importNotes: (path: string) => typedError<ImportReport, AppError>(__TAURI_INVOKE("import_notes", { path })),
+	/**
+	 *  Rendu Markdown d'une sélection, que le front pose dans le presse-papier.
+	 *  Rien n'est envoyé nulle part : « partager » s'arrête au presse-papier.
+	 */
+	shareNotes: (ids: string[]) => typedError<string, AppError>(__TAURI_INVOKE("share_notes", { ids })),
 	/**
 	 *  Creates the icon, or replaces only its menu if it already exists — a
 	 *  language change thus re-translates it without making it flicker.
@@ -28,6 +112,12 @@ export const commands = {
 	 *  could call it back.
 	 */
 	syncTray: (labels: TrayLabels) => __TAURI_INVOKE<void>("sync_tray", { labels }),
+	/**
+	 *  Ce que le front affiche au démarrage quand un raccourci n'a pas pu être pris.
+	 * 
+	 *  Une liste vide est le cas courant ; elle ne produit aucun message.
+	 */
+	unavailableShortcuts: () => __TAURI_INVOKE<string[]>("unavailable_shortcuts"),
 };
 
 /* Types */
@@ -39,6 +129,20 @@ export type AppError = {
 	detail: string,
 };
 
+export type Attachment = {
+	id: string,
+	noteId: string,
+	/**  Nom d'origine, celui qu'on affiche. Jamais utilisé comme chemin. */
+	fileName: string,
+	mimeType: string,
+	/**
+	 *  `u32` et non `u64` : Specta refuse ce que JSON ne rend pas sans perte, et
+	 *  [`MAX_BYTES`] tient largement dedans.
+	 */
+	byteSize: number,
+	createdAt: string,
+};
+
 /**
  *  `flatten` flattens the note into the same JSON object: the front end only has a single
  *  note type.
@@ -46,6 +150,16 @@ export type AppError = {
 export type DisplayNote = {
 	footer: NoteFooter,
 	expiringSoon: boolean,
+	/**
+	 *  Champs `{{…}}` du contenu : la carte propose de les remplir avant de
+	 *  copier. Dérivés, jamais écrits.
+	 */
+	placeholders: Placeholder[],
+	/**
+	 *  Renseigné après coup par ce qui dispose d'une connexion — `decorate` ne
+	 *  lit pas la base. Zéro tant que personne ne l'a rempli.
+	 */
+	attachmentCount: number,
 } & Note;
 
 /**
@@ -55,11 +169,30 @@ export type DisplayNote = {
  *  No "schema too recent" variant: that failure aborts startup during the
  *  migration, so no command can ever return it.
  */
-export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" | 
+export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" | "attachmentNotFound" | 
+/**  Reading or writing a file outside the database failed. */
+"fileAccess" | 
+/**  The chosen file is not an export bundle this version can read. */
+"importFormat" | 
 /**  The `field` parameter names the offending field. */
 "invalidInput" | 
 /**  Poisoned mutex: a command panicked while holding the connection. */
 "storageUnavailable" | "storage";
+
+export type ExportReport = {
+	notes: number,
+	spaces: number,
+};
+
+/**
+ *  `skipped` : notes déjà présentes (même identifiant) ou dont l'espace manque
+ *  au fichier. Un import doit pouvoir être rejoué sans dupliquer.
+ */
+export type ImportReport = {
+	spacesCreated: number,
+	notesImported: number,
+	notesSkipped: number,
+};
 
 /**
  *  **Closed** list, which is the whole point: the front end receives it as a
@@ -186,6 +319,12 @@ export type NotesView = {
 	matched: number,
 };
 
+export type Placeholder = {
+	name: string,
+	/**  Vide quand le snippet n'en propose pas. */
+	defaultValue: string,
+};
+
 export type Space = {
 	id: string,
 	/**  Uniqueness is case-insensitive, decided by persistence. */
@@ -198,6 +337,25 @@ export type SpaceDraft = {
 };
 
 /**
+ *  Un tag du corpus et le nombre de notes vivantes qui le portent : de quoi
+ *  décider quoi renommer, fusionner ou jeter.
+ */
+export type TagUsage = {
+	tag: string,
+	noteCount: number,
+};
+
+/**  `flatten` : le front lit une note, avec deux dates de plus. */
+export type TrashedNote = {
+	deletedAt: string,
+	/**
+	 *  Dérivée, jamais stockée : la rétention peut changer d'une version à
+	 *  l'autre et une échéance figée en base ne suivrait pas.
+	 */
+	purgeAt: string,
+} & Note;
+
+/**
  *  Labels cross the bridge **already translated**: the interface language
  *  is a front-end preference, and keeping a translation table in Rust would
  *  mean maintaining a second one.
@@ -206,6 +364,7 @@ export type TrayLabels = {
 	open: string,
 	newNote: string,
 	capture: string,
+	palette: string,
 	quit: string,
 };
 

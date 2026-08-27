@@ -44,7 +44,15 @@ libsqlite3-sys = { version = "0.38.1", features = ["bundled"] }
 uuid = { version = "1.24.0", features = ["v4"] }
 # `serde` : c'est chrono qui sérialise les `DateTime<Utc>` du domaine, en RFC 3339.
 chrono = { version = "0.4.45", features = ["serde"] }
+# Les pièces jointes traversent le pont en `data:` URI : le CSP interdit de
+# charger un fichier local, et ouvrir le protocole `asset:` serait une porte
+# large pour afficher une capture d'écran.
+base64 = "0.22.1"
+# Encodage des images collées depuis le presse-papier, qui arrivent en RGBA brut.
+png = "0.17.16"
 tauri-plugin-process = "2"
+# Sélecteur de fichiers natif : import, export et ajout de pièce jointe.
+tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-clipboard-manager = "2"

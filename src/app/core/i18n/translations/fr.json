@@ -28,7 +28,13 @@
     "untitled": "Sans titre",
     "pinnedState": "Note épinglée",
     "loading": "Chargement des notes…",
-    "noResults": "Aucune note ne correspond à cette recherche."
+    "noResults": "Aucune note ne correspond à cette recherche.",
+    "attachmentsCount": "{{count}} pièce(s) jointe(s)",
+    "placeholdersCount": "{{count}} champ(s) à remplir",
+    "selectNote": "Sélectionner la note {{title}}",
+    "keyboardHint": "↑↓←→ naviguer · Entrée ouvrir · C copier · X sélectionner · Suppr corbeille",
+    "trash": "Corbeille",
+    "manageTags": "Gérer"
   },
   "filters": {
     "groupLabel": "Filtrer les notes",
@@ -96,13 +102,31 @@
     "invalidInput": "Valeur refusée par le moteur : {{field}}.",
     "storageUnavailable": "Le stockage est indisponible. Redémarrez DevBox.",
     "updateFailed": "La mise à jour a échoué. DevBox reste utilisable dans sa version actuelle.",
-    "updateCheckFailed": "La recherche de mise à jour a échoué. Réessayez plus tard."
+    "updateCheckFailed": "La recherche de mise à jour a échoué. Réessayez plus tard.",
+    "attachmentGone": "Cette pièce jointe n'existe plus.",
+    "fileAccess": "Le fichier est inaccessible.",
+    "importFormat": "Ce fichier n'est pas un export DevBox lisible par cette version.",
+    "trashLoadFailed": "Impossible de charger la corbeille.",
+    "trashActionFailed": "L'opération sur la corbeille a échoué.",
+    "tagsLoadFailed": "Impossible de charger les tags.",
+    "tagActionFailed": "L'opération sur les tags a échoué.",
+    "bulkActionFailed": "L'action sur la sélection a échoué.",
+    "exportFailed": "L'export a échoué. Rien n'a été écrit.",
+    "importFailed": "L'import a échoué.",
+    "shareFailed": "Impossible de préparer le partage.",
+    "attachFailed": "Impossible d'ajouter la pièce jointe.",
+    "attachmentReadFailed": "Impossible de lire la pièce jointe.",
+    "attachmentDeleteFailed": "Impossible de retirer la pièce jointe.",
+    "copyFailed": "La copie dans le presse-papier a échoué.",
+    "attachmentOpenFailed": "Impossible d'ouvrir la pièce jointe avec une application.",
+    "attachmentSaveFailed": "Impossible d'enregistrer la pièce jointe à cet emplacement."
   },
   "tray": {
     "open": "Ouvrir DevBox",
     "newNote": "Nouvelle note",
     "capture": "Coller le presse-papier",
-    "quit": "Quitter DevBox"
+    "quit": "Quitter DevBox",
+    "palette": "Collage rapide"
   },
   "locale": {
     "groupLabel": "Langue de l'interface",
@@ -134,5 +158,107 @@
     "developedBy": "Développé par",
     "repository": "Dépôt",
     "close": "Fermer"
+  },
+  "trash": {
+    "title": "Corbeille",
+    "close": "Fermer la corbeille",
+    "empty": "La corbeille est vide.",
+    "loading": "Chargement…",
+    "retentionHint": "Les notes supprimées sont conservées 30 jours, puis effacées.",
+    "restore": "Restaurer",
+    "purge": "Supprimer définitivement",
+    "purgeConfirm": "Confirmer ?",
+    "emptyTrash": "Vider la corbeille",
+    "emptyTrashConfirm": "Tout effacer ?",
+    "deletedAt": "supprimée {{when}}",
+    "purgesIn": "effacée dans {{count}} j",
+    "purgesToday": "effacée aujourd'hui",
+    "untitled": "Sans titre"
+  },
+  "tagManager": {
+    "title": "Gérer les tags",
+    "close": "Fermer la gestion des tags",
+    "empty": "Aucun tag pour le moment.",
+    "loading": "Chargement…",
+    "noteCount": "{{count}} note(s)",
+    "selectLabel": "Sélectionner le tag {{tag}}",
+    "targetLabel": "Nom de destination",
+    "targetPlaceholder": "nom du tag",
+    "rename": "Renommer",
+    "merge": "Fusionner",
+    "delete": "Supprimer",
+    "deleteConfirm": "Confirmer ?",
+    "hint": "Renommer vers un tag existant fusionne les deux.",
+    "selectionHint": "Sélectionnez les tags à fusionner, puis saisissez leur nom commun."
+  },
+  "selection": {
+    "label": "Actions sur la sélection",
+    "count": "{{count}} sélectionnée(s)",
+    "clear": "Tout désélectionner",
+    "moveTo": "Déplacer vers",
+    "addTagLabel": "Ajouter un tag à la sélection",
+    "addTagPlaceholder": "+ tag",
+    "delete": "Mettre à la corbeille",
+    "deleteConfirm": "Confirmer ?"
+  },
+  "palette": {
+    "title": "Collage rapide",
+    "placeholder": "Rechercher un snippet…",
+    "searchLabel": "Rechercher un snippet à coller",
+    "resultsLabel": "Snippets trouvés",
+    "empty": "Aucun snippet ne correspond.",
+    "hint": "↑↓ naviguer · Entrée copier ou créer · Tab ouvrir · Échap fermer",
+    "close": "Fermer la palette",
+    "createNote": "+ Créer une note « {{query}} »"
+  },
+  "placeholders": {
+    "title": "Remplir les champs",
+    "hint": "Ce snippet attend {{count}} valeur(s).",
+    "fieldLabel": "Valeur de {{name}}",
+    "copy": "Copier rempli",
+    "copyRaw": "Copier tel quel",
+    "cancel": "Annuler"
+  },
+  "attachments": {
+    "title": "Pièces jointes",
+    "add": "+ Fichier",
+    "adding": "Ajout…",
+    "remove": "Retirer {{name}}",
+    "preview": "Aperçu de {{name}}",
+    "size": "{{size}} Ko",
+    "openPreview": "Afficher {{name}}",
+    "closePreview": "Fermer l'aperçu",
+    "open": "Ouvrir {{name}}",
+    "save": "Enregistrer {{name}} sous…",
+    "saved": "Pièce jointe enregistrée dans {{path}}.",
+    "added": "« {{name}} » jointe à la note.",
+    "dropHint": "Déposez un fichier ou collez une image (Ctrl+V) pour la joindre.",
+    "pasteEmpty": "Le presse-papier ne contient pas d'image.",
+    "zoom": "Agrandir {{name}}",
+    "closeZoom": "Fermer l'image"
+  },
+  "undo": {
+    "deleted": "{{count}} note(s) mise(s) à la corbeille",
+    "restore": "Annuler",
+    "dismiss": "Masquer"
+  },
+  "file": {
+    "menuLabel": "Fichier",
+    "import": "Importer…",
+    "exportAll": "Exporter tout…",
+    "exportSpace": "Exporter l'espace actif…",
+    "exportSelection": "Exporter la sélection…",
+    "copyMarkdown": "Copier la sélection en Markdown",
+    "quit": "Quitter DevBox",
+    "quitConfirm": "Confirmer ?",
+    "imported": "{{notes}} note(s) importée(s) depuis {{path}}, {{skipped}} ignorée(s).",
+    "importedNothing": "Rien à importer : ces {{skipped}} note(s) sont déjà dans votre bibliothèque.",
+    "exported": "{{notes}} note(s) exportée(s) vers {{path}}.",
+    "copied": "{{notes}} note(s) copiée(s) en Markdown dans le presse-papier.",
+    "needsSelection": "Sélectionnez au moins une note.",
+    "emptyLibrary": "Rien à exporter : cette bibliothèque n'a aucune note."
+  },
+  "shortcuts": {
+    "unavailable": "Raccourci(s) global(aux) indisponible(s) : {{list}}. Une autre application les utilise déjà."
   }
 }

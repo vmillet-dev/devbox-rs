@@ -12,7 +12,7 @@ import { commands, type TrayLabels as WireTrayLabels } from '@core/ipc/bindings'
  */
 export type TrayLabels = WireTrayLabels;
 
-const LABEL_KEYS = ['tray.open', 'tray.newNote', 'tray.capture', 'tray.quit'];
+const LABEL_KEYS = ['tray.open', 'tray.newNote', 'tray.capture', 'tray.palette', 'tray.quit'];
 
 /**
  * Icône de la zone de notification : DevBox y reste résidente, à portée des
@@ -31,9 +31,11 @@ export class TrayService {
   private readonly transloco = inject(TranslocoService);
 
   start(): void {
-    this.transloco.selectTranslate<string[]>(LABEL_KEYS).subscribe(([open, newNote, capture, quit]) => {
-      void this.push({ open, newNote, capture, quit });
-    });
+    this.transloco
+      .selectTranslate<string[]>(LABEL_KEYS)
+      .subscribe(([open, newNote, capture, palette, quit]) => {
+        void this.push({ open, newNote, capture, palette, quit });
+      });
   }
 
   /**

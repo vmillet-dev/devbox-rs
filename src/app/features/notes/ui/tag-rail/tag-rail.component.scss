@@ -14,3 +14,27 @@
   margin-right: 2px;
   flex-shrink: 0;
 }
+
+// En fin de rail : la gestion agit sur exactement ce qui est affiché à gauche.
+.tag-rail-manage {
+  all: unset;
+  box-sizing: border-box;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.tag-rail-manage:hover {
+  border-color: var(--amber-dim);
+  color: var(--amber);
+}
+
+.tag-rail-manage:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}

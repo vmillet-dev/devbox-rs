@@ -32,6 +32,7 @@ describe('TrayService', () => {
       open: 'Ouvrir DevBox',
       newNote: 'Nouvelle note',
       capture: 'Coller le presse-papier',
+      palette: 'Collage rapide',
       quit: 'Quitter DevBox',
     });
   });

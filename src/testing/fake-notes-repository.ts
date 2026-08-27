@@ -1,20 +1,26 @@
 import { guard } from './fail-next';
 import { NotesRepository } from '@features/notes/data/notes.repository';
-import { Note, NoteDraft, NotePatch } from '@features/notes/model/note.model';
+import { Note, NoteDraft, NotePatch, TagUsage, TrashedNote } from '@features/notes/model/note.model';
 import { NotesQuery, NotesView } from '@features/notes/model/note.model';
+
+/** Mirrors `notes::trash::RETENTION`, so the double's `purgeAt` is plausible. */
+const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * In-memory `NotesRepository` test double.
  *
- * It deliberately does **not** reimplement filtering, grouping or tag
- * normalisation: those now live in Rust and are tested there
- * (`src-tauri/src/notes/store.rs`). Duplicating them here would let a front-end spec
- * pass against rules the real backend does not apply.
+ * It deliberately does **not** reimplement filtering, grouping, tag
+ * normalisation or `{{field}}` parsing: those now live in Rust and are tested
+ * there. Duplicating them here would let a front-end spec pass against rules the
+ * real backend does not apply.
  *
  * What it does emulate is persistence — it owns the notes, assigns ids and
  * timestamps, and returns the stored note — and it wraps them in a trivial
  * single-section view. A spec that needs a specific view (search results, empty
  * results, several sections) sets one explicitly with `setView`.
+ *
+ * Deletion is a **soft** one here too: a deleted note moves to `trashed`, which
+ * is what makes undo and the trash panel observable.
  *
  * `lastQuery` and `queryCount` expose what the store asked for, which is the
  * only part of querying the front is still responsible for.
@@ -25,6 +31,7 @@ import { NotesQuery, NotesView } from '@features/notes/model/note.model';
  */
 export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRepository> {
   private notes: readonly Note[];
+  private trashed: readonly TrashedNote[] = [];
   private forcedView: NotesView | null = null;
   private nextId = 0;
 
@@ -34,6 +41,12 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
   /** Query the store sent last, for asserting how it assembles its parameters. */
   lastQuery: NotesQuery | null = null;
   queryCount = 0;
+
+  /** Calls recorded for the operations that return only a count. */
+  movedTo: { ids: readonly string[]; spaceId: string } | null = null;
+  taggedWith: { ids: readonly string[]; tags: readonly string[] } | null = null;
+  retagged: { tags: readonly string[]; into: string } | null = null;
+  deletedTags: string[] = [];
 
   private gate: Promise<void> | null = null;
   private openGate: (() => void) | null = null;
@@ -83,6 +96,8 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
         // plain case rather than reimplementing the rule.
         footer: { kind: 'age', at: now },
         expiringSoon: false,
+        placeholders: [],
+        attachmentCount: 0,
       };
       this.notes = [note, ...this.notes];
       return note;
@@ -103,8 +118,147 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
 
   delete(id: string): Promise<void> {
     return guard(this, () => {
-      this.notes = this.notes.filter((note) => note.id !== id);
+      this.trash([id]);
     });
+  }
+
+  deleteMany(ids: readonly string[]): Promise<number> {
+    return guard(this, () => this.trash(ids));
+  }
+
+  restore(ids: readonly string[]): Promise<number> {
+    return guard(this, () => {
+      const restored = this.trashed.filter((note) => ids.includes(note.id));
+      this.trashed = this.trashed.filter((note) => !ids.includes(note.id));
+      // The note comes back as an ordinary one: the trash shape carries no
+      // derived field, exactly like the wire type it stands for.
+      this.notes = [
+        ...restored.map((note) => ({
+          ...note,
+          updatedAt: note.deletedAt,
+          createdAt: note.deletedAt,
+          pinned: false,
+          source: '',
+          lifecycle: { kind: 'permanent' } as const,
+          footer: { kind: 'age', at: note.deletedAt } as const,
+          expiringSoon: false,
+          placeholders: [],
+          attachmentCount: 0,
+        })),
+        ...this.notes,
+      ];
+      return restored.length;
+    });
+  }
+
+  loadTrash(): Promise<readonly TrashedNote[]> {
+    return guard(this, () => this.trashed);
+  }
+
+  purge(ids: readonly string[]): Promise<number> {
+    return guard(this, () => {
+      const before = this.trashed.length;
+      this.trashed = this.trashed.filter((note) => !ids.includes(note.id));
+      return before - this.trashed.length;
+    });
+  }
+
+  emptyTrash(): Promise<number> {
+    return guard(this, () => {
+      const count = this.trashed.length;
+      this.trashed = [];
+      return count;
+    });
+  }
+
+  moveMany(ids: readonly string[], spaceId: string): Promise<number> {
+    return guard(this, () => {
+      this.movedTo = { ids, spaceId };
+      this.notes = this.notes.map((note) => (ids.includes(note.id) ? { ...note, spaceId } : note));
+      return ids.length;
+    });
+  }
+
+  tagMany(ids: readonly string[], tags: readonly string[]): Promise<number> {
+    return guard(this, () => {
+      this.taggedWith = { ids, tags };
+      this.notes = this.notes.map((note) =>
+        ids.includes(note.id) ? { ...note, tags: [...note.tags, ...tags] } : note,
+      );
+      return ids.length;
+    });
+  }
+
+  loadTags(): Promise<readonly TagUsage[]> {
+    return guard(this, () => {
+      const counts = new Map<string, number>();
+      for (const note of this.notes) {
+        for (const tag of note.tags) {
+          counts.set(tag, (counts.get(tag) ?? 0) + 1);
+        }
+      }
+      return [...counts]
+        .map(([tag, noteCount]) => ({ tag, noteCount }))
+        .sort((a, b) => a.tag.localeCompare(b.tag));
+    });
+  }
+
+  renameTag(tag: string, into: string): Promise<number> {
+    return this.mergeTags([tag], into);
+  }
+
+  mergeTags(tags: readonly string[], into: string): Promise<number> {
+    return guard(this, () => {
+      this.retagged = { tags, into };
+      this.notes = this.notes.map((note) => ({
+        ...note,
+        tags: [...new Set(note.tags.map((tag) => (tags.includes(tag) ? into : tag)))],
+      }));
+      return tags.length;
+    });
+  }
+
+  deleteTag(tag: string): Promise<number> {
+    return guard(this, () => {
+      this.deletedTags.push(tag);
+      this.notes = this.notes.map((note) => ({
+        ...note,
+        tags: note.tags.filter((existing) => existing !== tag),
+      }));
+      return 1;
+    });
+  }
+
+  /** The real one delegates to Rust; the double does the substitution naively. */
+  fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
+    return guard(this, () =>
+      Object.entries(values).reduce(
+        (filled, [name, value]) => filled.split(`{{${name}}}`).join(value),
+        content,
+      ),
+    );
+  }
+
+  private trash(ids: readonly string[]): number {
+    const removed = this.notes.filter((note) => ids.includes(note.id));
+    this.notes = this.notes.filter((note) => !ids.includes(note.id));
+
+    const deletedAt = new Date();
+    this.trashed = [
+      ...removed.map((note) => ({
+        id: note.id,
+        spaceId: note.spaceId,
+        title: note.title,
+        language: note.language,
+        content: note.content,
+        tags: note.tags,
+        deletedAt,
+        purgeAt: new Date(deletedAt.getTime() + RETENTION_MS),
+      })),
+      ...this.trashed,
+    ];
+
+    return removed.length;
   }
 
   /** Every note in one section — the shape, not the grouping rules. */

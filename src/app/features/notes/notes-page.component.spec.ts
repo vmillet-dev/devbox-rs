@@ -157,7 +157,7 @@ describe('NotesPageComponent', () => {
       const openNote = vi.spyOn(store, 'openNote');
       const createNoteSpy = vi.spyOn(store, 'createNote').mockResolvedValue();
 
-      sections()[0].noteOpened.emit('note-1');
+      sections()[0].noteOpened.emit({ noteId: 'note-1', toggleChecked: false, extendRange: false });
       sections()[0].createRequested.emit();
 
       expect(openNote).toHaveBeenCalledWith('note-1');

@@ -47,6 +47,15 @@ pub enum StorageError {
     /// Name already taken (case-insensitive comparison).
     #[error("A space named \"{0}\" already exists")]
     DuplicateSpaceName(String),
+    #[error("Attachment not found: {0}")]
+    AttachmentNotFound(String),
+    /// Reading, copying or writing a file outside the database failed —
+    /// attachments, export and import all land here.
+    #[error("File error: {0}")]
+    File(String),
+    /// A file offered as an export bundle that is not one.
+    #[error("Unreadable export file: {0}")]
+    ImportFormat(String),
     /// A column no write from this code could have produced.
     #[error("Note \"{id}\" unreadable: field \"{field}\" is out of format")]
     CorruptRow { id: String, field: &'static str },
@@ -75,6 +84,11 @@ pub enum ErrorCode {
     NoteNotFound,
     SpaceNotFound,
     DuplicateSpaceName,
+    AttachmentNotFound,
+    /// Reading or writing a file outside the database failed.
+    FileAccess,
+    /// The chosen file is not an export bundle this version can read.
+    ImportFormat,
     /// The `field` parameter names the offending field.
     InvalidInput,
     /// Poisoned mutex: a command panicked while holding the connection.
@@ -141,6 +155,11 @@ impl From<StorageError> for AppError {
             StorageError::DuplicateSpaceName(name) => {
                 Self::with(ErrorCode::DuplicateSpaceName, detail, "name", &name)
             }
+            StorageError::AttachmentNotFound(id) => {
+                Self::with(ErrorCode::AttachmentNotFound, detail, "id", &id)
+            }
+            StorageError::File(_) => Self::new(ErrorCode::FileAccess, detail),
+            StorageError::ImportFormat(_) => Self::new(ErrorCode::ImportFormat, detail),
             // None of these causes gives the front anything to do beyond
             // reporting the failure; `detail` carries the rest in plain text.
             StorageError::SchemaTooRecent(_)

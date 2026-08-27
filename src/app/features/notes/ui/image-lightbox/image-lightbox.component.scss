@@ -1,0 +1,66 @@
+@use 'mixins' as *;
+
+// Au-dessus de l'éditeur (50) qui l'ouvre, et de la palette (65) : c'est la
+// dernière chose ouverte, donc la première à recevoir Échap.
+.lightbox-backdrop {
+  @include backdrop(75);
+  background: rgba(var(--backdrop-rgb), 0.85);
+}
+
+.lightbox-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 92vw;
+  max-height: 92vh;
+}
+
+.lightbox-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lightbox-name {
+  flex: 1;
+  font-family: var(--font-mono), serif;
+  font-size: 12px;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-close {
+  @include unstyled-control;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  font-size: 14px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.lightbox-close:hover {
+  background: var(--bg-2);
+  color: var(--text-0);
+}
+
+.lightbox-close:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+// `contain` et non une taille imposée : une capture large et une capture haute
+// doivent toutes deux tenir sans être déformées.
+.lightbox-image {
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: var(--shadow-overlay);
+}

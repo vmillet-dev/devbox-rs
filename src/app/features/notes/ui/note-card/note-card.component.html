@@ -5,16 +5,17 @@
 <!-- Enveloppe et non `<button>` racine : le menu d'actions est lui-même un
      bouton, et le modèle de contenu d'un <button> interdit d'en imbriquer un.
      C'est aussi elle qui ancre le menu (`position: relative`). -->
-<div class="card-shell">
+<div class="card-shell" [class.checked]="checked()">
   <!-- Contenu en <span> et non en <div> : le modèle de contenu d'un <button>
        n'admet que du contenu de phrasé. Un <div> imbriqué produit un HTML
        invalide, au comportement d'accessibilité indéfini selon les navigateurs. -->
   <button
+    #cardButton
     type="button"
     class="card"
     [class.pinned]="note().pinned"
     [class.selected]="selected()"
-    (click)="onOpen()"
+    (click)="onOpen($event)"
   >
     @if (note().pinned) {
       <!-- L'épinglage n'est signalé que par une pastille décorative : sans ce
@@ -23,6 +24,18 @@
     }
     <span class="card-top">
       <app-language-badge [language]="note().language" />
+      @if (hasPlaceholders()) {
+        <span class="card-fields" aria-hidden="true">⚡</span>
+        <span class="visually-hidden">
+          {{ 'notes.placeholdersCount' | transloco: { count: note().placeholders.length } }}
+        </span>
+      }
+      @if (note().attachmentCount > 0) {
+        <span class="card-clip" aria-hidden="true">📎 {{ note().attachmentCount }}</span>
+        <span class="visually-hidden">
+          {{ 'notes.attachmentsCount' | transloco: { count: note().attachmentCount } }}
+        </span>
+      }
       @if (note().pinned) {
         <span class="card-pin" aria-hidden="true">📌</span>
       }
@@ -55,7 +68,34 @@
     </span>
   </button>
 
-  <app-copy-button [value]="note().content" />
+  <!-- Case à cocher de la sélection multiple. Un vrai bouton à `aria-pressed`
+       plutôt qu'un `<input type=checkbox>` : la carte parente est un bouton, et
+       un contrôle natif y hériterait de ses styles. -->
+  <button
+    type="button"
+    class="card-check"
+    [class.checked]="checked()"
+    [attr.aria-pressed]="checked()"
+    [attr.aria-label]="'notes.selectNote' | transloco: { title: menuTitle }"
+    (click)="onCheck($event)"
+  >
+    <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
+  </button>
+
+  <!-- Un snippet à champs ne se copie pas tel quel : le bouton ouvre la saisie
+       au lieu de poser `psql -h {{ '{{host}}' }}` dans le presse-papier. -->
+  @if (hasPlaceholders()) {
+    <button
+      type="button"
+      class="card-fill"
+      [attr.aria-label]="'placeholders.title' | transloco"
+      (click)="onFill($event)"
+    >
+      <span aria-hidden="true">⚡</span>
+    </button>
+  } @else {
+    <app-copy-button [value]="note().content" />
+  }
 
   <app-note-card-menu
     [noteTitle]="menuTitle"

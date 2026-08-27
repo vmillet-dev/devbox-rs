@@ -11,7 +11,10 @@ The two halves talk only through Tauri's `invoke()` bridge.
 
 Notes and spaces are complete end to end: the front-end has no in-memory dataset left, every
 read and write goes through `invoke()`, and the Rust commands persist to an embedded SQLite
-database. The planned domains (crypto, formatters) have **no** module of their own yet: a
+database. Built on top of that: a 30-day trash with undo, multiple selection and bulk actions,
+corpus-wide tag management, `{{fields}}` in snippets, a quick-paste palette on a global
+shortcut, attachments, and import / export / share. The planned domains (crypto, formatters)
+have **no** module of their own yet: a
 placeholder would ship dead code in the binary, and an empty file documenting a contract
 drifts from whatever eventually gets written.
 
@@ -28,7 +31,8 @@ yet — a round trip per keystroke), and plain UI concerns like keyboard shortcu
 src/                Angular front-end
 ├── app/
 │   ├── core/       cross-cutting infrastructure, one folder per subject: IPC, i18n,
-│   │               errors, time, preferences, updates, app-info, language, clipboard
+│   │               errors, time, preferences, updates, app-info, language, clipboard,
+│   │               dialogs (native file picker), window (hide / quit)
 │   ├── features/   one folder per tool, owning its data/, model/, state/ and ui/
 │   ├── layout/     the app chrome: shell, titlebar, about, error banner, update prompt
 │   └── shared/     presentation kit — a11y directives and components that inject nothing
@@ -36,8 +40,10 @@ src/                Angular front-end
 ├── styles/         global theme (styles.scss) and SCSS partials
 └── testing/        test doubles, fixtures and shared providers
 src-tauri/          Rust back-end
-├── src/notes/      the notes feature: model, language, view, SQL
+├── src/notes/      the notes feature: model, language, view, placeholder, trash, SQL
 ├── src/spaces/     the spaces feature: model, SQL
+├── src/attachments/ the attachments feature: model, SQL (the bytes live on disk)
+├── src/transfer/   import, export and share: the exchange format and Markdown rendering
 ├── src/db.rs       connection, migrations, schema, stored-instant format
 ├── src/error.rs    the three errors and the translation between them
 ├── src/desktop.rs  tray and global shortcuts — native glue, not a feature
@@ -47,9 +53,14 @@ src-tauri/          Rust back-end
 
 ### Feature-first, not layer-first
 
-The back-end is filed by **subject**. `notes.rs` and `spaces.rs` are the two features, and
-each owns everything about itself: its model, its SQL, and the Tauri commands that expose it.
-Deleting `src/notes/` deletes the feature.
+The back-end is filed by **subject**. `notes.rs`, `spaces.rs`, `attachments.rs` and
+`transfer.rs` are the features, and each owns everything about itself: its model, its SQL, and
+the Tauri commands that expose it. Deleting `src/notes/` deletes the feature.
+
+`transfer` is the one without a `store.rs`: import and export read and write **whole
+libraries**, so they compose the two other stores rather than owning a table. That is also why
+it is the only feature allowed a `notes::store::all` — a raw note list, which no command ever
+returns to the front (see [Data access](#data-access)).
 
 Both follow the same three-part convention:
 
@@ -276,6 +287,30 @@ Creating a note files it in the active space, falling back to the first one in "
 mode; with no space at all, creation is refused with a translated message, because a note
 with no `spaceId` would vanish as soon as a space filter is applied.
 
+`NotesStore` also owns two things that are **not** query criteria and deliberately never
+reach `query_notes`:
+
+- **The multiple selection** (`checkedIds`), derived through `checkedNotes` so that an id
+  checked and then gone — note deleted, filter tightened — never reaches a bulk action.
+- **The keyboard focus** (`focusedNoteId`), plus `visibleNotes`, the sections flattened in
+  display order. Both the arrow keys and the Shift-range selection reason in **indexes** into
+  that list, the only reference that survives a note being renamed.
+
+Five smaller stores sit beside it, each for a screen that is not the canvas. None of them
+knows `NotesStore` — the reverse dependency already exists and closing the loop would be an
+injection cycle — so each returns a **boolean** and `NotesPageComponent` chains the reload:
+
+| Store              | Owns                                                                 |
+| ------------------ | -------------------------------------------------------------------- |
+| `TrashStore`       | the trash panel: open/close, list, restore, purge, empty             |
+| `TagsStore`        | global tag management: list with counts, selection, rename/merge     |
+| `LibraryStore`     | import, export and copy-out, each reporting through `StatusNotifier` |
+| `PaletteStore`     | the quick-paste palette: its own search, highlight and copy          |
+| `AttachmentsStore` | the open note's attachments, and the one preview being displayed     |
+
+`TrashStore` and `TagsStore` load **on opening** rather than through a permanent `resource`:
+neither is displayed anywhere else, and a resource would re-query on every deletion.
+
 Rules of the house:
 
 - **Writable signals stay private, exposed read-only.** A store field is
@@ -436,6 +471,237 @@ Deletion is a two-step confirm in the toolbar rather than a native `confirm()`, 
 freeze the whole WebView. The fullscreen toggle expands the panel to fill the backdrop and
 persists through `PreferencesService`.
 
+The attachment strip sits between the meta row and the body. It is fed by inputs and emits
+outputs like everything else here: `AttachmentsStore` owns the state, and an effect in
+`NotesPageComponent` points it at the open note. Attachments deliberately do **not** travel
+inside `Note` — they have their own write cycle, and routing them through the note would mean
+reloading the whole note on every add.
+
+### The trash, and undoing a deletion
+
+Deleting is **not** destroying. `delete_note` stamps `deleted_at` and the note leaves the
+canvas; `notes::trash::RETENTION` (30 days) then decides when it really goes. Three
+consequences:
+
+- **Every read filters on `deleted_at IS NULL`** — `fetch`, `find`, both facet queries and
+  the tag counts. A trashed note that resurfaced in a query would be editable without ever
+  saying it is on borrowed time.
+- **Purging is restricted to notes already in the trash** (`WHERE deleted_at IS NOT NULL`),
+  so nothing can short-circuit the 30-day reprieve.
+- **The retention is applied even if nobody opens the panel**: `lib.rs` sweeps at startup, and
+  `list_trash` purges what expired before answering, so the panel never shows a note that a
+  restart would erase.
+
+`purgeAt` is **derived**, never stored: the retention can change between versions and a
+deadline frozen in the database would not follow.
+
+On the front, every deletion records the ids it took away and shows `UndoBarComponent` for
+`UNDO_WINDOW_MS` (8 s).
+
+⚠️ The banner and the record are **two different things**: `undoBanner()` is what the timer
+clears, `lastDeletion()` is what `Ctrl+Z` reads, and it survives. Hiding a suggestion is not
+withdrawing it — the deletion stays undoable until another one replaces it or the user
+dismisses the banner by hand, which _is_ an explicit refusal.
+
+`Ctrl+Z` is handled by the page's keydown, ahead of the modifier guard that stops every other
+canvas shortcut: it is the one gesture people make without looking at the screen.
+
+### Keyboard navigation of the canvas
+
+The canvas is driven from the keyboard whenever the focus is neither in a field nor behind a
+modal (`canvasHasFocus`, which also disables the `Ctrl+K` search shortcut). Arrows move,
+`Enter` opens, `C` copies, `P` pins, `X` checks, `Delete` trashes, `Escape` clears the
+selection. The keys are deliberately bare letters: they only ever fire where no typing is
+happening.
+
+**The number of columns is measured, not assumed.** It depends on the window width and each
+section has its own card count, so `nextFocusIndex` (`ui/grid-navigation.util.ts`) takes the
+cards' measured `top`/`left`, groups rows by `top` within a few pixels of tolerance, and picks
+the nearest column in the adjacent row. Keeping it a pure function over rectangles is what
+makes it testable without a DOM. Moving past an edge stops rather than wraps: wrapping in a
+grid with no visible start or end makes it impossible to tell where you are.
+
+The card is a real `<button>`, so the DOM focus follows the state through an effect —
+otherwise the arrows would move an outline while the keyboard stayed behind.
+
+### Multiple selection and bulk actions
+
+`Ctrl`-click checks a card, `Shift`-click extends the range from the focused one, `X` toggles
+it from the keyboard — the conventions of a file list, which is what the canvas becomes once
+several notes are selected. `SelectionBarComponent` appears only when something is checked and
+offers: move to a space, add a tag, share, move to trash.
+
+Each action is **one command for the whole batch** (`move_notes`, `tag_notes`,
+`delete_notes`), not a loop of single writes: the count comes back so a stale id in the
+selection produces a partial result rather than failing the lot. Tagging **adds** without
+replacing — a bulk action enriches the labelling, it does not overwrite it.
+
+### `{{fields}}` in a snippet
+
+A snippet like `psql -h {{host}} -p {{port=5432}}` is worth copying **filled in**. What counts
+as a field is decided in `notes::placeholder` and nowhere else: the name is restricted to
+`[A-Za-z0-9_-]`, so a note holding Angular template code (`{{ user.name }}`) does not turn
+into a form on every copy. Values arrive parsed on `DisplayNote.placeholders`, and
+`fill_placeholders` — a pure command, no database — does the substitution.
+
+The form seeds each field with its default value (they exist to be kept) and submits **every**
+field, empty ones included: the back-end decides what an empty value means. "Copy as is"
+stays available for the note that only looks templated — the heuristic is careful, not
+infallible.
+
+### The quick-paste palette
+
+`Ctrl+Alt+P` reveals the window and emits `devbox:palette`; `PaletteStore` opens,
+searches, and on `Enter` copies the highlighted snippet and **hides the window** so the user
+lands back where they were pasting.
+
+It searches **every space and ignores the canvas filters**: when you recall a snippet you do
+not remember which space you filed it in. It also keeps its own state rather than reusing
+`NotesStore`, whose search would otherwise change what the canvas shows behind it.
+
+A snippet with fields goes through the fill form first — copying `psql -h {{host}}` verbatim
+gives an unusable command. `Tab` opens the note instead of copying it, which is what makes the
+palette double as a "find that note" shortcut.
+
+**It captures as much as it retrieves.** As soon as the query is non-empty, a "créer une note"
+row is appended **after** the results — retrieving a snippet is the more frequent gesture and
+keeps the first place, but a query that matches nothing highlights the create row by default,
+which is exactly the quick-capture case. Choosing it turns what was typed into the note's
+content, saved and opened straight away (no draft: there is nothing to wait for).
+
+`PaletteStore` does not create the note itself — it does not know `NotesStore`, and the
+reverse would be a cycle. `takeNewNoteContent()` hands the text over and closes; the page
+chains `NotesStore.createWithContent`, the same path the clipboard capture uses.
+
+The palette is an overlay in the main window rather than a second Tauri window: the window is
+already warm behind the global shortcut, and a second one would mean a second Angular
+bootstrap, its own CSP and its own lifecycle for the same result.
+
+⚠️ It has **no focus trap**, unlike the other modals. The field keeps the focus from start to
+finish and the list is walked with `aria-activedescendant`; moving the real focus onto an
+option would lose the query being typed.
+
+### Global tag management
+
+Free-text tags drift (`auth`, `authentication`, `Auth`), and nothing else in the app lets you
+recollapse them. `list_tags` returns each tag of the corpus with the number of live notes
+carrying it, and one operation covers both cases: renaming onto an existing tag **is** a
+merge, because the database cannot carry the same tag twice on one note. Only the button label
+changes with the number of selected tags.
+
+Two subtleties in `notes::store::retag`:
+
+- The target is **swept along with the sources and rewritten**, which is what makes a pure
+  case correction (`auth` → `Auth`) effective. `INSERT OR IGNORE` alone would change nothing:
+  the primary key is `NOCASE`, so both spellings are the same row.
+- `updated_at` is left alone. A global retag would otherwise float the whole corpus to the top
+  of a canvas that sorts on it, for notes nobody reopened.
+
+### Attachments
+
+An attachment is a file **next to** a note: the database keeps a record, the bytes live in
+`app_data_dir()/attachments/` under a name derived from the record's id — two screenshots both
+called `capture.png` must not overwrite each other, and a name coming from outside has no
+business deciding a write path.
+
+The bytes cross the bridge only on demand, as a `data:` URI: the WebView's CSP forbids loading
+a local file, and opening the `asset:` protocol would be a wide door for displaying a
+screenshot. That encoding costs a third more than the file, which is why `read_attachment`
+fetches **one** at a time and never the list.
+
+**Three ways in, two ways back out.** A file arrives through the picker, through a drag-drop
+onto the window (`FileDropService` — the drop is a _window_ event carrying real paths, a DOM
+`drop` handler would receive nothing), or as an image pasted into the editor. It leaves
+through `open_attachment` (the system's default application) or `save_attachment` (copied
+where the user asks). A file you can only read the name of is not attached, it is stored.
+
+The pasted image is the one worth explaining: the editor's `paste` handler reads only the
+**type** of what was pasted and, for an image, calls `attach_clipboard_image`. The bytes never
+cross the bridge — the native side reads the system clipboard, which hands it raw RGBA, and
+encodes a PNG (`model::encode_png`). Sending them up to send them back down would cost two
+conversions and several megabytes of JSON, and the body is a `<textarea>` that could not
+display the image anyway.
+
+The strip's inline preview is capped at 220 px so it cannot push the editor off screen, which
+makes a screenshot of code unreadable — clicking it opens `ImageLightboxComponent`, bounded
+only by the window. It **reuses the `data:` URI the preview already loaded**: a multi-megabyte
+payload has no business crossing the bridge twice. Two consequences: the lightbox only exists
+while a preview does (closing one closes the other), and the editor's Escape handler yields to
+it (`imageZoomed`) since both listen on the document and the topmost layer should close first.
+
+Ordering matters on write: the file is copied **before** the record is inserted, and the
+record is rolled back with the file if the insert fails. A record without a file shows a
+broken thumbnail; a file without a record is swept at the next startup
+(`attachments::sweep_orphan_files`). Purging a note collects its file names **before** the
+`DELETE`, since the cascade takes the records with it.
+
+### The "Fichier" menu, and where the rest lives
+
+The titlebar carries a **File menu** next to "À propos" — the convention of a desktop
+application. It holds import, export, "copy the selection as Markdown", and quitting.
+
+`layout/` still knows no feature. `AppMenuRegistry` (`core/menu/`) holds the entries, and
+`NotesPageComponent` **contributes** its own on construction and takes them back on
+destruction. The titlebar renders whatever is registered plus its own "Quitter"; the hashing
+tool will add its entries without touching that component. `disabled` is a `Signal` because
+"Exporter la sélection" follows what is checked at that instant.
+
+Two things deliberately did **not** go in that menu, because they are views on the notes and
+not operations on a file:
+
+- **The trash** sits next to the quick filters in the notes topbar — it is one more way of
+  looking at the notes.
+- **Tag management** sits at the end of the tag rail, which is exactly what it acts on. The
+  rail disappears when no tag exists, and so does the button: there is nothing to manage.
+
+### Import, export and copying out
+
+- **Export** writes a JSON bundle (`transfer::model::Bundle`: a version, an instant, the
+  spaces cited and the notes), for everything, one space, or the current selection. The format
+  reuses the domain types rather than duplicating them, so a field added to `Note` is exported
+  without anyone thinking about it. Only the spaces actually cited travel: exporting one space
+  should not recreate a whole tree on the other side.
+- **Import merges, it never replaces.** Spaces are matched by name, case-insensitively, and a
+  note whose id is already taken is counted as skipped rather than overwritten — so the same
+  file can be imported twice without duplicating anything. A bundle from a newer format
+  version is refused outright rather than half-read.
+- **Copying out stops at the clipboard.** `share_notes` renders the selection as Markdown
+  (heading, space, context, tags, then a fenced block). The fence is longer than the longest
+  run of backticks in the content, otherwise a note that already contains a Markdown block
+  would cut its own in half. The menu entry names the format — "Copier la sélection en
+  Markdown" — because a format nobody asked for is a surprise, not a feature.
+
+⚠️ **Every one of these reports, including when it changed nothing.** Exporting then
+re-importing at once is the first thing anyone tries, and it legitimately imports zero notes:
+every id is already there. Without a message that outcome is indistinguishable from a
+failure, so `LibraryStore` pushes a distinct `file.importedNothing` for it, and an export
+names the file it wrote. The report goes to `StatusNotifier` (`core/notifications/`), rendered
+under the titlebar by `StatusToastComponent` — not inside the menu, which closes on the click
+and which a native file dialog covers anyway.
+
+`transfer::collect` and `transfer::merge` take a `&mut SqliteConnection` rather than living
+inside the commands, which is what makes the round trip testable (`tests/transfer.rs`) without
+a Tauri runtime.
+
+The file itself is written and read **in Rust**: the serialisation is the domain's, and
+sending it across the bridge to be reassembled in TypeScript would mean a second format to
+keep in step. The front-end only picks a path, through `FileDialogService`.
+
+### Creating a note writes nothing
+
+Opening the editor on "+ Nouvelle note" produces a **local draft** (`DRAFT_ID`), not a row: a
+blank note per opening turns the canvas into a pile of things to tidy up. The draft is
+persisted on the first change that makes it worth keeping — a title, a body, a tag, a pin, a
+deadline (`isWorthSaving`) — and closing it untouched simply drops it.
+
+⚠️ `draftMaterialisedAs` is not optional. Closing the editor commits the title **then** the
+content with no change detection in between, so the second call still carries `DRAFT_ID` while
+the note already exists; `resolve()` redirects it. Without that, the second commit would write
+into nothing.
+
+Attaching a file needs a real row, so `materialiseDraft()` saves the draft first — a note you
+attach a file to is not empty either.
+
 ### Data access
 
 Stores never talk to a data source directly. They inject `NotesRepository` /
@@ -452,9 +718,16 @@ its public members, which both drops the private `ipc` (nominal, hence unimpleme
 keeps the method list in sync by construction. Rename a method on the real class and
 `src/testing/` fails to compile.
 
-The notes contract is `query` / `create` / `update` / `delete`; spaces expose `loadAll` /
-`create` / `rename` / `delete`. There is deliberately **no method returning the raw list of
-notes** — offering one would invite a caller to filter it again.
+The notes contract is `query` / `create` / `update` / `delete`, plus the batch and trash
+operations (`deleteMany`, `restore`, `loadTrash`, `purge`, `emptyTrash`, `moveMany`,
+`tagMany`), the corpus-wide tag operations (`loadTags`, `renameTag`, `mergeTags`,
+`deleteTag`) and `fillPlaceholders`. Spaces expose `loadAll` / `create` / `rename` / `delete`.
+`AttachmentsRepository` covers `loadFor` / `attach` / `read` / `delete`, and
+`TransferRepository` covers `export` / `import` / `share`.
+
+There is deliberately **no method returning the raw list of notes** — offering one would invite
+a caller to filter it again. That holds even for export: `export_notes` returns a _count_, and
+the note list it assembled never leaves Rust.
 
 `SpacesRepository.delete` takes a refuge (`delete(id, targetSpaceId)`) rather than an id
 alone: a one-argument signature would have made data loss the default, since the schema
@@ -536,6 +809,12 @@ raw cause so the failure stays readable.
 `ErrorCode` has no variant for a too-recent schema: that failure is only produced by the
 migration during Tauri's `setup()`, where it aborts startup. No command can return it, so
 giving it a code would advertise a case the front can never handle.
+
+Three codes exist for what happens **outside** the database: `attachmentNotFound`,
+`fileAccess` (reading, copying or writing a file — attachments, export and import all land
+there) and `importFormat` (a file offered as a bundle that is not one, or one written by a
+newer version). They are codes rather than a generic storage failure because each has a
+different thing to tell the user, and only `importFormat` means "choose another file".
 
 ### Serialisation contract
 
@@ -630,13 +909,20 @@ shortcuts and the system tray. It is native glue rather than a feature, so it si
 capability: capabilities gate the API the **WebView** calls, not what the native side does on
 its own.
 
-Two producers, **the same two events**, so the front wires the actions once:
+Two producers, **the same three events**, so the front wires the actions once:
 
-- `Ctrl+Alt+V` / `Ctrl+Alt+N`, registered at startup;
-- the tray menu's "new note" and "paste from clipboard" items.
+- `Ctrl+Alt+V` / `Ctrl+Alt+N` / `Ctrl+Alt+P`, registered at startup;
+- the tray menu's "new note", "paste from clipboard" and "quick paste" items.
 
-Both reveal the window and emit `devbox:capture` or `devbox:new-note`; `NotesPageComponent`
-listens, reads the clipboard and creates the note.
+Each reveals the window and emits `devbox:capture`, `devbox:new-note` or `devbox:palette`;
+`NotesPageComponent` listens, reads the clipboard, creates the note or opens the palette.
+
+⚠️ **A global shortcut is first-come, first-served across the whole machine**, and the loser
+gets no error — the key simply does nothing. `Ctrl+Alt+Space` was the palette's first choice
+and lost it to a widely installed application, which is why it is now `Ctrl+Alt+P`. Losing one
+is still possible, so `register_shortcuts` records what it could not take and
+`unavailable_shortcuts` hands the list to the front, which says so once at startup. A log line
+is not an interface.
 
 - **Rust does not create the note.** Keeping creation on the front means one creation path
   (`create_note`), so a captured note gets language detection without a second implementation,
@@ -668,10 +954,24 @@ if closing it killed the shortcut.
   front can act on, and giving it an `ErrorCode` would add a branch no UI would ever render —
   it is logged natively, like an unavailable global shortcut.
 
-The eight commands are `query_notes`, `create_note`, `update_note`, `delete_note`,
-`list_spaces`, `create_space`, `rename_space` and `delete_space`. The guarantees the
-front-end relies on (persisted value returned, `Err` on an unknown id, "absent field means
-unchanged" for patches) are implemented in `notes/` and `spaces/`, and tested there.
+The commands, grouped by the feature that owns them:
+
+| Feature       | Commands                                                                                                                                                                                                                                       |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `notes`       | `query_notes`, `create_note`, `update_note`, `delete_note`, `delete_notes`, `restore_notes`, `list_trash`, `purge_notes`, `empty_trash`, `move_notes`, `tag_notes`, `list_tags`, `rename_tag`, `merge_tags`, `delete_tag`, `fill_placeholders` |
+| `spaces`      | `list_spaces`, `create_space`, `rename_space`, `delete_space`                                                                                                                                                                                  |
+| `attachments` | `attach_file`, `attach_clipboard_image`, `list_attachments`, `read_attachment`, `open_attachment`, `save_attachment`, `delete_attachment`                                                                                                      |
+| `transfer`    | `export_notes`, `export_selection`, `import_notes`, `share_notes`                                                                                                                                                                              |
+| `desktop`     | `sync_tray`, `unavailable_shortcuts`                                                                                                                                                                                                           |
+
+The guarantees the front-end relies on (persisted value returned, `Err` on an unknown id,
+"absent field means unchanged" for patches) are implemented in each feature, and tested there.
+The batch commands return a **count** rather than a `Result` per note: a selection can hold an
+id that has gone stale, and failing the whole batch for one of them would be worse than a
+partial result.
+
+`fill_placeholders` is the one command with no `State<Db>`: it is a pure function, so the
+palette can fill an unsaved draft as easily as the note it just opened.
 
 `delete_space` takes a **refuge** (`targetSpaceId`) and is the one command whose argument is
 multi-word, so it is the first to actually exercise Tauri's camelCase renaming. The refuge is
@@ -791,6 +1091,17 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   command passes `Utc::now()` — the same reason `ClockService` exists on the front.
   Millisecond precision is deliberate: two notes saved within one second would otherwise be
   impossible to order.
+- **Deletion is a column, not a `DELETE`.** `notes.deleted_at` (the `trash_and_attachments`
+  migration) is `NULL` for a live note, which lets the index be partial and every read filter
+  on `deleted_at IS NULL`. See [The trash](#the-trash-and-undoing-a-deletion) for what that
+  costs and buys.
+- **Attachment bytes are not in the database.** The `attachments` table holds a record; the
+  file sits in `app_data_dir()/attachments/`. A base growing by 10 MB per screenshot would
+  make every note read slower, for data no query ever looks inside.
+- **`updated_at` is not touched by operations the user did not aim at a note.** Deleting a
+  space moves its notes, a global retag rewrites their tags, restoring pulls one back out of
+  the trash — none of the three refreshes it. The canvas sorts on that column, and touching it
+  would float notes nobody reopened to the top.
 
 ## Cross-cutting services
 
@@ -825,6 +1136,18 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   `PreferencesService`: outside Tauri the plugin rejects, and the service reports a `false`
   rather than throwing — a copy that failed only has a visual acknowledgement to withhold.
   It is in `core/` by the usual test: a hashing tool would inject it verbatim.
+- **`FileDialogService`** (`core/dialogs/`) is the native file picker, behind
+  `tauri-plugin-dialog` (permissions `dialog:allow-open` and `dialog:allow-save`). Same
+  `FILE_DIALOG_ADAPTER` token and same degradation as above, with one addition: `null` covers
+  both a cancelled dialog **and** an unavailable plugin. An exception would force every caller
+  to tell two non-choices apart, and there is nothing to open either way. It also flattens the
+  plugin's `string | string[]` union, which stays a union even with `multiple: false`.
+- **`AppWindowService`** (`core/window/`) hides the window and quits the app
+  (`core:window:allow-hide`, `process:allow-exit`). The two are and stay distinct: the window's
+  close button **hides** (`lib.rs` intercepts `CloseRequested` while there is a tray), the
+  palette hides after copying, and `quit()` is the only path that really ends the process. The
+  adapter is substituted in **every** spec — a real `exit()` would take the test runner down
+  with the application.
 
 ## i18n
 
@@ -979,7 +1302,13 @@ a new data seam does not have to be added to a dozen spec files by hand.
 
 `FakeNotesRepository` and `FakeSpacesRepository` behave like real persistence (they own the
 list and assign ids and timestamps) and expose `failNext`, which is what makes the stores'
-failure paths testable at all.
+failure paths testable at all. `FakeAttachmentsRepository` and `FakeTransferRepository` follow
+the same pattern; `FakeFileDialog` and `FakeAppWindow` stand in for the two native services.
+
+`FakeNotesRepository`'s deletion is a **soft** one, like the real back-end's: a deleted note
+moves to its trash list, which is what makes undo and the trash panel observable at all.
+`FakeAppWindow` is provided in **every** spec, not only those that need it: a real `exit()`
+would take the test runner down with the application.
 
 `FakeNotesRepository` deliberately **does not** reimplement filtering, grouping or tag
 normalisation: those live in Rust and are tested there. Duplicating them in the double would

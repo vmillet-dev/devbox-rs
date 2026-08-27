@@ -12,7 +12,7 @@ import { FakeClipboard } from '@testing/fake-clipboard';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
-import { NotesStore, SEARCH_DEBOUNCE_MS } from './notes.store';
+import { DRAFT_ID, NotesStore, SEARCH_DEBOUNCE_MS, UNDO_WINDOW_MS } from './notes.store';
 
 /**
  * Filtering, grouping and tag normalisation are the backend's job now and are
@@ -632,15 +632,27 @@ describe('NotesStore', () => {
   });
 
   describe('createNote', () => {
-    it('opens the note returned by the repository', async () => {
-      const { store } = await createStore([createNote({ id: 'existing' })]);
+    it('writes nothing until the note is worth keeping', async () => {
+      // Une note vide par ouverture ferait un canevas de déchets à ranger.
+      const { store, repository } = await createStore([]);
+      const create = vi.spyOn(repository, 'create');
 
-      await store.createNote();
+      store.createNote();
 
-      // Blank title and source: the UI renders translated placeholders rather
-      // than storing French strings in the data.
+      expect(create).not.toHaveBeenCalled();
+      expect(store.selectedNoteId()).toBe(DRAFT_ID);
+      expect(store.persistedNoteId()).toBeNull();
+    });
+
+    it('opens a blank draft', async () => {
+      // Titre et source vides : l'UI affiche des libellés traduits plutôt que
+      // du français figé dans les données.
+      const { store } = await createStore([]);
+
+      store.createNote();
+
       expect(store.selectedNote()).toMatchObject({
-        id: 'fake-1',
+        id: DRAFT_ID,
         title: '',
         source: '',
         content: '',
@@ -649,29 +661,21 @@ describe('NotesStore', () => {
       });
     });
 
-    it('takes its id from the repository rather than generating one locally', async () => {
-      const { store } = await createStore([]);
-
-      await store.createNote();
-
-      expect(store.selectedNoteId()).toBe('fake-1');
-    });
-
-    it('files the note in the selected space', async () => {
+    it('files the draft in the selected space', async () => {
       const { store, spaces } = await createStore([]);
 
       spaces.selectSpace('space-2');
-      await store.createNote();
+      store.createNote();
 
       expect(store.selectedNote()?.spaceId).toBe('space-2');
     });
 
-    it('files the note in the first space while showing all spaces', async () => {
-      // It has to land somewhere, and the first space is the one the switcher
-      // shows at the top of the list.
+    it('files the draft in the first space while showing all spaces', async () => {
+      // Il faut bien qu'elle atterrisse quelque part, et le premier espace est
+      // celui que le sélecteur montre en tête.
       const { store } = await createStore([]);
 
-      await store.createNote();
+      store.createNote();
 
       expect(store.selectedNote()?.spaceId).toBe('space-1');
     });
@@ -682,20 +686,118 @@ describe('NotesStore', () => {
       const notifier = TestBed.inject(ErrorNotifier);
       const create = vi.spyOn(repository, 'create');
 
-      await store.createNote();
+      store.createNote();
 
       expect(create).not.toHaveBeenCalled();
+      expect(store.selectedNote()).toBeNull();
       expect(notifier.notice()?.ref.key).toBe('errors.spaceRequired');
     });
 
-    it('notifies and selects nothing when creation fails', async () => {
+    it('persists on the first change worth keeping, and takes the real id', async () => {
+      const { store } = await createStore([]);
+      store.createNote();
+
+      await store.renameNote(DRAFT_ID, 'Titre');
+
+      expect(store.persistedNoteId()).toBe('fake-1');
+      expect(store.selectedNote()).toMatchObject({ id: 'fake-1', title: 'Titre' });
+    });
+
+    it('keeps a change that leaves the note empty local', async () => {
+      const { store, repository } = await createStore([]);
+      const create = vi.spyOn(repository, 'create');
+      store.createNote();
+
+      // Changer le langage d'une note vide ne doit pas la faire apparaître.
+      await store.setLanguage(DRAFT_ID, 'json');
+
+      expect(create).not.toHaveBeenCalled();
+      expect(store.selectedNote()).toMatchObject({ id: DRAFT_ID, language: 'json' });
+    });
+
+    it('saves a note that carries only a tag', async () => {
+      // Elle n'est plus vide, même sans texte.
+      const { store } = await createStore([]);
+      store.createNote();
+
+      await store.addTag(DRAFT_ID, 'urgent');
+
+      expect(store.persistedNoteId()).toBe('fake-1');
+    });
+
+    it('routes a second commit still carrying the draft id to the real note', async () => {
+      // La fermeture confirme le titre puis le contenu sans détection de
+      // changement entre les deux : le second appel porte encore `DRAFT_ID`.
+      const { store, repository } = await createStore([]);
+      const update = vi.spyOn(repository, 'update');
+      store.createNote();
+
+      await store.renameNote(DRAFT_ID, 'Titre');
+      await store.updateContent(DRAFT_ID, 'corps');
+
+      expect(update).toHaveBeenCalledWith('fake-1', { content: 'corps' });
+      expect(store.selectedNote()?.content).toBe('corps');
+    });
+
+    it('discards an untouched draft on close', async () => {
+      const { store, repository } = await createStore([]);
+      const create = vi.spyOn(repository, 'create');
+      store.createNote();
+
+      store.closeOverlay();
+
+      expect(create).not.toHaveBeenCalled();
+      expect(store.selectedNote()).toBeNull();
+    });
+
+    it('discards the draft when another note is opened', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a' })]);
+      const create = vi.spyOn(repository, 'create');
+      store.createNote();
+
+      store.openNote('a');
+
+      expect(create).not.toHaveBeenCalled();
+      expect(store.selectedNoteId()).toBe('a');
+    });
+
+    it('throws nothing away and offers no undo when a draft is deleted', async () => {
+      // Un brouillon n'existe nulle part : il n'y a rien à mettre à la corbeille.
+      const { store, repository } = await createStore([]);
+      const remove = vi.spyOn(repository, 'delete');
+      store.createNote();
+
+      await store.deleteNote(DRAFT_ID);
+
+      expect(remove).not.toHaveBeenCalled();
+      expect(store.selectedNote()).toBeNull();
+      expect(store.lastDeletion()).toBeNull();
+    });
+
+    it('materialises the draft on demand, for what needs a real note', async () => {
+      // Joindre un fichier vise une ligne de la base.
+      const { store } = await createStore([]);
+      store.createNote();
+
+      expect(await store.materialiseDraft()).toBe('fake-1');
+      expect(store.persistedNoteId()).toBe('fake-1');
+    });
+
+    it('has nothing to materialise without a draft', async () => {
+      const { store } = await createStore([]);
+
+      expect(await store.materialiseDraft()).toBeNull();
+    });
+
+    it('notifies and selects nothing when the write fails', async () => {
       const { store, repository } = await createStore([]);
       const notifier = TestBed.inject(ErrorNotifier);
+      store.createNote();
       repository.failNext = new Error('read-only');
 
-      await store.createNote();
+      await store.renameNote(DRAFT_ID, 'Titre');
 
-      expect(store.selectedNote()).toBeNull();
+      expect(store.persistedNoteId()).toBeNull();
       expect(notifier.notice()?.ref.key).toBe('errors.noteCreateFailed');
     });
   });
@@ -752,6 +854,245 @@ describe('NotesStore', () => {
 
       // The store must not re-sort, re-group or drop empty sections.
       expect(store.sections().map((section) => section.key)).toEqual(['pinned', 'today', 'week']);
+    });
+  });
+  describe('multiple selection', () => {
+    async function withThreeNotes(): Promise<Harness> {
+      return createStore([createNote({ id: 'a' }), createNote({ id: 'b' }), createNote({ id: 'c' })]);
+    }
+
+    it('starts empty and reports no selection', async () => {
+      const { store } = await withThreeNotes();
+
+      expect(store.checkedCount()).toBe(0);
+      expect(store.hasSelection()).toBe(false);
+    });
+
+    it('toggles a note in and out of the selection', async () => {
+      const { store } = await withThreeNotes();
+
+      store.toggleChecked('b');
+      expect(store.checkedNotes().map((note) => note.id)).toEqual(['b']);
+
+      store.toggleChecked('b');
+      expect(store.hasSelection()).toBe(false);
+    });
+
+    it('never hands out a note that is no longer displayed', async () => {
+      // Un identifiant coché puis disparu ne doit pas partir dans une action de
+      // masse : la sélection se dérive de ce qui est visible.
+      const { store, repository } = await withThreeNotes();
+      store.toggleChecked('a');
+      const before = repository.queryCount;
+
+      repository.setView({ sections: [] });
+      store.setFilter('pinned');
+      await awaitQuery(repository, before);
+
+      expect(store.checkedNotes()).toEqual([]);
+    });
+
+    it('extends the selection from the focused note to the clicked one', async () => {
+      const { store } = await withThreeNotes();
+      store.focusNote('a');
+
+      store.checkRangeTo('c');
+
+      expect(store.checkedNotes().map((note) => note.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('checks a single note when there is no anchor', async () => {
+      const { store } = await withThreeNotes();
+
+      store.checkRangeTo('b');
+
+      expect(store.checkedNotes().map((note) => note.id)).toEqual(['b']);
+    });
+
+    it('moves the whole selection in one call', async () => {
+      const { store, repository } = await withThreeNotes();
+      store.toggleChecked('a');
+      store.toggleChecked('c');
+
+      await store.moveSelection('space-2');
+
+      expect(repository.movedTo).toEqual({ ids: ['a', 'c'], spaceId: 'space-2' });
+    });
+
+    it('sends the typed tag through untouched', async () => {
+      // Trim, « # » de tête et doublons sont tranchés par le back, seul
+      // dépositaire de la règle.
+      const { store, repository } = await withThreeNotes();
+      store.toggleChecked('a');
+
+      await store.tagSelection('#Urgent');
+
+      expect(repository.taggedWith).toEqual({ ids: ['a'], tags: ['#Urgent'] });
+    });
+
+    it('ignores a blank tag rather than sending it', async () => {
+      const { store, repository } = await withThreeNotes();
+      store.toggleChecked('a');
+
+      await store.tagSelection('   ');
+
+      expect(repository.taggedWith).toBeNull();
+    });
+
+    it('does nothing at all without a selection', async () => {
+      const { store, repository } = await withThreeNotes();
+
+      await store.moveSelection('space-2');
+      await store.tagSelection('urgent');
+      await store.deleteSelection();
+
+      expect(repository.movedTo).toBeNull();
+      expect(repository.taggedWith).toBeNull();
+      expect(visibleIds(store)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('reports a failed bulk action without clearing the selection', async () => {
+      const { store, repository } = await withThreeNotes();
+      const notifier = TestBed.inject(ErrorNotifier);
+      store.toggleChecked('a');
+      repository.failNext = new Error('boom');
+
+      await store.moveSelection('space-2');
+
+      expect(notifier.notice()?.ref.key).toBe('errors.bulkActionFailed');
+      expect(store.checkedCount()).toBe(1);
+    });
+  });
+
+  describe('trash and undo', () => {
+    it('offers to undo what a deletion took away', async () => {
+      const { store } = await createStore([createNote({ id: 'a' })]);
+
+      await store.deleteNote('a');
+
+      expect(store.lastDeletion()).toEqual({ ids: ['a'], count: 1 });
+    });
+
+    it('brings a deleted note back', async () => {
+      const { store } = await createStore([createNote({ id: 'a' }), createNote({ id: 'b' })]);
+      await store.deleteNote('a');
+
+      await store.undoDeletion();
+      await vi.waitFor(() => expect(visibleIds(store)).toContain('a'));
+
+      expect(store.lastDeletion()).toBeNull();
+    });
+
+    it('clears the selection once it is in the trash', async () => {
+      const { store } = await createStore([createNote({ id: 'a' }), createNote({ id: 'b' })]);
+      store.toggleChecked('a');
+      store.toggleChecked('b');
+
+      await store.deleteSelection();
+
+      expect(store.hasSelection()).toBe(false);
+      expect(store.lastDeletion()?.count).toBe(2);
+    });
+
+    it('hides the banner after its window but stays undoable', async () => {
+      // Masquer une proposition n'est pas y renoncer : `Ctrl+Z` doit encore
+      // marcher une fois le bandeau parti.
+      const { store } = await createStore([createNote({ id: 'a' })]);
+      // Les timers sont truqués **après** la construction du store : `waitFor`
+      // en dépend pour attendre la première vue.
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        await store.deleteNote('a');
+        expect(store.undoBanner()).not.toBeNull();
+
+        await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+
+        expect(store.undoBanner()).toBeNull();
+        expect(store.lastDeletion()).toEqual({ ids: ['a'], count: 1 });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('drops the offer when dismissed', async () => {
+      // Masquer le bandeau à la main, lui, renonce pour de bon.
+      const { store } = await createStore([createNote({ id: 'a' })]);
+      await store.deleteNote('a');
+
+      store.dismissUndo();
+
+      expect(store.undoBanner()).toBeNull();
+      expect(store.lastDeletion()).toBeNull();
+    });
+  });
+
+  describe('keyboard focus', () => {
+    it('flattens the sections in display order', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a' })]);
+      const before = repository.queryCount;
+      repository.setView({
+        sections: [
+          {
+            key: 'pinned',
+            notes: [createNote({ id: 'p' })],
+            hasExpiringNotes: false,
+            showCreateGhost: false,
+          },
+          {
+            key: 'week',
+            notes: [createNote({ id: 'w' })],
+            hasExpiringNotes: false,
+            showCreateGhost: false,
+          },
+        ],
+      });
+      store.setFilter('pinned');
+      await awaitQuery(repository, before);
+
+      expect(store.visibleNotes().map((note) => note.id)).toEqual(['p', 'w']);
+    });
+
+    it('reports no index when nothing is focused', async () => {
+      const { store } = await createStore([createNote({ id: 'a' })]);
+
+      expect(store.focusedIndex()).toBe(-1);
+    });
+
+    it('focuses by position, which survives a rename', async () => {
+      const { store } = await createStore([createNote({ id: 'a' }), createNote({ id: 'b' })]);
+
+      store.focusIndex(1);
+
+      expect(store.focusedNoteId()).toBe('b');
+      expect(store.focusedIndex()).toBe(1);
+    });
+
+    it('ignores a position outside the grid', async () => {
+      const { store } = await createStore([createNote({ id: 'a' })]);
+      store.focusIndex(0);
+
+      store.focusIndex(9);
+
+      expect(store.focusedNoteId()).toBe('a');
+    });
+
+    it('follows the note being opened', async () => {
+      const { store } = await createStore([createNote({ id: 'a' }), createNote({ id: 'b' })]);
+
+      store.openNote('b');
+
+      expect(store.focusedNoteId()).toBe('b');
+    });
+  });
+
+  describe('{{fields}}', () => {
+    it('delegates the substitution to the backend', async () => {
+      // Ce qui est un champ et ce qui est du template Angular s'y décide.
+      const { store } = await createStore();
+
+      const filled = await store.fillPlaceholders('psql -h {{host}}', { host: 'db' });
+
+      expect(filled).toBe('psql -h db');
     });
   });
 });

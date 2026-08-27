@@ -3,6 +3,8 @@
 //! **Nothing user-visible is written here**: the menu labels arrive from the
 //! front end already translated.
 
+use std::sync::Mutex;
+
 use serde::Deserialize;
 use specta::Type;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -14,6 +16,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 /// silently inert subscription.
 const CAPTURE_EVENT: &str = "devbox:capture";
 const NEW_NOTE_EVENT: &str = "devbox:new-note";
+const PALETTE_EVENT: &str = "devbox:palette";
 
 /// `unminimize` first: a minimised window that is merely shown stays in the
 /// taskbar.
@@ -37,11 +40,32 @@ fn reveal_and_emit(app: &AppHandle, topic: &str) {
 
 const CONTROL_ALT: Modifiers = Modifiers::CONTROL.union(Modifiers::ALT);
 
+/// Raccourcis qu'une autre application avait déjà pris. Rien n'échoue — DevBox
+/// doit démarrer sans eux — mais le front les lit pour **le dire**, faute de
+/// quoi la seule trace serait une ligne de journal et l'utilisateur presserait
+/// une touche morte sans comprendre.
+pub type UnavailableShortcuts = Mutex<Vec<String>>;
+
+/// Libellé lisible d'un raccourci, tel qu'on l'écrirait dans une documentation.
+/// `Debug` sur un `Shortcut` rendrait `Shortcut { mods: CONTROL | ALT, … }`.
+fn label_of(code: Code) -> String {
+    let key = match code {
+        Code::Space => "Espace".to_string(),
+        other => format!("{other:?}").trim_start_matches("Key").to_string(),
+    };
+
+    format!("Ctrl+Alt+{key}")
+}
+
 /// A shortcut already taken by another application is logged but **not fatal**:
 /// DevBox must start without it.
 pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
     let capture = Shortcut::new(Some(CONTROL_ALT), Code::KeyV);
     let new_note = Shortcut::new(Some(CONTROL_ALT), Code::KeyN);
+    // ⚠️ Pas `Ctrl+Alt+Espace` : ce raccourci est déjà pris par des applications
+    // très répandues (Claude, entre autres), et le premier arrivé gagne — DevBox
+    // n'aurait alors qu'une touche morte, sans rien pour le signaler.
+    let palette = Shortcut::new(Some(CONTROL_ALT), Code::KeyP);
 
     app.plugin(
         tauri_plugin_global_shortcut::Builder::new()
@@ -55,6 +79,8 @@ pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
                     CAPTURE_EVENT
                 } else if shortcut == &new_note {
                     NEW_NOTE_EVENT
+                } else if shortcut == &palette {
+                    PALETTE_EVENT
                 } else {
                     return;
                 };
@@ -64,13 +90,32 @@ pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
             .build(),
     )?;
 
-    for shortcut in [capture, new_note] {
+    let mut unavailable = Vec::new();
+    for (shortcut, code) in [
+        (capture, Code::KeyV),
+        (new_note, Code::KeyN),
+        (palette, Code::KeyP),
+    ] {
         if let Err(error) = app.global_shortcut().register(shortcut) {
-            log::warn!("Global shortcut {shortcut:?} unavailable: {error}");
+            let label = label_of(code);
+            log::warn!("Global shortcut {label} unavailable: {error}");
+            unavailable.push(label);
         }
     }
 
+    app.manage(UnavailableShortcuts::new(unavailable));
+
     Ok(())
+}
+
+/// Ce que le front affiche au démarrage quand un raccourci n'a pas pu être pris.
+///
+/// Une liste vide est le cas courant ; elle ne produit aucun message.
+#[tauri::command]
+#[specta::specta]
+#[allow(clippy::needless_pass_by_value)]
+pub fn unavailable_shortcuts(state: tauri::State<'_, UnavailableShortcuts>) -> Vec<String> {
+    state.lock().map(|taken| taken.clone()).unwrap_or_default()
 }
 
 // --- System tray: icon, menu, and item actions --------------------------------
@@ -80,6 +125,7 @@ const TRAY_ID: &str = "devbox";
 const OPEN_ITEM: &str = "open";
 const NEW_NOTE_ITEM: &str = "new-note";
 const CAPTURE_ITEM: &str = "capture";
+const PALETTE_ITEM: &str = "palette";
 const QUIT_ITEM: &str = "quit";
 
 /// Labels cross the bridge **already translated**: the interface language
@@ -91,6 +137,7 @@ pub struct TrayLabels {
     pub open: String,
     pub new_note: String,
     pub capture: String,
+    pub palette: String,
     pub quit: String,
 }
 
@@ -136,10 +183,14 @@ fn build_menu(app: &AppHandle, labels: &TrayLabels) -> tauri::Result<Menu<Wry>> 
     let open = MenuItem::with_id(app, OPEN_ITEM, &labels.open, true, None::<&str>)?;
     let new_note = MenuItem::with_id(app, NEW_NOTE_ITEM, &labels.new_note, true, None::<&str>)?;
     let capture = MenuItem::with_id(app, CAPTURE_ITEM, &labels.capture, true, None::<&str>)?;
+    let palette = MenuItem::with_id(app, PALETTE_ITEM, &labels.palette, true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, QUIT_ITEM, &labels.quit, true, None::<&str>)?;
 
-    Menu::with_items(app, &[&open, &new_note, &capture, &separator, &quit])
+    Menu::with_items(
+        app,
+        &[&open, &new_note, &capture, &palette, &separator, &quit],
+    )
 }
 
 fn build_tray(app: &AppHandle, menu: &Menu<Wry>) -> tauri::Result<()> {
@@ -159,6 +210,7 @@ fn build_tray(app: &AppHandle, menu: &Menu<Wry>) -> tauri::Result<()> {
             OPEN_ITEM => reveal(app),
             NEW_NOTE_ITEM => reveal_and_emit(app, NEW_NOTE_EVENT),
             CAPTURE_ITEM => reveal_and_emit(app, CAPTURE_EVENT),
+            PALETTE_ITEM => reveal_and_emit(app, PALETTE_EVENT),
             // The only path that actually terminates the process: the window's
             // close button only hides it.
             QUIT_ITEM => app.exit(0),

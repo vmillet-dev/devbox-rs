@@ -14,10 +14,13 @@ export function createNote(overrides: Partial<Note> = {}): Note {
     createdAt: new Date('2026-01-01T10:00:00Z'),
     updatedAt: new Date('2026-01-01T10:00:00Z'),
     lifecycle: { kind: 'permanent' },
-    // Derived by the backend (`domain::display`). The default mirrors what it
-    // returns for an ordinary note; a spec about footers overrides it.
+    // Derived by the backend (`notes::model::decorate`). The defaults mirror
+    // what it returns for an ordinary note; a spec about footers, `{{fields}}`
+    // or attachments overrides them.
     footer: { kind: 'age', at: new Date('2026-01-01T10:00:00Z') },
     expiringSoon: false,
+    placeholders: [],
+    attachmentCount: 0,
     ...overrides,
   };
 }

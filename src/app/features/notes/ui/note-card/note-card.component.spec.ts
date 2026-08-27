@@ -151,9 +151,11 @@ describe('NoteCardComponent', () => {
     fixture.componentRef.setInput('note', createNote({ id: 'note-42' }));
     await fixture.whenStable();
     let emitted: string | undefined;
-    fixture.componentInstance.opened.subscribe((id) => (emitted = id));
+    fixture.componentInstance.opened.subscribe(({ noteId }) => (emitted = noteId));
 
-    fixture.debugElement.query(By.css('.card')).triggerEventHandler('click');
+    // Un `MouseEvent` explicite : la carte lit ses modificateurs pour décider
+    // entre ouvrir, cocher et étendre la sélection.
+    fixture.debugElement.query(By.css('.card')).triggerEventHandler('click', new MouseEvent('click'));
 
     expect(emitted).toBe('note-42');
   });

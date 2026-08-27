@@ -112,3 +112,72 @@ app-copy-button:focus-within {
   font-size: 9.5px;
   color: var(--text-2);
 }
+
+// --- Sélection multiple et badges -------------------------------------------
+
+// Coin haut-gauche, à l'opposé du menu ⋯. Comme le bouton de copie : discret au
+// repos plutôt que masqué, `display: none` le sortirait de la tabulation.
+.card-check {
+  @include unstyled-control;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  padding: 2px 4px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.card-shell:hover .card-check,
+.card-check:focus-visible,
+.card-check.checked {
+  opacity: 1;
+}
+
+.card-check.checked {
+  color: var(--amber);
+}
+
+.card-shell.checked .card {
+  border-color: var(--amber-dim);
+  background: rgba(var(--amber-rgb), 0.06);
+}
+
+// Même emplacement que le bouton de copie, qu'il remplace : les deux ne
+// coexistent jamais.
+.card-fill {
+  @include unstyled-control;
+  position: absolute;
+  top: 8px;
+  right: 34px;
+  z-index: 1;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--amber);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.card-shell:hover .card-fill,
+.card-fill:focus-visible {
+  opacity: 1;
+}
+
+.card-fill:focus-visible,
+.card-check:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+.card-fields,
+.card-clip {
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+
+.card-fields {
+  color: var(--amber);
+}

@@ -1,0 +1,44 @@
+<div appDialogBackdrop class="fields-backdrop" (dismissed)="cancelled.emit()">
+  <form
+    appFocusTrap
+    class="fields-panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="placeholder-form-title"
+    (submit)="submit($event)"
+  >
+    <h2 id="placeholder-form-title" class="fields-title">
+      {{ 'placeholders.title' | transloco }}
+    </h2>
+    <p class="fields-hint">{{ 'placeholders.hint' | transloco: { count: count() } }}</p>
+
+    <div class="fields-list">
+      @for (placeholder of placeholders(); track placeholder.name) {
+        <label class="fields-row">
+          <span class="fields-name">{{ placeholder.name }}</span>
+          <input
+            #valueInput
+            type="text"
+            class="fields-input"
+            [attr.aria-label]="'placeholders.fieldLabel' | transloco: { name: placeholder.name }"
+            [placeholder]="placeholder.defaultValue"
+            [value]="valueOf(placeholder)"
+            (input)="setValue(placeholder.name, valueInput.value)"
+          />
+        </label>
+      }
+    </div>
+
+    <div class="fields-actions">
+      <button type="button" class="fields-action" (click)="rawRequested.emit()">
+        {{ 'placeholders.copyRaw' | transloco }}
+      </button>
+      <button type="button" class="fields-action" (click)="cancelled.emit()">
+        {{ 'placeholders.cancel' | transloco }}
+      </button>
+      <button type="submit" class="fields-action primary">
+        {{ 'placeholders.copy' | transloco }}
+      </button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,90 @@
+<div class="strip">
+  <span class="strip-label">{{ 'attachments.title' | transloco }}</span>
+
+  @for (attachment of attachments(); track attachment.id) {
+    <span class="strip-item" [class.previewing]="previewId() === attachment.id">
+      <!-- Ouvrir avec l'application par défaut : c'est ce qui rend un PDF ou une
+           archive utilisable, là où l'aperçu ne sait montrer que des images. -->
+      <button
+        type="button"
+        class="strip-name"
+        [attr.aria-label]="'attachments.open' | transloco: { name: attachment.fileName }"
+        (click)="openRequested.emit(attachment.id)"
+      >
+        <span aria-hidden="true">{{ isImage(attachment) ? '🖼' : '📎' }}</span>
+        {{ attachment.fileName }}
+        <span class="strip-size">
+          {{ 'attachments.size' | transloco: { size: sizeInKb(attachment) } }}
+        </span>
+      </button>
+
+      @if (isImage(attachment)) {
+        <button
+          type="button"
+          class="strip-icon"
+          [attr.aria-pressed]="previewId() === attachment.id"
+          [attr.aria-label]="'attachments.openPreview' | transloco: { name: attachment.fileName }"
+          (click)="previewToggled.emit(attachment.id)"
+        >
+          <span aria-hidden="true">👁</span>
+        </button>
+      }
+
+      <button
+        type="button"
+        class="strip-icon"
+        [attr.aria-label]="'attachments.save' | transloco: { name: attachment.fileName }"
+        (click)="saveRequested.emit(attachment.id)"
+      >
+        <span aria-hidden="true">⭳</span>
+      </button>
+
+      <button
+        type="button"
+        class="strip-icon strip-remove"
+        [class.confirming]="confirmingRemove() === attachment.id"
+        [attr.aria-label]="'attachments.remove' | transloco: { name: attachment.fileName }"
+        (click)="onRemoveClick(attachment.id)"
+      >
+        <span aria-hidden="true">{{ confirmingRemove() === attachment.id ? '?' : '✕' }}</span>
+      </button>
+    </span>
+  } @empty {
+    <span class="strip-empty">{{ 'attachments.dropHint' | transloco }}</span>
+  }
+
+  <button
+    type="button"
+    class="strip-add"
+    [attr.aria-disabled]="isBusy()"
+    (click)="addRequested.emit()"
+  >
+    {{ (isBusy() ? 'attachments.adding' : 'attachments.add') | transloco }}
+  </button>
+</div>
+
+@if (previewed(); as attachment) {
+  <div class="strip-preview">
+    @if (previewData(); as data) {
+      <!-- Un <button> autour de l'image plutôt qu'un `(click)` dessus : la vue
+           agrandie doit s'atteindre au clavier comme à la souris. -->
+      <button
+        type="button"
+        class="strip-preview-zoom"
+        [attr.aria-label]="'attachments.zoom' | transloco: { name: attachment.fileName }"
+        (click)="zoomRequested.emit()"
+      >
+        <!-- `data:` URI et non un chemin de fichier : le CSP de la WebView
+             n'autorise que `img-src 'self' data:`. -->
+        <img
+          class="strip-preview-image"
+          [src]="data"
+          [alt]="'attachments.preview' | transloco: { name: attachment.fileName }"
+        />
+      </button>
+    }
+    <button type="button" class="strip-preview-close" (click)="previewToggled.emit(attachment.id)">
+      {{ 'attachments.closePreview' | transloco }}
+    </button>
+  </div>
+}

@@ -10,10 +10,14 @@
       <app-note-card
         [note]="note"
         [selected]="note.id === selectedNoteId()"
+        [focused]="note.id === focusedNoteId()"
+        [checked]="checkedIds().has(note.id)"
         [spaces]="spaces()"
         (opened)="noteOpened.emit($event)"
+        (checkToggled)="noteChecked.emit($event)"
         (moveRequested)="noteMoved.emit($event)"
         (deleteRequested)="noteDeleted.emit($event)"
+        (fillRequested)="fillRequested.emit($event)"
       />
     }
     @if (section().showCreateGhost) {

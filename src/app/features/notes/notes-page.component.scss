@@ -74,3 +74,39 @@
     outline-offset: 2px;
   }
 }
+
+// Rappel des touches du canevas. Discret : il s'adresse à qui cherche, pas à
+// qui lit ses notes.
+.canvas-keyboard-hint {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  color: var(--text-2);
+  text-align: center;
+}
+
+// Près des filtres, pas dans le menu « Fichier » : la corbeille est une vue des
+// notes, pas une opération sur un fichier.
+.trash-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.trash-btn:hover {
+  border-color: var(--amber-dim);
+  color: var(--text-0);
+}
+
+.trash-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}

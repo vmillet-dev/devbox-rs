@@ -32,13 +32,20 @@ export interface Note {
   readonly footer: NoteFooter;
   /** Échéance proche. Seuil unique, tenu par le back. */
   readonly expiringSoon: boolean;
+  /** Champs `{{…}}` repérés dans le contenu. Dérivé, jamais écrit. */
+  readonly placeholders: readonly Placeholder[];
+  /** Dérivé aussi : la carte n'en affiche qu'un compteur. */
+  readonly attachmentCount: number;
 }
 
 /**
  * `id` et les horodatages sont attribués par la persistance ; `footer` et
  * `expiringSoon` sont dérivés — les envoyer laisserait croire que le front décide.
  */
-export type NoteDraft = Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'footer' | 'expiringSoon'>;
+export type NoteDraft = Omit<
+  Note,
+  'id' | 'createdAt' | 'updatedAt' | 'footer' | 'expiringSoon' | 'placeholders' | 'attachmentCount'
+>;
 
 export type NotePatch = Partial<NoteDraft>;
 
@@ -95,4 +102,64 @@ export interface NoteSection {
   readonly hasExpiringNotes: boolean;
   /** Affiche la carte fantôme « coller ou créer » en fin de section. */
   readonly showCreateGhost: boolean;
+}
+
+/**
+ * Champ `{{nom}}` d'un snippet, éventuellement muni d'une valeur par défaut
+ * (`{{port=5432}}`). Repéré par le back, qui décide seul de ce qui en est un.
+ */
+export interface Placeholder {
+  readonly name: string;
+  readonly defaultValue: string;
+}
+
+/**
+ * Note en corbeille. Volontairement **pas** un `Note` : rien n'y est décoré
+ * (pied de carte, échéance, champs `{{…}}`), parce qu'une note au rebut n'est
+ * ni ouverte ni copiée — elle est restaurée ou purgée.
+ *
+ * `purgeAt` est dérivée : la rétention peut changer d'une version à l'autre, une
+ * échéance figée en base ne suivrait pas.
+ */
+export interface TrashedNote {
+  readonly id: string;
+  readonly spaceId: string;
+  readonly title: string;
+  readonly language: LanguageTag;
+  readonly content: string;
+  readonly tags: readonly string[];
+  readonly deletedAt: Date;
+  readonly purgeAt: Date;
+}
+
+/** Un tag du corpus et le nombre de notes vivantes qui le portent. */
+export interface TagUsage {
+  readonly tag: string;
+  readonly noteCount: number;
+}
+
+/**
+ * Fiche d'une pièce jointe. Les octets n'y sont pas : ils arrivent à la demande,
+ * en `data:` URI, par `AttachmentsRepository.read`.
+ */
+export interface Attachment {
+  readonly id: string;
+  readonly noteId: string;
+  /** Nom d'origine, affiché tel quel. Jamais utilisé comme chemin. */
+  readonly fileName: string;
+  readonly mimeType: string;
+  readonly byteSize: number;
+  readonly createdAt: Date;
+}
+
+export interface ExportReport {
+  readonly notes: number;
+  readonly spaces: number;
+}
+
+/** `notesSkipped` : déjà présentes, ou sans espace où atterrir. */
+export interface ImportReport {
+  readonly spacesCreated: number;
+  readonly notesImported: number;
+  readonly notesSkipped: number;
 }

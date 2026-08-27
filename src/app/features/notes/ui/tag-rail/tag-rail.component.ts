@@ -14,4 +14,6 @@ export class TagRailComponent {
   readonly activeTags = input.required<ReadonlySet<string>>();
 
   readonly tagToggled = output<string>();
+  /** Ouvre la gestion globale : elle agit sur exactement ce que ce rail montre. */
+  readonly manageRequested = output<void>();
 }

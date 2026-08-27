@@ -9,6 +9,8 @@
 //! note falls into exactly one section: a note without a section would be
 //! unreachable in the interface, including search.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Datelike, FixedOffset, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -91,6 +93,22 @@ pub enum NoteSectionKey {
 
 /// An empty view is a valid response: first launch, or unsuccessful
 /// search — `is_filtering` distinguishes the two.
+/// Pose le nombre de pièces jointes sur les notes d'une vue déjà construite.
+///
+/// Séparé de [`build`], qui ne lit pas la base : le compteur vient d'une
+/// seconde requête, et le faire descendre jusqu'ici imposerait une table de
+/// hachage à chaque test de découpage en sections.
+pub fn apply_attachment_counts<S: std::hash::BuildHasher>(
+    view: &mut NotesView,
+    counts: &HashMap<String, u32, S>,
+) {
+    for section in &mut view.sections {
+        for note in &mut section.notes {
+            note.attachment_count = counts.get(&note.id).copied().unwrap_or(0);
+        }
+    }
+}
+
 pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesView {
     let mut notes = notes;
 

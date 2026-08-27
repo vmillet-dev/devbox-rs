@@ -1,0 +1,89 @@
+@use 'mixins' as *;
+
+// Au-dessus de la palette (65) : c'est elle qui l'ouvre.
+.fields-backdrop {
+  @include backdrop(70);
+}
+
+.fields-panel {
+  @include dialog-panel(420px);
+  gap: 12px;
+  max-height: 80vh;
+}
+
+.fields-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.fields-hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.fields-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.fields-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fields-name {
+  width: 110px;
+  flex-shrink: 0;
+  font-family: var(--font-mono), serif;
+  font-size: 11.5px;
+  color: var(--amber);
+  overflow-wrap: anywhere;
+}
+
+.fields-input {
+  @include unstyled-control;
+  @include surface($radius: 7px);
+  flex: 1;
+  padding: 7px 10px;
+  font-family: var(--font-mono), serif;
+  font-size: 12px;
+  color: var(--text-0);
+}
+
+.fields-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.fields-action {
+  @include unstyled-control;
+  @include surface($radius: 7px);
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.fields-action:hover {
+  @include accent-state(var(--text-0), var(--amber-dim));
+}
+
+.fields-action.primary {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--amber-ink);
+}
+
+.fields-panel :focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}

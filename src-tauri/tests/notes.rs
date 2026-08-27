@@ -15,7 +15,10 @@ use devbox_lib::db::schema::{note_tags, spaces as spaces_table};
 use devbox_lib::error::StorageError;
 use devbox_lib::notes::language::Language;
 use devbox_lib::notes::model::{Note, NoteDraft, NoteLifecycle, NotePatch};
-use devbox_lib::notes::store::{create, delete, fetch, update};
+use devbox_lib::notes::store::{
+    all, by_ids, create, delete, drop_tag, expired_ids, fetch, insert_imported, list_trashed,
+    move_many, purge, restore_many, retag, tag_many, tag_usage, update,
+};
 use devbox_lib::notes::view::{self, NoteFilter, NotesQuery, NotesView};
 use devbox_lib::spaces::store as spaces;
 
@@ -355,14 +358,71 @@ fn updating_an_unknown_note_reports_an_error() {
 }
 
 #[test]
-fn deleting_removes_the_note_and_its_tags() {
+fn deleting_takes_the_note_off_the_canvas_without_destroying_it() {
     let mut connection = open_in_memory().unwrap();
     let space_id = space(&mut connection, "Perso");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    delete(&mut connection, &created.id).unwrap();
+    delete(&mut connection, &created.id, t1()).unwrap();
 
     assert!(list(&mut connection).unwrap().is_empty());
+    // Les tags survivent : ils reviendront avec la note si elle est restaurée.
+    let kept_tags = note_tags::table
+        .count()
+        .get_result::<i64>(&mut connection)
+        .unwrap();
+    assert_eq!(kept_tags, 2);
+
+    let trashed = list_trashed(&mut connection).unwrap();
+    assert_eq!(trashed.len(), 1);
+    assert_eq!(trashed[0].0.id, created.id);
+    assert_eq!(trashed[0].1, t1());
+}
+
+#[test]
+fn a_restored_note_comes_back_whole() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let created = create(&mut connection, draft(&space_id), t0()).unwrap();
+    delete(&mut connection, &created.id, t1()).unwrap();
+
+    assert_eq!(
+        restore_many(&mut connection, std::slice::from_ref(&created.id)).unwrap(),
+        1
+    );
+
+    let listed = list(&mut connection).unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].tags, ["api", "auth"]);
+    // `updated_at` intact : restaurer ne fait pas remonter la note en tête.
+    assert_eq!(listed[0].updated_at, t0());
+}
+
+#[test]
+fn a_trashed_note_is_no_longer_editable() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let created = create(&mut connection, draft(&space_id), t0()).unwrap();
+    delete(&mut connection, &created.id, t1()).unwrap();
+
+    let error = update(&mut connection, &created.id, &NotePatch::default(), t1()).unwrap_err();
+
+    assert!(matches!(error, StorageError::NoteNotFound(_)));
+}
+
+#[test]
+fn purging_removes_the_note_and_its_tags_for_good() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let created = create(&mut connection, draft(&space_id), t0()).unwrap();
+    delete(&mut connection, &created.id, t1()).unwrap();
+
+    assert_eq!(
+        purge(&mut connection, std::slice::from_ref(&created.id)).unwrap(),
+        1
+    );
+
+    assert!(list_trashed(&mut connection).unwrap().is_empty());
     let orphan_tags = note_tags::table
         .count()
         .get_result::<i64>(&mut connection)
@@ -371,12 +431,303 @@ fn deleting_removes_the_note_and_its_tags() {
 }
 
 #[test]
+fn a_note_still_on_the_canvas_cannot_be_purged() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let created = create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    // Le sursis de 30 jours ne doit pas pouvoir être court-circuité.
+    assert_eq!(
+        purge(&mut connection, std::slice::from_ref(&created.id)).unwrap(),
+        0
+    );
+    assert_eq!(list(&mut connection).unwrap().len(), 1);
+}
+
+#[test]
+fn only_notes_past_the_retention_are_reported_as_expired() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let old = create(&mut connection, draft(&space_id), t0()).unwrap();
+    let recent = create(&mut connection, draft(&space_id), t0()).unwrap();
+    delete(&mut connection, &old.id, t0()).unwrap();
+    delete(&mut connection, &recent.id, at("2026-08-20T09:00:00.000Z")).unwrap();
+
+    let expired = expired_ids(&mut connection, at("2026-08-25T09:00:00.000Z")).unwrap();
+
+    assert_eq!(expired, [old.id]);
+}
+
+#[test]
 fn deleting_an_unknown_note_reports_an_error() {
     let mut connection = open_in_memory().unwrap();
 
-    let error = delete(&mut connection, "inconnu").unwrap_err();
+    let error = delete(&mut connection, "inconnu", t1()).unwrap_err();
 
     assert!(matches!(error, StorageError::NoteNotFound(_)));
+}
+
+#[test]
+fn deleting_the_same_note_twice_reports_an_error_rather_than_a_silent_ok() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let created = create(&mut connection, draft(&space_id), t0()).unwrap();
+    delete(&mut connection, &created.id, t1()).unwrap();
+
+    let error = delete(&mut connection, &created.id, t1()).unwrap_err();
+
+    assert!(matches!(error, StorageError::NoteNotFound(_)));
+}
+
+// --- Actions en masse -------------------------------------------------------
+
+#[test]
+fn moving_a_selection_leaves_the_notes_already_there_untouched() {
+    let mut connection = open_in_memory().unwrap();
+    let source = space(&mut connection, "Perso");
+    let target = space(&mut connection, "Boulot");
+    let moved = create(&mut connection, draft(&source), t0()).unwrap();
+    let settled = create(&mut connection, draft(&target), t0()).unwrap();
+
+    let count = move_many(
+        &mut connection,
+        &[moved.id.clone(), settled.id.clone()],
+        &target,
+        t1(),
+    )
+    .unwrap();
+
+    // Celle qui y était déjà n'est pas comptée, et son `updated_at` ne bouge pas.
+    assert_eq!(count, 1);
+    let listed = list(&mut connection).unwrap();
+    assert!(listed.iter().all(|note| note.space_id == target));
+    let untouched = listed.iter().find(|note| note.id == settled.id).unwrap();
+    assert_eq!(untouched.updated_at, t0());
+}
+
+#[test]
+fn moving_to_an_unknown_space_is_refused_for_the_whole_batch() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let note = create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    let error = move_many(
+        &mut connection,
+        std::slice::from_ref(&note.id),
+        "ghost",
+        t1(),
+    )
+    .unwrap_err();
+
+    assert!(matches!(error, StorageError::SpaceNotFound(_)));
+    assert_eq!(list(&mut connection).unwrap()[0].space_id, space_id);
+}
+
+#[test]
+fn tagging_a_selection_adds_without_replacing() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let note = create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    let count = tag_many(
+        &mut connection,
+        std::slice::from_ref(&note.id),
+        &["urgent".to_string()],
+        t1(),
+    )
+    .unwrap();
+
+    assert_eq!(count, 1);
+    assert_eq!(
+        list(&mut connection).unwrap()[0].tags,
+        ["api", "auth", "urgent"]
+    );
+}
+
+#[test]
+fn tagging_twice_does_not_duplicate_the_tag() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let note = create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    // La clé primaire de `note_tags` est NOCASE : la seconde pose est ignorée.
+    tag_many(
+        &mut connection,
+        std::slice::from_ref(&note.id),
+        &["Auth".to_string()],
+        t1(),
+    )
+    .unwrap();
+
+    assert_eq!(list(&mut connection).unwrap()[0].tags, ["api", "auth"]);
+}
+
+// --- Gestion globale des tags -----------------------------------------------
+
+#[test]
+fn every_tag_is_listed_with_the_number_of_notes_carrying_it() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    create(&mut connection, draft(&space_id), t0()).unwrap();
+    create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    assert_eq!(
+        tag_usage(&mut connection).unwrap(),
+        [("api".to_string(), 2), ("auth".to_string(), 2)]
+    );
+}
+
+#[test]
+fn a_trashed_note_no_longer_counts_towards_its_tags() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let kept = create(&mut connection, draft(&space_id), t0()).unwrap();
+    let thrown = create(&mut connection, draft(&space_id), t0()).unwrap();
+    delete(&mut connection, &thrown.id, t1()).unwrap();
+
+    let usage = tag_usage(&mut connection).unwrap();
+
+    assert_eq!(usage[0], ("api".to_string(), 1));
+    assert_eq!(list(&mut connection).unwrap()[0].id, kept.id);
+}
+
+#[test]
+fn renaming_a_tag_onto_an_existing_one_merges_them() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let note = create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    // La note porte déjà « auth » : un `UPDATE` violerait la clé primaire.
+    let touched = retag(&mut connection, &["api".to_string()], "auth").unwrap();
+
+    assert_eq!(touched, 1);
+    assert_eq!(list(&mut connection).unwrap()[0].tags, ["auth"]);
+    assert_eq!(note.tags.len(), 2);
+}
+
+#[test]
+fn merging_several_tags_keeps_one_note_entry_each() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    retag(
+        &mut connection,
+        &["api".to_string(), "auth".to_string()],
+        "backend",
+    )
+    .unwrap();
+
+    assert_eq!(list(&mut connection).unwrap()[0].tags, ["backend"]);
+}
+
+#[test]
+fn correcting_the_case_of_a_tag_does_not_erase_it() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    // La cible figure parmi les sources : supprimer « auth » après avoir écrit
+    // « Auth » effacerait les deux, la collation étant NOCASE.
+    retag(&mut connection, &["auth".to_string()], "Auth").unwrap();
+
+    assert_eq!(list(&mut connection).unwrap()[0].tags, ["api", "Auth"]);
+}
+
+#[test]
+fn dropping_a_tag_leaves_the_notes_in_place() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    assert_eq!(drop_tag(&mut connection, "auth").unwrap(), 1);
+
+    let listed = list(&mut connection).unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].tags, ["api"]);
+}
+
+#[test]
+fn a_global_retag_does_not_float_the_corpus_to_the_top_of_the_canvas() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    retag(&mut connection, &["auth".to_string()], "identity").unwrap();
+
+    // Le canevas trie sur `updated_at` : le toucher remonterait toutes les
+    // notes que personne n'a rouvertes.
+    assert_eq!(list(&mut connection).unwrap()[0].updated_at, t0());
+}
+
+// --- Export et import -------------------------------------------------------
+
+#[test]
+fn an_export_reads_every_live_note_of_a_space() {
+    let mut connection = open_in_memory().unwrap();
+    let perso = space(&mut connection, "Perso");
+    let boulot = space(&mut connection, "Boulot");
+    create(&mut connection, draft(&perso), t0()).unwrap();
+    let elsewhere = create(&mut connection, draft(&boulot), t0()).unwrap();
+    let thrown = create(&mut connection, draft(&perso), t0()).unwrap();
+    delete(&mut connection, &thrown.id, t1()).unwrap();
+
+    let exported = all(&mut connection, Some(&perso)).unwrap();
+
+    assert_eq!(exported.len(), 1);
+    assert_eq!(exported[0].tags, ["api", "auth"]);
+    assert_eq!(all(&mut connection, None).unwrap().len(), 2);
+    assert!(
+        all(&mut connection, None)
+            .unwrap()
+            .iter()
+            .any(|note| note.id == elsewhere.id)
+    );
+}
+
+#[test]
+fn an_imported_note_keeps_its_identifier_and_its_dates() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let mut note = create(&mut connection, draft(&space_id), t0()).unwrap();
+    note.id = "imported".to_string();
+
+    assert!(insert_imported(&mut connection, &note).unwrap());
+
+    let found = all(&mut connection, None)
+        .unwrap()
+        .into_iter()
+        .find(|candidate| candidate.id == "imported")
+        .unwrap();
+    assert_eq!(found.created_at, t0());
+    assert_eq!(found.tags, ["api", "auth"]);
+}
+
+#[test]
+fn importing_the_same_note_twice_leaves_the_first_one_alone() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let mut note = create(&mut connection, draft(&space_id), t0()).unwrap();
+    note.title = "Écrasé ?".to_string();
+
+    // Même identifiant : l'import doit compter la note comme ignorée, pas
+    // remplacer ce que la machine contient déjà.
+    assert!(!insert_imported(&mut connection, &note).unwrap());
+    assert_eq!(list(&mut connection).unwrap()[0].title, "Titre");
+}
+
+#[test]
+fn sharing_a_selection_reads_the_notes_it_names() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let first = create(&mut connection, draft(&space_id), t0()).unwrap();
+    create(&mut connection, draft(&space_id), t0()).unwrap();
+
+    let selected = by_ids(&mut connection, std::slice::from_ref(&first.id)).unwrap();
+
+    assert_eq!(selected.len(), 1);
+    assert_eq!(selected[0].id, first.id);
+    assert!(by_ids(&mut connection, &[]).unwrap().is_empty());
 }
 
 /// Neutral query: everything, no search, no tags. Tests override one field

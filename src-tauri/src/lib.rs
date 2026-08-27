@@ -1,8 +1,10 @@
 // Public: `tests/` is a separate crate, and sees nothing of the binary but its API.
+pub mod attachments;
 pub mod db;
 pub mod error;
 pub mod notes;
 pub mod spaces;
+pub mod transfer;
 
 #[cfg(desktop)]
 pub mod desktop;
@@ -10,9 +12,18 @@ pub mod desktop;
 use tauri::Manager;
 use tauri_specta::{Builder, collect_commands};
 
-use desktop::sync_tray;
-use notes::{create_note, delete_note, query_notes, update_note};
+use attachments::{
+    attach_clipboard_image, attach_file, delete_attachment, list_attachments, open_attachment,
+    read_attachment, save_attachment,
+};
+use desktop::{sync_tray, unavailable_shortcuts};
+use notes::{
+    create_note, delete_note, delete_notes, delete_tag, empty_trash, fill_placeholders, list_tags,
+    list_trash, merge_tags, move_notes, purge_notes, query_notes, rename_tag, restore_notes,
+    tag_notes, update_note,
+};
 use spaces::{create_space, delete_space, list_spaces, rename_space};
+use transfer::{export_notes, export_selection, import_notes, share_notes};
 
 /// Resolved from the manifest and not from the current directory: neither `tauri dev`
 /// nor `cargo run --manifest-path` guarantees which one that is, and a relative path
@@ -39,11 +50,35 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         create_note,
         update_note,
         delete_note,
+        delete_notes,
+        restore_notes,
+        list_trash,
+        purge_notes,
+        empty_trash,
+        move_notes,
+        tag_notes,
+        list_tags,
+        rename_tag,
+        merge_tags,
+        delete_tag,
+        fill_placeholders,
         list_spaces,
         create_space,
         rename_space,
         delete_space,
+        attach_file,
+        attach_clipboard_image,
+        list_attachments,
+        read_attachment,
+        open_attachment,
+        save_attachment,
+        delete_attachment,
+        export_notes,
+        export_selection,
+        import_notes,
+        share_notes,
         sync_tray,
+        unavailable_shortcuts,
     ])
 }
 
@@ -69,6 +104,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -89,6 +125,16 @@ pub fn run() {
 
             let connection = db::open(&directory.join(db::DB_FILE_NAME))?;
             app.manage(db::Db::new(connection));
+
+            // La rétention de la corbeille s'applique même si personne n'ouvre
+            // le panneau, et le balayage ramasse les fichiers qu'une copie
+            // interrompue aurait laissés. Ni l'un ni l'autre n'est fatal.
+            let handle = app.handle().clone();
+            let db = handle.state::<db::Db>();
+            notes::sweep_trash_at_startup(&handle, &db);
+            if let Err(error) = attachments::sweep_orphan_files(&handle, &db) {
+                log::warn!("Orphan attachment files not swept: {error}");
+            }
 
             Ok(())
         })

@@ -1,0 +1,134 @@
+@use 'mixins' as *;
+
+.tags-backdrop {
+  @include backdrop(50);
+}
+
+.tags-panel {
+  @include dialog-panel(480px);
+  gap: 12px;
+  max-height: 80vh;
+}
+
+.tags-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tags-title {
+  margin: 0;
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.tags-close {
+  @include unstyled-control;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.tags-close:hover {
+  color: var(--text-0);
+}
+
+.tags-hint,
+.tags-state {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.tags-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.tags-item {
+  @include unstyled-control;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  @include surface($radius: 999px);
+  font-size: 11.5px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.tags-item:hover {
+  @include accent-state(var(--text-0), var(--amber-dim));
+}
+
+.tags-item.selected {
+  @include tint-badge('--amber-rgb', 0.15, 0.5);
+}
+
+.tags-item-name {
+  font-family: var(--font-mono), serif;
+}
+
+.tags-item-count {
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+
+.tags-item.selected .tags-item-count {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.tags-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.tags-target {
+  @include unstyled-control;
+  @include surface($radius: 7px);
+  flex: 1;
+  padding: 7px 10px;
+  font-family: var(--font-mono), serif;
+  font-size: 12px;
+  color: var(--text-0);
+}
+
+.tags-action {
+  @include unstyled-control;
+  @include surface($radius: 7px);
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.tags-action:hover {
+  @include accent-state(var(--text-0), var(--amber-dim));
+}
+
+.tags-action.danger:hover,
+.tags-action.danger.confirming {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.tags-action[aria-disabled='true'] {
+  cursor: default;
+  color: var(--text-2);
+}
+
+.tags-panel :focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}

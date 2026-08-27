@@ -1,0 +1,131 @@
+@use 'mixins' as *;
+
+// Même étage que l'éditeur : les deux ne s'ouvrent jamais ensemble.
+.trash-backdrop {
+  @include backdrop(50);
+}
+
+.trash-panel {
+  @include dialog-panel(560px);
+  gap: 12px;
+  max-height: 80vh;
+}
+
+.trash-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.trash-title {
+  margin: 0;
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.trash-close {
+  @include unstyled-control;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.trash-close:hover {
+  color: var(--text-0);
+}
+
+.trash-hint,
+.trash-state {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.trash-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.trash-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 9px 11px;
+  @include surface($radius: 8px);
+}
+
+.trash-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trash-row-title {
+  font-size: 12.5px;
+  color: var(--text-0);
+}
+
+// `pre` pour garder les sauts de ligne de l'extrait, tronqué à sa largeur.
+.trash-row-snippet {
+  margin: 0;
+  max-height: 2.8em;
+  overflow: hidden;
+  font-family: var(--font-mono), serif;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.trash-row-meta {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.trash-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.trash-action {
+  @include unstyled-control;
+  @include surface($radius: 6px);
+  padding: 5px 10px;
+  font-size: 11.5px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.trash-action:hover {
+  @include accent-state(var(--text-0), var(--amber-dim));
+}
+
+.trash-action.danger:hover,
+.trash-action.danger.confirming {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.trash-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.trash-panel :focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}

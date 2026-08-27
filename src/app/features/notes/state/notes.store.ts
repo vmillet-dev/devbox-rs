@@ -31,6 +31,95 @@ export type { NoteFilter } from '../model/note.model';
 /** La recherche traverse le pont IPC : un appel par caractère serait gâché. */
 export const SEARCH_DEBOUNCE_MS = 150;
 
+/**
+ * Durée pendant laquelle l'annulation reste proposée. Passé ce délai la note
+ * n'est pas perdue pour autant — elle est en corbeille pour 30 jours.
+ */
+export const UNDO_WINDOW_MS = 8000;
+
+/** Ce qu'une annulation a besoin de reprendre. */
+export interface Deletion {
+  readonly ids: readonly string[];
+  readonly count: number;
+}
+
+/**
+ * Identifiant de la note en cours de création, **jamais persisté**.
+ *
+ * Ouvrir la création n'écrit rien : une note vide par ouverture ferait un
+ * canevas de déchets à ranger. Le brouillon vit dans le store jusqu'à la
+ * première saisie qui vaut la peine d'être gardée.
+ */
+export const DRAFT_ID = '__draft__';
+
+/**
+ * Ce qui distingue une note qu'on abandonne d'une note qu'on enregistre. Un tag
+ * ou une échéance suffisent : la note n'est plus vide, même sans texte.
+ */
+function isWorthSaving(note: Note): boolean {
+  return (
+    note.title.trim() !== '' ||
+    note.content.trim() !== '' ||
+    note.source.trim() !== '' ||
+    note.tags.length > 0 ||
+    note.pinned ||
+    note.lifecycle.kind === 'expires'
+  );
+}
+
+/**
+ * Champs d'une note neuve.
+ *
+ * Titre et source vides : l'UI affiche des libellés de remplacement traduits,
+ * et stocker « Nouvelle note » en dur figerait du français dans les données.
+ * `txt` vaut « rien choisi » — c'est ce que `create_note` remplace par une
+ * détection sur le contenu.
+ */
+function emptyDraft(spaceId: string): NoteDraft {
+  return {
+    spaceId,
+    title: '',
+    language: FALLBACK_LANGUAGE,
+    content: '',
+    source: '',
+    tags: [],
+    pinned: false,
+    lifecycle: { kind: 'permanent' },
+  };
+}
+
+/**
+ * Le brouillon vu comme une `Note`, pour que l'éditeur n'ait pas à connaître
+ * deux formes. Les champs dérivés portent des valeurs neutres : ils viennent du
+ * back, qui n'a encore rien vu de cette note.
+ */
+function emptyNote(spaceId: string, now: Date): Note {
+  return {
+    ...emptyDraft(spaceId),
+    id: DRAFT_ID,
+    createdAt: now,
+    updatedAt: now,
+    footer: { kind: 'age', at: now },
+    expiringSoon: false,
+    placeholders: [],
+    attachmentCount: 0,
+  };
+}
+
+/** Ce qu'on envoie à `create_note` : le brouillon sans ses champs dérivés. */
+function toDraftPayload(note: Note): NoteDraft {
+  return {
+    spaceId: note.spaceId,
+    title: note.title,
+    language: note.language,
+    content: note.content,
+    source: note.source,
+    tags: [...note.tags],
+    pinned: note.pinned,
+    lifecycle: note.lifecycle,
+  };
+}
+
 /** Journée **locale** : on ne re-interroge qu'au changement de jour. */
 function localDayKey(now: Date): string {
   return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
@@ -105,16 +194,46 @@ export class NotesStore {
   private readonly _selectedTags = signal<ReadonlySet<string>>(new Set());
   private readonly _selectedLanguages = signal<ReadonlySet<LanguageTag>>(new Set());
   private readonly _selectedNote = signal<Note | null>(null);
+  private readonly _draftNote = signal<Note | null>(null);
+  private readonly _checkedIds = signal<ReadonlySet<string>>(new Set());
+  private readonly _focusedNoteId = signal<string | null>(null);
+  private readonly _lastDeletion = signal<Deletion | null>(null);
+  private readonly _undoVisible = signal(false);
 
   /** Reflète la frappe sans attendre : c'est la valeur affichée dans le champ. */
   readonly searchQuery = this._searchQuery.asReadonly();
   readonly activeFilter = this._activeFilter.asReadonly();
   readonly selectedTags = this._selectedTags.asReadonly();
   readonly selectedLanguages = this._selectedLanguages.asReadonly();
-  readonly selectedNote = this._selectedNote.asReadonly();
-  readonly selectedNoteId = computed<string | null>(() => this._selectedNote()?.id ?? null);
+  /** Le brouillon prime : tant qu'il existe, c'est lui que l'éditeur affiche. */
+  readonly selectedNote = computed<Note | null>(() => this._draftNote() ?? this._selectedNote());
+  readonly selectedNoteId = computed<string | null>(() => this.selectedNote()?.id ?? null);
+
+  /**
+   * Identifiant réellement en base, ou `null` tant que la note ouverte n'est
+   * qu'un brouillon. Ce que doit lire tout ce qui a besoin d'une note existante
+   * — les pièces jointes, par exemple.
+   */
+  readonly persistedNoteId = computed<string | null>(() => this._selectedNote()?.id ?? null);
+  readonly focusedNoteId = this._focusedNoteId.asReadonly();
+  readonly checkedIds = this._checkedIds.asReadonly();
+  readonly lastDeletion = this._lastDeletion.asReadonly();
+
+  /** Ce que le bandeau affiche : la même suppression, tant qu'elle est proposée. */
+  readonly undoBanner = computed<Deletion | null>(() => (this._undoVisible() ? this._lastDeletion() : null));
 
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+  private undoTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Identifiant réel pris par le brouillon une fois enregistré.
+   *
+   * ⚠️ Indispensable : la fermeture de l'éditeur confirme le titre **puis** le
+   * contenu sans détection de changement entre les deux, donc le second appel
+   * porte encore `DRAFT_ID` alors que la note existe déjà. Sans cette
+   * redirection, il irait écrire dans le vide.
+   */
+  private draftMaterialisedAs: string | null = null;
 
   /**
    * Critères déclenchant une requête. L'instant exact n'en fait pas partie :
@@ -190,8 +309,32 @@ export class NotesStore {
 
   readonly loadError: Signal<Error | undefined> = this.viewResource.error;
 
+  /**
+   * Les notes affichées, à plat et **dans l'ordre des sections** : c'est l'ordre
+   * que suit la navigation au clavier, et celui d'une sélection par plage.
+   */
+  readonly visibleNotes = computed<readonly Note[]>(() =>
+    this.sections().flatMap((section) => [...section.notes]),
+  );
+
+  /**
+   * Dérivée de ce qui est visible, jamais lue crue : un identifiant coché puis
+   * disparu (note supprimée, filtre resserré) ne doit pas partir dans une action
+   * de masse.
+   */
+  readonly checkedNotes = computed<readonly Note[]>(() => {
+    const checked = this._checkedIds();
+    return this.visibleNotes().filter((note) => checked.has(note.id));
+  });
+
+  readonly checkedCount = computed(() => this.checkedNotes().length);
+  readonly hasSelection = computed(() => this.checkedCount() > 0);
+
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.cancelPendingSearch());
+    inject(DestroyRef).onDestroy(() => {
+      this.cancelPendingSearch();
+      this.cancelUndoWindow();
+    });
   }
 
   reload(): void {
@@ -221,11 +364,129 @@ export class NotesStore {
   }
 
   openNote(id: string): void {
+    this.discardDraft();
     this._selectedNote.set(this.find(id));
+    this._focusedNoteId.set(id);
   }
 
+  /** Un brouillon encore vide à la fermeture est abandonné, pas enregistré. */
   closeOverlay(): void {
+    this.discardDraft();
     this._selectedNote.set(null);
+  }
+
+  // --- Navigation au clavier ------------------------------------------------
+
+  /** `null` retire le focus du canevas (ouverture d'une modale, par exemple). */
+  focusNote(id: string | null): void {
+    this._focusedNoteId.set(id);
+  }
+
+  /**
+   * Index de la note focalisée dans [`visibleNotes`], ou `-1`. Le composant s'en
+   * sert pour mesurer la grille et rendre l'index voisin.
+   */
+  focusedIndex(): number {
+    const focused = this._focusedNoteId();
+    return focused === null ? -1 : this.visibleNotes().findIndex((note) => note.id === focused);
+  }
+
+  /**
+   * Focalise par position plutôt que par identifiant : la navigation raisonne
+   * en index, seul repère qui survit à une note renommée.
+   */
+  focusIndex(index: number): void {
+    const note = this.visibleNotes()[index];
+    if (note) {
+      this._focusedNoteId.set(note.id);
+    }
+  }
+
+  // --- Sélection multiple ---------------------------------------------------
+
+  toggleChecked(id: string): void {
+    this._checkedIds.update((checked) => toggled(checked, id));
+  }
+
+  /**
+   * Coche tout ce qui sépare la note focalisée de `id` — le Maj+clic d'une liste
+   * de fichiers. Sans ancre, revient à cocher la seule note désignée.
+   */
+  checkRangeTo(id: string): void {
+    const visible = this.visibleNotes();
+    const anchor = this.focusedIndex();
+    const target = visible.findIndex((note) => note.id === id);
+    if (target < 0) return;
+
+    const from = anchor < 0 ? target : Math.min(anchor, target);
+    const to = anchor < 0 ? target : Math.max(anchor, target);
+
+    this._checkedIds.update((checked) => {
+      const next = new Set(checked);
+      for (const note of visible.slice(from, to + 1)) {
+        next.add(note.id);
+      }
+      return next;
+    });
+    this._focusedNoteId.set(id);
+  }
+
+  clearSelection(): void {
+    this._checkedIds.set(new Set());
+  }
+
+  /**
+   * Les trois actions de masse suivent la même règle que les écritures unitaires :
+   * le back tranche, on recharge, rien n'est appliqué localement.
+   */
+  async moveSelection(spaceId: string): Promise<void> {
+    await this.runOnSelection((ids) => this.repository.moveMany(ids, spaceId));
+  }
+
+  async tagSelection(tag: string): Promise<void> {
+    if (!tag.trim()) return;
+    // Aucune normalisation ici : `notes::model::normalize_tags` en est le seul
+    // dépositaire, côté Rust.
+    await this.runOnSelection((ids) => this.repository.tagMany(ids, [tag]));
+  }
+
+  async deleteSelection(): Promise<void> {
+    const ids = this.checkedNotes().map((note) => note.id);
+    if (ids.length === 0) return;
+
+    try {
+      const count = await this.repository.deleteMany(ids);
+      this.clearSelection();
+      this.openUndoWindow({ ids, count });
+      this.reload();
+    } catch (error) {
+      this.notifier.reportFailure('errors.bulkActionFailed', error);
+    }
+  }
+
+  // --- Annulation d'une suppression ----------------------------------------
+
+  async undoDeletion(): Promise<void> {
+    const deletion = this._lastDeletion();
+    if (!deletion) return;
+
+    this.dismissUndo();
+    try {
+      await this.repository.restore(deletion.ids);
+      this.reload();
+    } catch (error) {
+      this.notifier.reportFailure('errors.trashActionFailed', error);
+    }
+  }
+
+  /**
+   * Masquer le bandeau **renonce** à l'annulation : c'est un geste explicite,
+   * contrairement à l'expiration du délai, qui ne fait que ranger l'affichage.
+   */
+  dismissUndo(): void {
+    this.cancelUndoWindow();
+    this._undoVisible.set(false);
+    this._lastDeletion.set(null);
   }
 
   togglePinned(id: string): Promise<void> {
@@ -288,72 +549,173 @@ export class NotesStore {
   }
 
   /**
-   * Crée une note vide dans l'espace actif et l'ouvre ; l'identifiant est
-   * attribué par la persistance.
+   * Ouvre l'éditeur sur un **brouillon local** : rien n'est écrit tant que la
+   * note ne vaut pas la peine d'être gardée.
    *
-   * En mode « tous les espaces », la note part dans le premier — il faut bien en
-   * choisir un. Sans aucun espace la création échoue : une note sans espace
-   * serait invisible dès qu'un filtre d'espace est posé.
+   * En mode « tous les espaces », la note ira dans le premier — il faut bien en
+   * choisir un. Sans aucun espace, refus immédiat : une note sans espace serait
+   * invisible dès qu'un filtre d'espace est posé.
    */
-  createNote(): Promise<void> {
-    return this.create('');
+  createNote(): void {
+    const spaceId = this.spaceForNewNote();
+    if (!spaceId) return;
+
+    this._selectedNote.set(null);
+    this.draftMaterialisedAs = null;
+    this._draftNote.set(emptyNote(spaceId, this.clock.now()));
   }
 
   /**
-   * Note faite du presse-papier, déclenchée par le raccourci global. Un
-   * presse-papier vide ne produit rien : une note vide de plus serait un déchet
-   * à ranger, pas une capture.
+   * Note faite du presse-papier, déclenchée par le raccourci global. Elle porte
+   * déjà du contenu, donc elle est enregistrée tout de suite — il n'y a rien à
+   * attendre.
    */
   async captureFromClipboard(): Promise<void> {
-    const content = await this.clipboard.paste();
-    if (content.trim()) {
-      await this.create(content);
-    }
+    await this.createWithContent(await this.clipboard.paste());
   }
 
-  private async create(content: string): Promise<void> {
+  /**
+   * Note créée d'un seul geste parce qu'elle a déjà son contenu : capture du
+   * presse-papier, ou saisie dans la palette. Pas de brouillon ici — il n'y a
+   * rien à attendre, et l'éditeur s'ouvre sur une note déjà enregistrée.
+   *
+   * Un contenu vide ne produit rien : une note vide de plus serait un déchet à
+   * ranger, pas une capture.
+   */
+  async createWithContent(content: string): Promise<void> {
+    if (!content.trim()) return;
+
+    const spaceId = this.spaceForNewNote();
+    if (!spaceId) return;
+
+    await this.persistNew({ ...emptyDraft(spaceId), content });
+  }
+
+  /**
+   * Force l'enregistrement du brouillon et rend son identifiant réel.
+   *
+   * Utilisé par ce qui exige une note **existante** — joindre un fichier vise
+   * une ligne de la base. Rend `null` s'il n'y a rien à enregistrer.
+   */
+  async materialiseDraft(): Promise<string | null> {
+    const persisted = this.persistedNoteId();
+    if (persisted) return persisted;
+
+    const draft = this._draftNote();
+    if (!draft) return null;
+
+    return this.saveDraft(draft);
+  }
+
+  private spaceForNewNote(): string | null {
     const spaceId = this.spaces.activeSpaceId() ?? this.spaces.spaces()[0]?.id;
     if (!spaceId) {
       this.notifier.notify({ ref: { key: 'errors.spaceRequired' } });
-      return;
+      return null;
     }
 
-    const draft: NoteDraft = {
-      spaceId,
-      // Titre et source vides : l'UI affiche des libellés de remplacement
-      // traduits. Stocker « Nouvelle note » en dur figerait du français
-      // dans les données.
-      title: '',
-      // `txt` vaut « rien choisi » : c'est ce que `create_note` remplace par
-      // une détection sur le contenu (`domain::detect`).
-      language: FALLBACK_LANGUAGE,
-      content,
-      source: '',
-      tags: [],
-      pinned: false,
-      lifecycle: { kind: 'permanent' },
-    };
+    return spaceId;
+  }
 
+  /**
+   * Écrit le brouillon et adopte la note renvoyée. C'est ici, et seulement ici,
+   * que `DRAFT_ID` cesse d'exister.
+   */
+  private async saveDraft(draft: Note): Promise<string | null> {
+    const created = await this.persistNew(toDraftPayload(draft));
+    if (!created) return null;
+
+    this.draftMaterialisedAs = created.id;
+    this._draftNote.set(null);
+
+    return created.id;
+  }
+
+  private async persistNew(payload: NoteDraft): Promise<Note | null> {
     try {
-      const created = await this.repository.create(draft);
+      const created = await this.repository.create(payload);
       this._selectedNote.set(created);
+      this._focusedNoteId.set(created.id);
       this.reload();
+      return created;
     } catch (error) {
       this.notifier.reportFailure('errors.noteCreateFailed', error);
+      return null;
     }
   }
 
+  private discardDraft(): void {
+    this._draftNote.set(null);
+    this.draftMaterialisedAs = null;
+  }
+
+  /**
+   * Met à la corbeille et propose l'annulation. La note n'est pas perdue passé
+   * ce délai : elle y reste 30 jours.
+   */
   async deleteNote(id: string): Promise<void> {
-    if (!this.find(id)) return;
+    const resolved = this.resolve(id);
+
+    // Un brouillon n'existe nulle part : il n'y a rien à mettre à la corbeille,
+    // donc rien non plus à proposer d'annuler.
+    if (resolved === DRAFT_ID) {
+      this.closeOverlay();
+      return;
+    }
+
+    if (!this.find(resolved)) return;
 
     try {
-      await this.repository.delete(id);
-      if (this.selectedNoteId() === id) {
+      await this.repository.delete(resolved);
+      if (this.selectedNoteId() === resolved) {
         this.closeOverlay();
       }
+      this.openUndoWindow({ ids: [resolved], count: 1 });
       this.reload();
     } catch (error) {
       this.notifier.reportFailure('errors.noteDeleteFailed', error);
+    }
+  }
+
+  /**
+   * Remplit les `{{champs}}` d'un contenu. Le back en est le seul juge : ce qui
+   * est un champ et ce qui est du template Angular s'y décide.
+   */
+  fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
+    return this.repository.fillPlaceholders(content, values);
+  }
+
+  private async runOnSelection(action: (ids: readonly string[]) => Promise<number>): Promise<void> {
+    const ids = this.checkedNotes().map((note) => note.id);
+    if (ids.length === 0) return;
+
+    try {
+      await action(ids);
+      this.reload();
+    } catch (error) {
+      this.notifier.reportFailure('errors.bulkActionFailed', error);
+    }
+  }
+
+  /**
+   * ⚠️ Le bandeau s'efface, **la suppression reste annulable**. Les deux états
+   * sont distincts pour que `Ctrl+Z` fonctionne encore après que le bandeau a
+   * disparu : masquer une proposition n'est pas y renoncer.
+   */
+  private openUndoWindow(deletion: Deletion): void {
+    this.cancelUndoWindow();
+    this._lastDeletion.set(deletion);
+    this._undoVisible.set(true);
+    this.undoTimeout = setTimeout(() => {
+      this.undoTimeout = null;
+      this._undoVisible.set(false);
+    }, UNDO_WINDOW_MS);
+  }
+
+  private cancelUndoWindow(): void {
+    if (this.undoTimeout !== null) {
+      clearTimeout(this.undoTimeout);
+      this.undoTimeout = null;
     }
   }
 
@@ -363,11 +725,42 @@ export class NotesStore {
    * introuvable et une modification nulle ne produisent aucun aller-retour.
    */
   private async edit(id: string, changes: (note: Note) => NotePatch | null): Promise<void> {
-    const target = this.find(id);
+    const resolved = this.resolve(id);
+    const target = this.find(resolved);
     const patch = target && changes(target);
-    if (patch) {
-      await this.persist(id, patch);
+    if (!patch) return;
+
+    if (resolved === DRAFT_ID) {
+      await this.editDraft(target, patch);
+      return;
     }
+
+    await this.persist(resolved, patch);
+  }
+
+  /**
+   * Une écriture sur un brouillon reste **locale** tant que la note ne vaut pas
+   * la peine d'être gardée : changer le langage d'une note vide ne doit pas la
+   * faire apparaître sur le canevas.
+   */
+  private async editDraft(draft: Note, patch: NotePatch): Promise<void> {
+    const updated: Note = { ...draft, ...patch };
+
+    if (!isWorthSaving(updated)) {
+      this._draftNote.set(updated);
+      return;
+    }
+
+    await this.saveDraft(updated);
+  }
+
+  /**
+   * `DRAFT_ID` désigne le brouillon **ou** la note qu'il est devenu : l'éditeur
+   * enchaîne plusieurs confirmations sans que la vue ait été recalculée entre
+   * les deux, et continue donc d'envoyer l'ancien identifiant.
+   */
+  private resolve(id: string): string {
+    return id === DRAFT_ID && this.draftMaterialisedAs ? this.draftMaterialisedAs : id;
   }
 
   /**
@@ -380,7 +773,7 @@ export class NotesStore {
   private async persist(id: string, patch: NotePatch): Promise<void> {
     try {
       const saved = await this.repository.update(id, patch);
-      if (this.selectedNoteId() === id) {
+      if (this.persistedNoteId() === id) {
         this._selectedNote.set(saved);
       }
       this.reload();
@@ -394,6 +787,9 @@ export class NotesStore {
    * filtrée depuis son ouverture sans cesser d'être éditable.
    */
   private find(id: string): Note | null {
+    const draft = this._draftNote();
+    if (draft?.id === id) return draft;
+
     const selected = this._selectedNote();
     if (selected?.id === id) return selected;
 

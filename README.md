@@ -11,6 +11,20 @@ A developer's Swiss Army knife for the desktop: a notes/snippets manager, plus u
 > SQLite database. Business rules live in each feature's `model.rs`, which depends on neither
 > Diesel nor Tauri. `crypto` and `formatters` are documented placeholders, not yet built.
 
+What it does today, beyond writing notes:
+
+| Feature              | What it gives you                                                                            |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| **Quick paste**      | `Ctrl+Alt+P` from anywhere: search a snippet, `Enter` copies it and the window steps aside   |
+| **`{{fields}}`**     | `psql -h {{host}} -p {{port=5432}}` asks for its values before landing in the clipboard      |
+| **Keyboard canvas**  | arrows to move, `Enter` open, `C` copy, `P` pin, `X` select, `Del` trash                     |
+| **Trash**            | deleting is undoable, and reversible for 30 days                                             |
+| **Bulk actions**     | select several notes, then move, tag, export or trash them in one go                         |
+| **Tag management**   | rename, merge or drop a tag across the whole library                                         |
+| **Attachments**      | drop a file on the editor or paste an image; open it, save it elsewhere, preview it inline   |
+| **Import / export**  | a JSON bundle both ways — everything, one space, or the selection — with a report either way |
+| **Copy as Markdown** | the selection rendered for a PR, a ticket or a chat message                                  |
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 20+ and npm
@@ -53,8 +67,11 @@ For Rust-only iteration, `cargo check` from `src-tauri/` is much faster than a f
 ```
 src/              Angular front-end (core/ state & data, features/ screens, layout/, shared/)
 src-tauri/src/
-  notes/          The notes feature: model.rs, language.rs, view.rs, store.rs
+  notes/          The notes feature: model.rs, language.rs, view.rs, placeholder.rs,
+                  trash.rs, store.rs
   spaces/         The spaces feature: model.rs, store.rs
+  attachments/    The attachments feature: model.rs, store.rs (the bytes live on disk)
+  transfer/       Import, export, share: the exchange format and the Markdown rendering
   db.rs           Connection, migrations, schema, stored-instant format
   error.rs        The three errors and the translation between them
   desktop.rs      Tray and global shortcuts — native glue, not a feature
@@ -87,8 +104,12 @@ owns its model, its SQL and the commands that expose it: `<feature>.rs` holds th
       append-only, embedded migrations
 - [x] Business rules isolated in each feature's `model.rs`, testable without a database
 - [x] Rust tests, clippy (`deny(clippy::all)`) and rustfmt
-- [ ] Renaming and deleting a space — needs a decision on what happens to its notes
-- [ ] Moving a note between spaces (already expressible: `spaceId` is part of `NotePatch`)
+- [x] Renaming and deleting a space, its notes moved to a refuge space in one transaction
+- [x] Moving a note between spaces (`spaceId` is part of `NotePatch`)
+- [x] 30-day trash with `Ctrl+Z` undo, multiple selection and bulk actions
+- [x] Global tag management: rename, merge, drop across the library
+- [x] `{{fields}}` in snippets, and a quick-paste palette on a global shortcut
+- [x] Attachments (drop, paste, open, save), and import / export / share
 - [ ] `crypto` module: SHA-256, MD5, UUID generation
 - [ ] `formatters` module: base64 encode/decode, JSON formatting
 

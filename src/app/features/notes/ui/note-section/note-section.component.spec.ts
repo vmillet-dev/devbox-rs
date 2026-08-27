@@ -77,11 +77,11 @@ describe('NoteSectionComponent', () => {
     fixture.componentRef.setInput('section', createSection('today', [createNote({ id: 'a' })]));
     await fixture.whenStable();
     let emitted: string | undefined;
-    fixture.componentInstance.noteOpened.subscribe((id) => (emitted = id));
+    fixture.componentInstance.noteOpened.subscribe(({ noteId }) => (emitted = noteId));
 
     const card = fixture.debugElement.query(By.directive(NoteCardComponent))
       .componentInstance as NoteCardComponent;
-    card.opened.emit('a');
+    card.opened.emit({ noteId: 'a', toggleChecked: false, extendRange: false });
 
     expect(emitted).toBe('a');
   });

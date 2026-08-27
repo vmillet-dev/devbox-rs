@@ -13,6 +13,12 @@
     (queryChange)="store.setSearchQuery($event)"
   />
   <app-filter-chips [active]="store.activeFilter()" (filterChanged)="store.setFilter($event)" />
+  <!-- La corbeille est une **vue des notes**, pas une opération sur un fichier :
+       sa place est près des filtres, pas dans le menu « Fichier ». -->
+  <button type="button" class="trash-btn" (click)="trash.open()">
+    <span aria-hidden="true">🗑</span>
+    {{ 'notes.trash' | transloco }}
+  </button>
   <button type="button" class="new-note-btn" (click)="store.createNote()">
     {{ 'notes.newNote' | transloco }}
   </button>
@@ -22,6 +28,7 @@
   [tags]="store.allTags()"
   [activeTags]="store.selectedTags()"
   (tagToggled)="store.toggleTag($event)"
+  (manageRequested)="tags.open()"
 />
 
 <app-language-rail
@@ -29,6 +36,18 @@
   [activeLanguages]="store.selectedLanguages()"
   (languageToggled)="store.toggleLanguage($event)"
 />
+
+@if (store.hasSelection()) {
+  <app-selection-bar
+    [count]="store.checkedCount()"
+    [spaces]="spaces.spaces()"
+    (moveRequested)="store.moveSelection($event)"
+    (tagRequested)="store.tagSelection($event)"
+    (copyRequested)="onCopySelection()"
+    (deleteRequested)="store.deleteSelection()"
+    (cleared)="store.clearSelection()"
+  />
+}
 
 @let error = store.loadError();
 
@@ -52,21 +71,32 @@
       <app-note-section
         [section]="section"
         [selectedNoteId]="store.selectedNoteId()"
+        [focusedNoteId]="store.focusedNoteId()"
+        [checkedIds]="store.checkedIds()"
         [spaces]="spaces.spaces()"
-        (noteOpened)="store.openNote($event)"
+        (noteOpened)="onNoteActivated($event)"
+        (noteChecked)="store.toggleChecked($event)"
         (noteMoved)="store.moveNote($event.noteId, $event.spaceId)"
         (noteDeleted)="store.deleteNote($event)"
+        (fillRequested)="onFillRequested($event)"
         (createRequested)="store.createNote()"
       />
     }
+    <p class="canvas-keyboard-hint">{{ 'notes.keyboardHint' | transloco }}</p>
   }
 </div>
 
 <!-- L'identifiant vient du store, jamais d'une émission de l'éditeur : c'est le
-     store qui décide de la note ouverte. -->
+     store qui décide de la note ouverte. Elle peut être un brouillon encore
+     absent de la base — l'éditeur ne fait pas la différence. -->
 @if (store.selectedNote(); as note) {
   <app-note-editor-overlay
     [note]="note"
+    [attachments]="attachments.attachments()"
+    [attachmentsBusy]="attachments.isBusy()"
+    [attachmentPreviewId]="attachments.previewId()"
+    [attachmentPreviewData]="attachments.previewData()"
+    [imageZoomed]="imageZoomed()"
     (closed)="store.closeOverlay()"
     (titleChanged)="store.renameNote(note.id, $event)"
     (contentChanged)="store.updateContent(note.id, $event)"
@@ -77,5 +107,82 @@
     (pinToggled)="store.togglePinned(note.id)"
     (lifecycleChanged)="store.setLifecycle(note.id, $event)"
     (deleteRequested)="store.deleteNote(note.id)"
+    (attachmentAddRequested)="onAttachRequested()"
+    (attachmentRemoveRequested)="attachments.remove($event)"
+    (attachmentPreviewToggled)="onTogglePreview($event)"
+    (attachmentOpenRequested)="attachments.open($event)"
+    (attachmentSaveRequested)="onSaveAttachment($event)"
+    (imagePasted)="onImagePasted()"
+    (imageZoomRequested)="imageZoomed.set(true)"
   />
+}
+
+<!-- Au-dessus de l'éditeur : la vue agrandie montre les octets que l'aperçu a
+     déjà chargés, elle ne relit rien. -->
+@if (imageZoomed() && attachments.previewed(); as attachment) {
+  @if (attachments.previewData(); as data) {
+    <app-image-lightbox [source]="data" [fileName]="attachment.fileName" (closed)="imageZoomed.set(false)" />
+  }
+}
+
+@if (palette.isOpen()) {
+  <!-- Le formulaire de champs passe **devant** la palette : c'est elle qui
+       l'ouvre, et elle reste en dessous le temps de la saisie. -->
+  @if (palette.pendingFill(); as note) {
+    <app-placeholder-form
+      [placeholders]="note.placeholders"
+      (submitted)="onPaletteFill($event)"
+      (rawRequested)="palette.copyAndDismiss(note.content)"
+      (cancelled)="palette.cancelFill()"
+    />
+  }
+  <app-quick-palette
+    [query]="palette.query()"
+    [results]="palette.results()"
+    [highlighted]="palette.highlighted()"
+    (queryChanged)="palette.setQuery($event)"
+    (highlightMoved)="palette.moveHighlight($event)"
+    (highlightSet)="palette.highlight($event)"
+    [canCreate]="palette.canCreate()"
+    (chosen)="onPaletteChosen()"
+    (openRequested)="onPaletteOpen($event)"
+    (closed)="palette.close()"
+  />
+}
+
+@if (fillTarget(); as note) {
+  <app-placeholder-form
+    [placeholders]="note.placeholders"
+    (submitted)="onFillSubmitted($event)"
+    (rawRequested)="onFillRaw()"
+    (cancelled)="fillTarget.set(null)"
+  />
+}
+
+@if (trash.isOpen()) {
+  <app-trash-panel
+    [notes]="trash.notes()"
+    [isLoading]="trash.isLoading()"
+    (closed)="onCloseTrash()"
+    (restoreRequested)="onRestore($event)"
+    (purgeRequested)="trash.purge($event)"
+    (emptyRequested)="trash.emptyTrash()"
+  />
+}
+
+@if (tags.isOpen()) {
+  <app-tag-manager
+    [tags]="tags.tags()"
+    [selected]="tags.selected()"
+    [isLoading]="tags.isLoading()"
+    (closed)="tags.close()"
+    (toggled)="tags.toggle($event)"
+    (renameRequested)="onRenameTag($event)"
+    (deleteRequested)="onDeleteTags()"
+  />
+}
+
+<!-- Le bandeau s'efface après quelques secondes ; `Ctrl+Z` reste possible. -->
+@if (store.undoBanner(); as deletion) {
+  <app-undo-bar [count]="deletion.count" (undone)="store.undoDeletion()" (dismissed)="store.dismissUndo()" />
 }

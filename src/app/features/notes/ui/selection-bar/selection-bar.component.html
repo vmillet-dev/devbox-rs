@@ -1,0 +1,51 @@
+<div class="selection-bar" role="group" [attr.aria-label]="'selection.label' | transloco">
+  <span class="selection-count">{{ 'selection.count' | transloco: { count: count() } }}</span>
+
+  @if (spaces().length > 0) {
+    <select
+      #moveSelect
+      class="selection-move"
+      [attr.aria-label]="'selection.moveTo' | transloco"
+      (change)="onMove(moveSelect.value); moveSelect.value = ''"
+    >
+      <option value="">{{ 'selection.moveTo' | transloco }}</option>
+      @for (space of spaces(); track space.id) {
+        <option [value]="space.id">{{ space.name }}</option>
+      }
+    </select>
+  }
+
+  <form class="selection-tag-form" (submit)="submitTag($event)">
+    <input
+      #tagInput
+      type="text"
+      class="selection-tag-input"
+      [attr.aria-label]="'selection.addTagLabel' | transloco"
+      [placeholder]="'selection.addTagPlaceholder' | transloco"
+      [value]="tagDraft()"
+      (input)="tagDraft.set(tagInput.value)"
+    />
+  </form>
+
+  <button type="button" class="selection-action" (click)="copyRequested.emit()">
+    {{ 'file.copyMarkdown' | transloco }}
+  </button>
+
+  <button
+    type="button"
+    class="selection-action danger"
+    [class.confirming]="confirmingDelete()"
+    (click)="onDeleteClick()"
+  >
+    {{ (confirmingDelete() ? 'selection.deleteConfirm' : 'selection.delete') | transloco }}
+  </button>
+
+  <button
+    type="button"
+    class="selection-clear"
+    [attr.aria-label]="'selection.clear' | transloco"
+    (click)="cleared.emit()"
+  >
+    <span aria-hidden="true">✕</span>
+  </button>
+</div>

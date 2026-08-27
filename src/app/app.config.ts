@@ -14,6 +14,7 @@ import { AppErrorHandler } from '@core/errors/app-error-handler';
 import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from '@core/i18n/locale.service';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
 import { PreferencesService } from '@core/preferences/preferences.service';
+import { GlobalShortcutsService } from '@core/shortcuts/global-shortcuts.service';
 import { TrayService } from '@core/tray/tray.service';
 import { UpdateStore } from '@core/updates/update.store';
 
@@ -51,6 +52,13 @@ export const appConfig: ApplicationConfig = {
       // donnant ses libellés, et la créer avant aurait affiché la langue par
       // défaut le temps d'un aller-retour.
       tray.start();
+    }),
+
+    // Un raccourci global déjà pris par une autre application ne fait rien et ne
+    // dit rien : le signaler est la seule façon de ne pas croire à une panne.
+    // La promesse n'est pas retournée — l'application n'a pas à attendre.
+    provideAppInitializer(() => {
+      void inject(GlobalShortcutsService).report();
     }),
 
     // Recherche de mise à jour au lancement. La promesse n'est délibérément pas

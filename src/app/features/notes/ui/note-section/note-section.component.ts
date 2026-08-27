@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteSection } from '@features/notes/model/note.model';
 import { Space } from '@features/notes/model/space.model';
-import { NoteCardComponent, NoteMove } from '../note-card/note-card.component';
+import { NoteActivation, NoteCardComponent, NoteMove } from '../note-card/note-card.component';
 
 @Component({
   selector: 'app-note-section',
@@ -14,12 +14,16 @@ import { NoteCardComponent, NoteMove } from '../note-card/note-card.component';
 export class NoteSectionComponent {
   readonly section = input.required<NoteSection>();
   readonly selectedNoteId = input<string | null>(null);
+  readonly focusedNoteId = input<string | null>(null);
+  readonly checkedIds = input<ReadonlySet<string>>(new Set());
   /** Relayé aux cartes : leur menu propose d'y déplacer la note. */
   readonly spaces = input<readonly Space[]>([]);
 
-  readonly noteOpened = output<string>();
+  readonly noteOpened = output<NoteActivation>();
+  readonly noteChecked = output<string>();
   readonly noteMoved = output<NoteMove>();
   readonly noteDeleted = output<string>();
+  readonly fillRequested = output<string>();
   readonly createRequested = output<void>();
 
   /** La clé de section *est* la clé de traduction : aucun libellé à maintenir en double. */

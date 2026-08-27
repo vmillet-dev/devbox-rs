@@ -18,13 +18,14 @@ import {
   LanguageTag,
   isLanguageTag,
 } from '@core/language/language.model';
-import { Note, NoteLifecycle } from '@features/notes/model/note.model';
+import { Attachment, Note, NoteLifecycle } from '@features/notes/model/note.model';
 import { PreferencesService } from '@core/preferences/preferences.service';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/time/relative-time.util';
 import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
+import { AttachmentStripComponent } from '../attachment-strip/attachment-strip.component';
 import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { LifecycleBadgeComponent } from '../lifecycle-badge/lifecycle-badge.component';
 import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
@@ -77,6 +78,7 @@ function toDateInputValue(date: Date): string {
   selector: 'app-note-editor-overlay',
   imports: [
     DialogBackdropDirective,
+    AttachmentStripComponent,
     CopyButtonComponent,
     TagPillComponent,
     LifecycleBadgeComponent,
@@ -97,6 +99,18 @@ export class NoteEditorOverlayComponent {
 
   readonly note = input<Note | null>(null);
 
+  /**
+   * Les pièces jointes viennent d'un store à part et ne descendent pas de la
+   * note : elles ont leur propre cycle d'écriture, et les faire transiter par
+   * `Note` obligerait à recharger la note entière à chaque ajout.
+   */
+  readonly attachments = input<readonly Attachment[]>([]);
+  readonly attachmentsBusy = input(false);
+  readonly attachmentPreviewId = input<string | null>(null);
+  readonly attachmentPreviewData = input<string | null>(null);
+  /** Vue agrandie ouverte par-dessus : elle capte Échap avant l'éditeur. */
+  readonly imageZoomed = input(false);
+
   readonly closed = output<void>();
   readonly titleChanged = output<string>();
   readonly contentChanged = output<string>();
@@ -107,6 +121,15 @@ export class NoteEditorOverlayComponent {
   readonly pinToggled = output<void>();
   readonly lifecycleChanged = output<NoteLifecycle>();
   readonly deleteRequested = output<void>();
+  readonly attachmentAddRequested = output<void>();
+  readonly attachmentRemoveRequested = output<string>();
+  readonly attachmentPreviewToggled = output<string>();
+  readonly attachmentOpenRequested = output<string>();
+  readonly attachmentSaveRequested = output<string>();
+  /** L'aperçu a été cliqué : la page ouvre la vue agrandie, au-dessus d'ici. */
+  readonly imageZoomRequested = output<void>();
+  /** Une image a été collée dans le corps : la page la joint à la note. */
+  readonly imagePasted = output<void>();
 
   protected readonly languageOptions = LANGUAGE_OPTIONS;
 
@@ -184,6 +207,28 @@ export class NoteEditorOverlayComponent {
     }
   }
 
+  /**
+   * Une image collée devient une **pièce jointe** : le corps est un `<textarea>`,
+   * il ne peut rien afficher d'autre que du texte, et y laisser tomber le
+   * collage ne ferait rien du tout.
+   *
+   * Seul le *type* du contenu est lu ici — les octets sont relus côté natif, où
+   * le presse-papier système les rend déjà décodés. Un collage qui porte du
+   * texte reste traité nativement par le champ.
+   */
+  protected onPaste(event: ClipboardEvent): void {
+    const data = event.clipboardData;
+    if (!data || data.types.includes('text/plain')) return;
+
+    const hasImage =
+      data.types.some((type) => type.startsWith('image/')) ||
+      [...data.files].some((file) => file.type.startsWith('image/'));
+    if (!hasImage) return;
+
+    event.preventDefault();
+    this.imagePasted.emit();
+  }
+
   /** N'émet que si le corps a réellement changé. */
   protected commitContent(): void {
     const note = this.note();
@@ -254,7 +299,9 @@ export class NoteEditorOverlayComponent {
    * le brouillon au passage.
    */
   protected onEscape(): void {
-    if (!this.note()) return;
+    // La vue agrandie est ouverte **par-dessus** l'éditeur : elle est la
+    // première à devoir se refermer, et les deux écoutent le même document.
+    if (!this.note() || this.imageZoomed()) return;
 
     const editor = this.bodyEditor()?.nativeElement;
     if (editor && document.activeElement === editor) {

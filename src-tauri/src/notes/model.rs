@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use super::language::{self, Language};
+use super::placeholder::{self, Placeholder};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -171,6 +172,12 @@ pub struct DisplayNote {
     pub note: Note,
     pub footer: NoteFooter,
     pub expiring_soon: bool,
+    /// Champs `{{…}}` du contenu : la carte propose de les remplir avant de
+    /// copier. Dérivés, jamais écrits.
+    pub placeholders: Vec<Placeholder>,
+    /// Renseigné après coup par ce qui dispose d'une connexion — `decorate` ne
+    /// lit pas la base. Zéro tant que personne ne l'a rempli.
+    pub attachment_count: u32,
 }
 
 /// To read `note.id` instead of `note.note.id`.
@@ -186,6 +193,8 @@ pub fn decorate(note: Note, now: DateTime<Utc>) -> DisplayNote {
     DisplayNote {
         footer: footer_of(&note),
         expiring_soon: expires_soon(&note, now),
+        placeholders: placeholder::parse(&note.content),
+        attachment_count: 0,
         note,
     }
 }
@@ -227,6 +236,25 @@ fn expires_soon(note: &Note, now: DateTime<Utc>) -> bool {
     // A duration, not a number of whole days: at 3 days and 1 hour,
     // rounding down would switch the note to alert one day too early.
     at.signed_duration_since(now) <= EXPIRING_SOON
+}
+
+/// Un tag du corpus et le nombre de notes vivantes qui le portent : de quoi
+/// décider quoi renommer, fusionner ou jeter.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TagUsage {
+    pub tag: String,
+    pub note_count: u32,
+}
+
+/// Un tag saisi pour être **écrit sur tout le corpus** (renommage, fusion) passe
+/// par la même normalisation que les autres, mais son échec est une erreur : un
+/// silence renommerait vers rien.
+pub fn validated_tag(raw: &str) -> Result<String, crate::error::ValidationError> {
+    normalize_tags(std::slice::from_ref(&raw.to_string()))
+        .into_iter()
+        .next()
+        .ok_or_else(|| crate::error::ValidationError::new("tag", "a tag must have a readable name"))
 }
 
 /// Trim, leading `#`, blanks, and duplicates.

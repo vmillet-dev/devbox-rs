@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { Note, NoteDraft } from '../model/note.model';
-import { ContractError, NoteDto, toNote, toNoteDraftDto, toNotePatchDto } from './note.dto';
+import {
+  ContractError,
+  NoteDto,
+  toAttachment,
+  toImportReport,
+  toNote,
+  toNoteDraftDto,
+  toNotePatchDto,
+  toTrashedNote,
+} from './note.dto';
 
 const BASE_DTO: NoteDto = {
   id: 'note-1',
@@ -16,6 +25,8 @@ const BASE_DTO: NoteDto = {
   lifecycle: { kind: 'permanent' },
   footer: { kind: 'age', at: '2026-01-02T10:00:00.000Z' },
   expiringSoon: false,
+  placeholders: [],
+  attachmentCount: 0,
 };
 
 describe('toNote', () => {
@@ -158,5 +169,83 @@ describe('toNotePatchDto', () => {
 
   it('produces an empty object for an empty patch', () => {
     expect(toNotePatchDto({})).toEqual({});
+  });
+});
+
+describe('toTrashedNote', () => {
+  const DTO = {
+    id: 'note-1',
+    spaceId: 'space-1',
+    title: 'Deleted',
+    language: 'sql' as const,
+    content: 'select 1',
+    source: '',
+    tags: ['auth'],
+    pinned: false,
+    createdAt: '2026-08-01T10:00:00.000Z',
+    updatedAt: '2026-08-02T10:00:00.000Z',
+    lifecycle: { kind: 'permanent' as const },
+    deletedAt: '2026-08-27T08:00:00.000Z',
+    purgeAt: '2026-09-26T08:00:00.000Z',
+  };
+
+  it('parses both trash dates', () => {
+    const note = toTrashedNote(DTO);
+
+    expect(note.deletedAt.toISOString()).toBe('2026-08-27T08:00:00.000Z');
+    expect(note.purgeAt.toISOString()).toBe('2026-09-26T08:00:00.000Z');
+  });
+
+  it('carries only what the panel shows', () => {
+    // Rien n'y est décoré : une note au rebut n'est ni ouverte ni copiée.
+    const note = toTrashedNote(DTO);
+
+    expect(note).toEqual({
+      id: 'note-1',
+      spaceId: 'space-1',
+      title: 'Deleted',
+      language: 'sql',
+      content: 'select 1',
+      tags: ['auth'],
+      deletedAt: new Date('2026-08-27T08:00:00.000Z'),
+      purgeAt: new Date('2026-09-26T08:00:00.000Z'),
+    });
+  });
+
+  it('copies the tags rather than aliasing the payload', () => {
+    const note = toTrashedNote(DTO);
+
+    expect(note.tags).not.toBe(DTO.tags);
+  });
+
+  it('fails loudly on an unreadable date', () => {
+    expect(() => toTrashedNote({ ...DTO, purgeAt: 'jamais' })).toThrow(ContractError);
+  });
+});
+
+describe('toAttachment', () => {
+  it('parses the creation instant and copies the rest verbatim', () => {
+    const attachment = toAttachment({
+      id: 'attachment-1',
+      noteId: 'note-1',
+      fileName: 'capture.png',
+      mimeType: 'image/png',
+      byteSize: 2048,
+      createdAt: '2026-08-27T09:00:00.000Z',
+    });
+
+    expect(attachment.createdAt).toBeInstanceOf(Date);
+    expect(attachment.fileName).toBe('capture.png');
+    expect(attachment.byteSize).toBe(2048);
+  });
+});
+
+describe('toImportReport', () => {
+  it('keeps the three counters apart', () => {
+    expect(toImportReport({ spacesCreated: 1, notesImported: 2, notesSkipped: 3 })).toEqual({
+      spacesCreated: 1,
+      notesImported: 2,
+      notesSkipped: 3,
+    });
   });
 });

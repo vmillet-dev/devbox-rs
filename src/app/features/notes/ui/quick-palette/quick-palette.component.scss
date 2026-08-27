@@ -1,0 +1,109 @@
+@use 'mixins' as *;
+
+// Au-dessus de tout ce que le canevas peut ouvrir : la palette arrive par un
+// raccourci global, éventuellement par-dessus un éditeur resté ouvert.
+.palette-backdrop {
+  @include backdrop(65);
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.palette-panel {
+  @include dialog-panel(560px);
+  padding: 12px;
+  gap: 8px;
+}
+
+.palette-input {
+  @include unstyled-control;
+  @include surface($radius: 8px);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-0);
+}
+
+.palette-input:focus-visible {
+  @include accent-state(var(--text-0), var(--amber));
+  outline: none;
+}
+
+.palette-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.palette-option-button {
+  @include unstyled-control;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.palette-option.highlighted .palette-option-button {
+  background: var(--bg-3);
+}
+
+.palette-option-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.palette-option-title {
+  font-size: 12.5px;
+  color: var(--text-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-option-fields {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--amber);
+}
+
+.palette-option-snippet {
+  font-family: var(--font-mono), serif;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-2);
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-empty,
+.palette-hint {
+  padding: 6px 9px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.palette-hint {
+  margin: 0;
+  border-top: 1px solid var(--line-soft);
+  padding-bottom: 0;
+}
+
+// Détachée des résultats : c'est une action, pas un snippet trouvé.
+.palette-create {
+  border-top: 1px solid var(--line-soft);
+  margin-top: 2px;
+  padding-top: 2px;
+}
+
+.palette-create .palette-option-title {
+  color: var(--amber);
+}

@@ -1,5 +1,7 @@
 import type {
+  Attachment as WireAttachment,
   DisplayNote,
+  ImportReport as WireImportReport,
   NoteDraft as WireNoteDraft,
   NoteFooter as WireNoteFooter,
   NoteLifecycle as WireNoteLifecycle,
@@ -7,8 +9,11 @@ import type {
   NoteSection as WireNoteSection,
   NotesQuery as WireNotesQuery,
   NotesView as WireNotesView,
+  TrashedNote as WireTrashedNote,
 } from '@core/ipc/bindings';
 import {
+  Attachment,
+  ImportReport,
   Note,
   NoteDraft,
   NoteFooter,
@@ -17,6 +22,7 @@ import {
   NoteSection,
   NotesQuery,
   NotesView,
+  TrashedNote,
 } from '../model/note.model';
 
 /**
@@ -105,6 +111,40 @@ export function toNote(dto: NoteDto): Note {
     lifecycle: toLifecycle(dto.lifecycle),
     footer: toFooter(dto.footer),
     expiringSoon: dto.expiringSoon,
+    placeholders: dto.placeholders.map((placeholder) => ({ ...placeholder })),
+    attachmentCount: dto.attachmentCount,
+  };
+}
+
+export function toTrashedNote(dto: WireTrashedNote): TrashedNote {
+  return {
+    id: dto.id,
+    spaceId: dto.spaceId,
+    title: dto.title,
+    language: dto.language,
+    content: dto.content,
+    tags: [...dto.tags],
+    deletedAt: parseIsoDate(dto.deletedAt, 'deletedAt'),
+    purgeAt: parseIsoDate(dto.purgeAt, 'purgeAt'),
+  };
+}
+
+export function toAttachment(dto: WireAttachment): Attachment {
+  return {
+    id: dto.id,
+    noteId: dto.noteId,
+    fileName: dto.fileName,
+    mimeType: dto.mimeType,
+    byteSize: dto.byteSize,
+    createdAt: parseIsoDate(dto.createdAt, 'createdAt'),
+  };
+}
+
+export function toImportReport(dto: WireImportReport): ImportReport {
+  return {
+    spacesCreated: dto.spacesCreated,
+    notesImported: dto.notesImported,
+    notesSkipped: dto.notesSkipped,
   };
 }
 

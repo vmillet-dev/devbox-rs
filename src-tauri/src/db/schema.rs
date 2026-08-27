@@ -28,6 +28,7 @@ diesel::table! {
         updated_at -> Text,
         lifecycle_kind -> Text,
         lifecycle_expires_at -> Nullable<Text>,
+        deleted_at -> Nullable<Text>,
     }
 }
 
@@ -38,7 +39,19 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    attachments (id) {
+        id -> Text,
+        note_id -> Text,
+        file_name -> Text,
+        mime_type -> Text,
+        byte_size -> BigInt,
+        created_at -> Text,
+    }
+}
+
 diesel::joinable!(notes -> spaces (space_id));
 diesel::joinable!(note_tags -> notes (note_id));
+diesel::joinable!(attachments -> notes (note_id));
 
-diesel::allow_tables_to_appear_in_same_query!(spaces, notes, note_tags);
+diesel::allow_tables_to_appear_in_same_query!(spaces, notes, note_tags, attachments);
