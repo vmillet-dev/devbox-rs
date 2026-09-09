@@ -144,6 +144,10 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
           expiringSoon: false,
           placeholders: [],
           attachmentCount: 0,
+          // The trash shape drops the items, so a restored checklist comes back
+          // empty here. The real back-end keeps them in `note_items`; a spec
+          // needing them restored pins the note with `setView`.
+          items: [],
         })),
         ...this.notes,
       ];
@@ -252,6 +256,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
         language: note.language,
         content: note.content,
         tags: note.tags,
+        kind: note.kind,
         deletedAt,
         purgeAt: new Date(deletedAt.getTime() + RETENTION_MS),
       })),

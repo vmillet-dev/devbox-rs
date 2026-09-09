@@ -13,7 +13,13 @@ const SNIPPET_LINES = 2;
 /** Ce que la ligne affiche, résolu une fois pour toutes plutôt qu'en template. */
 interface TrashRow {
   readonly note: TrashedNote;
+  /**
+   * Vide pour une todolist : ses items ne descendent pas jusqu'à la corbeille,
+   * une note au rebut n'étant ni ouverte ni cochée. La ligne affiche alors le
+   * libellé `snippetKey` plutôt qu'un aperçu vide.
+   */
   readonly snippet: string;
+  readonly snippetKey: string | null;
   readonly deletedRef: TranslationRef;
   readonly purgeRef: TranslationRef;
 }
@@ -55,6 +61,7 @@ export class TrashPanelComponent {
     return this.notes().map((note) => ({
       note,
       snippet: note.content.split('\n').slice(0, SNIPPET_LINES).join('\n'),
+      snippetKey: note.kind === 'checklist' ? 'trash.checklistNote' : null,
       deletedRef: relativeTimeRef(note.deletedAt, now),
       purgeRef: purgeRef(note.purgeAt, now),
     }));

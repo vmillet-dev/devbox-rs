@@ -122,6 +122,8 @@ describe('toNoteDraftDto', () => {
       tags: [],
       pinned: false,
       lifecycle: { kind: 'expires', at: new Date('2026-05-01T00:00:00.000Z') },
+      kind: 'snippet',
+      items: [],
     };
 
     const dto = toNoteDraftDto(draft);
@@ -135,6 +137,8 @@ describe('toNoteDraftDto', () => {
       tags: [],
       pinned: false,
       lifecycle: { kind: 'expires', at: '2026-05-01T00:00:00.000Z' },
+      kind: 'snippet',
+      items: [],
     });
     expect(dto).not.toHaveProperty('id');
     expect(dto).not.toHaveProperty('createdAt');
@@ -209,6 +213,9 @@ describe('toTrashedNote', () => {
       tags: ['auth'],
       deletedAt: new Date('2026-08-27T08:00:00.000Z'),
       purgeAt: new Date('2026-09-26T08:00:00.000Z'),
+      // Le type suffit au panneau : une todolist au rebut affiche un libellé au
+      // lieu d'un aperçu vide. Les items, eux, ne descendent pas jusqu'ici.
+      kind: 'snippet',
     });
   });
 

@@ -129,3 +129,12 @@
   outline: 2px solid var(--amber);
   outline-offset: 2px;
 }
+
+// Une todolist n'a pas de contenu : la corbeille dit ce qu'elle est plutôt que
+// de laisser un aperçu vide, qui se lirait comme une note perdue.
+.trash-row-kind {
+  display: block;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-2);
+}

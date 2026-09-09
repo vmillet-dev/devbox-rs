@@ -11,6 +11,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use super::checklist::{self, ChecklistItem, NoteKind};
 use super::language::{self, Language};
 use super::placeholder::{self, Placeholder};
 
@@ -30,6 +31,14 @@ pub struct Note {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub lifecycle: NoteLifecycle,
+    /// ⚠️ `default` is not decoration: `transfer::Bundle` deserialises `Note`
+    /// itself, and a required key here would make every export file written
+    /// before todo-lists existed unreadable.
+    #[serde(default)]
+    pub kind: NoteKind,
+    /// Empty for a snippet. A checklist has these **instead of** `content`.
+    #[serde(default)]
+    pub items: Vec<ChecklistItem>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -54,6 +63,10 @@ pub struct NoteDraft {
     pub tags: Vec<String>,
     pub pinned: bool,
     pub lifecycle: NoteLifecycle,
+    #[serde(default)]
+    pub kind: NoteKind,
+    #[serde(default)]
+    pub items: Vec<ChecklistItem>,
 }
 
 /// A field set to `None` remains **unchanged** in the database.
@@ -80,14 +93,28 @@ pub struct NotePatch {
     pub pinned: Option<bool>,
     #[specta(optional)]
     pub lifecycle: Option<NoteLifecycle>,
+    #[specta(optional)]
+    pub kind: Option<NoteKind>,
+    /// Replaces the **whole** list, like `tags`: nothing addresses a single
+    /// item, since a position is all the identity an item has.
+    #[specta(optional)]
+    pub items: Option<Vec<ChecklistItem>>,
 }
 
 impl NoteDraft {
-    /// Language guessed if the front end didn't choose one, normalized tags: these two
-    /// rules live here, not in the SQL.
+    /// Language guessed if the front end didn't choose one, normalized tags and
+    /// items: these rules live here, not in the SQL.
+    ///
+    /// A checklist is exempt from detection — it has no body to read, and
+    /// guessing a language for a note that will never show one is noise.
     pub fn into_note(self, id: String, now: DateTime<Utc>) -> Note {
-        let language = language::for_draft(&self);
+        let language = if self.kind == NoteKind::Checklist {
+            Language::default()
+        } else {
+            language::for_draft(&self)
+        };
         let tags = normalize_tags(&self.tags);
+        let items = checklist::normalize_items(&self.items);
 
         Note {
             id,
@@ -101,6 +128,8 @@ impl NoteDraft {
             created_at: now,
             updated_at: now,
             lifecycle: self.lifecycle,
+            kind: self.kind,
+            items,
         }
     }
 }
@@ -115,7 +144,14 @@ impl NotePatch {
     /// ⚠️ Does not check that `space_id` exists — only persistence can
     /// see it, and it does so before calling.
     pub fn apply(&self, note: &mut Note, now: DateTime<Utc>) {
-        let detected = language::after_patch(note, self);
+        // Read on the pre-patch note, and skipped once the note is — or becomes —
+        // a checklist: such a note has no body for a heuristic to read.
+        let becomes_checklist = self.kind.unwrap_or(note.kind) == NoteKind::Checklist;
+        let detected = if becomes_checklist {
+            None
+        } else {
+            language::after_patch(note, self)
+        };
 
         if let Some(space_id) = &self.space_id {
             note.space_id.clone_from(space_id);
@@ -143,6 +179,12 @@ impl NotePatch {
         }
         if let Some(lifecycle) = &self.lifecycle {
             note.lifecycle = lifecycle.clone();
+        }
+        if let Some(kind) = self.kind {
+            note.kind = kind;
+        }
+        if let Some(items) = &self.items {
+            note.items = checklist::normalize_items(items);
         }
 
         note.updated_at = now;
@@ -352,6 +394,8 @@ mod tests {
             tags: vec!["  #Urgent ".to_string(), "urgent".to_string()],
             pinned: true,
             lifecycle: NoteLifecycle::Permanent,
+            kind: NoteKind::Snippet,
+            items: Vec::new(),
         }
     }
 
@@ -445,6 +489,93 @@ mod tests {
         let footer = footer_of(&sample());
 
         assert_eq!(footer, NoteFooter::Age { at: at(NOW) });
+    }
+
+    #[test]
+    fn a_checklist_is_not_given_a_guessed_language() {
+        // No body to read: a language on a note that will never show one is noise,
+        // and `Txt` doubles as "nothing chosen".
+        let draft = NoteDraft {
+            kind: NoteKind::Checklist,
+            content: "{ \"a\": 1 }".to_string(),
+            language: Language::Txt,
+            ..draft(Language::Txt, String::new().as_str())
+        };
+
+        let note = draft.into_note("n-2".to_string(), now());
+
+        assert_eq!(note.language, Language::Txt);
+    }
+
+    #[test]
+    fn turning_a_note_into_a_checklist_does_not_trigger_a_detection() {
+        let mut note = Note {
+            language: Language::Txt,
+            content: String::new(),
+            ..sample()
+        };
+        let patch = NotePatch {
+            kind: Some(NoteKind::Checklist),
+            content: Some("{ \"a\": 1 }".to_string()),
+            ..NotePatch::default()
+        };
+
+        patch.apply(&mut note, now());
+
+        assert_eq!(note.language, Language::Txt);
+    }
+
+    #[test]
+    fn a_patch_replaces_the_whole_item_list_and_normalises_it() {
+        let mut note = Note {
+            items: vec![ChecklistItem {
+                text: "Old".to_string(),
+                done: true,
+            }],
+            ..sample()
+        };
+        let patch = NotePatch {
+            items: Some(vec![
+                ChecklistItem {
+                    text: "  Ship it ".to_string(),
+                    done: false,
+                },
+                ChecklistItem {
+                    text: "   ".to_string(),
+                    done: false,
+                },
+            ]),
+            ..NotePatch::default()
+        };
+
+        patch.apply(&mut note, now());
+
+        assert_eq!(
+            note.items,
+            [ChecklistItem {
+                text: "Ship it".to_string(),
+                done: false
+            }]
+        );
+    }
+
+    #[test]
+    fn a_patch_that_says_nothing_about_the_items_leaves_them_alone() {
+        let mut note = Note {
+            items: vec![ChecklistItem {
+                text: "Ship it".to_string(),
+                done: true,
+            }],
+            ..sample()
+        };
+
+        NotePatch {
+            title: Some("T".to_string()),
+            ..NotePatch::default()
+        }
+        .apply(&mut note, now());
+
+        assert_eq!(note.items.len(), 1);
     }
 
     #[test]

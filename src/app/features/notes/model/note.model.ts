@@ -1,4 +1,7 @@
 import { LanguageTag } from '@core/language/language.model';
+import { ChecklistItem, NoteKind } from './checklist.model';
+
+export { type ChecklistItem, type NoteKind } from './checklist.model';
 
 export type NoteLifecycle = { readonly kind: 'permanent' } | { readonly kind: 'expires'; readonly at: Date };
 
@@ -36,6 +39,10 @@ export interface Note {
   readonly placeholders: readonly Placeholder[];
   /** Dérivé aussi : la carte n'en affiche qu'un compteur. */
   readonly attachmentCount: number;
+  /** Ce que la note est. Une note écrite avant les todolists relit `snippet`. */
+  readonly kind: NoteKind;
+  /** Vide pour un snippet. Une todolist a ceci **à la place** de `content`. */
+  readonly items: readonly ChecklistItem[];
 }
 
 /**
@@ -130,6 +137,12 @@ export interface TrashedNote {
   readonly tags: readonly string[];
   readonly deletedAt: Date;
   readonly purgeAt: Date;
+  /**
+   * Une todolist n'a pas de `content` : le panneau affiche un libellé plutôt
+   * qu'un aperçu vide. Les items, eux, ne descendent pas jusqu'ici — une note
+   * au rebut n'est ni ouverte ni cochée.
+   */
+  readonly kind: NoteKind;
 }
 
 /** Un tag du corpus et le nombre de notes vivantes qui le portent. */

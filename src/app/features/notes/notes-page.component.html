@@ -19,9 +19,7 @@
     <span aria-hidden="true">🗑</span>
     {{ 'notes.trash' | transloco }}
   </button>
-  <button type="button" class="new-note-btn" (click)="store.createNote()">
-    {{ 'notes.newNote' | transloco }}
-  </button>
+  <app-new-note-button (created)="store.createNote($event)" />
 </div>
 
 <app-tag-rail
@@ -80,6 +78,7 @@
         (noteDeleted)="store.deleteNote($event)"
         (fillRequested)="onFillRequested($event)"
         (createRequested)="store.createNote()"
+        (itemToggled)="store.setChecklist($event.noteId, $event.items)"
       />
     }
     <p class="canvas-keyboard-hint">{{ 'notes.keyboardHint' | transloco }}</p>
@@ -106,6 +105,7 @@
     (tagRemoved)="store.removeTag(note.id, $event)"
     (pinToggled)="store.togglePinned(note.id)"
     (lifecycleChanged)="store.setLifecycle(note.id, $event)"
+    (checklistChanged)="store.setChecklist(note.id, $event)"
     (deleteRequested)="store.deleteNote(note.id)"
     (attachmentAddRequested)="onAttachRequested()"
     (attachmentRemoveRequested)="attachments.remove($event)"

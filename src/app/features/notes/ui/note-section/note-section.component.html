@@ -18,6 +18,7 @@
         (moveRequested)="noteMoved.emit($event)"
         (deleteRequested)="noteDeleted.emit($event)"
         (fillRequested)="fillRequested.emit($event)"
+        (itemToggled)="itemToggled.emit($event)"
       />
     }
     @if (section().showCreateGhost) {

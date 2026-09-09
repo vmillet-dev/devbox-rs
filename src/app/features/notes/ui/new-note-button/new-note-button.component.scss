@@ -1,0 +1,77 @@
+@use 'mixins' as *;
+
+.new-note-wrapper {
+  position: relative;
+  display: flex;
+}
+
+// Les deux moitiés forment une seule pastille ambrée : seuls les coins
+// extérieurs sont arrondis, et ce qui les sépare est une bordure, pas un écart.
+.new-note-btn,
+.new-note-caret {
+  @include unstyled-control;
+  background: var(--amber);
+  color: var(--amber-ink);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.new-note-btn {
+  padding: 8px 12px 8px 14px;
+  border-radius: 8px 0 0 8px;
+}
+
+.new-note-caret {
+  padding: 8px 9px;
+  border-radius: 0 8px 8px 0;
+  border-left: 1px solid rgba(var(--black-rgb), 0.22);
+  font-size: 11px;
+}
+
+.new-note-btn:hover,
+.new-note-caret:hover {
+  filter: brightness(1.08);
+}
+
+.new-note-btn:focus-visible,
+.new-note-caret:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+// Calé à droite, à l'inverse du sélecteur d'espaces : ce bouton est en fin de
+// barre, un panneau aligné à gauche déborderait de la fenêtre.
+.new-note-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  @include surface;
+  padding: 4px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--shadow-dropdown);
+}
+
+.new-note-option {
+  @include unstyled-control;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-1);
+  cursor: pointer;
+  text-align: left;
+}
+
+.new-note-option:hover {
+  background: var(--bg-3);
+}
+
+.new-note-option:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}

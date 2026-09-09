@@ -7,7 +7,10 @@ import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
 import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
-import { NoteActivation, NoteCardComponent, NoteMove } from './note-card.component';
+import { ItemToggle, NoteActivation, NoteCardComponent, NoteMove } from './note-card.component';
+
+/** Un littéral, pour garder les chaînes attendues sur une seule ligne. */
+const NEWLINE = String.fromCharCode(10);
 
 describe('NoteCardComponent', () => {
   let fixture: ComponentFixture<NoteCardComponent>;
@@ -263,6 +266,91 @@ describe('NoteCardComponent', () => {
       menu().deleteRequested.emit();
 
       expect(deleted).toBe('note-42');
+    });
+  });
+
+  describe('a checklist note', () => {
+    const checklist = (items: { text: string; done: boolean }[], overrides = {}) =>
+      createNote({ id: 'note-42', kind: 'checklist', content: '', items, ...overrides });
+
+    beforeEach(async () => {
+      fixture.componentRef.setInput(
+        'note',
+        checklist([
+          { text: 'Relire', done: true },
+          { text: 'Déployer', done: false },
+        ]),
+      );
+      await fixture.whenStable();
+    });
+
+    it('shows the progress graphically and as text, since colour alone says nothing', () => {
+      const fill = fixture.nativeElement.querySelector('.progress-fill') as HTMLElement;
+
+      expect(fill.style.width).toBe('50%');
+      expect(text('.progress-count')).toBe('1/2');
+    });
+
+    it('renders the items with their state', () => {
+      const items = fixture.nativeElement.querySelectorAll('.card-item');
+
+      expect(items).toHaveLength(2);
+      expect(items[0].getAttribute('aria-checked')).toBe('true');
+      expect(items[1].getAttribute('aria-checked')).toBe('false');
+    });
+
+    it('counts the items it could not fit rather than dropping them silently', async () => {
+      fixture.componentRef.setInput(
+        'note',
+        checklist([1, 2, 3, 4, 5].map((n) => ({ text: `t${n}`, done: false }))),
+      );
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.querySelectorAll('.card-item')).toHaveLength(2);
+      expect(text('.card-items-more')).toBe('+3 autre(s)');
+    });
+
+    it('shows no language badge, a checklist having no format to announce', () => {
+      expect(fixture.debugElement.query(By.directive(LanguageBadgeComponent))).toBeNull();
+    });
+
+    it('emits the whole list with the ticked item flipped', () => {
+      const toggles: ItemToggle[] = [];
+      fixture.componentInstance.itemToggled.subscribe((toggle) => toggles.push(toggle));
+
+      fixture.nativeElement.querySelectorAll('.card-item')[1].click();
+
+      expect(toggles).toEqual([
+        {
+          noteId: 'note-42',
+          items: [
+            { text: 'Relire', done: true },
+            { text: 'Déployer', done: true },
+          ],
+        },
+      ]);
+    });
+
+    it('does not open the note when a box is ticked', () => {
+      const opened: NoteActivation[] = [];
+      fixture.componentInstance.opened.subscribe((activation) => opened.push(activation));
+
+      fixture.nativeElement.querySelector('.card-item').click();
+
+      // Les items vivent hors du bouton de carte, mais un clic remonterait
+      // jusqu'à lui sans le `stopPropagation`.
+      expect(opened).toEqual([]);
+    });
+
+    it('hands the copy button a markdown rendering, the note having no content', () => {
+      const copy = fixture.debugElement.query(By.directive(CopyButtonComponent))
+        .componentInstance as CopyButtonComponent;
+
+      expect(copy.value()).toBe(['- [x] Relire', '- [ ] Déployer'].join(NEWLINE));
+    });
+
+    it('shows no code viewer, a checklist having no body to colour', () => {
+      expect(fixture.nativeElement.querySelector('.card-snippet')).toBeNull();
     });
   });
 });

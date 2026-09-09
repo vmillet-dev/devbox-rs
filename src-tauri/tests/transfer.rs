@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 use diesel::SqliteConnection;
 
 use devbox_lib::db::{iso8601, open_in_memory};
+use devbox_lib::notes::checklist::NoteKind;
 use devbox_lib::notes::language::Language;
 use devbox_lib::notes::model::{NoteDraft, NoteLifecycle};
 use devbox_lib::notes::store as notes;
@@ -30,6 +31,8 @@ fn draft(space_id: &str, title: &str) -> NoteDraft {
         tags: vec!["auth".to_string()],
         pinned: false,
         lifecycle: NoteLifecycle::Permanent,
+        kind: NoteKind::Snippet,
+        items: Vec::new(),
     }
 }
 

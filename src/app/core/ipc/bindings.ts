@@ -144,6 +144,16 @@ export type Attachment = {
 };
 
 /**
+ *  One line of a todo list. No identifier: the position **is** the identity —
+ *  `note_items` is keyed on `(note_id, position)` and a write rewrites the whole
+ *  list, exactly like `note_tags`.
+ */
+export type ChecklistItem = {
+	text: string,
+	done: boolean,
+};
+
+/**
  *  `flatten` flattens the note into the same JSON object: the front end only has a single
  *  note type.
  */
@@ -220,6 +230,14 @@ export type Note = {
 	createdAt: string,
 	updatedAt: string,
 	lifecycle: NoteLifecycle,
+	/**
+	 *  ⚠️ `default` is not decoration: `transfer::Bundle` deserialises `Note`
+	 *  itself, and a required key here would make every export file written
+	 *  before todo-lists existed unreadable.
+	 */
+	kind?: NoteKind,
+	/**  Empty for a snippet. A checklist has these **instead of** `content`. */
+	items?: ChecklistItem[],
 };
 
 /**  Neither identifier nor timestamps: persistence assigns them. */
@@ -232,6 +250,8 @@ export type NoteDraft = {
 	tags: string[],
 	pinned: boolean,
 	lifecycle: NoteLifecycle,
+	kind?: NoteKind,
+	items?: ChecklistItem[],
 };
 
 /**  `Untriaged` = notes with a deadline, those whose fate is not decided. */
@@ -243,6 +263,20 @@ export type NoteFilter = "all" | "pinned" | "untriaged";
  *  on the screen, so formatting remains on the front end.
  */
 export type NoteFooter = { kind: "source"; value: string } | { kind: "expiry"; at: string } | { kind: "age"; at: string };
+
+/**
+ *  **Closed** list, like `Language`: the front end receives it as a generated
+ *  TypeScript union, so an unknown value stops compiling there rather than
+ *  being refused at runtime.
+ */
+export type NoteKind = 
+/**
+ *  The ordinary note: a title and a coloured body. Default, and what every
+ *  note written before todo-lists existed reads back as.
+ */
+"snippet" | 
+/**  A todo list: no body, an ordered list of items instead. */
+"checklist";
 
 export type NoteLifecycle = { kind: "permanent" } | 
 /**  "Untriaged" until this date. */
@@ -264,6 +298,12 @@ export type NotePatch = {
 	tags?: string[] | null,
 	pinned?: boolean | null,
 	lifecycle?: NoteLifecycle | null,
+	kind?: NoteKind | null,
+	/**
+	 *  Replaces the **whole** list, like `tags`: nothing addresses a single
+	 *  item, since a position is all the identity an item has.
+	 */
+	items?: ChecklistItem[] | null,
 };
 
 export type NoteSection = {

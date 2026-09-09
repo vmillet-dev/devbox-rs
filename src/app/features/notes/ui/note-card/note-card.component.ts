@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { ChecklistItem, checklistProgress, noteCopyText } from '@features/notes/model/checklist.model';
 import { Note } from '@features/notes/model/note.model';
 import { Space } from '@features/notes/model/space.model';
 import { TranslationRef } from '@core/i18n/translation-ref.model';
@@ -38,6 +39,17 @@ export interface NoteActivation {
 
 const SNIPPET_LINES = 3;
 const MAX_VISIBLE_TAGS = 2;
+/**
+ * Ce qui tient entre la barre de progression et le pied, sur une carte haute de
+ * 150 px : deux lignes et le compteur du reste.
+ */
+const MAX_VISIBLE_ITEMS = 2;
+
+/** Une case cochée sur une carte : la note, et la liste telle qu'elle devient. */
+export interface ItemToggle {
+  readonly noteId: string;
+  readonly items: readonly ChecklistItem[];
+}
 
 @Component({
   selector: 'app-note-card',
@@ -70,6 +82,8 @@ export class NoteCardComponent {
   readonly deleteRequested = output<string>();
   /** La note porte des `{{champs}}` : la page ouvre le formulaire de saisie. */
   readonly fillRequested = output<string>();
+  /** Case cochée depuis le canevas, sans passer par l'éditeur. */
+  readonly itemToggled = output<ItemToggle>();
 
   private readonly cardButton = viewChild.required<ElementRef<HTMLButtonElement>>('cardButton');
 
@@ -88,6 +102,16 @@ export class NoteCardComponent {
   );
 
   protected readonly displayedTags = computed(() => this.note().tags.slice(0, MAX_VISIBLE_TAGS));
+
+  protected readonly isChecklist = computed(() => this.note().kind === 'checklist');
+  protected readonly progress = computed(() => checklistProgress(this.note().items));
+  protected readonly visibleItems = computed(() => this.note().items.slice(0, MAX_VISIBLE_ITEMS));
+  protected readonly hiddenItemCount = computed(() =>
+    Math.max(0, this.note().items.length - MAX_VISIBLE_ITEMS),
+  );
+
+  /** Vide pour un snippet, la liste rendue en Markdown pour une todolist. */
+  protected readonly copyText = computed(() => noteCopyText(this.note()));
 
   protected readonly hasPlaceholders = computed(() => this.note().placeholders.length > 0);
 
@@ -123,6 +147,23 @@ export class NoteCardComponent {
   protected onCheck(event: MouseEvent): void {
     event.stopPropagation();
     this.checkToggled.emit(this.note().id);
+  }
+
+  /**
+   * Cocher depuis la carte, sans ouvrir la note — c'est le geste réel d'une
+   * liste de tâches, on barre au fil de l'eau.
+   *
+   * La carte émet la liste **entière** telle qu'elle devient : elle ne persiste
+   * rien elle-même, comme tout le reste ici.
+   */
+  protected onItemToggle(event: MouseEvent, index: number): void {
+    event.stopPropagation();
+    this.itemToggled.emit({
+      noteId: this.note().id,
+      items: this.note().items.map((item, at) =>
+        at === index ? { ...item, done: !item.done } : { ...item },
+      ),
+    });
   }
 
   protected onFill(event: MouseEvent): void {

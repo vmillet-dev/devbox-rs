@@ -23,19 +23,23 @@
           (blur)="commitTitle()"
         />
 
-        <select
-          #languageSelect
-          class="overlay-language-select"
-          [attr.aria-label]="'editor.languageLabel' | transloco"
-          [value]="note.language"
-          (change)="onLanguageChange(languageSelect.value)"
-        >
-          @for (option of languageOptions; track option.value) {
-            <option [value]="option.value" [selected]="option.value === note.language">
-              {{ option.label }}
-            </option>
-          }
-        </select>
+        <!-- Pas de format pour une todolist : elle n'a pas de corps à colorier,
+             et un sélecteur sans effet vaut moins que pas de sélecteur. -->
+        @if (!isChecklist()) {
+          <select
+            #languageSelect
+            class="overlay-language-select"
+            [attr.aria-label]="'editor.languageLabel' | transloco"
+            [value]="note.language"
+            (change)="onLanguageChange(languageSelect.value)"
+          >
+            @for (option of languageOptions; track option.value) {
+              <option [value]="option.value" [selected]="option.value === note.language">
+                {{ option.label }}
+              </option>
+            }
+          </select>
+        }
 
         <button
           type="button"
@@ -47,7 +51,7 @@
           <span aria-hidden="true">📌</span>
           {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
         </button>
-        <app-copy-button [value]="draftContent()" [showLabel]="true" />
+        <app-copy-button [value]="copyText()" [showLabel]="true" />
         <button
           type="button"
           class="toolbar-btn delete-btn"
@@ -149,26 +153,41 @@
            C'est lui qui porte le texte accessible ; le visualiseur est masqué
            aux lecteurs d'écran, qui liraient sinon le contenu deux fois. -->
       <div class="overlay-body">
-        <div class="editor-stack">
-          <app-code-viewer aria-hidden="true" [content]="draftContent()" [language]="note.language" />
-          <textarea
-            #bodyEditor
-            class="overlay-body-editor"
-            spellcheck="false"
-            [attr.aria-label]="'editor.contentLabel' | transloco"
-            [placeholder]="'editor.emptyBody' | transloco"
-            [value]="draftContent()"
-            (input)="onBodyInput($event, bodyEditor.value)"
-            (paste)="onPaste($event)"
-            (blur)="commitContent()"
-          ></textarea>
-        </div>
+        @if (isChecklist()) {
+          <app-checklist-editor
+            [items]="note.items"
+            [noteId]="note.id"
+            (itemsChanged)="checklistChanged.emit($event)"
+          />
+        } @else {
+          <div class="editor-stack">
+            <app-code-viewer aria-hidden="true" [content]="draftContent()" [language]="note.language" />
+            <textarea
+              #bodyEditor
+              class="overlay-body-editor"
+              spellcheck="false"
+              [attr.aria-label]="'editor.contentLabel' | transloco"
+              [placeholder]="'editor.emptyBody' | transloco"
+              [value]="draftContent()"
+              (input)="onBodyInput($event, bodyEditor.value)"
+              (paste)="onPaste($event)"
+              (blur)="commitContent()"
+            ></textarea>
+          </div>
+        }
       </div>
 
       <div class="overlay-footer">
         <span>
-          {{ languageLabel() }} ·
-          {{ 'editor.footerStats' | transloco: { lines: lineCount(), bytes: byteSize() } }}
+          @if (isChecklist()) {
+            {{
+              'editor.checklistStats'
+                | transloco: { done: checklistStats().done, total: checklistStats().total }
+            }}
+          } @else {
+            {{ languageLabel() }} ·
+            {{ 'editor.footerStats' | transloco: { lines: lineCount(), bytes: byteSize() } }}
+          }
         </span>
         @if (modifiedRef(); as ref) {
           <span>{{ 'editor.modifiedPrefix' | transloco }} {{ ref.key | transloco: ref.params }}</span>
