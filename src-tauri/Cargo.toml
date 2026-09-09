@@ -16,7 +16,12 @@ default-run = "devbox"
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "devbox_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# `rlib` seul : `cdylib` et `staticlib` ne servent qu'à Android et iOS, que ce projet ne
+# cible pas (tray, raccourcis globaux, updater, bundles NSIS/AppImage). Cargo les construit
+# quand même à chaque `cargo build`, et en release chacun déclenche une édition de liens
+# LTO complète du graphe — l'essentiel des onze minutes du bundle Windows. Les remettre est
+# le premier geste d'un portage mobile.
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
+  # Un cache GitHub non lu depuis 7 jours est évincé, et le dépôt reste parfois plusieurs
+  # semaines sans commit : sans ce passage hebdomadaire, la première PR d'après la pause
+  # repaie une compilation à froid entière. Une exécution par semaine suffit à le garder.
+  schedule:
+    - cron: '0 4 * * 1'
 
 # On annule les runs empilés sur une branche, jamais un run de tag qui publie une release.
 concurrency:
@@ -18,6 +23,13 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Aucun débogueur ne s'attache ici : l'info de débogage complète coûte du temps de
+  # codegen et gonfle le cache — donc son transfert, qui pèse déjà plus que la
+  # compilation. `line-tables-only` garde ce qui sert vraiment sur un CI : le fichier
+  # et la ligne dans le backtrace d'un test en échec. Le profil `release` n'est pas
+  # concerné, il n'embarque déjà rien (`strip = true`).
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
 
 jobs:
   lint-front:
@@ -38,6 +50,9 @@ jobs:
       # qui couvre aussi les fichiers de ce workflow.
       - run: npm run lint
 
+  # Ce job tient lieu de « est-ce que le Rust compile » : `--all-targets` type-vérifie la
+  # lib, les binaires et les tests. Un `cargo build` séparé ne disait rien de plus et
+  # coûtait sa propre compilation complète, en plus de sérialiser `test-rust` derrière lui.
   lint-rust:
     name: Lint Rust
     runs-on: ubuntu-22.04
@@ -45,9 +60,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Clé de cache distincte de `test-rust`, et non partagée : clippy s'arrête aux
+      # `.rmeta` là où `cargo test` produit des rlib, et cargo ne réutilise pas les uns
+      # pour les autres. Sous une clé commune, le job qui ne l'écrit pas re-vérifie tout
+      # à chaque run — c'était le cas ici, et ça coûtait deux minutes.
       - uses: ./.github/actions/setup-rust
         with:
-          shared-key: rust-ubuntu
+          shared-key: rust-check
+          save-if: 'true'
 
       # `generate_context!` lit frontendDist à la compilation. Faire dépendre ce job du
       # build front le sérialiserait pour rien : il valide du Rust, pas le bundle.
@@ -58,7 +78,11 @@ jobs:
 
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
 
-      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+      - name: Clippy
+        run: |
+          start=$(date +%s)
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+          echo "\`lint-rust\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
   build-front:
     name: Build front
@@ -95,30 +119,6 @@ jobs:
           name: front-dist
           path: dist/devbox/browser
           retention-days: 1
-
-  build-rust:
-    name: Build Rust
-    runs-on: ubuntu-22.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-
-      # Seul job autorisé à écrire le cache cargo, pour que `test-rust` le lise sans course.
-      - uses: ./.github/actions/setup-rust
-        with:
-          shared-key: rust-ubuntu
-          save-if: 'true'
-
-      - name: Placeholder frontendDist
-        run: |
-          mkdir -p dist/devbox/browser
-          printf '<!doctype html><title>ci</title>' > dist/devbox/browser/index.html
-
-      - name: Build
-        run: |
-          start=$(date +%s)
-          cargo build --manifest-path src-tauri/Cargo.toml --locked
-          echo "\`build-rust\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
   test-front:
     name: Test front
@@ -158,26 +158,28 @@ jobs:
           path: coverage
           retention-days: 7
 
+  # Sans `needs` : ce job compile ce dont il a besoin. L'attente derrière un job de build
+  # pour hériter d'un target/ chaud coûtait plus cher que la compilation elle-même, et la
+  # compilation de SQLite (`libsqlite3-sys` en `bundled`) est de toute façon dans le cache.
   test-rust:
     name: Test Rust
-    needs: build-rust
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      # Restaure le target/ de `build-rust` — dont la compilation de SQLite
-      # (`libsqlite3-sys` en `bundled` compile les sources C), qui est l'essentiel
-      # du temps de ce job.
       - uses: ./.github/actions/setup-rust
         with:
-          shared-key: rust-ubuntu
+          shared-key: rust-test
+          save-if: 'true'
 
       - name: Placeholder frontendDist
         run: |
           mkdir -p dist/devbox/browser
           printf '<!doctype html><title>ci</title>' > dist/devbox/browser/index.html
 
+      # `cargo test` lie aussi les binaires — les tests d'intégration ont besoin de
+      # `CARGO_BIN_EXE_devbox` —, donc l'édition de liens reste couverte.
       - name: Test
         run: |
           start=$(date +%s)
@@ -238,6 +240,8 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           shared-key: release-${{ matrix.target }}
+          # Seul job qui empaquette : il lui faut patchelf et librsvg pour l'AppImage.
+          bundle: 'true'
           save-if: 'true'
 
       - run: npm ci
