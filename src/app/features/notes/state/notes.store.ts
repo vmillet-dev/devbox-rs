@@ -14,9 +14,11 @@ import { ClipboardService } from '@core/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { FALLBACK_LANGUAGE, LanguageTag } from '@core/language/language.model';
 import {
+  ChecklistItem,
   Note,
   NoteDraft,
   NoteFilter,
+  NoteKind,
   NoteLifecycle,
   NotePatch,
   NoteSection,
@@ -26,7 +28,7 @@ import {
 import { ClockService } from '@core/time/clock.service';
 import { SpacesStore } from './spaces.store';
 
-export type { NoteFilter } from '../model/note.model';
+export type { NoteFilter, NoteKind } from '../model/note.model';
 
 /** La recherche traverse le pont IPC : un appel par caractère serait gâché. */
 export const SEARCH_DEBOUNCE_MS = 150;
@@ -55,6 +57,9 @@ export const DRAFT_ID = '__draft__';
 /**
  * Ce qui distingue une note qu'on abandonne d'une note qu'on enregistre. Un tag
  * ou une échéance suffisent : la note n'est plus vide, même sans texte.
+ *
+ * Un item aussi : une todolist n'a pas de corps, sans cette clause une liste
+ * remplie mais sans titre resterait locale et disparaîtrait à la fermeture.
  */
 function isWorthSaving(note: Note): boolean {
   return (
@@ -62,6 +67,7 @@ function isWorthSaving(note: Note): boolean {
     note.content.trim() !== '' ||
     note.source.trim() !== '' ||
     note.tags.length > 0 ||
+    note.items.length > 0 ||
     note.pinned ||
     note.lifecycle.kind === 'expires'
   );
@@ -75,7 +81,7 @@ function isWorthSaving(note: Note): boolean {
  * `txt` vaut « rien choisi » — c'est ce que `create_note` remplace par une
  * détection sur le contenu.
  */
-function emptyDraft(spaceId: string): NoteDraft {
+function emptyDraft(spaceId: string, kind: NoteKind): NoteDraft {
   return {
     spaceId,
     title: '',
@@ -85,6 +91,8 @@ function emptyDraft(spaceId: string): NoteDraft {
     tags: [],
     pinned: false,
     lifecycle: { kind: 'permanent' },
+    kind,
+    items: [],
   };
 }
 
@@ -93,9 +101,9 @@ function emptyDraft(spaceId: string): NoteDraft {
  * deux formes. Les champs dérivés portent des valeurs neutres : ils viennent du
  * back, qui n'a encore rien vu de cette note.
  */
-function emptyNote(spaceId: string, now: Date): Note {
+function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
   return {
-    ...emptyDraft(spaceId),
+    ...emptyDraft(spaceId, kind),
     id: DRAFT_ID,
     createdAt: now,
     updatedAt: now,
@@ -117,7 +125,16 @@ function toDraftPayload(note: Note): NoteDraft {
     tags: [...note.tags],
     pinned: note.pinned,
     lifecycle: note.lifecycle,
+    kind: note.kind,
+    items: note.items.map((item) => ({ ...item })),
   };
+}
+
+function sameItems(a: readonly ChecklistItem[], b: readonly ChecklistItem[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((item, index) => item.text === b[index].text && item.done === b[index].done)
+  );
 }
 
 /** Journée **locale** : on ne re-interroge qu'au changement de jour. */
@@ -527,6 +544,21 @@ export class NotesStore {
   }
 
   /**
+   * Remplace la liste **entière** — cocher, renommer, ajouter, supprimer et
+   * réordonner passent tous par là, parce qu'aucun item n'a d'identité propre :
+   * sa position est tout ce qui le désigne.
+   *
+   * La comparaison évite l'écriture inutile que ferait la fermeture de
+   * l'éditeur juste après une coche, `updated_at` remontant la note en tête du
+   * canevas pour rien.
+   */
+  setChecklist(id: string, items: readonly ChecklistItem[]): Promise<void> {
+    return this.edit(id, (note) =>
+      sameItems(note.items, items) ? null : { items: items.map((item) => ({ ...item })) },
+    );
+  }
+
+  /**
    * Pose ou retire l'échéance. C'est cette écriture, et elle seule, qui alimente
    * le filtre « À trier » et l'indice « à trier bientôt » des sections.
    */
@@ -555,14 +587,18 @@ export class NotesStore {
    * En mode « tous les espaces », la note ira dans le premier — il faut bien en
    * choisir un. Sans aucun espace, refus immédiat : une note sans espace serait
    * invisible dès qu'un filtre d'espace est posé.
+   *
+   * Le type par défaut est `snippet` : c'est ce que les autres chemins de
+   * création (carte fantôme, raccourci, palette) veulent tous, et le menu du
+   * bouton est le seul endroit d'où l'autre valeur arrive.
    */
-  createNote(): void {
+  createNote(kind: NoteKind = 'snippet'): void {
     const spaceId = this.spaceForNewNote();
     if (!spaceId) return;
 
     this._selectedNote.set(null);
     this.draftMaterialisedAs = null;
-    this._draftNote.set(emptyNote(spaceId, this.clock.now()));
+    this._draftNote.set(emptyNote(spaceId, this.clock.now(), kind));
   }
 
   /**
@@ -588,7 +624,7 @@ export class NotesStore {
     const spaceId = this.spaceForNewNote();
     if (!spaceId) return;
 
-    await this.persistNew({ ...emptyDraft(spaceId), content });
+    await this.persistNew({ ...emptyDraft(spaceId, 'snippet'), content });
   }
 
   /**

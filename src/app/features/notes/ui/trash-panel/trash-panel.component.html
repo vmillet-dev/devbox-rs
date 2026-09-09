@@ -26,7 +26,11 @@
               <span class="trash-row-title">
                 {{ row.note.title || ('trash.untitled' | transloco) }}
               </span>
-              <pre class="trash-row-snippet">{{ row.snippet }}</pre>
+              @if (row.snippetKey; as key) {
+                <span class="trash-row-kind">{{ key | transloco }}</span>
+              } @else {
+                <pre class="trash-row-snippet">{{ row.snippet }}</pre>
+              }
               <span class="trash-row-meta">
                 {{
                   'trash.deletedAt'

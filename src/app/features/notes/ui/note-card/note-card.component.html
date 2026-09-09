@@ -5,7 +5,7 @@
 <!-- Enveloppe et non `<button>` racine : le menu d'actions est lui-même un
      bouton, et le modèle de contenu d'un <button> interdit d'en imbriquer un.
      C'est aussi elle qui ancre le menu (`position: relative`). -->
-<div class="card-shell" [class.checked]="checked()">
+<div class="card-shell" [class.checked]="checked()" [class.checklist]="isChecklist()">
   <!-- Contenu en <span> et non en <div> : le modèle de contenu d'un <button>
        n'admet que du contenu de phrasé. Un <div> imbriqué produit un HTML
        invalide, au comportement d'accessibilité indéfini selon les navigateurs. -->
@@ -23,7 +23,11 @@
       <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
     }
     <span class="card-top">
-      <app-language-badge [language]="note().language" />
+      <!-- Pas de format pour une todolist : elle n'a pas de corps à colorier, et un
+           badge « TXT » y annonce un langage que rien ne montre. -->
+      @if (!isChecklist()) {
+        <app-language-badge [language]="note().language" />
+      }
       @if (hasPlaceholders()) {
         <span class="card-fields" aria-hidden="true">⚡</span>
         <span class="visually-hidden">
@@ -47,13 +51,29 @@
         {{ 'notes.untitled' | transloco }}
       }
     </span>
-    <app-code-viewer
-      class="card-snippet"
-      [content]="snippet()"
-      [language]="note().language"
-      [showLineNumbers]="false"
-      [compact]="true"
-    />
+    @if (isChecklist()) {
+      <!-- Barre décorative : le décompte juste à côté porte la même information
+           en texte, sans quoi elle n'existerait que graphiquement. -->
+      <span class="card-progress">
+        <span class="progress-track" aria-hidden="true">
+          <span class="progress-fill" [style.width.%]="progress().percent"></span>
+        </span>
+        <span class="progress-count">
+          {{ 'notes.checklistProgress' | transloco: { done: progress().done, total: progress().total } }}
+        </span>
+      </span>
+      <!-- Place réservée aux items, qui sont posés par-dessus : ils portent des
+           boutons, et un <button> ne peut pas en contenir un autre. -->
+      <span class="card-items-space"></span>
+    } @else {
+      <app-code-viewer
+        class="card-snippet"
+        [content]="snippet()"
+        [language]="note().language"
+        [showLineNumbers]="false"
+        [compact]="true"
+      />
+    }
     <span class="card-footer">
       <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). D'où le prettier-ignore, qui réintroduirait ces sauts de ligne. -->
       <!-- prettier-ignore -->
@@ -82,6 +102,36 @@
     <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
   </button>
 
+  <!-- Les items d'une todolist : sœurs du bouton de carte et non ses enfants,
+       parce que ce sont des boutons. La couche est transparente aux clics, seules
+       les cases en reçoivent — tout le reste tombe sur la carte, qui ouvre la
+       note. Même mécanique que le visualiseur sous le textarea de l'éditeur. -->
+  @if (isChecklist() && note().items.length > 0) {
+    <ul class="card-items">
+      @for (item of visibleItems(); track $index) {
+        <li>
+          <button
+            type="button"
+            class="card-item"
+            role="checkbox"
+            [class.done]="item.done"
+            [attr.aria-checked]="item.done"
+            [attr.aria-label]="'notes.checklistToggle' | transloco: { text: item.text }"
+            (click)="onItemToggle($event, $index)"
+          >
+            <span class="item-box" aria-hidden="true">{{ item.done ? '☑' : '☐' }}</span>
+            <span class="item-text">{{ item.text }}</span>
+          </button>
+        </li>
+      }
+      @if (hiddenItemCount() > 0) {
+        <li class="card-items-more">
+          {{ 'notes.checklistMore' | transloco: { count: hiddenItemCount() } }}
+        </li>
+      }
+    </ul>
+  }
+
   <!-- Un snippet à champs ne se copie pas tel quel : le bouton ouvre la saisie
        au lieu de poser `psql -h {{ '{{host}}' }}` dans le presse-papier. -->
   @if (hasPlaceholders()) {
@@ -94,7 +144,7 @@
       <span aria-hidden="true">⚡</span>
     </button>
   } @else {
-    <app-copy-button [value]="note().content" />
+    <app-copy-button [value]="copyText()" />
   }
 
   <app-note-card-menu

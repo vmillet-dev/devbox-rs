@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteSection } from '@features/notes/model/note.model';
 import { Space } from '@features/notes/model/space.model';
-import { NoteActivation, NoteCardComponent, NoteMove } from '../note-card/note-card.component';
+import { ItemToggle, NoteActivation, NoteCardComponent, NoteMove } from '../note-card/note-card.component';
 
 @Component({
   selector: 'app-note-section',
@@ -25,6 +25,8 @@ export class NoteSectionComponent {
   readonly noteDeleted = output<string>();
   readonly fillRequested = output<string>();
   readonly createRequested = output<void>();
+  /** Case d'une todolist cochée depuis le canevas. */
+  readonly itemToggled = output<ItemToggle>();
 
   /** La clé de section *est* la clé de traduction : aucun libellé à maintenir en double. */
   protected readonly titleKey = computed(() => `sections.${this.section().key}`);

@@ -510,6 +510,56 @@ describe('NotesStore', () => {
     });
   });
 
+  describe('setChecklist', () => {
+    const items = [
+      { text: 'Relire', done: false },
+      { text: 'Déployer', done: false },
+    ];
+
+    it('replaces the whole list, no item having an identity of its own', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', kind: 'checklist', items })]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.setChecklist('a', [{ text: 'Relire', done: true }]);
+
+      expect(update).toHaveBeenCalledWith('a', { items: [{ text: 'Relire', done: true }] });
+    });
+
+    it('does not write when nothing changed', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', kind: 'checklist', items })]);
+      const update = vi.spyOn(repository, 'update');
+
+      // Une liste équivalente mais reconstruite : comparer par identité ferait
+      // remonter la note en tête du canevas à chaque fermeture de l'éditeur.
+      await store.setChecklist(
+        'a',
+        items.map((item) => ({ ...item })),
+      );
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('writes when only the order changed', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', kind: 'checklist', items })]);
+      const update = vi.spyOn(repository, 'update');
+
+      await store.setChecklist('a', [items[1], items[0]]);
+
+      expect(update).toHaveBeenCalledTimes(1);
+    });
+
+    it('copies the list rather than aliasing the caller array', async () => {
+      const { store, repository } = await createStore([createNote({ id: 'a', kind: 'checklist', items })]);
+      const update = vi.spyOn(repository, 'update');
+      const outgoing = [{ text: 'Relire', done: true }];
+
+      await store.setChecklist('a', outgoing);
+      outgoing[0].text = 'Modifié après coup';
+
+      expect(update.mock.calls[0][1].items).toEqual([{ text: 'Relire', done: true }]);
+    });
+  });
+
   describe('setLifecycle', () => {
     it('turns a permanent note into an expiring one', async () => {
       const { store, repository } = await createStore([createNote({ id: 'a' })]);
@@ -659,6 +709,48 @@ describe('NotesStore', () => {
         pinned: false,
         tags: [],
       });
+    });
+
+    it('opens a checklist draft when the menu asks for one', async () => {
+      const { store } = await createStore([]);
+
+      store.createNote('checklist');
+
+      expect(store.selectedNote()).toMatchObject({ id: DRAFT_ID, kind: 'checklist', items: [] });
+    });
+
+    it('creates an ordinary note when nothing says otherwise', async () => {
+      // Le défaut couvre la carte fantôme, le raccourci et la palette : le menu
+      // du bouton est le seul endroit d'où l'autre valeur arrive.
+      const { store } = await createStore([]);
+
+      store.createNote();
+
+      expect(store.selectedNote()?.kind).toBe('snippet');
+    });
+
+    it('keeps an empty checklist draft local', async () => {
+      const { store, repository } = await createStore([]);
+      const create = vi.spyOn(repository, 'create');
+
+      store.createNote('checklist');
+
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('persists a checklist as soon as it holds an item, having no body to fill', async () => {
+      const { store, repository } = await createStore([]);
+      const create = vi.spyOn(repository, 'create');
+      store.createNote('checklist');
+
+      await store.setChecklist(DRAFT_ID, [{ text: 'Relire', done: false }]);
+
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(create.mock.calls[0][0]).toMatchObject({
+        kind: 'checklist',
+        items: [{ text: 'Relire', done: false }],
+      });
+      expect(store.persistedNoteId()).toBe('fake-1');
     });
 
     it('files the draft in the selected space', async () => {

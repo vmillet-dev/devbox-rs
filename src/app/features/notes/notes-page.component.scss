@@ -17,21 +17,6 @@
   flex-shrink: 0;
 }
 
-.new-note-btn {
-  @include unstyled-control;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--amber);
-  color: var(--amber-ink);
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
 .canvas {
   flex: 1;
   overflow-y: auto;

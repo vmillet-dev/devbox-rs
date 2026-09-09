@@ -4,6 +4,7 @@ import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { ClockService } from '@core/time/clock.service';
 import { AppWindowService } from '@core/window/app-window.service';
 import { NotesRepository } from '../data/notes.repository';
+import { noteCopyText } from '../model/checklist.model';
 import { Note } from '../model/note.model';
 import { SEARCH_DEBOUNCE_MS } from './notes.store';
 
@@ -134,7 +135,9 @@ export class PaletteStore {
       return;
     }
 
-    await this.copyAndDismiss(note.content);
+    // Une todolist n'a pas de contenu : sans ce rendu, la palette poserait une
+    // chaîne vide dans le presse-papier.
+    await this.copyAndDismiss(noteCopyText(note));
   }
 
   /** Sortie du formulaire de champs, ou choix explicite de copier le brut. */

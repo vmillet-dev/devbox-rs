@@ -11,16 +11,18 @@ use uuid::Uuid;
 
 use chrono::{DateTime, Utc};
 
+use super::checklist::{self, ChecklistItem};
 use super::model::{self, Note, NoteDraft, NoteLifecycle, NotePatch};
 use super::trash;
 use super::view::{Facets, NoteFilter, NotesQuery};
 use crate::db::iso8601;
-use crate::db::schema::{note_tags, notes};
+use crate::db::schema::{note_items, note_tags, notes};
 use crate::error::StorageError;
 use crate::spaces::store as spaces;
 
-/// `lifecycle` is split into two columns here, and tags are absent: they
-/// live in `note_tags`, then attached in a single query for the whole list.
+/// `lifecycle` is split into two columns here; tags and checklist items are
+/// absent: they live in `note_tags` and `note_items`, then get attached in a
+/// single query for the whole list.
 #[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = notes)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -36,6 +38,7 @@ struct NoteRow {
     updated_at: String,
     lifecycle_kind: String,
     lifecycle_expires_at: Option<String>,
+    kind: String,
 }
 
 /// An unreadable date makes the **read fail**: these columns are only written
@@ -45,6 +48,7 @@ struct NoteRow {
 /// The language, however, falls back to its default: `notes.language` carries no
 /// `CHECK` (migration 3), a newer version may have written a legitimate language
 /// that this one ignores. The note remains readable, without its highlighting.
+/// `kind` follows the same rule, and for the same reason.
 impl TryFrom<NoteRow> for Note {
     type Error = StorageError;
 
@@ -68,12 +72,14 @@ impl TryFrom<NoteRow> for Note {
             created_at: instant("createdAt", &row.created_at)?,
             updated_at: instant("updatedAt", &row.updated_at)?,
             language: row.language.parse().unwrap_or_default(),
+            kind: row.kind.parse().unwrap_or_default(),
             id: row.id,
             space_id: row.space_id,
             title: row.title,
             content: row.content,
             source: row.source,
             tags: Vec::new(),
+            items: Vec::new(),
             pinned: row.pinned,
             lifecycle,
         })
@@ -99,6 +105,7 @@ impl From<&Note> for NoteRow {
             updated_at: iso8601::format(note.updated_at),
             lifecycle_kind: lifecycle_kind.to_string(),
             lifecycle_expires_at,
+            kind: note.kind.to_string(),
         }
     }
 }
@@ -153,6 +160,77 @@ fn replace_tags(
     }
 
     tags_of(connection, note_id)
+}
+
+/// Une requête pour toute la liste, comme `all_tags`.
+fn all_items(
+    connection: &mut SqliteConnection,
+) -> Result<HashMap<String, Vec<ChecklistItem>>, StorageError> {
+    let rows = note_items::table
+        .select((note_items::note_id, note_items::text, note_items::done))
+        .order((note_items::note_id.asc(), note_items::position.asc()))
+        .load::<(String, String, bool)>(connection)?;
+
+    let mut grouped: HashMap<String, Vec<ChecklistItem>> = HashMap::new();
+    for (note_id, text, done) in rows {
+        grouped
+            .entry(note_id)
+            .or_default()
+            .push(ChecklistItem { text, done });
+    }
+
+    Ok(grouped)
+}
+
+fn items_of(
+    connection: &mut SqliteConnection,
+    note_id: &str,
+) -> Result<Vec<ChecklistItem>, StorageError> {
+    Ok(note_items::table
+        .filter(note_items::note_id.eq(note_id))
+        .select((note_items::text, note_items::done))
+        .order(note_items::position.asc())
+        .load::<(String, bool)>(connection)?
+        .into_iter()
+        .map(|(text, done)| ChecklistItem { text, done })
+        .collect())
+}
+
+/// Écrit les items **déjà normalisés** par le domaine.
+///
+/// Table rasée puis réinsérée, comme les tags : la position fait partie de la
+/// clé, et réordonner reviendrait sinon à déplacer des lignes une à une sous
+/// une clé primaire qui refuse les doublons en cours de route.
+///
+/// Pas de relecture ici, contrairement aux tags : `position` ordonne en
+/// numérique, ce que l'ordre d'insertion reproduit exactement.
+fn replace_items(
+    connection: &mut SqliteConnection,
+    note_id: &str,
+    items: &[ChecklistItem],
+) -> Result<(), StorageError> {
+    diesel::delete(note_items::table.filter(note_items::note_id.eq(note_id)))
+        .execute(connection)?;
+
+    if !items.is_empty() {
+        let rows: Vec<_> = items
+            .iter()
+            .enumerate()
+            .map(|(position, item)| {
+                (
+                    note_items::note_id.eq(note_id),
+                    note_items::position.eq(i32::try_from(position).unwrap_or(i32::MAX)),
+                    note_items::text.eq(&item.text),
+                    note_items::done.eq(item.done),
+                )
+            })
+            .collect();
+        diesel::insert_into(note_items::table)
+            .values(rows)
+            .execute(connection)?;
+    }
+
+    Ok(())
 }
 
 /// Portées à l'espace et non au filtre courant — voir [`NotesView`].
@@ -248,10 +326,13 @@ pub fn fetch(
         .map(Note::try_from)
         .collect::<Result<Vec<_>, _>>()?;
 
-    // La recherche du domaine porte dessus.
+    // La recherche du domaine porte dessus — et sur les items, seul contenu
+    // d'une todolist.
     let mut grouped = all_tags(connection)?;
+    let mut items = all_items(connection)?;
     for note in &mut notes {
         note.tags = grouped.remove(&note.id).unwrap_or_default();
+        note.items = items.remove(&note.id).unwrap_or_default();
     }
 
     Ok((notes, facets(connection, request.space_id.as_deref())?))
@@ -270,6 +351,7 @@ fn find(connection: &mut SqliteConnection, id: &str) -> Result<Option<Note>, Sto
 
     Ok(Some(Note {
         tags: tags_of(connection, id)?,
+        items: items_of(connection, id)?,
         ..Note::try_from(row)?
     }))
 }
@@ -293,6 +375,7 @@ pub fn create(
             .execute(connection)?;
         let written = std::mem::take(&mut note.tags);
         note.tags = replace_tags(connection, &note.id, &written)?;
+        replace_items(connection, &note.id, &note.items)?;
 
         Ok(note)
     })
@@ -336,12 +419,17 @@ pub fn update(
                 notes::updated_at.eq(&row.updated_at),
                 notes::lifecycle_kind.eq(&row.lifecycle_kind),
                 notes::lifecycle_expires_at.eq(&row.lifecycle_expires_at),
+                notes::kind.eq(&row.kind),
             ))
             .execute(connection)?;
 
         if patch.tags.is_some() {
             let written = std::mem::take(&mut note.tags);
             note.tags = replace_tags(connection, &note.id, &written)?;
+        }
+
+        if patch.items.is_some() {
+            replace_items(connection, &note.id, &note.items)?;
         }
 
         Ok(note)
@@ -645,8 +733,10 @@ pub fn all(
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut grouped = all_tags(connection)?;
+    let mut items = all_items(connection)?;
     for note in &mut notes {
         note.tags = grouped.remove(&note.id).unwrap_or_default();
+        note.items = items.remove(&note.id).unwrap_or_default();
     }
 
     Ok(notes)
@@ -673,8 +763,10 @@ pub fn by_ids(
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut grouped = all_tags(connection)?;
+    let mut items = all_items(connection)?;
     for note in &mut notes {
         note.tags = grouped.remove(&note.id).unwrap_or_default();
+        note.items = items.remove(&note.id).unwrap_or_default();
     }
 
     Ok(notes)
@@ -702,6 +794,11 @@ pub fn insert_imported(
             .values(NoteRow::from(note))
             .execute(connection)?;
         replace_tags(connection, &note.id, &model::normalize_tags(&note.tags))?;
+        replace_items(
+            connection,
+            &note.id,
+            &checklist::normalize_items(&note.items),
+        )?;
 
         Ok(true)
     })

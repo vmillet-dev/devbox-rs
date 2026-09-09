@@ -358,6 +358,7 @@ fn is_shell(content: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::notes::checklist::NoteKind;
     use crate::notes::model::NoteLifecycle;
 
     #[test]
@@ -400,6 +401,8 @@ mod tests {
             tags: Vec::new(),
             pinned: false,
             lifecycle: NoteLifecycle::Permanent,
+            kind: NoteKind::Snippet,
+            items: Vec::new(),
         }
     }
 

@@ -36,6 +36,11 @@ import {
  * chaîne ISO 8601. Le `language`, lui, ne demande plus rien : l'enum Rust en
  * fait une union générée que le front reçoit déjà restreinte.
  *
+ * `kind` et `items` arrivent déclarés optionnels — c'est le `#[serde(default)]`
+ * qui garde lisibles les fichiers d'export écrits avant les todolists. Le Rust
+ * les sérialise toujours ; le repli ci-dessous couvre l'écart entre ce que le
+ * type promet et ce que le pont livre.
+ *
  * `footer` et `expiringSoon` sont aplatis dans le même objet (le `#[serde(flatten)]`
  * de `DisplayNote`) : un seul type de note côté front.
  */
@@ -113,6 +118,8 @@ export function toNote(dto: NoteDto): Note {
     expiringSoon: dto.expiringSoon,
     placeholders: dto.placeholders.map((placeholder) => ({ ...placeholder })),
     attachmentCount: dto.attachmentCount,
+    kind: dto.kind ?? 'snippet',
+    items: (dto.items ?? []).map((item) => ({ ...item })),
   };
 }
 
@@ -126,6 +133,7 @@ export function toTrashedNote(dto: WireTrashedNote): TrashedNote {
     tags: [...dto.tags],
     deletedAt: parseIsoDate(dto.deletedAt, 'deletedAt'),
     purgeAt: parseIsoDate(dto.purgeAt, 'purgeAt'),
+    kind: dto.kind ?? 'snippet',
   };
 }
 
@@ -158,6 +166,8 @@ export function toNoteDraftDto(draft: NoteDraft): NoteDraftDto {
     tags: [...draft.tags],
     pinned: draft.pinned,
     lifecycle: toLifecycleDto(draft.lifecycle),
+    kind: draft.kind,
+    items: draft.items.map((item) => ({ ...item })),
   };
 }
 
@@ -174,6 +184,8 @@ export function toNotePatchDto(patch: NotePatch): NotePatchDto {
   if (patch.tags !== undefined) dto.tags = [...patch.tags];
   if (patch.pinned !== undefined) dto.pinned = patch.pinned;
   if (patch.lifecycle !== undefined) dto.lifecycle = toLifecycleDto(patch.lifecycle);
+  if (patch.kind !== undefined) dto.kind = patch.kind;
+  if (patch.items !== undefined) dto.items = patch.items.map((item) => ({ ...item }));
   return dto;
 }
 

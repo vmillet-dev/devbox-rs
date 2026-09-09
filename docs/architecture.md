@@ -70,10 +70,12 @@ Both follow the same three-part convention:
 | `<feature>/model.rs` | the types and the business rules, testable without opening a database   |
 | `<feature>/store.rs` | the SQL, and nothing else                                               |
 
-`notes/` carries two extra modules, both of them notes-specific vocabulary: `language.rs`
-(the closed `Language` enum and the heuristics that guess one from pasted content) and
+`notes/` carries extra modules, all of them notes-specific vocabulary: `language.rs`
+(the closed `Language` enum and the heuristics that guess one from pasted content),
 `view.rs` (what is asked — `NotesQuery`, `NoteFilter` — what comes back — `NotesView`,
-`NoteSection` — plus the search matching and chronological placement that produce it).
+`NoteSection` — plus the search matching and chronological placement that produce it), and
+`checklist.rs` (the closed `NoteKind` enum, `ChecklistItem`, the normalisation of a list and
+its Markdown rendering).
 
 What is left at the root is what belongs to no single feature:
 
@@ -380,6 +382,73 @@ show, the front decides _how_.
 previously lived only on the front (`isExpiringSoon`, 3 days) while the back separately
 computed `has_expiring_notes` — two definitions of "soon" behind a hint that reads "to triage
 soon". The section flag now derives from the same per-note value.
+
+### The two kinds of note
+
+A note is a `snippet` or a `checklist`, and `notes::checklist::NoteKind` is a closed enum for
+the same reason `Language` is: the front receives a generated union, so an unhandled variant
+stops compiling rather than surfacing at runtime.
+
+A checklist has **no body**. Its items replace `content` — they are not an addition to it —
+and they live in `note_items`, keyed `(note_id, position)`. That key is the whole design: an
+item has no identity beyond where it sits, so every write replaces the entire list, exactly
+the way `note_tags` does. Nothing addresses a single item, and nothing generates an id for
+one. Reordering is therefore an ordinary write, not a shuffle of rows under a primary key
+that forbids duplicates halfway through.
+
+Three behaviours would go quietly wrong without a thought for the kind, and each is handled
+where its rule already lived:
+
+- `notes::view::matches_search` scans the item texts as well. A checklist has no `content`,
+  so it would otherwise be findable only by its title.
+- `transfer::model::to_markdown` renders `- [x] …` lines instead of a fenced block. An empty
+  ` ```txt ` block is not something anybody pastes into a ticket.
+- Language detection is skipped, at creation and on patch alike. There is no body to read,
+  and a format select over a note that shows no code is a control with nothing to do — which
+  is why the editor hides it too.
+
+Both fields carry `#[serde(default)]`. `transfer::Bundle` deserialises `Note` itself, so a
+required key would have made every export file written before todo lists unreadable —
+`FORMAT_VERSION` stays at 1 precisely because old files still read.
+
+Progress (`done`/`total`) is **not** on the wire. The items already travel with the note, and
+a counter beside them would be the identity mapper this codebase refuses elsewhere; the card
+and the editor each count in a `computed()`. That is the same line as relative-time
+formatting: presenting data the front already holds is the front's job.
+
+### A tickable card, and why it is two layers
+
+A card is a `<button>`, and a `<button>` may not contain another — the reason the `⋯` menu
+already lives in `.card-shell` rather than inside the card. Ticking a box from the canvas
+needs buttons _in_ the card's body, so a checklist card is built as two layers: the card
+button underneath, carrying the click surface and the keyboard focus the canvas moves around,
+and a sibling `.card-items` layer over it in `pointer-events: none`, where only the item
+checkboxes take pointer events back. Everything else falls through and opens the note.
+
+This is the same trick the editor uses for its body, where the code viewer sits under the
+textarea. The card button keeps a `.card-items-space` spacer so the footer does not ride up
+under the list.
+
+Ticking from the card matters more than it looks: crossing tasks off is the gesture a todo
+list exists for, and routing it through the editor would put a modal between the user and a
+one-click action.
+
+### Reordering, and why not drag & drop
+
+⚠️ **HTML5 drag & drop does not work in this WebView.** `dragDropEnabled` is Tauri's default
+`true`, which is what makes a file dropped on the window reach `FileDropService` at all; with
+it on, the WebView never sees `dragstart` or `drop`. Turning it off to get the DOM events
+back would break attachments.
+
+So `ChecklistEditorComponent` reorders with **pointer events** — `pointerdown`,
+`setPointerCapture`, `pointermove`, `pointerup` — and the capture is what keeps a slightly
+fast gesture from being lost the moment the cursor leaves the row. The call is optional
+(`?.`): capture makes the gesture comfortable, it does not condition it.
+
+`Alt+↑/↓` does the same thing from the keyboard, and it is not a bonus: the template
+accessibility rules are errors here, and an interaction only the mouse can reach does not
+ship. The visual preview during a drag is CSS `order`, so rows keep their place in the DOM —
+and with it their focus and their caret — while only their position moves.
 
 ### "Untriaged" — the ephemeral note
 
@@ -1052,6 +1121,15 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   re-runs `CREATE TABLE spaces` nor keeps a second, drifting source of truth. A pre-Diesel
   binary reopening such a database now fails loudly at startup instead of writing into a schema
   it believes it understands.
+- **A checklist's items are a child table, not a serialised column.** `note_items` is keyed
+  `(note_id, position)` and written by wiping the note's rows and re-inserting them in order —
+  the same shape as `note_tags`, for the same reason. It is _not_ read back after writing, and
+  that asymmetry with tags is deliberate: `position` orders numerically, which the insertion
+  order reproduces exactly, whereas `note_tags.tag` is `COLLATE NOCASE` and only a read gives
+  its order. `notes.kind` carries no `CHECK`, following `language` rather than `lifecycle_kind`:
+  the list of kinds lives in the domain and can move between versions. Its `DEFAULT 'snippet'`
+  is not a convenience either — SQLite refuses an `ADD COLUMN NOT NULL` without one, and it is
+  what gives every note already in the database its value.
 - **Schema choices that made filtering movable to the back-end.** `lifecycle` is split into
   `lifecycle_kind` + `lifecycle_expires_at` columns rather than stored as JSON, and tags live
   in their own `note_tags` table rather than in a serialised column. Both exist so that

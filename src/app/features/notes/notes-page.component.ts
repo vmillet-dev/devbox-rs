@@ -28,6 +28,7 @@ import { TrashStore } from './state/trash.store';
 import { FilterChipsComponent } from './ui/filter-chips/filter-chips.component';
 import { CardBox, FocusDirection, nextFocusIndex } from './ui/grid-navigation.util';
 import { LanguageRailComponent } from './ui/language-rail/language-rail.component';
+import { NewNoteButtonComponent } from './ui/new-note-button/new-note-button.component';
 import { NoteActivation } from './ui/note-card/note-card.component';
 import { NoteEditorOverlayComponent } from './ui/note-editor-overlay/note-editor-overlay.component';
 import { NoteSectionComponent } from './ui/note-section/note-section.component';
@@ -77,6 +78,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
     SpaceSwitcherComponent,
     SearchBoxComponent,
     FilterChipsComponent,
+    NewNoteButtonComponent,
     SelectionBarComponent,
     TagRailComponent,
     LanguageRailComponent,

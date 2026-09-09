@@ -1,0 +1,82 @@
+<div class="checklist">
+  <!-- La barre est décorative : `aria-hidden` sur le graphique, le décompte
+       juste à côté porte la même information en texte. -->
+  <div class="checklist-progress">
+    <span class="progress-track" aria-hidden="true">
+      <span class="progress-fill" [style.width.%]="progress().percent"></span>
+    </span>
+    <span class="progress-count">
+      {{ 'editor.checklistStats' | transloco: { done: progress().done, total: progress().total } }}
+    </span>
+  </div>
+
+  <ul class="checklist-items">
+    @for (item of draft(); track $index) {
+      <li
+        class="checklist-row"
+        [class.dragging]="dragging()?.from === $index"
+        [style.order]="displayIndex($index)"
+      >
+        <!-- Poignée : pointeur pour la souris, Alt+↑/↓ pour le clavier. Le
+             glisser HTML5 ne reçoit rien dans cette WebView. -->
+        <button
+          type="button"
+          class="row-grip"
+          [attr.aria-label]="'editor.moveItem' | transloco: { text: item.text }"
+          (pointerdown)="onPointerDown($event, $index)"
+          (pointermove)="onPointerMove($event)"
+          (pointerup)="onPointerUp($event)"
+          (pointercancel)="onPointerUp($event)"
+          (keydown.alt.arrowup)="move($index, $index - 1)"
+          (keydown.alt.arrowdown)="move($index, $index + 1)"
+        >
+          <span aria-hidden="true">⠿</span>
+        </button>
+
+        <!-- Un bouton `role=checkbox` plutôt qu'un `<input type=checkbox>` : le
+             natif hériterait des styles du panneau et ne se colorie pas. -->
+        <button
+          type="button"
+          class="row-check"
+          role="checkbox"
+          [attr.aria-checked]="item.done"
+          [attr.aria-label]="'editor.toggleItem' | transloco: { text: item.text }"
+          (click)="toggle($index)"
+        >
+          <span aria-hidden="true">{{ item.done ? '☑' : '☐' }}</span>
+        </button>
+
+        <input
+          #row
+          type="text"
+          class="row-text"
+          spellcheck="false"
+          [class.done]="item.done"
+          [attr.aria-label]="'editor.itemLabel' | transloco: { position: $index + 1 }"
+          [placeholder]="'editor.itemPlaceholder' | transloco"
+          [value]="item.text"
+          (input)="setText($index, row.value)"
+          (blur)="commit()"
+          (keydown.enter)="insertAfter($index)"
+          (keydown.backspace)="onBackspace($event, $index)"
+          (keydown.alt.arrowup)="move($index, $index - 1)"
+          (keydown.alt.arrowdown)="move($index, $index + 1)"
+        />
+
+        <button
+          type="button"
+          class="row-remove"
+          [attr.aria-label]="'editor.removeItem' | transloco: { text: item.text }"
+          (click)="remove($index)"
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
+      </li>
+    }
+  </ul>
+
+  <button type="button" class="checklist-add" (click)="append()">
+    <span aria-hidden="true">+</span>
+    {{ 'editor.addItem' | transloco }}
+  </button>
+</div>

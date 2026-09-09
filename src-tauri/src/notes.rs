@@ -12,6 +12,7 @@
 // they arrive owned, whether it consumes them or not.
 #![allow(clippy::needless_pass_by_value)]
 
+pub mod checklist;
 pub mod language;
 pub mod model;
 pub mod placeholder;
@@ -25,6 +26,7 @@ pub mod view;
 pub(crate) mod fixtures {
     use chrono::{DateTime, Utc};
 
+    use super::checklist::NoteKind;
     use super::language::Language;
     use super::model::{Note, NoteLifecycle};
     use crate::db::iso8601;
@@ -48,6 +50,8 @@ pub(crate) mod fixtures {
             created_at: at(NOW),
             updated_at: at(NOW),
             lifecycle: NoteLifecycle::Permanent,
+            kind: NoteKind::Snippet,
+            items: Vec::new(),
         }
     }
 }

@@ -18,7 +18,8 @@ import {
   LanguageTag,
   isLanguageTag,
 } from '@core/language/language.model';
-import { Attachment, Note, NoteLifecycle } from '@features/notes/model/note.model';
+import { checklistProgress, checklistToText } from '@features/notes/model/checklist.model';
+import { Attachment, ChecklistItem, Note, NoteLifecycle } from '@features/notes/model/note.model';
 import { PreferencesService } from '@core/preferences/preferences.service';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/time/relative-time.util';
@@ -26,6 +27,7 @@ import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive'
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
 import { AttachmentStripComponent } from '../attachment-strip/attachment-strip.component';
+import { ChecklistEditorComponent } from '../checklist-editor/checklist-editor.component';
 import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { LifecycleBadgeComponent } from '../lifecycle-badge/lifecycle-badge.component';
 import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
@@ -79,6 +81,7 @@ function toDateInputValue(date: Date): string {
   imports: [
     DialogBackdropDirective,
     AttachmentStripComponent,
+    ChecklistEditorComponent,
     CopyButtonComponent,
     TagPillComponent,
     LifecycleBadgeComponent,
@@ -120,6 +123,7 @@ export class NoteEditorOverlayComponent {
   readonly tagRemoved = output<string>();
   readonly pinToggled = output<void>();
   readonly lifecycleChanged = output<NoteLifecycle>();
+  readonly checklistChanged = output<readonly ChecklistItem[]>();
   readonly deleteRequested = output<void>();
   readonly attachmentAddRequested = output<void>();
   readonly attachmentRemoveRequested = output<string>();
@@ -163,6 +167,20 @@ export class NoteEditorOverlayComponent {
   protected readonly fullscreen = signal(this.preferences.read(FULLSCREEN_STORAGE_KEY) === 'true');
 
   private readonly bodyEditor = viewChild<ElementRef<HTMLTextAreaElement>>('bodyEditor');
+  private readonly checklistEditor = viewChild(ChecklistEditorComponent);
+
+  /** Une todolist n'a pas de corps : ni bloc coloré, ni sélecteur de format. */
+  protected readonly isChecklist = computed(() => this.note()?.kind === 'checklist');
+  protected readonly checklistStats = computed(() => checklistProgress(this.note()?.items ?? []));
+
+  /**
+   * Ce que le bouton de copie pose dans le presse-papier. Le brouillon pour une
+   * note ordinaire — copier avant d'avoir quitté le champ doit rendre ce qu'on
+   * voit —, la liste rendue en Markdown pour une todolist, qui n'a pas de corps.
+   */
+  protected readonly copyText = computed(() =>
+    this.isChecklist() ? checklistToText(this.note()?.items ?? []) : this.draftContent(),
+  );
 
   protected readonly languageLabel = computed(
     () => LANGUAGE_LABELS[this.note()?.language ?? FALLBACK_LANGUAGE],
@@ -311,11 +329,18 @@ export class NoteEditorOverlayComponent {
     this.requestClose();
   }
 
-  /** Seul chemin de fermeture : il confirme les brouillons avant de sortir. */
+  /**
+   * Seul chemin de fermeture : il confirme les brouillons avant de sortir.
+   *
+   * La liste de tâches est confirmée de la même façon et pour la même raison :
+   * Échap, le fond et le bouton de fermeture ne produisent aucun `blur`, la
+   * dernière ligne tapée serait sinon perdue.
+   */
   protected requestClose(): void {
     this.commitTitle();
     this.commitSource();
     this.commitContent();
+    this.checklistEditor()?.commit();
     this.closed.emit();
   }
 }

@@ -16,6 +16,7 @@ function trashed(overrides: Partial<TrashedNote> = {}): TrashedNote {
     tags: [],
     deletedAt: new Date('2026-08-27T08:00:00Z'),
     purgeAt: new Date('2026-09-26T08:00:00Z'),
+    kind: 'snippet',
     ...overrides,
   };
 }

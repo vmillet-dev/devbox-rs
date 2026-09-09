@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::error::{StorageError, ValidationError};
+use crate::notes::checklist::{self, NoteKind};
 use crate::notes::model::Note;
 use crate::spaces::model::Space;
 
@@ -80,6 +81,9 @@ fn fence_for(content: &str) -> String {
 
 /// Rendu destiné à être collé ailleurs (revue, ticket, message) : titres,
 /// contexte, tags, puis le contenu dans un bloc annoté par son langage.
+///
+/// Une todolist sort en liste de tâches Markdown plutôt qu'en bloc clôturé :
+/// elle n'a pas de contenu, et un bloc vide ne se colle nulle part.
 pub fn to_markdown(notes: &[Note], space_names: &BTreeMap<String, String>) -> String {
     let mut out = String::new();
 
@@ -115,6 +119,11 @@ pub fn to_markdown(notes: &[Note], space_names: &BTreeMap<String, String>) -> St
             let _ = writeln!(out, "_{}_\n", meta.join(" · "));
         }
 
+        if note.kind == NoteKind::Checklist {
+            let _ = writeln!(out, "{}", checklist::to_markdown(&note.items));
+            continue;
+        }
+
         let fence = fence_for(&note.content);
         let _ = writeln!(
             out,
@@ -130,6 +139,7 @@ pub fn to_markdown(notes: &[Note], space_names: &BTreeMap<String, String>) -> St
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::notes::checklist::ChecklistItem;
     use crate::notes::fixtures::note as sample;
 
     fn spaces() -> BTreeMap<String, String> {
@@ -158,6 +168,30 @@ mod tests {
         // La clôture extérieure doit être plus longue que celle du contenu.
         assert!(markdown.contains("````txt"));
         assert!(markdown.ends_with("````\n"));
+    }
+
+    #[test]
+    fn a_todo_list_is_shared_as_a_markdown_task_list() {
+        // Elle n'a pas de contenu : un bloc clôturé vide ne se colle nulle part.
+        let mut note = sample();
+        note.kind = NoteKind::Checklist;
+        note.content = String::new();
+        note.items = vec![
+            ChecklistItem {
+                text: "Relire".to_string(),
+                done: true,
+            },
+            ChecklistItem {
+                text: "Déployer".to_string(),
+                done: false,
+            },
+        ];
+
+        let markdown = to_markdown(&[note], &spaces());
+
+        assert!(markdown.contains("- [x] Relire"));
+        assert!(markdown.contains("- [ ] Déployer"));
+        assert!(!markdown.contains("```"));
     }
 
     #[test]

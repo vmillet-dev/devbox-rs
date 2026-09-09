@@ -252,6 +252,47 @@ mod tests {
     }
 
     #[test]
+    fn an_existing_note_becomes_a_snippet_when_todo_lists_arrive() {
+        // Le vrai chemin de mise à jour : une base déjà peuplée, pas une base
+        // neuve. `ADD COLUMN kind` n'a de valeur pour ces lignes que par son
+        // `DEFAULT`, et sans lui SQLite refuserait la colonne `NOT NULL`.
+        let mut connection = legacy_database(
+            &[
+                LEGACY_SCHEMA,
+                LEGACY_FOLD_TAG_CASE,
+                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Perso');
+                     INSERT INTO notes VALUES
+                       ('n-1', 's-1', 'A', 'sql', 'select 1', '', 0, '2026-07-25T09:00:00.000Z',
+                        '2026-07-25T09:00:00.000Z', 'permanent', NULL);",
+            ],
+            2,
+        );
+
+        run(&mut connection).unwrap();
+
+        assert!(!connection.has_pending_migration(MIGRATIONS).unwrap());
+        assert_eq!(
+            schema::notes::table
+                .select(schema::notes::kind)
+                .first::<String>(&mut connection)
+                .unwrap(),
+            "snippet"
+        );
+        // Le contenu n'est pas réécrit : la migration ajoute, elle ne touche à rien.
+        assert_eq!(
+            schema::notes::table
+                .select(schema::notes::content)
+                .first::<String>(&mut connection)
+                .unwrap(),
+            "select 1"
+        );
+        assert_eq!(
+            count(&mut connection, "SELECT COUNT(*) AS count FROM note_items"),
+            0
+        );
+    }
+
+    #[test]
     fn adopting_a_legacy_history_clears_the_pragma_it_replaces() {
         let mut connection = legacy_database(&[LEGACY_SCHEMA], 1);
 

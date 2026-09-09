@@ -34,7 +34,13 @@
     "selectNote": "Sélectionner la note {{title}}",
     "keyboardHint": "↑↓←→ naviguer · Entrée ouvrir · C copier · X sélectionner · Suppr corbeille",
     "trash": "Corbeille",
-    "manageTags": "Gérer"
+    "manageTags": "Gérer",
+    "newNoteKindLabel": "Choisir le type de note",
+    "newSnippet": "Nouvelle note",
+    "newChecklist": "Nouvelle todolist",
+    "checklistProgress": "{{done}}/{{total}}",
+    "checklistToggle": "Cocher la tâche {{text}}",
+    "checklistMore": "+{{count}} autre(s)"
   },
   "filters": {
     "groupLabel": "Filtrer les notes",
@@ -69,7 +75,14 @@
     "pinned": "Épinglée",
     "expiryLabel": "Échéance de la note (vide = permanente)",
     "footerStats": "{{lines}} lignes · {{bytes}} octets",
-    "modifiedPrefix": "Modifiée"
+    "modifiedPrefix": "Modifiée",
+    "checklistStats": "{{done}}/{{total}} tâche(s)",
+    "addItem": "Ajouter une tâche",
+    "itemLabel": "Tâche {{position}}",
+    "itemPlaceholder": "Décrire la tâche…",
+    "removeItem": "Supprimer la tâche {{text}}",
+    "moveItem": "Déplacer la tâche {{text}} (Alt + flèches)",
+    "toggleItem": "Cocher la tâche {{text}}"
   },
   "lifecycle": {
     "neverExpires": "N'expire jamais"
@@ -173,7 +186,8 @@
     "deletedAt": "supprimée {{when}}",
     "purgesIn": "effacée dans {{count}} j",
     "purgesToday": "effacée aujourd'hui",
-    "untitled": "Sans titre"
+    "untitled": "Sans titre",
+    "checklistNote": "Liste de tâches"
   },
   "tagManager": {
     "title": "Gérer les tags",

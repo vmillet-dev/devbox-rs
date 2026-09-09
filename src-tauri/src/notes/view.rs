@@ -142,6 +142,9 @@ pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesVie
 /// traite que l'ASCII, donc `Étape` ne correspondrait pas à `étape`. D'où une
 /// recherche qui ne descend pas dans le `WHERE`, contrairement aux filtres
 /// grossiers, qui eux y restent indexés.
+///
+/// Les items comptent autant que le contenu : une todolist n'a pas de corps,
+/// elle serait sinon introuvable autrement que par son titre.
 fn matches_search(note: &Note, needle: &str) -> bool {
     note.title.to_lowercase().contains(needle)
         || note
@@ -149,6 +152,10 @@ fn matches_search(note: &Note, needle: &str) -> bool {
             .iter()
             .any(|tag| tag.to_lowercase().contains(needle))
         || note.content.to_lowercase().contains(needle)
+        || note
+            .items
+            .iter()
+            .any(|item| item.text.to_lowercase().contains(needle))
 }
 
 const A_WEEK: TimeDelta = TimeDelta::days(7);
@@ -261,6 +268,7 @@ fn build_sections(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::notes::checklist::{ChecklistItem, NoteKind};
     use crate::notes::fixtures::{NOW, at, note as sample};
 
     fn request() -> NotesQuery {
@@ -433,6 +441,32 @@ mod tests {
             // SQLite's LOWER() leaves É alone without ICU, so this match is exactly
             // what moving the comparison into Rust buys.
             assert!(matches_search(&note, "étape"));
+        }
+
+        #[test]
+        fn a_checklist_is_found_by_the_text_of_its_items() {
+            // It has no content of its own: without this, a todo list would only
+            // ever be findable by its title.
+            let note = Note {
+                title: "Sprint".to_string(),
+                content: String::new(),
+                kind: NoteKind::Checklist,
+                items: vec![
+                    ChecklistItem {
+                        text: "Relire la migration".to_string(),
+                        done: false,
+                    },
+                    ChecklistItem {
+                        text: "Prévenir l'équipe".to_string(),
+                        done: true,
+                    },
+                ],
+                ..sample()
+            };
+
+            assert!(matches_search(&note, "migration"));
+            assert!(matches_search(&note, "équipe"));
+            assert!(!matches_search(&note, "terraform"));
         }
     }
 

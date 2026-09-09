@@ -10,6 +10,7 @@ use devbox_lib::db::iso8601;
 use devbox_lib::error::StorageError;
 use devbox_lib::error::ValidationError;
 use devbox_lib::error::{AppError, ErrorCode};
+use devbox_lib::notes::checklist::{ChecklistItem, NoteKind};
 use devbox_lib::notes::language::Language;
 use devbox_lib::notes::model::{
     DisplayNote, Note, NoteDraft, NoteLifecycle, NotePatch, TagUsage, decorate,
@@ -39,6 +40,8 @@ fn sample() -> Note {
         created_at: at(NOW),
         updated_at: at(NOW),
         lifecycle: NoteLifecycle::Permanent,
+        kind: NoteKind::Snippet,
+        items: Vec::new(),
     }
 }
 
@@ -477,6 +480,73 @@ fn an_export_bundle_reads_back_the_notes_it_wrote() {
     assert!(json.contains("\"exportedAt\""));
     let read = transfer::model::read_bundle(&json).unwrap();
     assert_eq!(read.notes[0].id, "n-1");
+}
+
+#[test]
+fn a_note_announces_its_kind_and_its_items() {
+    let note = Note {
+        kind: NoteKind::Checklist,
+        items: vec![ChecklistItem {
+            text: "Relire".to_string(),
+            done: true,
+        }],
+        ..sample()
+    };
+
+    let json = serde_json::to_value(note).unwrap();
+
+    // Enum unitaire : une chaîne nue, comme `language` — et non un objet tagué,
+    // contrairement à `lifecycle`.
+    assert_eq!(json["kind"], serde_json::json!("checklist"));
+    assert_eq!(json["items"][0]["text"], serde_json::json!("Relire"));
+    assert_eq!(json["items"][0]["done"], serde_json::json!(true));
+}
+
+#[test]
+fn an_ordinary_note_still_crosses_as_a_snippet() {
+    let json = serde_json::to_value(sample()).unwrap();
+
+    assert_eq!(json["kind"], serde_json::json!("snippet"));
+    assert_eq!(json["items"], serde_json::json!([]));
+}
+
+#[test]
+fn an_export_written_before_todo_lists_existed_still_reads() {
+    // `Bundle` désérialise `Note` lui-même : sans `#[serde(default)]` sur `kind`
+    // et `items`, tous les fichiers déjà exportés deviendraient illisibles.
+    let json = serde_json::json!({
+        "version": transfer::model::FORMAT_VERSION,
+        "exportedAt": NOW,
+        "spaces": [],
+        "notes": [{
+            "id": "n-1",
+            "spaceId": "s-1",
+            "title": "Titre",
+            "language": "txt",
+            "content": "Contenu",
+            "source": "",
+            "tags": [],
+            "pinned": false,
+            "createdAt": NOW,
+            "updatedAt": NOW,
+            "lifecycle": { "kind": "permanent" }
+        }],
+    })
+    .to_string();
+
+    let read = transfer::model::read_bundle(&json).unwrap();
+
+    assert_eq!(read.notes[0].kind, NoteKind::Snippet);
+    assert!(read.notes[0].items.is_empty());
+}
+
+#[test]
+fn a_patch_omitting_the_items_deserialises_to_none() {
+    let patch: NotePatch = serde_json::from_value(serde_json::json!({ "title": "T" })).unwrap();
+
+    // Un `Some(vec![])` viderait la liste au lieu de la laisser intacte.
+    assert!(patch.items.is_none());
+    assert!(patch.kind.is_none());
 }
 
 #[test]
