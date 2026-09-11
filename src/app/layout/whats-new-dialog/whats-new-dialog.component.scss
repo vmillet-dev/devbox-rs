@@ -1,0 +1,112 @@
+@use 'mixins' as *;
+
+.news-backdrop {
+  @include backdrop(55);
+}
+
+.news-panel {
+  @include help-panel(600px);
+}
+
+.news-header {
+  @include help-header;
+}
+
+.news-title {
+  @include help-title;
+}
+
+.news-subtitle {
+  @include help-subtitle;
+}
+
+.news-body {
+  @include help-body;
+  gap: 22px;
+}
+
+.news-state {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.news-release-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.news-version {
+  font-family: var(--font-mono), serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--amber);
+}
+
+.news-date {
+  font-family: var(--font-mono), serif;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.news-installed {
+  @include tint-badge('--green-rgb', 0.14, 0.3);
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+}
+
+.news-section-title {
+  margin: 12px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.news-items {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-1);
+}
+
+.news-actions {
+  @include help-actions;
+}
+
+.news-link {
+  @include unstyled-control;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono), serif;
+  font-size: 11.5px;
+  color: var(--blue);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.news-link:hover {
+  color: var(--text-0);
+}
+
+.news-link:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.news-close {
+  @include help-close;
+}

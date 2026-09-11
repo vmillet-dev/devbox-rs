@@ -1,5 +1,6 @@
 // Public: `tests/` is a separate crate, and sees nothing of the binary but its API.
 pub mod attachments;
+pub mod changelog;
 pub mod db;
 pub mod error;
 pub mod notes;
@@ -16,6 +17,7 @@ use attachments::{
     attach_clipboard_image, attach_file, delete_attachment, list_attachments, open_attachment,
     read_attachment, save_attachment,
 };
+use changelog::app_changelog;
 use desktop::{set_global_shortcuts, set_window_behavior, sync_tray};
 use notes::{
     create_note, delete_note, delete_notes, delete_tag, empty_trash, fill_placeholders,
@@ -81,6 +83,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         export_selection,
         import_notes,
         share_notes,
+        app_changelog,
         sync_tray,
         set_global_shortcuts,
         set_window_behavior,

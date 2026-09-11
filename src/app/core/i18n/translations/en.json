@@ -40,7 +40,37 @@
     "newChecklist": "New to-do list",
     "checklistProgress": "{{done}}/{{total}}",
     "checklistToggle": "Tick the task {{text}}",
-    "checklistMore": "+{{count}} more"
+    "checklistMore": "+{{count}} more",
+    "samples": {
+      "space": "Getting started",
+      "welcome": {
+        "title": "Welcome to DevBox",
+        "source": "DevBox / Getting started",
+        "content": "DevBox keeps your notes, your snippets and your lists within reach of a shortcut.\n\n- Cards file themselves: pinned, today, this week, older.\n- Click a card to open it, or copy it without opening it.\n- Everything is local: the database lives in your user folder, nothing goes over the network.\n\nThese four notes are samples. Edit them, or send them to the trash: the \"About → Getting started\" menu tells the same story and does not go away."
+      },
+      "snippet": {
+        "title": "psql connection",
+        "source": "PostgreSQL"
+      },
+      "checklist": {
+        "title": "Things to try",
+        "open": "Open a note by clicking its card",
+        "copy": "Copy a note without opening it, from the card's button",
+        "fields": "Copy \"psql connection\" and fill in its fields",
+        "palette": "Open the quick-paste palette with Ctrl+Alt+P",
+        "space": "Create a space of your own and move a note into it"
+      },
+      "code": {
+        "title": "Angular signals",
+        "source": "Angular / Signals"
+      },
+      "tags": {
+        "devbox": "devbox",
+        "example": "example",
+        "database": "sql",
+        "angular": "angular"
+      }
+    }
   },
   "filters": {
     "groupLabel": "Filter notes",
@@ -172,7 +202,10 @@
     "versionUnknown": "unknown",
     "developedBy": "Developed by",
     "repository": "Repository",
-    "close": "Close"
+    "close": "Close",
+    "whatsNew": "What's new",
+    "gettingStarted": "Getting started",
+    "shortcuts": "Keyboard shortcuts"
   },
   "trash": {
     "title": "Trash",
@@ -284,7 +317,47 @@
     "preferences": "Preferences…"
   },
   "shortcuts": {
-    "unavailable": "Global shortcut(s) unavailable: {{list}}. Another application is already using them."
+    "unavailable": "Global shortcut(s) unavailable: {{list}}. Another application is already using them.",
+    "title": "Keyboard shortcuts",
+    "subtitle": "The keys that are live depending on where you are. Bare letters only act on the canvas, never while you are typing.",
+    "editHint": "The quick-paste shortcut is set in File → Preferences.",
+    "close": "Close",
+    "groups": {
+      "global": "Global (even with the window closed)",
+      "canvas": "Canvas",
+      "editor": "Editor",
+      "palette": "Quick paste"
+    },
+    "global": {
+      "palette": "Open the quick-paste palette",
+      "capture": "Capture the clipboard into a note",
+      "newNote": "Create a note"
+    },
+    "canvas": {
+      "search": "Jump to the search field",
+      "move": "Move from card to card",
+      "open": "Open the focused card",
+      "copy": "Copy its content",
+      "pin": "Pin or unpin",
+      "check": "Check the card for a bulk action",
+      "checkWithClick": "Check a card with a click",
+      "extendWithClick": "Extend the selection with a click",
+      "trash": "Send to the trash",
+      "undo": "Undo the last deletion",
+      "clearSelection": "Clear the selection"
+    },
+    "editor": {
+      "close": "Close the editor, saving",
+      "newItem": "Add an item below this one",
+      "removeItem": "Remove an empty item",
+      "moveItem": "Move the item within the list"
+    },
+    "palette": {
+      "navigate": "Walk the results",
+      "paste": "Copy the note and close",
+      "open": "Open the note instead of copying it",
+      "close": "Close the palette"
+    }
   },
   "settings": {
     "title": "Preferences",
@@ -340,5 +413,58 @@
       "duplicate": "Duplicate name: {{names}}. Only the last row will be kept.",
       "nameRule": "A name is limited to letters, digits, dashes and underscores."
     }
+  },
+  "gettingStarted": {
+    "title": "Getting started",
+    "subtitle": "What DevBox can do, in the order you meet it.",
+    "hint": "The sample notes from the first launch show all of this for real.",
+    "close": "Close",
+    "chapters": {
+      "notes": {
+        "title": "Notes and snippets",
+        "body": "A note carries a title, a body coloured according to its language, a source and tags. Click a card to open it, or copy its content without opening it from the card's button. Nothing is saved while a note is empty: a note opened and then abandoned leaves no trace."
+      },
+      "spaces": {
+        "title": "Spaces to file things in",
+        "body": "Every note lives in a space — \"Personal\", \"Work\", whatever you like. The switcher at the top left filters the canvas, and \"All spaces\" shows them together. Deleting a space always asks where its notes should go: they never disappear with it."
+      },
+      "organise": {
+        "title": "Finding things: search, tags, filters",
+        "body": "The search runs through titles, bodies, sources and checklist items, accents included. The left rail filters by tag and by language, and the quick filters isolate the pinned ones or those carrying a deadline. Sorting, grouping by date and the sections are computed by the engine, not by the interface."
+      },
+      "fields": {
+        "title": "Fields to fill in",
+        "body": "Write a field between double braces in a snippet — a name alone, or a name and a default value — and DevBox asks you for it when you copy. What you type is kept with the note, and global variables (File → Preferences → Variables) propose a value for the whole corpus, shown in grey until you replace it."
+      },
+      "checklists": {
+        "title": "Lists to tick",
+        "body": "A note is either a snippet or a todo list: an ordered run of items, tickable from the card without opening it. In the editor, Enter adds an item, and Alt with an arrow — or a pointer drag — moves it within the list."
+      },
+      "palette": {
+        "title": "Pasting without leaving what you are doing",
+        "body": "{{palette}} opens the quick-paste palette over any application: type, choose, and the content lands in the clipboard. {{capture}} does the opposite and files the clipboard into a fresh note, {{newNote}} opens an empty one. All three work with the window closed, DevBox staying in the system tray."
+      },
+      "attachments": {
+        "title": "Attachments",
+        "body": "Drop a file on the window while a note is open, or paste an image from the clipboard: it is copied next to the database and attached to the note. The card shows the count, and a preview grows on click."
+      },
+      "trash": {
+        "title": "A trash, and Ctrl+Z",
+        "body": "Deleting a note sends it to the trash, where it stays thirty days before going for good. The banner that follows a deletion offers to take it back, and Ctrl+Z still does after the banner is gone. The trash opens from the quick filters."
+      },
+      "transfer": {
+        "title": "In and out",
+        "body": "The File menu exports everything, one space or the selection into a file DevBox can read back, and imports without ever creating a duplicate. \"Copy as Markdown\" puts the selection in the clipboard, ready to paste into a ticket or a message."
+      }
+    }
+  },
+  "whatsNew": {
+    "title": "What's new",
+    "subtitle": "The changelog shipped with the application. Deliberately untranslated.",
+    "loading": "Reading the changelog…",
+    "unavailable": "Changelog unavailable.",
+    "empty": "No release described yet.",
+    "installed": "installed",
+    "close": "Close"
   }
 }

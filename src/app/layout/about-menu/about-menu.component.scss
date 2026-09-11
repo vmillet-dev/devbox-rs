@@ -85,3 +85,10 @@
     display: none;
   }
 }
+
+// Separates the update check from the help panels, and those from the card.
+.about-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line-soft);
+}

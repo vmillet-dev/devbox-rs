@@ -59,6 +59,11 @@ The back-end is filed by **subject**. `notes.rs`, `spaces.rs`, `attachments.rs` 
 `transfer.rs` are the features, and each owns everything about itself: its model, its SQL, and
 the Tauri commands that expose it. Deleting `src/notes/` deletes the feature.
 
+`changelog.rs` is the smallest of them, and the odd one out: it owns no table and reads no
+database — the repository's `CHANGELOG.md` is baked into the binary by `include_str!` and
+parsed by `changelog/model.rs`. It keeps the convention all the same, the command in the file
+and the rules in the module, which is what lets the parser be tested without a Tauri runtime.
+
 `transfer` is the one without a `store.rs`: import and export read and write **whole
 libraries**, so they compose the two other stores rather than owning a table. That is also why
 it is the only feature allowed a `notes::store::all` — a raw note list, which no command ever
@@ -849,6 +854,84 @@ turning the entry off from the task manager has to uncheck the box, not see DevB
   its five callers, four of which show nothing today: copying from the canvas with `Ctrl+C`
   said not a word. Callers with something better to say — "3 notes copied as Markdown" — speak
   after, and the banner keeps the last message.
+
+### Help: what's new, getting started, shortcuts
+
+The titlebar's **"À propos" menu** carries the update check, three help panels and the card
+itself, separated into those three groups. They share one signal (`AboutMenuComponent.panel`)
+rather than a boolean each: they sit on the same backdrop rung (55), only one is ever wanted at
+a time, and four flags would allow a state where two of them are stacked and the focus trap of
+the loser keeps the keyboard.
+
+- **"Nouveautés"** renders `CHANGELOG.md`, the repository's own, **embedded in the binary** by
+  `include_str!` (`src-tauri/src/changelog.rs`) and read through `app_changelog`. The Markdown
+  is parsed **in Rust** (`changelog/model.rs`) into releases, categories and entries, so the
+  front renders a typed structure with the components it already has: no Markdown renderer to
+  pull in, no `innerHTML`, nothing for the CSP to forbid. The grammar is deliberately thin —
+  `## ` a release, `### ` a category, `- ` an entry, an indented line continues the one above —
+  and the file is written to match it; a shipped file that no longer parses fails a test rather
+  than emptying the panel in silence. The changelog is **not translated**, on purpose and like
+  the release notes the updater hands over: one changelog, written once, rather than two that
+  drift apart. The panel marks the release the running binary is, and its footer opens the
+  repository's releases page through the `opener` plugin.
+- **"Prise en main"** is nine chapters of prose, keyed by translation
+  (`gettingStarted.chapters.<id>`). The list of chapters lives in the component rather than in a
+  registry, unlike the menu entries and the shortcut groups, because a chapter carries **no
+  code**: nothing to run, nothing a feature has to be loaded to provide, so `layout/` imports
+  nothing from a feature by naming them. The bodies are handed the live key bindings as
+  interpolation parameters — a guide quoting the combination that shipped would be wrong for
+  anyone who changed it.
+- **"Raccourcis clavier"** is a read-only sheet. Read-only because the one shortcut that can be
+  changed is changed in the preferences, and a second editor for it would be a second place to
+  keep in step.
+
+`ShortcutsRegistry` (`core/shortcuts/`) is the third instance of the contribution pattern, after
+`AppMenuRegistry` and `SettingsRegistry`: the arrows of the canvas, `X` to check a card and
+`Alt+↑` to reorder a checklist item belong to the notes, and listing them from `layout/` would
+leave a sheet full of keys that do nothing the day the hashing tool is alone on screen.
+`NotesPageComponent` registers three groups on construction and takes them back on destruction.
+
+The **global** group is the exception and is built by the dialog itself: those three
+combinations are the application's, they work with the window closed, and the quick-paste one
+follows a preference — the sheet reads `SettingsStore` so it shows the key that is really bound
+rather than the one that shipped. A shortcut is spelled as one `<kbd>` per key
+(`acceleratorKeys`), the `+` drawn between the caps and `aria-hidden`: inside a cap it reads as
+a key to look for on the keyboard. What is not a key press — `Ctrl` + click to check a card — is
+said in the label rather than drawn as a cap.
+
+The three panels share their frame through mixins in `src/styles/_mixins.scss`
+(`help-panel`, `help-header`, `help-body`, `help-actions`, `key-cap`) rather than through a
+common component: a component's SCSS is out of reach of its neighbours, and three panels that do
+not look alike would read as three unrelated windows.
+
+### The first launch
+
+A brand-new installation opens on **sample notes**, in a space of their own
+(`SampleNotesService`, `features/notes/state/`). This is not decoration: a virgin database has
+no space, and creating a note with nowhere to file it is refused on purpose — so without them
+the first screen is empty, silent, and offers a "+ Nouvelle note" button that does nothing.
+
+Four notes, one feature each: a pinned welcome note (so the first screen is not an empty
+"pinned" heading), a shell snippet carrying `{{fields}}`, a checklist, and a code snippet with a
+deadline — which is what lights the ⏳ badge and gives the "à trier" filter something to find.
+They are ordinary notes: editing or trashing them is the point, and the written guide behind
+"Prise en main" is what survives the day they go.
+
+**The content comes from the front end**, not from a seed in Rust, for the reason no
+user-facing string ever comes out of the back end: it would ship French into an English
+interface. It also means the samples arrive in the language the application starts in. The two
+snippet bodies are the exception and are hard-coded in the service — they are _code_, so they
+are not translated, and they could not be: Transloco reads `{{name}}` as an interpolation and
+would replace a snippet's fields with empty strings on the way out.
+
+⚠️ **Two guards decide a first launch, not one.** A preference marker
+(`devbox.notes.samplesSeeded`) alone would re-seed anyone whose preferences file went missing;
+"no space at all" alone would re-seed the day the last space disappears. Together they only ever
+match a database that has never been written to. The marker is written **before** the notes, so
+a write that fails halfway leaves an incomplete set rather than a second full set on the next
+launch, and an installation that predates the samples is marked as skipped so the check stops
+running on every launch. A failure is silent: the canvas reports its own, and a second banner
+about samples nobody asked for would only add noise.
 
 ### Import, export and copying out
 

@@ -5,15 +5,34 @@ import { UpdateStore } from '@core/updates/update.store';
 import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 import { AboutDialogComponent } from '@layout/about-dialog/about-dialog.component';
+import { GettingStartedDialogComponent } from '@layout/getting-started-dialog/getting-started-dialog.component';
+import { ShortcutsDialogComponent } from '@layout/shortcuts-dialog/shortcuts-dialog.component';
+import { WhatsNewDialogComponent } from '@layout/whats-new-dialog/whats-new-dialog.component';
 
 /**
- * Menu « À propos » de la barre de titre. Deux entrées : chercher une mise à
- * jour, et ouvrir la fiche. La première rend compte sur place — c'est tout
- * l'intérêt d'une recherche manuelle face à celle du démarrage, silencieuse.
+ * What the menu can put on screen. One signal rather than one flag per panel:
+ * they share a backdrop rung and only ever appear one at a time, and four
+ * booleans would allow a state where two of them are stacked.
+ */
+export type AboutPanel = 'whatsNew' | 'gettingStarted' | 'shortcuts' | 'about';
+
+/**
+ * The titlebar's "À propos" menu: check for an update, the three help panels,
+ * and the card itself.
+ *
+ * The update check reports **in place** — that is the whole point of a manual
+ * check next to the silent one at startup.
  */
 @Component({
   selector: 'app-about-menu',
-  imports: [TranslocoPipe, AboutDialogComponent, MenuPanelDirective],
+  imports: [
+    TranslocoPipe,
+    AboutDialogComponent,
+    GettingStartedDialogComponent,
+    ShortcutsDialogComponent,
+    WhatsNewDialogComponent,
+    MenuPanelDirective,
+  ],
   hostDirectives: [MenuTriggerDirective],
   templateUrl: './about-menu.component.html',
   styleUrl: './about-menu.component.scss',
@@ -23,7 +42,7 @@ export class AboutMenuComponent {
   protected readonly store = inject(UpdateStore);
   protected readonly menu = inject(MenuTriggerDirective);
 
-  protected readonly dialogOpen = signal(false);
+  protected readonly panel = signal<AboutPanel | null>(null);
 
   constructor() {
     this.menu.escaped.subscribe(() => this.menu.close());
@@ -50,8 +69,8 @@ export class AboutMenuComponent {
     void this.store.checkNow();
   }
 
-  protected openDialog(): void {
-    this.dialogOpen.set(true);
+  protected openPanel(panel: AboutPanel): void {
+    this.panel.set(panel);
     // Sans focus rendu : la modale qui s'ouvre le prend elle-même.
     this.menu.close(false);
   }
@@ -61,8 +80,8 @@ export class AboutMenuComponent {
    * de son ouverture — l'entrée de menu, détruite depuis. Le focus repart donc
    * sur le déclencheur, seul point de repère encore à l'écran.
    */
-  protected closeDialog(): void {
-    this.dialogOpen.set(false);
+  protected closePanel(): void {
+    this.panel.set(null);
     this.menu.focusAnchor();
   }
 }

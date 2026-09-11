@@ -132,3 +132,16 @@ export function isAccelerator(value: string): boolean {
 
   return modifiers.every((modifier) => MODIFIER_NAMES.has(modifier)) && isKeyName(key);
 }
+
+/**
+ * The keys of an accelerator, one per `<kbd>`: `'Ctrl+Alt+P'` → `['Ctrl', 'Alt', 'P']`.
+ *
+ * Rendering the accelerator as a single string would put the `+` separators
+ * inside the key caps, where they read as a key to press.
+ */
+export function acceleratorKeys(accelerator: string): readonly string[] {
+  return accelerator
+    .split('+')
+    .map((token) => token.trim())
+    .filter((token) => token !== '');
+}
