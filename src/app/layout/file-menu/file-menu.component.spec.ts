@@ -49,11 +49,22 @@ describe('FileMenuComponent', () => {
     expect(trigger().getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('always offers quitting, even with no feature loaded', async () => {
+  it('always offers the preferences and quitting, even with no feature loaded', async () => {
+    // Les deux règlent l'application elle-même : elles ne passent pas par le
+    // registre, et un outil non chargé ne les fait pas disparaître.
     await openMenu();
 
-    expect(options()).toHaveLength(1);
-    expect(optionLabelled('Quitter')).toBeTruthy();
+    expect(options().map((option) => option.textContent?.trim())).toEqual(['Préférences…', 'Quitter DevBox']);
+  });
+
+  it('opens the preferences panel, closing the menu behind it', async () => {
+    await openMenu();
+
+    optionLabelled('Préférences').click();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('app-settings-dialog')).not.toBeNull();
+    expect(options()).toHaveLength(0);
   });
 
   it('renders what the features contributed, in order', async () => {
@@ -66,6 +77,7 @@ describe('FileMenuComponent', () => {
     expect(options().map((option) => option.textContent?.trim())).toEqual([
       'Importer…',
       'Exporter tout…',
+      'Préférences…',
       'Quitter DevBox',
     ]);
   });

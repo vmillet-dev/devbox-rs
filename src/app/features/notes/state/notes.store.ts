@@ -283,6 +283,9 @@ export class NotesStore {
         languages: params.languages,
         now,
         tzOffsetMinutes: now.getTimezoneOffset(),
+        // Toujours vrai sur le canevas : l'épinglage y est justement ce qui
+        // garde une note à portée, et c'est lui qui fait la section du haut.
+        pinnedFirst: true,
       };
       return this.repository.query(query);
     },

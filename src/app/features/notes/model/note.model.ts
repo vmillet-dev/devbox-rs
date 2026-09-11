@@ -78,6 +78,12 @@ export interface NotesQuery {
    * sans ce décalage, une note créée à 23 h tomberait dans la mauvaise section.
    */
   readonly tzOffsetMinutes: number;
+  /**
+   * Remonte les notes épinglées en tête : leur section à elles quand la vue est
+   * chronologique, le haut de la liste quand elle est plate. Le canevas dit
+   * toujours `true`, la palette de collage rapide suit la préférence.
+   */
+  readonly pinnedFirst: boolean;
 }
 
 /**

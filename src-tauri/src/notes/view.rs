@@ -9,7 +9,7 @@
 //! note falls into exactly one section: a note without a section would be
 //! unreachable in the interface, including search.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use chrono::{DateTime, Datelike, FixedOffset, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,14 @@ pub struct NotesQuery {
     /// (UTC+2 gives −120). Sections reason in local days: at 11 PM in
     /// Paris, `now` in UTC is already tomorrow.
     pub tz_offset_minutes: i32,
+    /// Les notes épinglées remontent en tête : leur propre section quand la vue
+    /// est chronologique, le haut de la liste quand elle est plate.
+    ///
+    /// Le canevas dit toujours `true` — l'épinglage y est justement ce qui
+    /// garde une note à portée. La palette de collage rapide, elle, suit la
+    /// préférence : chercher un snippet parmi huit résultats n'a pas les mêmes
+    /// priorités que retrouver une note sur le canevas.
+    pub pinned_first: bool,
 }
 
 /// `Untriaged` = notes with a deadline, those whose fate is not decided.
@@ -109,6 +117,20 @@ pub fn apply_attachment_counts<S: std::hash::BuildHasher>(
     }
 }
 
+/// Pose les variables globales sur toutes les notes d'une vue — même raison
+/// d'être séparée de [`build`] que [`apply_attachment_counts`].
+pub fn apply_global_defaults(view: &mut NotesView, globals: &BTreeMap<String, String>) {
+    if globals.is_empty() {
+        return;
+    }
+
+    for section in &mut view.sections {
+        for note in &mut section.notes {
+            model::apply_global_defaults(note, globals);
+        }
+    }
+}
+
 pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesView {
     let mut notes = notes;
 
@@ -128,7 +150,13 @@ pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesVie
     let offset = offset_from_minutes(request.tz_offset_minutes);
 
     NotesView {
-        sections: build_sections(notes, is_filtering, request.now, offset),
+        sections: build_sections(
+            notes,
+            is_filtering,
+            request.pinned_first,
+            request.now,
+            offset,
+        ),
         available_tags: facets.tags,
         available_languages: facets.languages,
         is_filtering,
@@ -208,7 +236,16 @@ fn section(
 
 /// Répartis par date, les résultats se diluent et semblent absents quand tout
 /// tombe en bas de page.
-fn results(notes: Vec<Note>, now: DateTime<Utc>) -> Vec<NoteSection> {
+///
+/// L'épinglage remonte ici aussi, faute de quoi le réglage n'aurait d'effet que
+/// sur une palette encore vide de toute frappe. Partition **stable** : à
+/// épinglage égal, l'ordre reçu du SQL fait toujours autorité.
+fn results(notes: Vec<Note>, pinned_first: bool, now: DateTime<Utc>) -> Vec<NoteSection> {
+    let mut notes = notes;
+    if pinned_first {
+        notes.sort_by_key(|note| !note.pinned);
+    }
+
     vec![section(NoteSectionKey::Results, notes, false, now)]
 }
 
@@ -217,12 +254,13 @@ fn results(notes: Vec<Note>, now: DateTime<Utc>) -> Vec<NoteSection> {
 fn build_sections(
     notes: Vec<Note>,
     is_filtering: bool,
+    pinned_first: bool,
     now: DateTime<Utc>,
     offset: FixedOffset,
 ) -> Vec<NoteSection> {
     let local_now = now.with_timezone(&offset);
     if is_filtering {
-        return results(notes, now);
+        return results(notes, pinned_first, now);
     }
 
     let mut pinned = Vec::new();
@@ -231,7 +269,10 @@ fn build_sections(
     let mut older = Vec::new();
 
     for note in notes {
-        if note.pinned {
+        // Sans remontée, une note épinglée reste une note comme les autres et
+        // suit sa date : la section « épinglées » disparaît, elle n'est pas
+        // seulement vide.
+        if pinned_first && note.pinned {
             pinned.push(note);
             continue;
         }
@@ -280,6 +321,7 @@ mod tests {
             languages: Vec::new(),
             now: at(NOW),
             tz_offset_minutes: 0,
+            pinned_first: true,
         }
     }
 
@@ -530,7 +572,7 @@ mod tests {
                 note("older", "2020-01-01T08:00:00.000Z"),
             ];
 
-            let sections = build_sections(notes, false, now_at(offset), offset);
+            let sections = build_sections(notes, false, true, now_at(offset), offset);
 
             // A note in no section would be unreachable in the UI, search included.
             let placed: Vec<String> = sections
@@ -547,7 +589,7 @@ mod tests {
         fn the_week_section_is_present_even_when_empty() {
             let offset = utc();
 
-            let sections = build_sections(Vec::new(), false, now_at(offset), offset);
+            let sections = build_sections(Vec::new(), false, true, now_at(offset), offset);
 
             // It hosts the "paste or create" ghost card, so it cannot be dropped.
             assert_eq!(keys(&sections), [NoteSectionKey::Week]);
@@ -562,7 +604,7 @@ mod tests {
                 note("older", "2020-01-01T08:00:00.000Z"),
             ];
 
-            let sections = build_sections(notes, false, now_at(offset), offset);
+            let sections = build_sections(notes, false, true, now_at(offset), offset);
 
             let with_ghost: Vec<NoteSectionKey> = sections
                 .iter()
@@ -578,10 +620,47 @@ mod tests {
             let mut pinned = note("pinned", "2026-07-25T08:00:00.000Z");
             pinned.pinned = true;
 
-            let sections = build_sections(vec![pinned], false, now_at(offset), offset);
+            let sections = build_sections(vec![pinned], false, true, now_at(offset), offset);
 
             assert_eq!(ids_in(&sections, NoteSectionKey::Pinned), ["pinned"]);
             assert!(ids_in(&sections, NoteSectionKey::Today).is_empty());
+        }
+
+        #[test]
+        fn without_the_hoist_a_pinned_note_follows_its_date_like_any_other() {
+            // La section « épinglées » disparaît alors, elle n'est pas vide :
+            // une section vide n'est jamais émise.
+            let offset = utc();
+            let mut pinned = note("pinned", "2026-07-25T08:00:00.000Z");
+            pinned.pinned = true;
+
+            let sections = build_sections(vec![pinned], false, false, now_at(offset), offset);
+
+            assert!(!keys(&sections).contains(&NoteSectionKey::Pinned));
+            assert_eq!(ids_in(&sections, NoteSectionKey::Today), ["pinned"]);
+        }
+
+        #[test]
+        fn the_hoist_reaches_the_flat_list_too() {
+            // Sans ça, le réglage de la palette n'aurait d'effet qu'avant la
+            // première frappe — or c'est en cherchant qu'on s'en sert.
+            let offset = utc();
+            let mut pinned = note("pinned", "2019-05-05T08:00:00.000Z");
+            pinned.pinned = true;
+            let notes = vec![note("recent", "2026-07-25T08:00:00.000Z"), pinned];
+
+            let hoisted = build_sections(notes.clone(), true, true, now_at(offset), offset);
+            let untouched = build_sections(notes, true, false, now_at(offset), offset);
+
+            assert_eq!(
+                ids_in(&hoisted, NoteSectionKey::Results),
+                ["pinned", "recent"]
+            );
+            // L'ordre reçu du SQL fait autorité : la partition est stable.
+            assert_eq!(
+                ids_in(&untouched, NoteSectionKey::Results),
+                ["recent", "pinned"]
+            );
         }
 
         #[test]
@@ -591,6 +670,7 @@ mod tests {
             let sections = build_sections(
                 vec![note("today", "2026-07-25T08:00:00.000Z")],
                 false,
+                true,
                 now_at(offset),
                 offset,
             );
@@ -608,7 +688,7 @@ mod tests {
             pinned.pinned = true;
             let notes = vec![pinned, note("ancient", "2019-05-05T08:00:00.000Z")];
 
-            let sections = build_sections(notes, true, now_at(offset), offset);
+            let sections = build_sections(notes, true, true, now_at(offset), offset);
 
             // Chronological grouping would bury an old match in a trailing section.
             assert_eq!(keys(&sections), [NoteSectionKey::Results]);
@@ -627,6 +707,7 @@ mod tests {
             let sections = build_sections(
                 vec![expiring, note("plain", "2026-07-25T08:00:00.000Z")],
                 false,
+                true,
                 now_at(offset),
                 offset,
             );
@@ -651,7 +732,7 @@ mod tests {
                 at: at("2027-01-01T00:00:00.000Z"),
             };
 
-            let sections = build_sections(vec![expiring], false, now_at(offset), offset);
+            let sections = build_sections(vec![expiring], false, true, now_at(offset), offset);
 
             // The hint reads "to triage soon"; firing it six months ahead would make
             // it permanent background noise.
@@ -672,6 +753,7 @@ mod tests {
             let sections = build_sections(
                 vec![note("local-today", "2026-07-25T20:00:00.000Z")],
                 false,
+                true,
                 now,
                 paris,
             );
@@ -689,6 +771,7 @@ mod tests {
             let sections = build_sections(
                 vec![note("after-midnight", "2026-07-25T22:10:00.000Z")],
                 false,
+                true,
                 now,
                 paris,
             );
@@ -703,6 +786,7 @@ mod tests {
             let sections = build_sections(
                 vec![note("future", "2030-01-01T00:00:00.000Z")],
                 false,
+                true,
                 now_at(offset),
                 offset,
             );
@@ -720,7 +804,7 @@ mod tests {
                 note("second", "2026-07-25T07:00:00.000Z"),
             ];
 
-            let sections = build_sections(notes, false, now_at(offset), offset);
+            let sections = build_sections(notes, false, true, now_at(offset), offset);
 
             // The SQL ORDER BY decides; this module must not re-sort.
             assert_eq!(

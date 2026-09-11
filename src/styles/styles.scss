@@ -57,6 +57,15 @@
   --shadow-dropdown: 0 10px 30px rgba(var(--black-rgb), 0.35);
   --shadow-overlay: 0 30px 60px rgba(var(--black-rgb), 0.5);
 
+  // Les quatre écarts que la densité resserre : padding d'une carte, grille du
+  // canevas, distance entre deux sections, marge du canevas. Ailleurs les
+  // espacements restent en dur — les resserrer tous rendrait l'interface
+  // illisible sans gagner une ligne de plus à l'écran.
+  --space-card: 14px;
+  --space-grid: 12px;
+  --space-section: 28px;
+  --space-canvas: 24px;
+
   // Inter et JetBrains Mono sont embarquées via les paquets @fontsource, déclarés
   // dans le tableau `styles` d'angular.json. Elles étaient auparavant tirées de
   // Google Fonts : sur une application de bureau, cela signifiait une typographie
@@ -69,6 +78,71 @@
      sombre de l'OS ne vienne modifier les couleurs natives des <input>,
      <select>, la barre de défilement, l'autofill, etc. */
   color-scheme: dark;
+}
+
+/*
+ * Thème clair. `SettingsStore` appose `data-theme` sur <html> ; le bloc
+ * `:root` ci-dessus reste la base sombre, ce qui évite un éclair blanc au
+ * lancement — la préférence vit dans un fichier, que rien ne peut lire avant
+ * qu'Angular ait démarré.
+ *
+ * Seules les couleurs sont redéfinies : polices, ombres et espacements sont les
+ * mêmes dans les deux thèmes.
+ *
+ * ⚠️ L'ambre du thème sombre (#e8a33d) tombe à 2:1 sur du blanc. L'accent clair
+ * est donc une teinte à part, et `--amber-ink` bascule avec elle : c'est le
+ * texte posé sur un aplat ambré (le bouton « nouvelle note »).
+ */
+:root[data-theme='light'] {
+  --bg-0: #eceef2;
+  --bg-1: #f7f8fa;
+  --bg-2: #ffffff;
+  --bg-3: #e9ecf2;
+  --line: #cdd2dc;
+  --line-soft: #e1e5ec;
+  --text-0: #1a1d24;
+  --text-1: #4a5163;
+  --text-2: #767d90;
+  --amber: #9c6410;
+  --amber-dim: #d9b070;
+  --amber-ink: #fff8ec;
+  --green: #2c7a4b;
+  --blue: #2a5d99;
+  --red: #b03a39;
+  --purple: #6a4aa6;
+
+  --text-1-rgb: 74, 81, 99;
+  --amber-rgb: 156, 100, 16;
+  --green-rgb: 44, 122, 75;
+  --blue-rgb: 42, 93, 153;
+  --red-rgb: 176, 58, 57;
+  --purple-rgb: 106, 74, 166;
+  // Le voile d'une modale reste sombre : c'est ce qui met le panneau devant.
+  --backdrop-rgb: 64, 70, 86;
+
+  --line-no: #b7bdca;
+
+  --shadow-dropdown: 0 10px 26px rgba(var(--black-rgb), 0.14);
+  --shadow-overlay: 0 24px 52px rgba(var(--black-rgb), 0.2);
+
+  // Comme `color-scheme: dark` plus haut, mais dans l'autre sens : c'est ce qui
+  // repeint les <select>, les barres de défilement et l'autocomplétion natives.
+  color-scheme: light;
+}
+
+/*
+ * Densité compacte : les **espacements** se resserrent, jamais la typographie —
+ * réduire le texte serait un zoom arrière, pas une densité.
+ *
+ * Quatre variables et non un facteur global : ce sont les quatre écarts qui
+ * décident du nombre de cartes visibles, et les régler un par un évite de
+ * comprimer au passage des marges qui n'y gagneraient rien.
+ */
+:root[data-density='compact'] {
+  --space-card: 10px;
+  --space-grid: 8px;
+  --space-section: 18px;
+  --space-canvas: 16px;
 }
 
 * {

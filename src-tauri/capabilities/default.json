@@ -8,6 +8,7 @@
     "core:window:allow-hide",
     "updater:default",
     "store:default",
+    "autostart:default",
     "process:allow-restart",
     "process:allow-exit",
     "dialog:allow-open",
@@ -16,7 +17,11 @@
     "clipboard-manager:allow-write-text",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://github.com/vmillet-dev/*" }]
+      "allow": [
+        {
+          "url": "https://github.com/vmillet-dev/*"
+        }
+      ]
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { ClipboardService } from '@core/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { SettingsStore } from '@core/settings/settings.store';
 import { ClockService } from '@core/time/clock.service';
 import { AppWindowService } from '@core/window/app-window.service';
 import { NotesRepository } from '../data/notes.repository';
@@ -32,6 +33,7 @@ export class PaletteStore {
   private readonly clock = inject(ClockService);
   private readonly window = inject(AppWindowService);
   private readonly notifier = inject(ErrorNotifier);
+  private readonly settings = inject(SettingsStore);
 
   private readonly _isOpen = signal(false);
   private readonly _query = signal('');
@@ -169,6 +171,10 @@ export class PaletteStore {
         languages: [],
         now,
         tzOffsetMinutes: now.getTimezoneOffset(),
+        // Le seul endroit où la remontée des épinglées se règle : sur le
+        // canevas elle fait la section du haut, ici elle décide juste de ce
+        // qu'on trouve sous la main en premier.
+        pinnedFirst: this.settings.showPinnedFirst(),
       });
 
       this._results.set(view.sections.flatMap((section) => [...section.notes]).slice(0, MAX_RESULTS));

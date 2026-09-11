@@ -12,6 +12,7 @@ import {
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AppEventsService } from '@core/ipc/app-events.service';
 import { AppMenuEntry, AppMenuRegistry } from '@core/menu/app-menu.registry';
+import { SettingsRegistry } from '@core/settings/settings-registry';
 import { ClipboardService } from '@core/clipboard/clipboard.service';
 import { ClockService } from '@core/time/clock.service';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
@@ -48,6 +49,7 @@ import {
 import { TagManagerComponent } from './ui/tag-manager/tag-manager.component';
 import { TagRailComponent } from './ui/tag-rail/tag-rail.component';
 import { TrashPanelComponent } from './ui/trash-panel/trash-panel.component';
+import { VariablesPageComponent } from './ui/variables-page/variables-page.component';
 import { UndoBarComponent } from './ui/undo-bar/undo-bar.component';
 
 /** Flèches et lettres du canevas, quand le focus n'est pas dans un champ. */
@@ -116,6 +118,7 @@ export class NotesPageComponent {
   private readonly notifier = inject(ErrorNotifier);
   private readonly status = inject(StatusNotifier);
   private readonly menu = inject(AppMenuRegistry);
+  private readonly settingsPages = inject(SettingsRegistry);
 
   /** Aperçu affiché en grand par-dessus l'éditeur. */
   protected readonly imageZoomed = signal(false);
@@ -169,6 +172,7 @@ export class NotesPageComponent {
     destroyRef.onDestroy(drops.on((paths) => void this.onFilesDropped(paths)));
 
     this.registerMenuEntries(destroyRef);
+    this.registerSettingsPages(destroyRef);
 
     // Les pièces jointes suivent la note **persistée** : un brouillon n'existe
     // pas encore en base, et rien n'y est attachable.
@@ -226,6 +230,26 @@ export class NotesPageComponent {
 
     this.menu.register(entries);
     destroyRef.onDestroy(() => this.menu.unregister(entries.map((entry) => entry.id)));
+  }
+
+  /**
+   * Les variables globales sont des valeurs de `{{champs}}` : du vocabulaire de
+   * notes, qui n'a donc pas sa place dans `layout/`. Le panneau de préférences
+   * l'affiche sans le connaître, exactement comme la barre de titre exécute une
+   * entrée de menu qu'elle ne connaît pas.
+   */
+  private registerSettingsPages(destroyRef: DestroyRef): void {
+    const pages = [
+      {
+        id: 'notes.variables',
+        labelKey: 'settings.pages.variables',
+        order: 20,
+        component: VariablesPageComponent,
+      },
+    ];
+
+    this.settingsPages.register(pages);
+    destroyRef.onDestroy(() => this.settingsPages.unregister(pages.map((page) => page.id)));
   }
 
   private checkedIds(): readonly string[] {

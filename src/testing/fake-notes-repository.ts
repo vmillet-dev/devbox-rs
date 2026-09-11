@@ -48,6 +48,9 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
   retagged: { tags: readonly string[]; into: string } | null = null;
   deletedTags: string[] = [];
 
+  /** Global `{{field}}` values, the corpus-wide fallback of a note's own. */
+  private variables: Record<string, string> = {};
+
   private gate: Promise<void> | null = null;
   private openGate: (() => void) | null = null;
 
@@ -257,14 +260,31 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
     });
   }
 
-  /** The real one delegates to Rust; the double does the substitution naively. */
+  /**
+   * The real one delegates to Rust; the double does the substitution naively —
+   * global variables included, since they are what a typed value falls back to.
+   */
   fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
     return guard(this, () =>
-      Object.entries(values).reduce(
+      Object.entries({ ...this.variables, ...values }).reduce(
         (filled, [name, value]) => filled.split(`{{${name}}}`).join(value),
         content,
       ),
     );
+  }
+
+  loadVariables(): Promise<Record<string, string>> {
+    return guard(this, () => ({ ...this.variables }));
+  }
+
+  /** Empty values are dropped, exactly as `normalize_values` does in Rust. */
+  saveVariables(values: Record<string, string>): Promise<Record<string, string>> {
+    return guard(this, () => {
+      this.variables = Object.fromEntries(
+        Object.entries(values).filter(([name, value]) => name !== '' && value !== ''),
+      );
+      return { ...this.variables };
+    });
   }
 
   private trash(ids: readonly string[]): number {

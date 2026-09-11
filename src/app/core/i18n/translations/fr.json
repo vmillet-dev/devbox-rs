@@ -132,7 +132,9 @@
     "attachmentDeleteFailed": "Impossible de retirer la pièce jointe.",
     "copyFailed": "La copie dans le presse-papier a échoué.",
     "attachmentOpenFailed": "Impossible d'ouvrir la pièce jointe avec une application.",
-    "attachmentSaveFailed": "Impossible d'enregistrer la pièce jointe à cet emplacement."
+    "attachmentSaveFailed": "Impossible d'enregistrer la pièce jointe à cet emplacement.",
+    "variablesLoadFailed": "Impossible de charger les variables.",
+    "variablesSaveFailed": "Impossible d'enregistrer les variables."
   },
   "tray": {
     "open": "Ouvrir DevBox",
@@ -278,9 +280,65 @@
     "exported": "{{notes}} note(s) exportée(s) vers {{path}}.",
     "copied": "{{notes}} note(s) copiée(s) en Markdown dans le presse-papier.",
     "needsSelection": "Sélectionnez au moins une note.",
-    "emptyLibrary": "Rien à exporter : cette bibliothèque n'a aucune note."
+    "emptyLibrary": "Rien à exporter : cette bibliothèque n'a aucune note.",
+    "preferences": "Préférences…"
   },
   "shortcuts": {
     "unavailable": "Raccourci(s) global(aux) indisponible(s) : {{list}}. Une autre application les utilise déjà."
+  },
+  "settings": {
+    "title": "Préférences",
+    "pagesLabel": "Sections des préférences",
+    "pages": {
+      "general": "Paramètres",
+      "variables": "Variables"
+    },
+    "close": "Fermer",
+    "appliedImmediately": "Les modifications s'appliquent immédiatement.",
+    "copied": "Copié dans le presse-papier.",
+    "appearance": {
+      "title": "Apparence",
+      "theme": "Thème",
+      "density": "Densité"
+    },
+    "theme": {
+      "system": "Système",
+      "dark": "Sombre",
+      "light": "Clair"
+    },
+    "density": {
+      "comfortable": "Confortable",
+      "compact": "Compacte"
+    },
+    "behavior": {
+      "title": "Comportement",
+      "startWithSystem": "Démarrer avec le système",
+      "minimizeToTray": "Réduire dans la barre système",
+      "closeToTray": "Fermer dans la barre système",
+      "trayNote": "Sans barre système, la fenêtre se réduit et se ferme normalement : DevBox refuse de se cacher là où plus rien ne pourrait la rappeler."
+    },
+    "quickPaste": {
+      "title": "Collage rapide",
+      "shortcut": "Raccourci global",
+      "shortcutHint": "Cliquez dans le champ puis composez la combinaison. Un raccourci déjà pris par une autre application est signalé au démarrage.",
+      "shortcutReset": "Rétablir",
+      "showPinnedFirst": "Épinglées en premier"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "copyConfirmation": "Accuser chaque copie"
+    },
+    "variables": {
+      "intro": "Valeurs par défaut des champs de vos snippets, valables pour toutes les notes. Ce qui est saisi sur une note passe devant ; ailleurs, la variable est proposée en gris, jamais recopiée.",
+      "name": "Nom",
+      "value": "Valeur",
+      "namePlaceholder": "host",
+      "valuePlaceholder": "db.internal",
+      "add": "Ajouter une variable",
+      "remove": "Retirer {{name}}",
+      "empty": "Aucune variable pour l'instant.",
+      "duplicate": "Nom en double : {{names}}. Seule la dernière ligne sera gardée.",
+      "nameRule": "Un nom se limite aux lettres, chiffres, tirets et soulignés."
+    }
   }
 }

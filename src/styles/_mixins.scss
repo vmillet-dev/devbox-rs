@@ -27,8 +27,8 @@
 
 // Fond d'une modale. Le z-index reste à l'appelant : c'est la seule chose qui
 // distingue les modales entre elles, et leur ordre d'empilement est une décision
-// (l'éditeur et ses panneaux 50, la fiche À propos 55, la mise à jour 60, la
-// palette 65, le formulaire de champs 70, la vue agrandie 75).
+// (l'éditeur et ses panneaux 50, la fiche À propos 55, les préférences 56, la
+// mise à jour 60, la palette 65, le formulaire de champs 70, la vue agrandie 75).
 //
 // ⚠️ **80 est réservé aux bandeaux** de `layout/` (accusé de réussite, erreur) :
 // ils vivent dans le flux, sous la barre de titre, et un fond flouté les
@@ -53,6 +53,103 @@
   padding: 22px 24px;
   display: flex;
   flex-direction: column;
+}
+
+// --- Panneau de préférences -------------------------------------------------
+//
+// Partagés, et non écrits dans `layout/settings-dialog/` : la page « Variables »
+// vit dans `features/notes/`, hors de portée du SCSS d'un composant voisin, et
+// deux panneaux qui ne se ressemblent pas feraient deux panneaux.
+
+// Une ligne de réglage : intitulé à gauche, contrôle à droite.
+@mixin setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+@mixin setting-label {
+  font-size: 12.5px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+// Champ ou liste déroulante d'un réglage.
+@mixin setting-field($width: 150px) {
+  @include surface($radius: 6px);
+  width: $width;
+  padding: 5px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-0);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 1px;
+  }
+}
+
+// Interrupteur : une vraie case à cocher repeinte, qui garde le clavier, le
+// libellé cliquable et l'état annoncé sans un seul attribut ARIA.
+@mixin setting-switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  margin: 0;
+  width: 34px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--text-2);
+    transition:
+      transform 0.15s ease,
+      background 0.15s ease;
+  }
+
+  &:checked {
+    background: rgba(var(--amber-rgb), 0.28);
+    border-color: var(--amber-dim);
+  }
+
+  &:checked::after {
+    transform: translateX(16px);
+    background: var(--amber);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+}
+
+// Précision sous un groupe : ce que le réglage ne dit pas de lui-même.
+@mixin setting-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-2);
 }
 
 // Badge teinté façon "pill" (lifecycle badge, tag de langage) : fond

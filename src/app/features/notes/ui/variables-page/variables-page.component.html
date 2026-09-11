@@ -1,0 +1,71 @@
+<p class="variables-intro">{{ 'settings.variables.intro' | transloco }}</p>
+
+@if (store.isEmpty()) {
+  <p class="variables-empty">{{ 'settings.variables.empty' | transloco }}</p>
+} @else {
+  <!-- Décoratif : chaque champ porte déjà son propre libellé. -->
+  <div class="variables-head" aria-hidden="true">
+    <span>{{ 'settings.variables.name' | transloco }}</span>
+    <span>{{ 'settings.variables.value' | transloco }}</span>
+  </div>
+
+  <ul class="variables-list">
+    <!-- Suivies par position : le nom est précisément ce qui change à la frappe. -->
+    @for (variable of store.variables(); track $index) {
+      <li class="variable-row">
+        <span class="variable-name-field">
+          <span class="variable-brace" aria-hidden="true">&#123;&#123;</span>
+          <input
+            #nameInput
+            type="text"
+            class="variable-name"
+            spellcheck="false"
+            autocomplete="off"
+            [class.rejected]="isRejected(variable) || store.duplicates().has(variable.name)"
+            [attr.aria-invalid]="isRejected(variable) || null"
+            [attr.aria-label]="'settings.variables.name' | transloco"
+            [placeholder]="'settings.variables.namePlaceholder' | transloco"
+            [value]="variable.name"
+            (input)="onName($index, $event)"
+            (blur)="commit()"
+          />
+          <span class="variable-brace" aria-hidden="true">&#125;&#125;</span>
+        </span>
+
+        <input
+          type="text"
+          class="variable-value"
+          spellcheck="false"
+          autocomplete="off"
+          [attr.aria-label]="'settings.variables.value' | transloco"
+          [placeholder]="'settings.variables.valuePlaceholder' | transloco"
+          [value]="variable.value"
+          (input)="onValue($index, $event)"
+          (blur)="commit()"
+        />
+
+        <button
+          type="button"
+          class="variable-remove"
+          [attr.aria-label]="'settings.variables.remove' | transloco: { name: nameInput.value || '—' }"
+          (click)="remove($index)"
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
+      </li>
+    }
+  </ul>
+
+  @if (store.duplicates().size > 0) {
+    <p class="variables-warning">
+      {{ 'settings.variables.duplicate' | transloco: { names: [...store.duplicates()].join(', ') } }}
+    </p>
+  }
+}
+
+<button type="button" class="variables-add" (click)="store.add()">
+  <span aria-hidden="true">+</span>
+  {{ 'settings.variables.add' | transloco }}
+</button>
+
+<p class="variables-note">{{ 'settings.variables.nameRule' | transloco }}</p>

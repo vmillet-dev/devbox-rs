@@ -19,8 +19,9 @@ use devbox_lib::notes::checklist::{ChecklistItem, NoteKind};
 use devbox_lib::notes::language::Language;
 use devbox_lib::notes::model::{Note, NoteDraft, NoteLifecycle, NotePatch, decorate};
 use devbox_lib::notes::store::{
-    all, by_ids, create, delete, drop_tag, expired_ids, fetch, insert_imported, list_trashed,
-    move_many, purge, restore_many, retag, set_placeholder_values, tag_many, tag_usage, update,
+    all, by_ids, create, delete, drop_tag, expired_ids, fetch, global_placeholder_values,
+    insert_imported, list_trashed, move_many, purge, replace_global_placeholder_values,
+    restore_many, retag, set_placeholder_values, tag_many, tag_usage, update,
 };
 use devbox_lib::notes::view::{self, NoteFilter, NotesQuery, NotesView};
 use devbox_lib::spaces::store as spaces;
@@ -38,6 +39,7 @@ fn list(connection: &mut SqliteConnection) -> Result<Vec<Note>, StorageError> {
             languages: Vec::new(),
             now: t0(),
             tz_offset_minutes: 0,
+            pinned_first: true,
         },
     )
     .map(|(notes, _)| notes)
@@ -763,6 +765,79 @@ fn purging_removes_the_note_and_its_values_for_good() {
     );
 }
 
+// --- Variables globales -----------------------------------------------------
+
+#[test]
+fn global_variables_read_back_what_was_written() {
+    let mut connection = open_in_memory().unwrap();
+
+    replace_global_placeholder_values(&mut connection, &values(&[("host", "db.internal")]))
+        .unwrap();
+
+    assert_eq!(
+        global_placeholder_values(&mut connection).unwrap(),
+        values(&[("host", "db.internal")])
+    );
+}
+
+#[test]
+fn writing_the_set_again_drops_what_is_no_longer_sent() {
+    // Ce qui n'est plus envoyé est ce que l'utilisateur a retiré : une écriture
+    // partielle laisserait une variable effacée continuer à remplir les jetons.
+    let mut connection = open_in_memory().unwrap();
+    replace_global_placeholder_values(
+        &mut connection,
+        &values(&[("host", "db.internal"), ("port", "5432")]),
+    )
+    .unwrap();
+
+    replace_global_placeholder_values(&mut connection, &values(&[("port", "6543")])).unwrap();
+
+    assert_eq!(
+        global_placeholder_values(&mut connection).unwrap(),
+        values(&[("port", "6543")])
+    );
+}
+
+#[test]
+fn a_global_variable_belongs_to_no_note_and_survives_a_purge() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let created = create(&mut connection, templated(&space_id), t0()).unwrap();
+    replace_global_placeholder_values(&mut connection, &values(&[("host", "db.internal")]))
+        .unwrap();
+    delete(&mut connection, &created.id, t1()).unwrap();
+
+    purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
+
+    // Aucune cascade ne les atteint : elles n'ont pas de `note_id`.
+    assert_eq!(
+        global_placeholder_values(&mut connection).unwrap(),
+        values(&[("host", "db.internal")])
+    );
+}
+
+#[test]
+fn a_global_variable_shows_up_as_the_suggested_value_of_a_field() {
+    let mut connection = open_in_memory().unwrap();
+    let space_id = space(&mut connection, "Perso");
+    let created = create(&mut connection, templated(&space_id), t0()).unwrap();
+
+    let globals = values(&[("host", "db.internal")]);
+    let mut display = decorate(created, t1());
+    devbox_lib::notes::model::apply_global_defaults(&mut display, &globals);
+
+    // Proposée, pas saisie : la recopier dans `value` figerait la variable le
+    // jour où elle change.
+    let field = display
+        .placeholders
+        .iter()
+        .find(|placeholder| placeholder.name == "host")
+        .unwrap();
+    assert_eq!(field.default_value, "db.internal");
+    assert!(field.value.is_empty());
+}
+
 // --- Actions en masse -------------------------------------------------------
 
 #[test]
@@ -1025,6 +1100,7 @@ fn all_notes() -> NotesQuery {
         languages: Vec::new(),
         now: t1(),
         tz_offset_minutes: 0,
+        pinned_first: true,
     }
 }
 

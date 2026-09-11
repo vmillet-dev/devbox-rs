@@ -18,11 +18,16 @@ const BASE_QUERY: NotesQuery = {
   languages: ['json'],
   now: new Date('2026-01-01T10:00:00.000Z'),
   tzOffsetMinutes: -120,
+  pinnedFirst: true,
 };
 
 describe('toNotesQueryDto', () => {
   it('sends the selected languages across the bridge', () => {
     expect(toNotesQueryDto(BASE_QUERY).languages).toEqual(['json']);
+  });
+
+  it('carries the pinned-first flag, which the palette alone turns off', () => {
+    expect(toNotesQueryDto({ ...BASE_QUERY, pinnedFirst: false }).pinnedFirst).toBe(false);
   });
 
   it('sends an empty list rather than omitting the field', () => {

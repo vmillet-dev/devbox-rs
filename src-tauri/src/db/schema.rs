@@ -62,6 +62,16 @@ diesel::table! {
     }
 }
 
+// Les variables globales : mêmes valeurs de `{{champs}}`, mais sans note pour
+// les porter — d'où une table à part plutôt qu'un `note_id` nullable, qui
+// aurait vidé la clé primaire de `note_placeholders` de son sens.
+diesel::table! {
+    global_placeholders (name) {
+        name -> Text,
+        value -> Text,
+    }
+}
+
 diesel::table! {
     attachments (id) {
         id -> Text,
@@ -85,5 +95,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     note_tags,
     note_items,
     note_placeholders,
+    global_placeholders,
     attachments
 );

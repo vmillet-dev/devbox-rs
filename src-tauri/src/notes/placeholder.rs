@@ -102,6 +102,29 @@ pub fn normalize_values(values: BTreeMap<String, String>) -> BTreeMap<String, St
         .collect()
 }
 
+/// Ce qui remplit réellement les jetons : ce qui a été saisi sur la note
+/// d'abord, la **variable globale** ensuite.
+///
+/// Une saisie vide n'écrase pas la variable — vide veut dire « je garde ce
+/// qu'on me propose », exactement comme face à une valeur par défaut écrite
+/// dans le texte. Et c'est la variable qui passe devant cette dernière : elle a
+/// été réglée pour cette machine, là où `{{host=localhost}}` n'était qu'une
+/// suggestion notée le jour où le snippet a été écrit.
+pub fn resolve(
+    globals: &BTreeMap<String, String>,
+    values: &BTreeMap<String, String>,
+) -> BTreeMap<String, String> {
+    let mut resolved = globals.clone();
+
+    for (name, value) in values {
+        if !value.is_empty() {
+            resolved.insert(name.clone(), value.clone());
+        }
+    }
+
+    resolved
+}
+
 /// Remplace chaque jeton par la valeur fournie, à défaut par sa valeur par
 /// défaut. Un jeton non reconnu est **laissé tel quel** : il fait partie du
 /// texte, pas du formulaire.
@@ -223,6 +246,51 @@ mod tests {
     #[test]
     fn an_unterminated_token_ends_the_scan_without_panicking() {
         assert_eq!(names("{{host}} puis {{oops"), ["host"]);
+    }
+
+    #[test]
+    fn a_global_variable_fills_a_field_the_note_says_nothing_about() {
+        let globals = values(&[("host", "db.internal")]);
+
+        assert_eq!(
+            fill("{{host}}", &resolve(&globals, &BTreeMap::new())),
+            "db.internal"
+        );
+    }
+
+    #[test]
+    fn what_was_typed_on_the_note_wins_over_the_global_variable() {
+        let globals = values(&[("host", "db.internal")]);
+
+        assert_eq!(
+            fill(
+                "{{host}}",
+                &resolve(&globals, &values(&[("host", "localhost")]))
+            ),
+            "localhost"
+        );
+    }
+
+    #[test]
+    fn an_empty_entry_leaves_the_global_variable_in_place() {
+        // Vide = « je garde ce qu'on me propose » : sans ce filtre, ouvrir le
+        // panneau sans rien taper effacerait la variable à la copie suivante.
+        let globals = values(&[("host", "db.internal")]);
+
+        assert_eq!(
+            fill("{{host}}", &resolve(&globals, &values(&[("host", "")]))),
+            "db.internal"
+        );
+    }
+
+    #[test]
+    fn a_global_variable_wins_over_the_default_written_in_the_text() {
+        let globals = values(&[("port", "6543")]);
+
+        assert_eq!(
+            fill("{{port=5432}}", &resolve(&globals, &BTreeMap::new())),
+            "6543"
+        );
     }
 
     #[test]
