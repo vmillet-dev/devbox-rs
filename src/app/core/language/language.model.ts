@@ -1,18 +1,16 @@
 import type { Language } from '@core/ipc/bindings';
 
 /**
- * Langages reconnus pour la coloration des badges et du corps des notes. Simple
- * alias de l'union **générée** depuis l'enum `Language` de
- * `src-tauri/src/notes/language.rs` : ce n'est plus un miroir tenu à la main,
- * une variante ajoutée en Rust apparaît ici dès la régénération et casse la
- * compilation partout où elle n'est pas traitée — à commencer par
- * `LANGUAGE_LABELS`, qui doit rester exhaustif.
+ * The languages recognised for badges and note bodies. A plain alias of the
+ * union **generated** from the Rust `Language` enum, so a variant added there
+ * appears here on regeneration and breaks the build everywhere it is not
+ * handled — starting with `LANGUAGE_LABELS`, which has to stay exhaustive.
  */
 export type LanguageTag = Language;
 
 /**
- * L'ordre des clés est celui du sélecteur de l'éditeur (cf. `LANGUAGE_OPTIONS`) :
- * formats de données d'abord, puis langages, puis balisage, puis texte.
+ * The key order is the editor select's: data formats first, then languages,
+ * then markup, then plain text.
  */
 export const LANGUAGE_LABELS: Record<LanguageTag, string> = {
   json: 'JSON',
@@ -30,13 +28,13 @@ export const LANGUAGE_LABELS: Record<LanguageTag, string> = {
   txt: 'TXT',
 };
 
-/** Langage retenu quand la valeur reçue n'est pas (ou plus) reconnue par le front. */
+/** The language kept when the value received is not (or no longer) recognised. */
 export const FALLBACK_LANGUAGE: LanguageTag = 'txt';
 
 /**
- * Restreint une chaîne **libre** — la valeur d'un `<select>`, jamais une donnée
- * venue du pont. Le pont, lui, livre déjà un `LanguageTag` : l'enum Rust y a
- * remplacé la chaîne, donc il n'y a plus rien à narrower de ce côté.
+ * Narrows a **free** string — a `<select>`'s value, never data from the bridge.
+ * The bridge already delivers a `LanguageTag`, the Rust enum having replaced
+ * the string there, so nothing is left to narrow on that side.
  */
 export function isLanguageTag(value: unknown): value is LanguageTag {
   return typeof value === 'string' && Object.hasOwn(LANGUAGE_LABELS, value);

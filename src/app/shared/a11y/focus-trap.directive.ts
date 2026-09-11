@@ -10,15 +10,13 @@ const FOCUSABLE_SELECTOR = [
 ].join(',');
 
 /**
- * Confine le focus clavier à l'intérieur de l'élément, et le restitue à sa
- * position d'origine à la destruction.
+ * Confines keyboard focus inside the element, and restores it on destruction.
  *
- * Sans ça, une boîte de dialogue n'est pas utilisable au clavier : le focus
- * reste sur l'élément qui l'a ouverte, `Tab` promène l'utilisateur dans le
- * contenu masqué derrière la modale, et la fermeture perd le focus dans le vide.
+ * Without this a dialog is not keyboard-usable: focus stays on the element that
+ * opened it, `Tab` walks the user through the content hidden behind the modal,
+ * and closing loses focus into nothing.
  *
- * Écrit à la main plutôt qu'en tirant `@angular/cdk` pour une seule directive —
- * même arbitrage que la coloration JSON de `CodeViewerComponent`.
+ * Written by hand rather than pulling in `@angular/cdk` for one directive.
  */
 @Directive({
   selector: '[appFocusTrap]',
@@ -40,20 +38,21 @@ export class FocusTrapDirective implements AfterViewInit, OnDestroy {
     this.previouslyFocused?.focus();
   }
 
-  // `Event` et non `KeyboardEvent` : les pseudo-événements à modificateur
-  // (`keydown.tab`) ne figurent pas dans la table de types des host bindings,
-  // et `typeCheckHostBindings` y fournit donc un `Event` générique.
-  // Seul `preventDefault()` est utilisé ici, le type de base suffit.
+  // `Event` and not `KeyboardEvent`: modifier pseudo-events (`keydown.tab`) are
+  // absent from the host-binding type table, so `typeCheckHostBindings` hands
+  // over a generic `Event`. Only `preventDefault()` is used here.
   protected onTab(event: Event, backwards: boolean): void {
     const elements = this.focusableElements();
     if (elements.length === 0) return;
 
     const first = elements[0];
-    const last = elements[elements.length - 1];
+    const last = elements.at(-1);
+    if (!first || !last) return;
+
     const active = document.activeElement;
 
-    // Seuls les deux bords du piège demandent une intervention : entre les deux,
-    // la navigation native fait déjà ce qu'il faut.
+    // Only the two edges of the trap need intervention: in between, native
+    // navigation already does the right thing.
     if (backwards && active === first) {
       event.preventDefault();
       last.focus();

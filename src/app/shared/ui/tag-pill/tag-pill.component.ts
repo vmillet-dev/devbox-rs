@@ -9,7 +9,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 export class TagPillComponent {
   readonly label = input.required<string>();
   readonly active = input(false);
-  /** À `false`, le tag n'est plus qu'un libellé (voir le template). */
+  /** At `false` the tag is only a label (see the template). */
   readonly interactive = input(true);
 
   readonly toggled = output<string>();

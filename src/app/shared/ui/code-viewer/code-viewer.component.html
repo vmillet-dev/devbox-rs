@@ -1,16 +1,16 @@
 @for (line of lines(); track $index) {
-  <!-- Des <span> et non des <div> : le visualiseur est inséré dans le <button>
-       d'une carte de note, dont le modèle de contenu n'admet que du contenu de
-       phrasé. Le `display: flex` du SCSS rend le résultat identique. -->
+  <!-- <span> and not <div>: the viewer is inserted into a note card's <button>,
+       whose content model admits only phrasing content. The SCSS `display:
+       flex` makes the result identical. -->
   <span class="code-line">
     @if (showLineNumbers()) {
-      <!-- Numérotation purement visuelle : la faire lire par un lecteur d'écran
-           reviendrait à annoncer « 1 2 3 … » entre chaque ligne de code. -->
+      <!-- Purely visual numbering: having a screen reader read it would mean
+           announcing "1 2 3 …" between every line of code. -->
       <span class="line-no" aria-hidden="true">{{ $index + 1 }}</span>
     }
-    <!-- [innerHTML] et non une interpolation : la coloration est du balisage.
-         Le HTML vient de highlight.js, qui échappe le texte source, et passe
-         ensuite par le sanitizer d'Angular — surtout ne pas le contourner. -->
+    <!-- [innerHTML] and not an interpolation: the colouring is markup. The HTML
+         comes from highlight.js, which escapes the source text, and then goes
+         through Angular's sanitizer — never bypass it. -->
     <span class="line-content" [innerHTML]="line"></span>
   </span>
 }

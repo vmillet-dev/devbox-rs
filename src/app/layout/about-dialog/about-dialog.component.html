@@ -2,8 +2,8 @@
   <div appFocusTrap class="about-panel" role="dialog" aria-modal="true" aria-labelledby="about-dialog-title">
     <div class="about-header">
       <h2 id="about-dialog-title" class="about-name">{{ 'about.title' | transloco }}</h2>
-      <!-- La version est absente hors runtime Tauri : un tiret plutôt qu'un
-           numéro inventé, et un doublon textuel pour les lecteurs d'écran. -->
+      <!-- The version is absent outside the Tauri runtime: a dash rather than a
+           made-up number, and a text twin for screen readers. -->
       <span class="about-version" aria-hidden="true">
         {{ version() ? 'v' + version() : '—' }}
       </span>
@@ -20,8 +20,8 @@
 
       <dt>{{ 'about.repository' | transloco }}</dt>
       <dd>
-        <!-- Un <button> et non un <a> : c'est le plugin `opener` qui agit, la
-             WebView ne navigue pas. Un href donnerait un lien mort. -->
+        <!-- A <button> and not an <a>: the `opener` plugin acts, the WebView
+             does not navigate. An href would give a dead link. -->
         <button type="button" class="about-repo" (click)="openRepository()">
           {{ repositoryLabel }}
           <span aria-hidden="true">↗</span>

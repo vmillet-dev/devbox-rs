@@ -50,7 +50,11 @@ export class AboutMenuComponent {
 
   protected readonly checking = computed(() => this.store.checkState() === 'checking');
 
-  /** `null` quand le menu n'a rien à annoncer — voir `CheckState`. */
+  /**
+   * `null` when the menu has nothing to announce. Exhaustive rather than
+   * defaulted: a state added to `CheckState` must break the build here, not
+   * silently announce nothing.
+   */
   protected readonly checkStatusRef = computed<TranslationRef | null>(() => {
     switch (this.store.checkState()) {
       case 'checking':
@@ -59,7 +63,7 @@ export class AboutMenuComponent {
         return { key: 'about.upToDate' };
       case 'failed':
         return { key: 'about.checkFailed' };
-      default:
+      case 'idle':
         return null;
     }
   });
@@ -71,14 +75,14 @@ export class AboutMenuComponent {
 
   protected openPanel(panel: AboutPanel): void {
     this.panel.set(panel);
-    // Sans focus rendu : la modale qui s'ouvre le prend elle-même.
+    // No focus restored: the modal opening takes it itself.
     this.menu.close(false);
   }
 
   /**
-   * Le piège à focus de la modale rendrait la main à l'élément actif au moment
-   * de son ouverture — l'entrée de menu, détruite depuis. Le focus repart donc
-   * sur le déclencheur, seul point de repère encore à l'écran.
+   * The modal's focus trap would hand back to the element active when it
+   * opened — the menu entry, destroyed since. Focus therefore returns to the
+   * trigger, the only landmark still on screen.
    */
   protected closePanel(): void {
     this.panel.set(null);

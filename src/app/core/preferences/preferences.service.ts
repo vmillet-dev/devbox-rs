@@ -3,10 +3,10 @@ import { load } from '@tauri-apps/plugin-store';
 import type { Store, StoreOptions } from '@tauri-apps/plugin-store';
 
 /**
- * Tout ce que ce service attend du plugin : ouvrir un fichier. Un jeton plutôt
- * qu'un appel direct à `load`, aussi par nécessité pratique — le builder
- * Angular regroupe les modules avant que Vitest ne les voie, et `vi.mock` sur un
- * paquet externe n'intercepte alors qu'une fois sur deux.
+ * All this service needs from the plugin: opening a file. A token rather than a
+ * direct call to `load`, also out of practical necessity — the Angular builder
+ * bundles the modules before Vitest sees them, and `vi.mock` on an external
+ * package then intercepts only half the time.
  */
 type PreferencesStoreLoader = (path: string, options: StoreOptions) => Promise<Store>;
 
@@ -15,25 +15,22 @@ export const PREFERENCES_STORE_LOADER = new InjectionToken<PreferencesStoreLoade
   { providedIn: 'root', factory: () => load },
 );
 
-/** Créé dans `app_config_dir()`, au même titre que la base SQLite. */
+/** Created in `app_config_dir()`, like the SQLite database. */
 const STORE_FILE = 'preferences.json';
 
-/** Une préférence bascule par clic, jamais en rafale. */
+/** A preference toggles on a click, never in a burst. */
 const AUTO_SAVE_MS = 300;
 
 /**
- * Préférences locales (langue de l'UI, plein écran de l'éditeur), adossées à
- * `tauri-plugin-store` : un vrai fichier, insensible à un vidage du WebView
- * contrairement au `localStorage` qu'il remplace.
+ * Local preferences, backed by `tauri-plugin-store`: a real file, immune to a
+ * WebView wipe unlike the `localStorage` it replaces.
  *
- * L'API reste **synchrone** alors que celle du plugin ne l'est pas : une
- * préférence est lue à la construction d'un composant, et un `read` asynchrone
- * ferait apparaître l'interface dans un état puis dans l'autre. Le fichier est
- * donc chargé une fois par [`hydrate`], et les écritures partent sans être
- * attendues — une préférence non persistée ne doit ni faire tomber
- * l'application ni la faire patienter.
+ * ⚠️ The API stays **synchronous** where the plugin's is not: a preference is
+ * read when a component is constructed, and an async `read` would show the
+ * interface in one state then the other. The file is loaded once by
+ * [`hydrate`], and writes leave without being awaited.
  *
- * Hors Tauri (jsdom), `load` échoue et le service dégrade en cache mémoire.
+ * Outside Tauri (jsdom), `load` fails and the service degrades to a memory cache.
  */
 @Injectable({ providedIn: 'root' })
 export class PreferencesService {
@@ -42,11 +39,11 @@ export class PreferencesService {
   private store: Store | null = null;
 
   /**
-   * Charge le fichier et remplit le cache. À appeler **avant** la première
-   * lecture, qui rendrait sinon `null`.
+   * Loads the file and fills the cache. Call **before** the first read, which
+   * would otherwise answer `null`.
    *
-   * Les valeurs d'une version antérieure encore dans `localStorage` sont
-   * reprises : sans ça, la mise à jour réinitialiserait la langue de l'interface.
+   * Values from an earlier version still in `localStorage` are adopted: without
+   * this, an upgrade would reset the interface language.
    */
   async hydrate(): Promise<void> {
     try {
@@ -59,8 +56,8 @@ export class PreferencesService {
       this.store = store;
       this.adoptLegacyValues();
     } catch {
-      // Plugin indisponible : le cache mémoire fait tourner la session, elle ne
-      // survivra simplement pas au redémarrage.
+      // Plugin unavailable: the memory cache runs the session, which simply
+      // will not survive a restart.
     }
   }
 
@@ -70,17 +67,17 @@ export class PreferencesService {
 
   write(key: string, value: string): void {
     this.cache.set(key, value);
-    // Non attendu : l'appelant bascule un état d'interface.
+    // Not awaited: the caller is toggling an interface state.
     void this.store?.set(key, value).catch(() => undefined);
   }
 
   private adoptLegacyValues(): void {
-    let migrated = false;
+    const adopted: string[] = [];
     try {
       for (let index = 0; index < localStorage.length; index++) {
         const key = localStorage.key(index);
-        // Seules nos clés : le WebView peut en porter d'autres, et tout
-        // déverser polluerait durablement le fichier de préférences.
+        // Our keys only: the WebView may carry others, and dumping everything
+        // would pollute the preferences file for good.
         if (!key?.startsWith('devbox.') || this.cache.has(key)) continue;
 
         const value = localStorage.getItem(key);
@@ -88,20 +85,21 @@ export class PreferencesService {
 
         this.cache.set(key, value);
         void this.store?.set(key, value).catch(() => undefined);
-        migrated = true;
+        adopted.push(key);
       }
     } catch {
-      // `localStorage` lève en navigation privée. Rien à reprendre, rien à faire.
+      // `localStorage` throws in private browsing. Nothing to adopt, nothing to do.
       return;
     }
 
-    if (migrated) {
-      // L'ancien emplacement n'est plus lu : le laisser en place ferait
-      // ressusciter une valeur périmée si la reprise se rejouait un jour.
+    // Only what was adopted: the old location is no longer read, and leaving a
+    // value there would resurrect it if this ever replayed. A `clear()` would
+    // also take the keys this loop deliberately refused to read.
+    for (const key of adopted) {
       try {
-        localStorage.clear();
+        localStorage.removeItem(key);
       } catch {
-        // Sans gravité : la reprise a déjà eu lieu côté fichier.
+        // Harmless: the adoption already happened on the file side.
       }
     }
   }

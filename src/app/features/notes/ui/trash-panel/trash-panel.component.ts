@@ -10,13 +10,13 @@ import { TrashedNote } from '@features/notes/model/note.model';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const SNIPPET_LINES = 2;
 
-/** Ce que la ligne affiche, résolu une fois pour toutes plutôt qu'en template. */
+/** What the row shows, resolved once rather than in the template. */
 interface TrashRow {
   readonly note: TrashedNote;
   /**
-   * Vide pour une todolist : ses items ne descendent pas jusqu'à la corbeille,
-   * une note au rebut n'étant ni ouverte ni cochée. La ligne affiche alors le
-   * libellé `snippetKey` plutôt qu'un aperçu vide.
+   * Empty for a todo list: its items do not travel this far, a discarded note
+   * being neither opened nor ticked. The row then shows the `snippetKey` label
+   * rather than a blank preview.
    */
   readonly snippet: string;
   readonly snippetKey: string | null;
@@ -25,10 +25,10 @@ interface TrashRow {
 }
 
 /**
- * Panneau de la corbeille : restaurer ou effacer pour de bon.
+ * The trash panel: restore, or erase for good.
  *
- * L'échéance de purge est calculée à l'affichage et non reçue en libellé — comme
- * les temps relatifs des cartes, elle doit vieillir à l'écran sans aller-retour.
+ * The purge deadline is computed at render rather than received as a label —
+ * like the cards' relative times, it has to age on screen without a round trip.
  */
 @Component({
   selector: 'app-trash-panel',
@@ -86,7 +86,7 @@ export class TrashPanelComponent {
   }
 }
 
-/** Arrondi **au supérieur** : « effacée dans 1 j » tant qu'il reste du temps. */
+/** Rounded **up**: "erased in 1 d" while there is any time left. */
 function purgeRef(purgeAt: Date, now: Date): TranslationRef {
   const days = Math.ceil((purgeAt.getTime() - now.getTime()) / MS_PER_DAY);
 

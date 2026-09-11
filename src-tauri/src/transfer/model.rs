@@ -1,9 +1,9 @@
-//! Ce qui sort de DevBox et ce qui y rentre : le format d'échange et le rendu
-//! Markdown du partage.
+//! What leaves DevBox and what comes back in: the exchange format, and the
+//! Markdown rendering used for sharing.
 //!
-//! Le format reprend les types du domaine plutôt que d'en dupliquer une copie —
-//! un champ ajouté à `Note` se retrouve exporté sans qu'on y pense, et un ancien
-//! fichier reste lisible tant que serde sait combler l'absence.
+//! The format reuses the domain types rather than duplicating them — a field
+//! added to `Note` is exported without anyone thinking about it, and an older
+//! file stays readable as long as serde can fill the gap.
 
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -17,8 +17,8 @@ use crate::notes::checklist::{self, NoteKind};
 use crate::notes::model::Note;
 use crate::spaces::model::Space;
 
-/// Incrémentée quand un fichier écrit aujourd'hui cesserait d'être lisible.
-/// Refuser une version plus récente vaut mieux qu'en importer la moitié.
+/// Bumped when a file written today would stop being readable. Refusing a newer
+/// version beats importing half of it.
 pub const FORMAT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -37,8 +37,8 @@ pub struct ExportReport {
     pub spaces: u32,
 }
 
-/// `skipped` : notes déjà présentes (même identifiant) ou dont l'espace manque
-/// au fichier. Un import doit pouvoir être rejoué sans dupliquer.
+/// `skipped`: notes already present (same id) or whose space is missing from the
+/// file. An import has to be replayable without duplicating.
 #[derive(Debug, Clone, Copy, Default, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportReport {
@@ -61,8 +61,7 @@ pub fn read_bundle(json: &str) -> Result<Bundle, StorageError> {
     Ok(bundle)
 }
 
-/// Le chemin est choisi par l'utilisateur dans un sélecteur de fichiers ; on
-/// vérifie seulement qu'il en est un.
+/// The path is chosen by the user in a file picker; this only checks it is one.
 pub fn validate_path(path: &str) -> Result<(), ValidationError> {
     if path.trim().is_empty() {
         return Err(ValidationError::new("path", "no file chosen"));
@@ -71,19 +70,20 @@ pub fn validate_path(path: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
-/// Une clôture plus longue que la plus longue suite de backticks du contenu :
-/// sans ça, une note qui contient déjà un bloc Markdown coupe le sien en deux.
+/// A fence longer than the longest run of backticks in the content: without it,
+/// a note that already holds a Markdown block would cut its own in two.
 fn fence_for(content: &str) -> String {
     let longest = content.split(|c| c != '`').map(str::len).max().unwrap_or(0);
 
     "`".repeat(longest.max(2) + 1)
 }
 
-/// Rendu destiné à être collé ailleurs (revue, ticket, message) : titres,
-/// contexte, tags, puis le contenu dans un bloc annoté par son langage.
+/// Rendering meant to be pasted elsewhere (a review, a ticket, a message):
+/// title, context, tags, then the content in a block annotated with its
+/// language.
 ///
-/// Une todolist sort en liste de tâches Markdown plutôt qu'en bloc clôturé :
-/// elle n'a pas de contenu, et un bloc vide ne se colle nulle part.
+/// A todo list comes out as a Markdown task list rather than a fenced block: it
+/// has no content, and an empty block pastes nowhere.
 pub fn to_markdown(notes: &[Note], space_names: &BTreeMap<String, String>) -> String {
     let mut out = String::new();
 
@@ -165,14 +165,14 @@ mod tests {
 
         let markdown = to_markdown(&[note], &spaces());
 
-        // La clôture extérieure doit être plus longue que celle du contenu.
+        // The outer fence has to be longer than the one in the content.
         assert!(markdown.contains("````txt"));
         assert!(markdown.ends_with("````\n"));
     }
 
     #[test]
     fn a_todo_list_is_shared_as_a_markdown_task_list() {
-        // Elle n'a pas de contenu : un bloc clôturé vide ne se colle nulle part.
+        // It has no content: an empty fenced block pastes nowhere.
         let mut note = sample();
         note.kind = NoteKind::Checklist;
         note.content = String::new();

@@ -2,27 +2,27 @@ import { Injectable, Signal, signal } from '@angular/core';
 import { TranslationRef } from '../i18n/translation-ref.model';
 import { IpcError, IpcErrorCode } from '../ipc/ipc.error';
 
-/** Message d'erreur destiné à l'utilisateur, exprimé en clé de traduction. */
+/** A user-facing error message, expressed as a translation key. */
 export interface AppNotice {
   readonly ref: TranslationRef;
-  /** Détail technique brut, affiché en second plan. */
+  /** Raw technical detail, shown in the background. */
   readonly detail?: string;
 }
 
-/** Message lisible d'une valeur levée, qui n'est pas toujours une `Error`. */
+/** A readable message for a thrown value, which is not always an `Error`. */
 export function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 /**
- * Message propre à chaque cause que le back sait nommer.
+ * A message per cause the back end can name.
  *
- * `Record<IpcErrorCode, …>` et non `Partial` : ajouter une variante casse la
- * compilation ici tant que sa clé n'est pas décidée — c'est ce qui rend le
- * miroir Rust ↔ front vérifiable par le compilateur.
+ * `Record<IpcErrorCode, …>` and not `Partial`: adding a variant breaks the build
+ * here until its key is decided, which is what makes the Rust ↔ front mirror
+ * checkable by the compiler.
  *
- * `null` = rien de plus utile à dire que le message d'action de l'appelant. Une
- * panne SQLite générique est dans ce cas.
+ * `null` means there is nothing more useful to say than the caller's own action
+ * message — a generic SQLite failure is one such case.
  */
 const CODE_KEYS: Record<IpcErrorCode, string | null> = {
   noteNotFound: 'errors.noteGone',
@@ -37,10 +37,9 @@ const CODE_KEYS: Record<IpcErrorCode, string | null> = {
 };
 
 /**
- * Traduit un échec en message affichable. `fallback` porte l'action tentée,
- * employée quand la cause n'apprend rien de plus — ou quand Tauri a rejeté
- * lui-même, auquel cas il n'y a pas de code. Les paramètres du back priment sur
- * ceux de l'appelant.
+ * Turns a failure into a displayable message. `fallback` carries the action
+ * attempted, used when the cause adds nothing — or when Tauri rejected on its
+ * own, in which case there is no code. The back end's params win.
  */
 export function ipcNotice(
   error: unknown,
@@ -60,11 +59,11 @@ export function ipcNotice(
 }
 
 /**
- * Canal de remontée des erreurs vers l'interface.
+ * The channel that carries errors up to the interface.
  *
- * Sur une app de bureau l'utilisateur n'ouvre pas la console : une écriture qui
- * échoue doit être visible à l'écran, sans quoi l'app paraît « ne rien faire ».
- * Une seule erreur est conservée, pour ne pas empiler les bannières.
+ * On a desktop app the user does not open the console: a write that fails has
+ * to be visible on screen, or the app appears to "do nothing". One error is
+ * kept at a time, so banners do not stack.
  */
 @Injectable({ providedIn: 'root' })
 export class ErrorNotifier {
@@ -81,12 +80,30 @@ export class ErrorNotifier {
   }
 
   /**
-   * Échec d'une action : `key` décrit ce qui était tenté, mais si le back a
-   * nommé la cause elle prime — « cette note n'existe plus » est plus utile que
-   * « impossible d'enregistrer ».
+   * A failed action: `key` says what was attempted, but a cause the back end
+   * named wins — "this note no longer exists" is more useful than "could not
+   * save".
    */
   reportFailure(key: string, error: unknown, params?: Record<string, string>): void {
     console.error(error);
     this.notify(ipcNotice(error, { key }, params));
+  }
+
+  /**
+   * Runs `action`, reporting a failure as `key` and answering `null`.
+   *
+   * The whole point is that the caller decides what `null` means — `false`, an
+   * early return, a banner — instead of repeating the same `try`/`catch` in
+   * every store. A thunk rather than a promise, so a synchronous throw is
+   * caught too.
+   */
+  attempt<T>(key: string, action: () => Promise<T>, params?: Record<string, string>): Promise<T | null> {
+    // `.catch` rather than `async`/`await`: wrapping in an async function adds
+    // two microtask hops between the call and its answer, which is enough to
+    // change when a rendered view settles.
+    return action().catch((error: unknown) => {
+      this.reportFailure(key, error, params);
+      return null;
+    });
   }
 }

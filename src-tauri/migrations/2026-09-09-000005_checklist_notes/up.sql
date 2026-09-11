@@ -1,15 +1,14 @@
--- Le type de note. `DEFAULT 'snippet'` n'est pas un confort : SQLite refuse un
--- `ADD COLUMN NOT NULL` sans défaut, et c'est aussi ce qui donne sa valeur aux
--- notes déjà en base.
+-- The note kind. `DEFAULT 'snippet'` is not a convenience: SQLite refuses an
+-- `ADD COLUMN NOT NULL` without a default, and it is also what gives the notes
+-- already stored their value.
 --
--- Pas de `CHECK`, pour la raison qui vaut déjà pour `notes.language`
--- (migration 3) : la liste vit dans le domaine et bouge d'une version à
--- l'autre — la figer ici imposerait une migration par ajout.
+-- No `CHECK`, for the reason that already applies to `notes.language`
+-- (migration 3): the list lives in the domain and moves between versions.
 ALTER TABLE notes ADD COLUMN kind TEXT NOT NULL DEFAULT 'snippet';
 
--- Les items d'une todolist, dans leur propre table plutôt qu'en colonne
--- sérialisée — même raisonnement que `note_tags`. La position est dans la clé
--- primaire : elle porte l'ordre, et l'écriture réécrit la liste entière.
+-- A todo list's items, in their own table rather than a serialised column —
+-- same reasoning as `note_tags`. The position is part of the primary key: it
+-- carries the order, and a write rewrites the whole list.
 CREATE TABLE note_items (
     note_id  TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
     position INTEGER NOT NULL,

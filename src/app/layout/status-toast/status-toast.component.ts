@@ -3,11 +3,11 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { StatusNotifier } from '@core/notifications/status.service';
 
 /**
- * Accusé de réception d'une action réussie, sous la barre de titre.
+ * The acknowledgement of a successful action, under the titlebar.
  *
- * Au même endroit que le bandeau d'erreur, et pour la même raison : un import
- * qui n'ajoute rien, un export qui écrit un fichier ailleurs — sans retour à
- * l'écran, l'application a l'air de n'avoir rien fait.
+ * In the same place as the error banner, and for the same reason: an import
+ * that adds nothing, an export that writes a file elsewhere — without something
+ * on screen, the application looks like it did nothing.
  */
 @Component({
   selector: 'app-status-toast',

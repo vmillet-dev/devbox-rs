@@ -3,10 +3,8 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { SettingsStore } from '@core/settings/settings.store';
 
 /**
- * Tout ce que ce service attend du greffon. Un jeton plutôt qu'un appel direct,
- * pour la même raison pratique que `PREFERENCES_STORE_LOADER` : le builder
- * Angular regroupe les modules avant que Vitest ne les voie, et `vi.mock` sur un
- * paquet externe n'intercepte alors qu'une fois sur deux.
+ * All this service needs from the plugin. A token rather than a direct call,
+ * for the same practical reason as `PREFERENCES_STORE_LOADER`.
  */
 export interface AutostartAdapter {
   enable(): Promise<void>;
@@ -20,14 +18,13 @@ export const AUTOSTART_ADAPTER = new InjectionToken<AutostartAdapter>('AUTOSTART
 });
 
 /**
- * « Démarrer avec le système » : une entrée que l'OS tient pour nous — la clé
- * `Run` du registre sur Windows, un agent de lancement sur macOS.
+ * "Start with the system": an entry the OS holds for us — the registry's `Run`
+ * key on Windows, a launch agent on macOS.
  *
- * L'état réel appartient donc au système, pas au fichier de préférences : au
- * démarrage c'est lui qu'on lit, et la préférence s'aligne dessus. Sans cette
- * relecture, désactiver le démarrage automatique depuis le gestionnaire des
- * tâches laisserait la case cochée — et DevBox le réactiverait au premier
- * réglage suivant.
+ * ⚠️ The real state therefore belongs to the system and not to the preferences
+ * file: at startup we read the system and align the preference to it. Without
+ * that read-back, disabling autostart from the task manager would leave the box
+ * ticked — and DevBox would re-enable it on the next setting change.
  */
 @Injectable({ providedIn: 'root' })
 export class AutostartService {
@@ -36,15 +33,15 @@ export class AutostartService {
   private readonly injector = inject(Injector);
 
   /**
-   * Aligne la préférence sur ce que le système déclare, puis suit chaque
-   * changement. Ne rejette jamais : un démarrage automatique impossible à régler
-   * ne doit pas empêcher l'application de s'ouvrir.
+   * Aligns the preference with what the system declares, then follows every
+   * change. Never rejects: an autostart that cannot be set must not stop the
+   * application from opening.
    */
   async start(): Promise<void> {
     try {
       this.settings.setStartWithSystem(await this.adapter.isEnabled());
     } catch {
-      // Hors Tauri, ou greffon indisponible : la préférence garde sa valeur.
+      // Outside Tauri, or plugin unavailable: the preference keeps its value.
     }
 
     effect(
@@ -57,13 +54,13 @@ export class AutostartService {
 
   private async push(enabled: boolean): Promise<void> {
     try {
-      // Relu d'abord : `enable()` réécrirait l'entrée du système à chaque
-      // démarrage, et sur macOS un agent réenregistré perd son état.
+      // Read back first: `enable()` would rewrite the system entry on every
+      // start, and on macOS a re-registered agent loses its state.
       if ((await this.adapter.isEnabled()) === enabled) return;
 
       await (enabled ? this.adapter.enable() : this.adapter.disable());
     } catch {
-      // Idem : l'échec est silencieux, la case reste ce que l'utilisateur a mis.
+      // Same: the failure is silent, the box stays what the user set.
     }
   }
 }

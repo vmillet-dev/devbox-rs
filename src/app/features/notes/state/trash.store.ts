@@ -2,19 +2,21 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { NotesRepository } from '../data/notes.repository';
 import { TrashedNote } from '../model/note.model';
+import { NotesRevision } from './notes-revision';
 
 /**
- * Corbeille. Chargée **à l'ouverture du panneau** et pas en continu : les notes
- * au rebut ne s'affichent nulle part ailleurs, et une ressource permanente
- * relancerait une requête à chaque suppression.
+ * The trash. Loaded **when the panel opens** and not continuously: discarded
+ * notes show nowhere else, and a permanent resource would fire a query on every
+ * deletion.
  *
- * Ne recharge pas le canevas : ce store ne connaît pas `NotesStore`, l'inverse
- * serait un cycle d'injection. D'où les booléens renvoyés, que la page enchaîne.
+ * It does not reload the canvas itself — it bumps `NotesRevision`, which
+ * `NotesStore` reads among its query parameters.
  */
 @Injectable({ providedIn: 'root' })
 export class TrashStore {
   private readonly repository = inject(NotesRepository);
   private readonly notifier = inject(ErrorNotifier);
+  private readonly revision = inject(NotesRevision);
 
   private readonly _notes = signal<readonly TrashedNote[]>([]);
   private readonly _isLoading = signal(false);
@@ -35,8 +37,8 @@ export class TrashStore {
   }
 
   /**
-   * Le back purge ce que la rétention a rattrapé **avant** de répondre : la
-   * corbeille ne montre jamais une note qu'un redémarrage effacerait.
+   * The back end purges what retention has caught up with **before** answering:
+   * the trash never shows a note a restart would erase.
    */
   async load(): Promise<void> {
     this._isLoading.set(true);
@@ -45,11 +47,13 @@ export class TrashStore {
     } catch (error) {
       this.notifier.reportFailure('errors.trashLoadFailed', error);
     } finally {
+      // `finally` rather than `attempt`: the flag brackets the call, and must
+      // be cleared even when what follows the await throws.
       this._isLoading.set(false);
     }
   }
 
-  /** `true` quand le canevas doit se recharger : une note lui est revenue. */
+  /** `true` when a note came back, which is what bumps the canvas revision. */
   async restore(id: string): Promise<boolean> {
     return this.run(() => this.repository.restore([id]));
   }
@@ -63,13 +67,11 @@ export class TrashStore {
   }
 
   private async run(action: () => Promise<number>): Promise<boolean> {
-    try {
-      await action();
-      await this.load();
-      return true;
-    } catch (error) {
-      this.notifier.reportFailure('errors.trashActionFailed', error);
-      return false;
-    }
+    if ((await this.notifier.attempt('errors.trashActionFailed', action)) === null) return false;
+
+    // Notes came back, or left for good: the canvas has to read again.
+    this.revision.bump();
+    await this.load();
+    return true;
   }
 }

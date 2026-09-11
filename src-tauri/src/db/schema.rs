@@ -62,9 +62,9 @@ diesel::table! {
     }
 }
 
-// Les variables globales : mêmes valeurs de `{{champs}}`, mais sans note pour
-// les porter — d'où une table à part plutôt qu'un `note_id` nullable, qui
-// aurait vidé la clé primaire de `note_placeholders` de son sens.
+// The global variables: the same `{{field}}` values, with no note to carry them
+// — hence a table of their own rather than a nullable `note_id`, which would
+// have emptied the `note_placeholders` primary key of its meaning.
 diesel::table! {
     global_placeholders (name) {
         name -> Text,

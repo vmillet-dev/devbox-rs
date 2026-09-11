@@ -4,14 +4,14 @@ import { AUTHOR_HANDLE, AUTHOR_NAME, AppInfoService, REPOSITORY_URL } from '@cor
 import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 
-/** Affichage du dépôt : l'URL sans son schéma, plus lisible et suffisante. */
+/** How the repository is displayed: the URL without its scheme. */
 const REPOSITORY_LABEL = REPOSITORY_URL.replace(/^https:\/\//, '');
 
 /**
- * Fiche « À propos » : version, description du projet, développeur et dépôt.
+ * The "About" card: version, project description, developer and repository.
  *
- * Purement informative — la recherche de mise à jour vit dans le menu qui ouvre
- * cette fiche, pas ici.
+ * Purely informative — the update check lives in the menu that opens this card,
+ * not here.
  */
 @Component({
   selector: 'app-about-dialog',

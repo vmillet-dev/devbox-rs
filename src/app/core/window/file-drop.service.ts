@@ -1,15 +1,15 @@
 import { InjectionToken, Injectable, inject } from '@angular/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 
-/** Se désabonne. Rien à faire si l'abonnement n'a jamais abouti. */
+/** Unsubscribes. A no-op when the subscription never landed. */
 export type Unlisten = () => void;
 
 export type FileDropSubscriber = (handler: (paths: readonly string[]) => void) => Promise<Unlisten>;
 
 /**
- * Le glisser-déposer est un événement **de la fenêtre**, pas du DOM : la WebView
- * ne voit pas passer les fichiers, c'est le natif qui les annonce avec leurs
- * chemins. Un `dragover`/`drop` HTML ne recevrait rien.
+ * ⚠️ Drag and drop is a **window** event, not a DOM one: the WebView never sees
+ * the files, the native side announces them with their paths. An HTML
+ * `dragover`/`drop` would receive nothing.
  */
 export const FILE_DROP_SUBSCRIBER = new InjectionToken<FileDropSubscriber>('FILE_DROP_SUBSCRIBER', {
   providedIn: 'root',
@@ -22,12 +22,12 @@ export const FILE_DROP_SUBSCRIBER = new InjectionToken<FileDropSubscriber>('FILE
 });
 
 /**
- * Fichiers déposés sur la fenêtre.
+ * Files dropped on the window.
  *
- * Même forme que `AppEventsService` : le désabonnement est rendu tout de suite
- * alors que l'abonnement n'aboutit qu'au tour suivant, sans quoi un composant
- * détruit entre les deux resterait abonné pour la session. Hors Tauri l'appel
- * échoue et l'abonnement est simplement inerte.
+ * Same shape as `AppEventsService`: the unsubscribe is handed back at once
+ * where the subscription only lands on the next turn, otherwise a component
+ * destroyed in between would stay subscribed for the session. Outside Tauri the
+ * call fails and the subscription is simply inert.
  */
 @Injectable({ providedIn: 'root' })
 export class FileDropService {

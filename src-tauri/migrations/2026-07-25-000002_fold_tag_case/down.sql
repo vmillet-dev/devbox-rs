@@ -1,6 +1,6 @@
--- La collation ne s'annule pas plus qu'elle ne s'applique : table recréée dans
--- l'autre sens. Les tags fusionnés par la migration montante ne se rescindent
--- pas — l'information a été perdue là, pas ici.
+-- A collation can no more be undone than applied: the table is recreated the
+-- other way round. Tags merged by the up migration do not split again — the
+-- information was lost there, not here.
 
 CREATE TABLE note_tags_v1 (
     note_id TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,

@@ -7,13 +7,12 @@ import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 import { SettingsDialogComponent } from '@layout/settings-dialog/settings-dialog.component';
 
 /**
- * Menu « Fichier » de la barre de titre, à côté d'« À propos » — la convention
- * d'une application de bureau.
+ * The titlebar's "File" menu, next to "About" — the desktop convention.
  *
- * Il n'exécute rien lui-même sauf quitter : les entrées viennent
- * d'[`AppMenuRegistry`], où les features les inscrivent. La barre de titre reste
- * ainsi ignorante des notes, et l'outil de hachage à venir posera ses propres
- * entrées sans toucher à ce fichier.
+ * It runs nothing itself except quitting: the entries come from
+ * [`AppMenuRegistry`], where the features register them. The titlebar stays
+ * ignorant of the notes, and a future tool will add its own entries without
+ * touching this file.
  */
 @Component({
   selector: 'app-file-menu',
@@ -29,7 +28,7 @@ export class FileMenuComponent {
   protected readonly registry = inject(AppMenuRegistry);
   protected readonly menu = inject(MenuTriggerDirective);
 
-  /** Quitter ferme l'application pour de bon : un second clic le confirme. */
+  /** Quitting closes the application for good: a second click confirms it. */
   protected readonly confirmingQuit = signal(false);
 
   protected readonly settingsOpen = signal(false);
@@ -40,10 +39,9 @@ export class FileMenuComponent {
   }
 
   /**
-   * Le menu se referme sur l'action : le compte rendu s'affiche sous la barre de
-   * titre (`StatusToastComponent`), pas dans le panneau — un sélecteur de
-   * fichiers natif passe devant, et rouvrir le menu pour lire le résultat serait
-   * absurde.
+   * The menu closes on the action: the report shows under the titlebar
+   * (`StatusToastComponent`) and not in the panel — a native file picker covers
+   * it, and reopening the menu to read the result would be absurd.
    */
   protected run(entry: AppMenuEntry): void {
     if (entry.disabled?.()) return;
@@ -53,20 +51,19 @@ export class FileMenuComponent {
   }
 
   /**
-   * Les préférences ne passent pas par le registre : elles règlent
-   * l'application elle-même, pas une feature — le menu les offre donc toujours,
-   * au même titre que « Quitter ».
+   * The preferences do not go through the registry: they set the application
+   * itself and not a feature, so the menu always offers them, like "Quit".
    */
   protected openSettings(): void {
     this.settingsOpen.set(true);
-    // Sans focus rendu : la modale qui s'ouvre le prend elle-même.
+    // No focus restored: the modal opening takes it itself.
     this.menu.close(false);
   }
 
   /**
-   * Le piège à focus de la modale rendrait la main à l'élément actif au moment
-   * de son ouverture — l'entrée de menu, détruite depuis. Le focus repart donc
-   * sur le déclencheur, seul point de repère encore à l'écran.
+   * The modal's focus trap would hand back to the element active when it
+   * opened — the menu entry, destroyed since. Focus therefore returns to the
+   * trigger, the only landmark still on screen.
    */
   protected closeSettings(): void {
     this.settingsOpen.set(false);

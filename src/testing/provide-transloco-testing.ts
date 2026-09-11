@@ -3,10 +3,10 @@ import { provideTransloco } from '@jsverse/transloco';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
 
 /**
- * Mêmes providers Transloco que l'app réelle (le loader embarqué est déjà
- * synchrone, pas besoin d'un `TranslocoTestingModule` séparé) : à spread dans
- * le `providers` de `TestBed.configureTestingModule` pour tout composant
- * dont le template (ou celui d'un enfant réel) utilise le pipe `transloco`.
+ * The same Transloco providers as the real app (the bundled loader is already
+ * synchronous, so no separate `TranslocoTestingModule` is needed): spread into
+ * `TestBed.configureTestingModule`'s `providers` for any component whose
+ * template uses the `transloco` pipe.
  */
 export function provideTranslocoTesting(): EnvironmentProviders[] {
   return provideTransloco({

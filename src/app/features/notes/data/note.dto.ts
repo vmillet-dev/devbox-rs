@@ -1,7 +1,6 @@
 import type {
   Attachment as WireAttachment,
   DisplayNote,
-  ImportReport as WireImportReport,
   NoteDraft as WireNoteDraft,
   NoteFooter as WireNoteFooter,
   NoteLifecycle as WireNoteLifecycle,
@@ -13,7 +12,6 @@ import type {
 } from '@core/ipc/bindings';
 import {
   Attachment,
-  ImportReport,
   Note,
   NoteDraft,
   NoteFooter,
@@ -26,23 +24,16 @@ import {
 } from '../model/note.model';
 
 /**
- * Représentation transportée sur le pont Tauri, **générée** depuis les structs
- * Rust par tauri-specta (`@core/ipc/bindings`). Le reste de l'application ne lit
- * jamais `bindings.ts` : elle passe par ces alias, qui gardent le vocabulaire de
- * la frontière au même endroit que sa conversion.
+ * The shape carried over the Tauri bridge, **generated** from the Rust structs
+ * by tauri-specta. The rest of the application never reads `bindings.ts`: it
+ * goes through these aliases, which keep the boundary vocabulary next to its
+ * conversion.
  *
- * Ce qui subsiste malgré la génération, c'est ce que le générateur ne peut pas
- * savoir : **JSON n'a pas de type date**, donc toute `Date` arrive et repart en
- * chaîne ISO 8601. Le `language`, lui, ne demande plus rien : l'enum Rust en
- * fait une union générée que le front reçoit déjà restreinte.
- *
- * `kind` et `items` arrivent déclarés optionnels — c'est le `#[serde(default)]`
- * qui garde lisibles les fichiers d'export écrits avant les todolists. Le Rust
- * les sérialise toujours ; le repli ci-dessous couvre l'écart entre ce que le
- * type promet et ce que le pont livre.
- *
- * `footer` et `expiringSoon` sont aplatis dans le même objet (le `#[serde(flatten)]`
- * de `DisplayNote`) : un seul type de note côté front.
+ * What generation cannot cover, and what this file exists for: **JSON has no
+ * date type**, so every `Date` arrives and leaves as an ISO 8601 string. Every
+ * other field already has the right type, which is why the conversions below
+ * spread the wire object and override only the dates — a scalar added on the
+ * Rust side then costs nothing here.
  */
 export type NoteDto = DisplayNote;
 
@@ -51,18 +42,18 @@ export type NotePatchDto = WireNotePatch;
 export type NotesQueryDto = WireNotesQuery;
 export type NotesViewDto = WireNotesView;
 
-/** Rupture de contrat entre ce que le pont livre et ce que le front sait lire. */
+/** A break between what the bridge delivers and what the front can read. */
 export class ContractError extends Error {
   constructor(field: string, value: unknown) {
-    super(`Contrat rompu : champ « ${field} » inexploitable (${JSON.stringify(value)})`);
+    super(`Broken contract: field "${field}" is unusable (${JSON.stringify(value)})`);
     this.name = 'ContractError';
   }
 }
 
 function parseIsoDate(value: string, field: string): Date {
   const date = new Date(value);
-  // Échouer bruyamment plutôt que de laisser une `Invalid Date` ressortir en
-  // `NaN` dans les libellés de temps relatif.
+  // Fail loudly rather than let an `Invalid Date` surface as `NaN` in the
+  // relative-time labels.
   if (Number.isNaN(date.getTime())) {
     throw new ContractError(field, value);
   }
@@ -70,14 +61,28 @@ function parseIsoDate(value: string, field: string): Date {
 }
 
 /**
- * Même exigence dans l'autre sens : `toISOString()` lève un `RangeError` nu sur
- * une `Invalid Date`, sans dire quel champ est en cause.
+ * Same requirement the other way: `toISOString()` throws a bare `RangeError` on
+ * an `Invalid Date`, without saying which field is at fault.
  */
 export function toIsoString(date: Date, field: string): string {
   if (Number.isNaN(date.getTime())) {
     throw new ContractError(field, date);
   }
   return date.toISOString();
+}
+
+/** Drops the keys a patch does not carry, which serde reads as "do not touch". */
+function withoutUndefined<T extends object>(source: T): T {
+  const kept = {} as T;
+
+  for (const key of Object.keys(source) as (keyof T)[]) {
+    const value = source[key];
+    if (value !== undefined) {
+      kept[key] = value;
+    }
+  }
+
+  return kept;
 }
 
 function toLifecycle(dto: WireNoteLifecycle): NoteLifecycle {
@@ -93,36 +98,50 @@ function toLifecycleDto(lifecycle: NoteLifecycle): WireNoteLifecycle {
 }
 
 function toFooter(dto: WireNoteFooter): NoteFooter {
-  if (dto.kind === 'source') return { kind: 'source', value: dto.value };
-  if (dto.kind === 'expiry') return { kind: 'expiry', at: parseIsoDate(dto.at, 'footer.at') };
-  if (dto.kind === 'age') return { kind: 'age', at: parseIsoDate(dto.at, 'footer.at') };
-  // Variante ajoutée côté Rust sans être répercutée ici : mieux vaut le dire que
-  // rendre un pied de carte vide.
-  throw new ContractError('footer.kind', (dto satisfies never as { kind: string }).kind);
+  switch (dto.kind) {
+    case 'source':
+      return { kind: 'source', value: dto.value };
+    case 'expiry':
+      return { kind: 'expiry', at: parseIsoDate(dto.at, 'footer.at') };
+    case 'age':
+      return { kind: 'age', at: parseIsoDate(dto.at, 'footer.at') };
+    default:
+      // A variant added on the Rust side and not reflected here. The switch is
+      // exhaustive at compile time, so this only fires when an older front
+      // meets a newer back end — and saying so beats a blank footer.
+      throw new ContractError('footer.kind', (dto satisfies never as { kind: string }).kind);
+  }
 }
 
-export function toNote(dto: NoteDto): Note {
+/**
+ * ⚠️ `placeholderValues` is dropped on purpose: the front reads what was typed
+ * through `placeholders[].value`, where the back end has already paired it with
+ * the field the text actually carries. A second, unpaired copy would invite
+ * reading a value whose token has left the content.
+ *
+ * The arrays are aliased rather than copied. This runs for every note of every
+ * view on every keystroke, the payload is a fresh `JSON.parse` nothing else
+ * retains, and the model types are `readonly` — the copies bought nothing and
+ * cost thousands of allocations per search.
+ */
+export function toNote({ placeholderValues: _stored, ...dto }: NoteDto): Note {
   return {
-    id: dto.id,
-    spaceId: dto.spaceId,
-    title: dto.title,
-    language: dto.language,
-    content: dto.content,
-    source: dto.source,
-    tags: [...dto.tags],
-    pinned: dto.pinned,
+    ...dto,
     createdAt: parseIsoDate(dto.createdAt, 'createdAt'),
     updatedAt: parseIsoDate(dto.updatedAt, 'updatedAt'),
     lifecycle: toLifecycle(dto.lifecycle),
     footer: toFooter(dto.footer),
-    expiringSoon: dto.expiringSoon,
-    placeholders: dto.placeholders.map((placeholder) => ({ ...placeholder })),
-    attachmentCount: dto.attachmentCount,
+    // Declared optional by `#[serde(default)]`, which keeps export files written
+    // before todo lists readable. Rust always serialises them.
     kind: dto.kind ?? 'snippet',
-    items: (dto.items ?? []).map((item) => ({ ...item })),
+    items: dto.items ?? [],
   };
 }
 
+/**
+ * Deliberately narrower than a `Note`: a trashed note is restored or purged,
+ * never opened, so nothing decorated travels this far.
+ */
 export function toTrashedNote(dto: WireTrashedNote): TrashedNote {
   return {
     id: dto.id,
@@ -130,6 +149,8 @@ export function toTrashedNote(dto: WireTrashedNote): TrashedNote {
     title: dto.title,
     language: dto.language,
     content: dto.content,
+    // Copied here, unlike `toNote`: the trash panel opens on demand over a
+    // handful of rows, so the allocation is free and the isolation is worth it.
     tags: [...dto.tags],
     deletedAt: parseIsoDate(dto.deletedAt, 'deletedAt'),
     purgeAt: parseIsoDate(dto.purgeAt, 'purgeAt'),
@@ -138,90 +159,49 @@ export function toTrashedNote(dto: WireTrashedNote): TrashedNote {
 }
 
 export function toAttachment(dto: WireAttachment): Attachment {
-  return {
-    id: dto.id,
-    noteId: dto.noteId,
-    fileName: dto.fileName,
-    mimeType: dto.mimeType,
-    byteSize: dto.byteSize,
-    createdAt: parseIsoDate(dto.createdAt, 'createdAt'),
-  };
+  return { ...dto, createdAt: parseIsoDate(dto.createdAt, 'createdAt') };
 }
 
-export function toImportReport(dto: WireImportReport): ImportReport {
-  return {
-    spacesCreated: dto.spacesCreated,
-    notesImported: dto.notesImported,
-    notesSkipped: dto.notesSkipped,
-  };
-}
-
+/** The wire draft wants mutable arrays; the model holds `readonly` ones. */
 export function toNoteDraftDto(draft: NoteDraft): NoteDraftDto {
   return {
-    spaceId: draft.spaceId,
-    title: draft.title,
-    language: draft.language,
-    content: draft.content,
-    source: draft.source,
+    ...draft,
     tags: [...draft.tags],
-    pinned: draft.pinned,
+    items: [...draft.items],
     lifecycle: toLifecycleDto(draft.lifecycle),
-    kind: draft.kind,
-    items: draft.items.map((item) => ({ ...item })),
   };
 }
 
+/**
+ * A key left out is a field the patch does not touch; a key sent as `null`
+ * would overwrite it. Hence the filtering rather than a plain spread — and
+ * hence `#[specta(optional)]` on the Rust fields, which is what makes the keys
+ * omissible at all.
+ */
 export function toNotePatchDto(patch: NotePatch): NotePatchDto {
-  const dto: NotePatchDto = {};
-  // Recopie champ par champ : un `undefined` sérialisé deviendrait `null` côté
-  // serde et écraserait la valeur existante au lieu de la laisser intacte. Le
-  // `#[specta(optional)]` des champs Rust est ce qui rend ces clés omissibles.
-  if (patch.spaceId !== undefined) dto.spaceId = patch.spaceId;
-  if (patch.title !== undefined) dto.title = patch.title;
-  if (patch.language !== undefined) dto.language = patch.language;
-  if (patch.content !== undefined) dto.content = patch.content;
-  if (patch.source !== undefined) dto.source = patch.source;
-  if (patch.tags !== undefined) dto.tags = [...patch.tags];
-  if (patch.pinned !== undefined) dto.pinned = patch.pinned;
-  if (patch.lifecycle !== undefined) dto.lifecycle = toLifecycleDto(patch.lifecycle);
-  if (patch.kind !== undefined) dto.kind = patch.kind;
-  if (patch.items !== undefined) dto.items = patch.items.map((item) => ({ ...item }));
+  const { lifecycle, tags, items, ...scalars } = patch;
+  const dto: NotePatchDto = withoutUndefined(scalars);
+
+  if (lifecycle !== undefined) dto.lifecycle = toLifecycleDto(lifecycle);
+  if (tags !== undefined) dto.tags = [...tags];
+  if (items !== undefined) dto.items = [...items];
+
   return dto;
 }
 
 export function toNotesQueryDto(query: NotesQuery): NotesQueryDto {
   return {
-    spaceId: query.spaceId,
-    search: query.search,
-    filter: query.filter,
+    ...query,
     tags: [...query.tags],
     languages: [...query.languages],
     now: toIsoString(query.now, 'now'),
-    tzOffsetMinutes: query.tzOffsetMinutes,
-    pinnedFirst: query.pinnedFirst,
   };
 }
 
-/**
- * Plus de garde sur `key` : `NoteSectionKey` vient des bindings, donc une
- * variante ajoutée côté Rust casse cette affectation à la compilation. La garde
- * d'exécution ne rattrapait que ce que le compilateur ignorait.
- */
 function toSection(dto: WireNoteSection): NoteSection {
-  return {
-    key: dto.key,
-    notes: dto.notes.map(toNote),
-    hasExpiringNotes: dto.hasExpiringNotes,
-    showCreateGhost: dto.showCreateGhost,
-  };
+  return { ...dto, notes: dto.notes.map(toNote) };
 }
 
 export function toNotesView(dto: NotesViewDto): NotesView {
-  return {
-    sections: dto.sections.map(toSection),
-    availableTags: [...dto.availableTags],
-    availableLanguages: [...dto.availableLanguages],
-    isFiltering: dto.isFiltering,
-    matched: dto.matched,
-  };
+  return { ...dto, sections: dto.sections.map(toSection) };
 }

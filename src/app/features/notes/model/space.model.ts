@@ -4,7 +4,7 @@ export interface Space {
 }
 
 /**
- * Champs fournis à la création d'un espace. Comme pour les notes, l'`id` est
- * attribué par la couche de persistance, jamais par le front.
+ * The fields supplied when creating a space. As for the notes, the `id` is
+ * assigned by persistence and never by the front.
  */
 export type SpaceDraft = Omit<Space, 'id'>;

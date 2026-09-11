@@ -7,8 +7,8 @@ import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 import { SettingsPageComponent } from './settings-page/settings-page.component';
 
 /**
- * Les réglages de l'application elle-même, toujours présents : ils ne dépendent
- * d'aucun outil chargé, contrairement aux pages du registre.
+ * The application's own settings, always present: unlike the registry's pages
+ * they depend on no loaded tool.
  */
 const GENERAL_PAGE: SettingsPage = {
   id: 'general',
@@ -18,17 +18,16 @@ const GENERAL_PAGE: SettingsPage = {
 };
 
 /**
- * Panneau de préférences : un rail de pages à gauche, la page choisie à droite.
+ * The preferences panel: a rail of pages on the left, the chosen page on the
+ * right.
  *
- * Il ne connaît qu'une seule page, la sienne. Les autres viennent de
- * [`SettingsRegistry`], où les features les inscrivent — « Variables » édite
- * les valeurs de `{{champs}}`, un sujet qui appartient aux notes, et l'importer
- * ici casserait la règle qui veut que supprimer un dossier de feature supprime
- * la feature.
+ * It knows one page, its own. The others come from [`SettingsRegistry`], where
+ * the features register them — importing one here would break the rule that
+ * deleting a feature's folder deletes the feature.
  *
- * **Pas d'« OK / Annuler / Appliquer ».** Tout s'applique à la frappe : c'est
- * déjà l'idiome de l'application, et un thème qu'on ne voit qu'après validation
- * ne se choisit pas, il se devine.
+ * **No "OK / Cancel / Apply".** Everything applies as it is typed: it is
+ * already the application's idiom, and a theme you only see after confirming is
+ * guessed at rather than chosen.
  */
 @Component({
   selector: 'app-settings-dialog',
@@ -52,14 +51,15 @@ export class SettingsDialogComponent {
   private readonly requestedPageId = signal<string | null>(null);
 
   /**
-   * La page affichée. Retombe sur la première quand rien n'a été choisi — ou
-   * quand la feature qui portait la page choisie vient d'être déchargée.
+   * The page shown. Falls back to the first when nothing was chosen — or when
+   * the feature carrying the chosen page has just been unloaded.
    */
   protected readonly activePage = computed<SettingsPage>(() => {
     const pages = this.pages();
     const requested = pages.find((page) => page.id === this.requestedPageId());
 
-    return requested ?? pages[0];
+    // `GENERAL_PAGE` is always in the list, so the last fallback never fires.
+    return requested ?? pages[0] ?? GENERAL_PAGE;
   });
 
   protected select(id: string): void {

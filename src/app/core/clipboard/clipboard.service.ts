@@ -4,10 +4,8 @@ import { StatusNotifier } from '@core/notifications/status.service';
 import { SettingsStore } from '@core/settings/settings.store';
 
 /**
- * Tout ce que ce service attend du plugin. Un jeton plutôt qu'un appel direct,
- * pour la même raison pratique que `PREFERENCES_STORE_LOADER` : le builder
- * Angular regroupe les modules avant que Vitest ne les voie, et `vi.mock` sur un
- * paquet externe n'intercepte alors qu'une fois sur deux.
+ * All this service needs from the plugin. A token rather than a direct call,
+ * for the same practical reason as `PREFERENCES_STORE_LOADER`.
  */
 export interface ClipboardAdapter {
   readText(): Promise<string | null>;
@@ -20,16 +18,15 @@ export const CLIPBOARD_ADAPTER = new InjectionToken<ClipboardAdapter>('CLIPBOARD
 });
 
 /**
- * Presse-papier système. Le CSP verrouille la WebView sur `'self'` et
- * `navigator.clipboard` y est inutilisable : tout passe par le plugin Tauri.
+ * The system clipboard. The CSP locks the WebView to `'self'` and
+ * `navigator.clipboard` is unusable there: everything goes through the plugin.
  *
- * Hors Tauri (jsdom), le plugin lève. Une copie qui échoue ne doit ni faire
- * tomber l'application ni remonter une erreur non gérée, d'où le booléen de
- * succès plutôt qu'une exception : l'appelant n'a qu'un retour visuel à décider.
+ * Outside Tauri (jsdom) the plugin throws. A failed copy must neither bring the
+ * application down nor surface an unhandled error, hence the success boolean
+ * rather than an exception.
  *
- * L'accusé de copie est posé **ici** et non chez les appelants : ils sont cinq,
- * et quatre d'entre eux ne montrent rien aujourd'hui — copier au clavier depuis
- * le canevas ne dit pas un mot. Un seul point le rend réglable d'un booléen.
+ * ⚠️ The copy acknowledgement is placed **here** and not in the callers: there
+ * are five of them, and a single point is what makes it settable by one boolean.
  */
 @Injectable({ providedIn: 'root' })
 export class ClipboardService {
@@ -44,8 +41,8 @@ export class ClipboardService {
       return false;
     }
 
-    // Les appelants qui ont mieux à dire — « 3 notes copiées en Markdown » —
-    // parlent après : le bandeau ne garde que le dernier message.
+    // Callers with something better to say — "3 notes copied as Markdown" —
+    // speak afterwards: the banner keeps only the last message.
     if (this.settings.copyConfirmation()) {
       this.notifier.notify({ key: 'settings.copied' });
     }
@@ -53,7 +50,7 @@ export class ClipboardService {
     return true;
   }
 
-  /** Chaîne vide aussi bien pour un presse-papier vide que pour une lecture impossible : dans les deux cas il n'y a rien à capturer. */
+  /** An empty string for an empty clipboard as for an impossible read: either way there is nothing to capture. */
   async paste(): Promise<string> {
     try {
       return (await this.adapter.readText()) ?? '';

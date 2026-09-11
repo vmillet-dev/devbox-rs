@@ -1,18 +1,18 @@
 import { DestroyRef, Injectable, Signal, inject, signal } from '@angular/core';
 import { TranslationRef } from '../i18n/translation-ref.model';
 
-/** Assez pour être lu, assez court pour ne pas rester en travers de l'écran. */
+/** Long enough to be read, short enough not to sit across the screen. */
 export const STATUS_TTL_MS = 6000;
 
 /**
- * Accusés de réception des actions qui **réussissent**.
+ * Acknowledgements for actions that **succeed**.
  *
- * Séparé d'`ErrorNotifier` : celui-ci porte une panne, qui reste tant qu'on ne
- * la masque pas, et mélanger les deux dans un même bandeau ferait passer un
- * succès pour un problème.
+ * Separate from `ErrorNotifier`, which carries a breakdown that stays until it
+ * is dismissed: mixing the two in one banner would make a success read as a
+ * problem.
  *
- * Le message est une **référence de traduction**, jamais une phrase : l'appelant
- * ne connaît pas la langue active.
+ * The message is a **translation reference**, never a sentence: the caller does
+ * not know the active language.
  */
 @Injectable({ providedIn: 'root' })
 export class StatusNotifier {

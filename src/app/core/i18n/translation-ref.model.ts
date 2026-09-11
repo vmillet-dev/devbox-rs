@@ -1,10 +1,8 @@
 /**
- * Référence vers une clé Transloco, consommée par le pipe `transloco` dans le
- * template.
+ * A reference to a Transloco key, consumed by the `transloco` pipe.
  *
- * Règle de la maison : le code qui produit du texte destiné à l'utilisateur
- * renvoie une référence, jamais une chaîne formatée — la traduction a donc
- * toujours lieu dans la langue active.
+ * House rule: code that produces user-facing text returns a reference and never
+ * a formatted string, so translation always happens in the active language.
  */
 export interface TranslationRef {
   readonly key: string;

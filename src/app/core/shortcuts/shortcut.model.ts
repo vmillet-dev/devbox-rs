@@ -5,12 +5,13 @@ export type { ShortcutBindings };
 /**
  * ⚠️ Miroir de `ShortcutBindings::defaults()` (`src-tauri/src/desktop.rs`).
  *
- * Le doublon est voulu : le natif prend ces combinaisons **avant** que le front
- * ait démarré, sans quoi `Ctrl+Alt+P` serait mort le temps du premier rendu —
- * précisément la seconde où l'on s'en sert depuis une autre application.
+ * The duplication is deliberate: the native side takes these **before** the
+ * front has started, and without them `Ctrl+Alt+P` would be dead for the length
+ * of the first render — precisely the second it is used from another
+ * application.
  *
- * Seule la palette est réglable depuis les préférences ; les deux autres
- * voyagent telles quelles, la commande native prenant les trois d'un bloc.
+ * Only the palette is settable from the preferences; the other two travel as
+ * they are, the native command taking all three at once.
  */
 export const DEFAULT_SHORTCUTS: ShortcutBindings = {
   capture: 'Ctrl+Alt+V',
@@ -19,8 +20,8 @@ export const DEFAULT_SHORTCUTS: ShortcutBindings = {
 };
 
 /**
- * Codes d'une touche **modificatrice** : tant qu'ils sont seuls, la combinaison
- * n'est pas finie et il n'y a rien à enregistrer.
+ * The codes of a **modifier** key: while they are alone the combination is not
+ * finished and there is nothing to record.
  */
 const MODIFIER_CODES = new Set([
   'ControlLeft',
@@ -35,8 +36,8 @@ const MODIFIER_CODES = new Set([
 ]);
 
 /**
- * Touches nommées que l'analyseur natif reconnaît. Les lettres, les chiffres et
- * les touches de fonction sont traités à part, par motif.
+ * Named keys the native parser recognises. Letters, digits and function keys
+ * are handled separately, by pattern.
  */
 const NAMED_KEYS = new Set([
   'Space',
@@ -73,26 +74,22 @@ const NAMED_KEYS = new Set([
 const MODIFIER_NAMES = new Set(['Ctrl', 'Alt', 'Shift', 'Super']);
 
 /**
- * Le nom que le natif attend pour cette touche, ou `null` si elle ne peut pas
- * porter un raccourci global.
+ * The name the native side expects for this key, or `null` when it cannot carry
+ * a global shortcut.
  *
- * `KeyboardEvent.code` décrit la **position** de la touche, pas le caractère
- * qu'elle produit : un raccourci réglé sur un clavier AZERTY reste au même
- * endroit sur un QWERTY, ce que `event.key` ne garantirait pas.
+ * ⚠️ `KeyboardEvent.code` describes the key's **position**, not the character it
+ * produces: a shortcut set on an AZERTY keyboard stays in the same place on a
+ * QWERTY, which `event.key` would not guarantee.
  */
 function keyName(code: string): string | null {
-  const letter = /^Key([A-Z])$/.exec(code);
-  if (letter) return letter[1];
+  const named = /^Key([A-Z])$/.exec(code)?.[1] ?? /^Digit(\d)$/.exec(code)?.[1];
 
-  const digit = /^Digit(\d)$/.exec(code);
-  if (digit) return digit[1];
-
-  return isKeyName(code) ? code : null;
+  return named ?? (isKeyName(code) ? code : null);
 }
 
 /**
- * Ce qu'[`keyName`] produit, et donc ce qu'un accélérateur enregistré porte —
- * `P` et non `KeyP`, les deux étant acceptés par l'analyseur natif.
+ * What [`keyName`] produces, and so what a stored accelerator carries — `P` and
+ * not `KeyP`, both being accepted by the native parser.
  */
 function isKeyName(name: string): boolean {
   return (
@@ -101,11 +98,10 @@ function isKeyName(name: string): boolean {
 }
 
 /**
- * La combinaison que cette frappe décrit, ou `null` tant qu'il n'y en a pas.
+ * The combination this keystroke describes, or `null` while there is none.
  *
- * Un modificateur au moins est exigé : un raccourci **global** sans
- * modificateur avalerait la touche dans toutes les applications de la machine,
- * y compris pendant une saisie.
+ * ⚠️ At least one modifier is required: a **global** shortcut without one would
+ * swallow that key in every application on the machine, typing included.
  */
 export function acceleratorFromEvent(event: KeyboardEvent): string | null {
   if (MODIFIER_CODES.has(event.code)) return null;
@@ -122,15 +118,15 @@ export function acceleratorFromEvent(event: KeyboardEvent): string | null {
   return key ? [...modifiers, key].join('+') : null;
 }
 
-/** Ce que le natif saurait relire : au moins un modificateur, puis une touche. */
+/** What the native side could read back: at least one modifier, then a key. */
 export function isAccelerator(value: string): boolean {
   const tokens = value.split('+').map((token) => token.trim());
   if (tokens.length < 2) return false;
 
-  const key = tokens[tokens.length - 1];
+  const key = tokens.at(-1);
   const modifiers = tokens.slice(0, -1);
 
-  return modifiers.every((modifier) => MODIFIER_NAMES.has(modifier)) && isKeyName(key);
+  return key !== undefined && modifiers.every((modifier) => MODIFIER_NAMES.has(modifier)) && isKeyName(key);
 }
 
 /**

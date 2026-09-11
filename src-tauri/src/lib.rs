@@ -1,6 +1,8 @@
 // Public: `tests/` is a separate crate, and sees nothing of the binary but its API.
 pub mod attachments;
 pub mod changelog;
+pub(crate) mod closed_enum;
+pub(crate) mod count;
 pub mod db;
 pub mod error;
 pub mod notes;
@@ -20,7 +22,7 @@ use attachments::{
 use changelog::app_changelog;
 use desktop::{set_global_shortcuts, set_window_behavior, sync_tray};
 use notes::{
-    create_note, delete_note, delete_notes, delete_tag, empty_trash, fill_placeholders,
+    create_note, delete_note, delete_notes, delete_tags, empty_trash, fill_placeholders,
     list_global_placeholders, list_tags, list_trash, merge_tags, move_notes, purge_notes,
     query_notes, rename_tag, restore_notes, set_global_placeholders, set_placeholder_values,
     tag_notes, update_note,
@@ -63,7 +65,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         list_tags,
         rename_tag,
         merge_tags,
-        delete_tag,
+        delete_tags,
         fill_placeholders,
         set_placeholder_values,
         list_global_placeholders,
@@ -122,9 +124,9 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
 
-            // « Démarrer avec Windows ». Aucun argument de lancement : DevBox
-            // démarrée par le système s'ouvre comme démarrée à la main, et la
-            // préférence « fermer dans la barre système » suffit à la ranger.
+            // "Start with Windows". No launch argument: DevBox started by the
+            // system opens as if started by hand, and the "close to tray"
+            // preference is enough to file it away.
             #[cfg(desktop)]
             app.handle().plugin(tauri_plugin_autostart::init(
                 tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -143,9 +145,9 @@ pub fn run() {
             let connection = db::open(&directory.join(db::DB_FILE_NAME))?;
             app.manage(db::Db::new(connection));
 
-            // La rétention de la corbeille s'applique même si personne n'ouvre
-            // le panneau, et le balayage ramasse les fichiers qu'une copie
-            // interrompue aurait laissés. Ni l'un ni l'autre n'est fatal.
+            // Trash retention applies even if nobody opens the panel, and the
+            // sweep collects files an interrupted copy would have left. Neither
+            // is fatal.
             let handle = app.handle().clone();
             let db = handle.state::<db::Db>();
             notes::sweep_trash_at_startup(&handle, &db);
@@ -171,8 +173,8 @@ pub fn run() {
                         api.prevent_close();
                         let _ = _window.hide();
                     }
-                    // Tauri n'émet rien pour « réduite » : `Resized` est le seul
-                    // passage, et c'est à la fenêtre de dire où elle en est.
+                    // Tauri emits nothing for "minimised": `Resized` is the only
+                    // way through, and the window has to say where it stands.
                     tauri::WindowEvent::Resized(_)
                         if desktop::hides_on_minimize(_window.app_handle())
                             && _window.is_minimized().unwrap_or(false) =>

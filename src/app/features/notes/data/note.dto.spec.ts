@@ -4,7 +4,6 @@ import {
   ContractError,
   NoteDto,
   toAttachment,
-  toImportReport,
   toNote,
   toNoteDraftDto,
   toNotePatchDto,
@@ -244,15 +243,5 @@ describe('toAttachment', () => {
     expect(attachment.createdAt).toBeInstanceOf(Date);
     expect(attachment.fileName).toBe('capture.png');
     expect(attachment.byteSize).toBe(2048);
-  });
-});
-
-describe('toImportReport', () => {
-  it('keeps the three counters apart', () => {
-    expect(toImportReport({ spacesCreated: 1, notesImported: 2, notesSkipped: 3 })).toEqual({
-      spacesCreated: 1,
-      notesImported: 2,
-      notesSkipped: 3,
-    });
   });
 });

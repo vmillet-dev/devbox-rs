@@ -1,11 +1,12 @@
-//! Fiches des pièces jointes : SQL seulement. Les fichiers sont écrits par
-//! `super`, qui est le seul à connaître le dossier de l'application.
+//! Attachment records: SQL only. The files are written by `super`, the only
+//! place that knows the application directory.
 
 use std::collections::HashMap;
 
 use diesel::prelude::*;
 
 use super::model::{self, Attachment};
+use crate::count::saturating_u32;
 use crate::db::iso8601;
 use crate::db::schema::{attachments, notes};
 use crate::error::StorageError;
@@ -32,7 +33,7 @@ impl TryFrom<AttachmentRow> for Attachment {
         })?;
 
         Ok(Self {
-            byte_size: u32::try_from(row.byte_size).unwrap_or(u32::MAX),
+            byte_size: saturating_u32(row.byte_size),
             id: row.id,
             note_id: row.note_id,
             file_name: row.file_name,
@@ -55,8 +56,8 @@ impl From<&Attachment> for AttachmentRow {
     }
 }
 
-/// La note est vérifiée ici : la clé étrangère la refuserait aussi, mais avec un
-/// message SQLite que le front ne sait pas traduire.
+/// The note is checked here: the foreign key would refuse it too, but with an
+/// SQLite message the front cannot translate.
 pub fn create(
     connection: &mut SqliteConnection,
     attachment: &Attachment,
@@ -118,8 +119,8 @@ pub fn delete(connection: &mut SqliteConnection, id: &str) -> Result<(), Storage
     Ok(())
 }
 
-/// Fichiers des notes désignées, à relever **avant** une purge : la cascade
-/// emporte les fiches, jamais ce qu'il y a sur le disque.
+/// The files of the named notes, to be collected **before** a purge: the
+/// cascade takes the records, never what is on the disk.
 pub fn stored_names_of(
     connection: &mut SqliteConnection,
     note_ids: &[String],
@@ -137,7 +138,7 @@ pub fn stored_names_of(
         .collect())
 }
 
-/// Ce que la base connaît, à comparer au contenu du dossier lors du nettoyage.
+/// What the database knows, to compare against the directory during a sweep.
 pub fn all_stored_names(connection: &mut SqliteConnection) -> Result<Vec<String>, StorageError> {
     Ok(attachments::table
         .select((attachments::id, attachments::file_name))
@@ -147,7 +148,7 @@ pub fn all_stored_names(connection: &mut SqliteConnection) -> Result<Vec<String>
         .collect())
 }
 
-/// Nombre de pièces jointes par note, pour le badge des cartes.
+/// Attachment count per note, for the card badge.
 pub fn counts(connection: &mut SqliteConnection) -> Result<HashMap<String, u32>, StorageError> {
     let rows = attachments::table
         .group_by(attachments::note_id)
@@ -156,7 +157,7 @@ pub fn counts(connection: &mut SqliteConnection) -> Result<HashMap<String, u32>,
 
     Ok(rows
         .into_iter()
-        .map(|(note_id, count)| (note_id, u32::try_from(count).unwrap_or(u32::MAX)))
+        .map(|(note_id, count)| (note_id, saturating_u32(count)))
         .collect())
 }
 
@@ -231,7 +232,7 @@ mod tests {
         let note_id = note(&mut connection);
         create(&mut connection, &sample("a-1", &note_id)).unwrap();
 
-        // Les fichiers sont relevés avant : la cascade ne dit plus rien après.
+        // The files are collected first: the cascade says nothing afterwards.
         let files = stored_names_of(&mut connection, std::slice::from_ref(&note_id)).unwrap();
         crate::notes::store::delete(&mut connection, &note_id, Utc::now()).unwrap();
         crate::notes::store::purge(&mut connection, std::slice::from_ref(&note_id)).unwrap();

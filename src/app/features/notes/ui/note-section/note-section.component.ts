@@ -16,7 +16,7 @@ export class NoteSectionComponent {
   readonly selectedNoteId = input<string | null>(null);
   readonly focusedNoteId = input<string | null>(null);
   readonly checkedIds = input<ReadonlySet<string>>(new Set());
-  /** Relayé aux cartes : leur menu propose d'y déplacer la note. */
+  /** Relayed to the cards: their menu offers to move the note there. */
   readonly spaces = input<readonly Space[]>([]);
 
   readonly noteOpened = output<NoteActivation>();
@@ -25,12 +25,12 @@ export class NoteSectionComponent {
   readonly noteDeleted = output<string>();
   readonly fillRequested = output<string>();
   readonly createRequested = output<void>();
-  /** Case d'une todolist cochée depuis le canevas. */
+  /** A todo-list box ticked from the canvas. */
   readonly itemToggled = output<ItemToggle>();
 
-  /** La clé de section *est* la clé de traduction : aucun libellé à maintenir en double. */
+  /** The section key *is* the translation key: no label kept in two places. */
   protected readonly titleKey = computed(() => `sections.${this.section().key}`);
 
-  /** Rattache la région à son titre, pour la navigation par régions des lecteurs d'écran. */
+  /** Ties the region to its heading, for screen-reader region navigation. */
   protected readonly headingId = computed(() => `section-heading-${this.section().key}`);
 }

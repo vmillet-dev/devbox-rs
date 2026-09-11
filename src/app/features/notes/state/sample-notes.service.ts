@@ -7,21 +7,15 @@ import { NotesRepository } from '../data/notes.repository';
 import { SpacesRepository } from '../data/spaces.repository';
 import { NoteDraft } from '../model/note.model';
 
-/**
- * Written once the samples have been offered, whatever came of it. A second
- * pass would file a second copy of everything the day someone deletes them.
- */
+/** Written once the samples have been offered, whatever came of it. */
 const SEEDED_KEY = 'devbox.notes.samplesSeeded';
 
-/** Days before the sample with a deadline falls due. */
 const DEADLINE_DAYS = 7;
 
 /**
- * Bodies that are **code**, and so are not translated.
- *
- * They also could not be: Transloco reads `{{name}}` as an interpolation and
- * would replace the snippet's fields with empty strings on the way out. A note
- * demonstrating `{{fields}}` has to carry them from here.
+ * Bodies that are **code**, and so are not translated — they also could not be:
+ * Transloco reads `{{name}}` as an interpolation and would replace a snippet's
+ * fields with empty strings on the way out.
  */
 const PSQL_SNIPPET = 'psql -h {{host}} -p {{port=5432}} -U {{user}} -d {{database}}';
 
@@ -32,44 +26,44 @@ increment(): void {
   this.count.update((value) => value + 1);
 }`;
 
-/** The keys read in one go, in the order [`seedIfFirstRun`] destructures them. */
-const KEYS = [
-  'notes.samples.space',
-  'notes.samples.welcome.title',
-  'notes.samples.welcome.content',
-  'notes.samples.welcome.source',
-  'notes.samples.snippet.title',
-  'notes.samples.snippet.source',
-  'notes.samples.checklist.title',
-  'notes.samples.checklist.open',
-  'notes.samples.checklist.copy',
-  'notes.samples.checklist.fields',
-  'notes.samples.checklist.palette',
-  'notes.samples.checklist.space',
-  'notes.samples.code.title',
-  'notes.samples.code.source',
-  'notes.samples.tags.devbox',
-  'notes.samples.tags.example',
-  'notes.samples.tags.database',
-  'notes.samples.tags.angular',
-];
+/**
+ * Keyed by name rather than positional: the whole set is translated in one go,
+ * and inserting a key here can no longer shift every sample's text by one.
+ */
+const KEYS = {
+  spaceName: 'notes.samples.space',
+  welcomeTitle: 'notes.samples.welcome.title',
+  welcomeContent: 'notes.samples.welcome.content',
+  welcomeSource: 'notes.samples.welcome.source',
+  snippetTitle: 'notes.samples.snippet.title',
+  snippetSource: 'notes.samples.snippet.source',
+  checklistTitle: 'notes.samples.checklist.title',
+  checklistOpen: 'notes.samples.checklist.open',
+  checklistCopy: 'notes.samples.checklist.copy',
+  checklistFields: 'notes.samples.checklist.fields',
+  checklistPalette: 'notes.samples.checklist.palette',
+  checklistSpace: 'notes.samples.checklist.space',
+  codeTitle: 'notes.samples.code.title',
+  codeSource: 'notes.samples.code.source',
+  devboxTag: 'notes.samples.tags.devbox',
+  exampleTag: 'notes.samples.tags.example',
+  databaseTag: 'notes.samples.tags.database',
+  angularTag: 'notes.samples.tags.angular',
+} as const;
+
+type SampleTexts = Record<keyof typeof KEYS, string>;
 
 /**
  * The notes a brand-new installation opens on.
  *
- * An empty canvas is the worst possible introduction: no space, so not even a
- * note can be created — the button is refused on purpose when there is nowhere
- * to file one. These four samples carry one feature each (pin, `{{fields}}`,
- * checklist, deadline), and they are ordinary notes: editing or trashing them
- * is the point.
+ * An empty canvas is the worst possible introduction: a virgin database has no
+ * space, so not even a note can be created. These four carry one feature each
+ * (pin, `{{fields}}`, checklist, deadline) and are ordinary notes — editing or
+ * trashing them is the point.
  *
- * **The content comes from the front end**, not from a seed in Rust, because it
- * is user-facing text and the back end writes none — it would ship French into
- * an English interface. It also means the samples arrive in the language the
- * application starts in.
- *
- * Lives in `state/` rather than `data/`: it orchestrates the repositories the
- * way a store does, it just has no state of its own to expose.
+ * The content comes from the front end because it is user-facing text, which
+ * the back end never writes. It also means the samples arrive in the language
+ * the application starts in.
  */
 @Injectable({ providedIn: 'root' })
 export class SampleNotesService {
@@ -80,13 +74,13 @@ export class SampleNotesService {
   private readonly clock = inject(ClockService);
 
   /**
-   * Files the samples when this is a fresh installation, and says whether it
-   * did — the caller reloads its stores on a `true`.
+   * Files the samples on a fresh installation, and says whether it did — the
+   * caller reloads its stores on a `true`.
    *
    * Two guards, not one. The marker alone would re-seed anyone whose
-   * preferences file is missing; "no space at all" alone would re-seed the day
-   * the last space disappears. Together they only ever match a database that
-   * has never been written to.
+   * preferences file went missing; "no space at all" alone would re-seed the
+   * day the last space disappears. Together they only ever match a database
+   * that has never been written to.
    */
   async seedIfFirstRun(): Promise<boolean> {
     if (this.preferences.read(SEEDED_KEY) !== null) return false;
@@ -102,35 +96,22 @@ export class SampleNotesService {
       return await this.seed();
     } catch {
       // No bridge (jsdom), or a database that will not open: the canvas reports
-      // its own failure, and a second banner about samples nobody asked for
-      // would only add noise.
+      // its own failure, and a second banner would only add noise.
       return false;
     }
   }
 
-  private async seed(): Promise<boolean> {
-    const [
-      spaceName,
-      welcomeTitle,
-      welcomeContent,
-      welcomeSource,
-      snippetTitle,
-      snippetSource,
-      checklistTitle,
-      checklistOpen,
-      checklistCopy,
-      checklistFields,
-      checklistPalette,
-      checklistSpace,
-      codeTitle,
-      codeSource,
-      devboxTag,
-      exampleTag,
-      databaseTag,
-      angularTag,
-    ] = await firstValueFrom(this.transloco.selectTranslate<string[]>(KEYS));
+  private async texts(): Promise<SampleTexts> {
+    const names = Object.keys(KEYS) as (keyof typeof KEYS)[];
+    const translated = await firstValueFrom(this.transloco.selectTranslate<string[]>(Object.values(KEYS)));
 
-    const space = await this.spaces.create({ name: spaceName });
+    return Object.fromEntries(names.map((name, index) => [name, translated[index] ?? ''])) as SampleTexts;
+  }
+
+  private async seed(): Promise<boolean> {
+    const text = await this.texts();
+
+    const space = await this.spaces.create({ name: text.spaceName });
     // Written before the notes: a failure halfway through leaves an incomplete
     // set, which is still better than a second full set on the next launch.
     this.preferences.write(SEEDED_KEY, 'true');
@@ -138,13 +119,13 @@ export class SampleNotesService {
     const drafts: NoteDraft[] = [
       {
         spaceId: space.id,
-        title: welcomeTitle,
+        title: text.welcomeTitle,
         language: 'md',
-        content: welcomeContent,
-        source: welcomeSource,
-        tags: [devboxTag],
-        // Pinned so it opens the canvas, and so the "pinned" section is not an
-        // empty heading on the first screen.
+        content: text.welcomeContent,
+        source: text.welcomeSource,
+        tags: [text.devboxTag],
+        // Pinned so the "pinned" section is not an empty heading on the first
+        // screen.
         pinned: true,
         lifecycle: { kind: 'permanent' },
         kind: 'snippet',
@@ -152,11 +133,11 @@ export class SampleNotesService {
       },
       {
         spaceId: space.id,
-        title: snippetTitle,
+        title: text.snippetTitle,
         language: 'sh',
         content: PSQL_SNIPPET,
-        source: snippetSource,
-        tags: [databaseTag, exampleTag],
+        source: text.snippetSource,
+        tags: [text.databaseTag, text.exampleTag],
         pinned: false,
         lifecycle: { kind: 'permanent' },
         kind: 'snippet',
@@ -164,27 +145,31 @@ export class SampleNotesService {
       },
       {
         spaceId: space.id,
-        title: checklistTitle,
+        title: text.checklistTitle,
         language: 'txt',
         content: '',
         source: '',
-        tags: [devboxTag],
+        tags: [text.devboxTag],
         pinned: false,
         lifecycle: { kind: 'permanent' },
         kind: 'checklist',
-        items: [checklistOpen, checklistCopy, checklistFields, checklistPalette, checklistSpace].map(
-          (text) => ({ text, done: false }),
-        ),
+        items: [
+          text.checklistOpen,
+          text.checklistCopy,
+          text.checklistFields,
+          text.checklistPalette,
+          text.checklistSpace,
+        ].map((label) => ({ text: label, done: false })),
       },
       {
         spaceId: space.id,
-        title: codeTitle,
+        title: text.codeTitle,
         language: 'ts',
         content: SIGNAL_SNIPPET,
-        source: codeSource,
-        tags: [angularTag, exampleTag],
+        source: text.codeSource,
+        tags: [text.angularTag, text.exampleTag],
         pinned: false,
-        // The one sample with a deadline: it is what puts a note in "à trier",
+        // The one sample with a deadline: it is what puts a note in the untriaged
         // lights the ⏳ badge and gives the quick filter something to find.
         lifecycle: { kind: 'expires', at: this.deadline() },
         kind: 'snippet',
@@ -192,7 +177,7 @@ export class SampleNotesService {
       },
     ];
 
-    // Sequential on purpose: `created_at` orders the canvas, and four parallel
+    // Sequential on purpose: `created_at` orders the canvas, and parallel
     // writes would land in whatever order the bridge answered in.
     for (const draft of drafts) {
       await this.notes.create(draft);

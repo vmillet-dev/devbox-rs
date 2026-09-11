@@ -24,12 +24,12 @@
       }
 
       @if (busy()) {
-        <!-- role="status" : l'avancement est annoncé sans voler le focus. -->
+        <!-- role="status": progress is announced without stealing focus. -->
         <p class="update-status" role="status">
           {{ statusRef().key | transloco: statusRef().params }}
         </p>
-        <!-- Sans attribut `value`, <progress> se rend indéterminé : c'est
-             exactement le cas où le serveur n'annonce pas de Content-Length. -->
+        <!-- Without a `value` attribute <progress> renders indeterminate, which
+             is exactly the case where the server announces no Content-Length. -->
         <progress
           class="update-progress"
           max="100"

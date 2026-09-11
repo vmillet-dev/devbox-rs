@@ -24,10 +24,19 @@ export default tseslint.config(
     files: ['**/*.ts'],
     extends: [
       eslint.configs.recommended,
-      ...tseslint.configs.recommended,
+      // Type-checked, not just syntactic: the codebase writes `void promise()`
+      // everywhere as a convention, and `no-floating-promises` is what turns
+      // that convention into a rule.
+      ...tseslint.configs.recommendedTypeChecked,
       ...tseslint.configs.stylistic,
       ...angular.configs.tsRecommended,
     ],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
     processor: angular.processInlineTemplates,
     rules: {
       '@angular-eslint/directive-selector': [
@@ -50,6 +59,10 @@ export default tseslint.config(
       // d'un store, exposés en lecture seule (voir notes.store.ts).
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
+
+      // A `switch` over a generated union must stay exhaustive: a variant added
+      // in Rust has to break the build, not fall through to a default.
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
     },
   },
   {
@@ -70,6 +83,18 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+
+      // Test doubles satisfy an async interface without awaiting anything,
+      // and assertions on queried DOM nodes are deliberately explicit.
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/prefer-promise-reject-errors': 'off',
     },
   },
 );

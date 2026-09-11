@@ -33,25 +33,25 @@ import { LifecycleBadgeComponent } from '../lifecycle-badge/lifecycle-badge.comp
 import { PlaceholderPanelComponent } from '../placeholder-panel/placeholder-panel.component';
 import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
 
-/** Sans état : en recréer un à chaque recalcul serait inutile. */
+/** Stateless: rebuilding one on every recompute would be pointless. */
 const TEXT_ENCODER = new TextEncoder();
 
 const FULLSCREEN_STORAGE_KEY = 'devbox.editorFullscreen';
 
 const FIELDS_PANEL_STORAGE_KEY = 'devbox.editorFieldsPanel';
 
-/** Dérivées de la table des libellés pour ne pas la dupliquer. */
+/** Derived from the label table rather than duplicating it. */
 const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({
   value: value as LanguageTag,
   label,
 }));
 
 /**
- * Une demande de remplissage : le texte et les valeurs à y poser.
+ * A fill request: the text, and the values to put in it.
  *
- * L'éditeur ne remplit pas lui-même — c'est `notes::placeholder::fill`, côté
- * Rust, qui décide ce qu'un champ vaut. Il dit donc *quoi* remplir, et la page
- * lui rend le résultat.
+ * The editor does not fill anything itself — `notes::placeholder::fill` decides
+ * what a field is worth. The editor says *what* to fill; the page hands back
+ * the result.
  */
 export interface FillRequest {
   readonly content: string;
@@ -59,12 +59,12 @@ export interface FillRequest {
 }
 
 /**
- * `yyyy-MM-dd` d'un `<input type="date">` vers l'échéance correspondante.
+ * The `yyyy-MM-dd` of an `<input type="date">` to the matching deadline.
  *
- * ⚠️ L'heure est portée à la **fin de la journée locale**, pas à minuit : une
- * note datée d'aujourd'hui serait sinon périmée au moment de la saisir. Et la
- * construction est explicite plutôt qu'un `new Date(value)`, qui interprète en
- * UTC — à l'ouest de Greenwich l'échéance reculerait d'un jour.
+ * ⚠️ The time is carried to the **end of the local day**, not to midnight: a
+ * note dated today would otherwise be expired the moment it is typed. And the
+ * construction is explicit rather than `new Date(value)`, which reads as UTC —
+ * west of Greenwich the deadline would slip back a day.
  */
 function endOfLocalDay(value: string): Date | null {
   const [year, month, day] = value.split('-').map(Number);
@@ -73,23 +73,23 @@ function endOfLocalDay(value: string): Date | null {
   return new Date(year, month - 1, day, 23, 59, 59, 999);
 }
 
-/** Chemin inverse : ce que le champ doit afficher, dans le fuseau de l'utilisateur. */
+/** The way back: what the field must show, in the user's time zone. */
 function toDateInputValue(date: Date): string {
   const pad = (value: number): string => String(value).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 /**
- * Éditeur plein écran d'une note. Ne mute rien : il émet, `NotesStore` persiste.
+ * A note's full-screen editor. Mutates nothing: it emits, `NotesStore` persists.
  *
- * Il tient des **brouillons locaux** pour le titre et le corps — persister à
- * chaque frappe ferait un aller-retour IPC par caractère. Ils sont confirmés au
- * blur et, point délicat, avant chaque chemin de fermeture (croix, Échap, clic
- * sur le fond), aucun des trois ne produisant de `blur`.
+ * It holds **local drafts** for the title and the body — persisting on every
+ * keystroke would mean one IPC round trip per character. They are committed on
+ * blur and, the delicate part, before every closing path (close button, Escape,
+ * backdrop click), none of which produces a `blur`.
  *
- * ⚠️ Ils sont réinitialisés sur l'**`id`** de la note et non sur la note :
- * chaque enregistrement rafraîchit `updatedAt` et produit un nouvel objet, qui
- * écraserait la saisie en cours.
+ * ⚠️ They are keyed on the note's **`id`** and not on the note: every save
+ * refreshes `updatedAt` and produces a new object, which would overwrite what
+ * is being typed.
  */
 @Component({
   selector: 'app-note-editor-overlay',
@@ -119,21 +119,21 @@ export class NoteEditorOverlayComponent {
   readonly note = input<Note | null>(null);
 
   /**
-   * Les pièces jointes viennent d'un store à part et ne descendent pas de la
-   * note : elles ont leur propre cycle d'écriture, et les faire transiter par
-   * `Note` obligerait à recharger la note entière à chaque ajout.
+   * Attachments come from a store of their own rather than down the note: they
+   * have their own write cycle, and routing them through `Note` would mean
+   * reloading the whole note on every addition.
    */
   readonly attachments = input<readonly Attachment[]>([]);
   readonly attachmentsBusy = input(false);
   readonly attachmentPreviewId = input<string | null>(null);
   readonly attachmentPreviewData = input<string | null>(null);
-  /** Vue agrandie ouverte par-dessus : elle capte Échap avant l'éditeur. */
+  /** The lightbox opens above: it takes Escape before the editor does. */
   readonly imageZoomed = input(false);
 
   /**
-   * Le corps une fois ses `{{champs}}` remplis, tel que la page l'a obtenu du
-   * back. `null` tant que rien n'a été demandé : l'aperçu n'affiche alors rien
-   * plutôt qu'un texte encore truffé de jetons.
+   * The body once its `{{fields}}` are filled, as the page got it from the back
+   * end. `null` until something is asked for, so the preview shows nothing
+   * rather than text still riddled with tokens.
    */
   readonly filledContent = input<string | null>(null);
 
@@ -153,15 +153,15 @@ export class NoteEditorOverlayComponent {
   readonly attachmentPreviewToggled = output<string>();
   readonly attachmentOpenRequested = output<string>();
   readonly attachmentSaveRequested = output<string>();
-  /** L'aperçu a été cliqué : la page ouvre la vue agrandie, au-dessus d'ici. */
+  /** The preview was clicked: the page opens the lightbox, above this. */
   readonly imageZoomRequested = output<void>();
-  /** Valeurs des `{{champs}}` à enregistrer sur la note. */
+  /** `{{field}}` values to store on the note. */
   readonly placeholderValuesChanged = output<Record<string, string>>();
-  /** Ce que l'aperçu doit montrer : la page remplit et redescend le texte. */
+  /** What the preview must show: the page fills and hands the text back down. */
   readonly fillPreviewRequested = output<FillRequest>();
-  /** Copier le corps rempli — c'est ce que « Copier » veut dire ici. */
+  /** Copy the filled body — that is what "Copy" means here. */
   readonly filledCopyRequested = output<FillRequest>();
-  /** Une image a été collée dans le corps : la page la joint à la note. */
+  /** An image was pasted into the body: the page attaches it to the note. */
   readonly imagePasted = output<void>();
 
   protected readonly languageOptions = LANGUAGE_OPTIONS;
@@ -183,26 +183,24 @@ export class NoteEditorOverlayComponent {
     computation: () => untracked(() => this.note()?.source ?? ''),
   });
 
-  /** Deux temps plutôt qu'un `confirm()` natif, qui bloque toute la WebView. */
+  /** Two steps rather than a native `confirm()`, which blocks the whole WebView. */
   protected readonly confirmingDelete = linkedSignal({ source: this.noteId, computation: () => false });
 
   protected readonly tagInputValue = signal('');
 
   /**
-   * Préférence d'affichage et non état de note : un `signal` simple, pas un
-   * `linkedSignal` sur `noteId`, pour qu'elle survive au passage d'une note à
-   * l'autre.
+   * A display preference and not note state: a plain `signal`, not a
+   * `linkedSignal` on `noteId`, so it survives moving from one note to the next.
    */
   protected readonly fullscreen = signal(this.preferences.read(FULLSCREEN_STORAGE_KEY) === 'true');
 
   /**
-   * Même nature que `fullscreen` : une préférence d'affichage, ouverte par
-   * défaut. Un panneau replié d'office cacherait la fonction à qui ne sait pas
-   * encore qu'elle existe.
+   * Same nature as `fullscreen`, open by default: a panel folded away would
+   * hide the feature from anyone who does not know it exists yet.
    */
   protected readonly fieldsPanelOpen = signal(this.preferences.read(FIELDS_PANEL_STORAGE_KEY) !== 'false');
 
-  /** L'aperçu est propre à la note ouverte : il retombe en passant à la suivante. */
+  /** The preview belongs to the open note: it drops when moving to the next. */
   protected readonly previewingFilled = linkedSignal({
     source: this.noteId,
     computation: () => false,
@@ -212,27 +210,24 @@ export class NoteEditorOverlayComponent {
   private readonly checklistEditor = viewChild(ChecklistEditorComponent);
   private readonly fieldsPanel = viewChild(PlaceholderPanelComponent);
 
-  /** Une todolist n'a pas de corps : ni bloc coloré, ni sélecteur de format. */
+  /** A todo list has no body: no coloured block, no format picker. */
   protected readonly isChecklist = computed(() => this.note()?.kind === 'checklist');
   protected readonly checklistStats = computed(() => checklistProgress(this.note()?.items ?? []));
 
   /**
-   * Ce que le bouton de copie pose dans le presse-papier. Le brouillon pour une
-   * note ordinaire — copier avant d'avoir quitté le champ doit rendre ce qu'on
-   * voit —, la liste rendue en Markdown pour une todolist, qui n'a pas de corps.
+   * What the copy button puts on the clipboard: the draft for an ordinary note
+   * — copying before leaving the field must yield what is on screen — and the
+   * list rendered as Markdown for a todo list, which has no body.
    */
   protected readonly copyText = computed(() =>
     this.isChecklist() ? checklistToText(this.note()?.items ?? []) : this.draftContent(),
   );
 
-  /**
-   * Une todolist n'a pas de corps, donc pas de jeton : `placeholders` est vide
-   * et le panneau n'est jamais monté — inutile de traiter le cas à part.
-   */
+  /** A todo list has no body and so no tokens: `placeholders` is simply empty. */
   protected readonly placeholders = computed(() => this.note()?.placeholders ?? []);
   protected readonly hasPlaceholders = computed(() => this.placeholders().length > 0);
 
-  /** Ce que l'aperçu montre : le corps rempli, en lecture seule. */
+  /** What the preview shows: the filled body, read-only. */
   protected readonly showingPreview = computed(
     () => this.previewingFilled() && this.filledContent() !== null,
   );
@@ -240,7 +235,7 @@ export class NoteEditorOverlayComponent {
   protected readonly languageLabel = computed(
     () => LANGUAGE_LABELS[this.note()?.language ?? FALLBACK_LANGUAGE],
   );
-  // Sur le brouillon : les stats suivent la frappe sans attendre la sauvegarde.
+  // On the draft: the stats follow the typing without waiting for a save.
   protected readonly lineCount = computed(() => (this.note() ? this.draftContent().split('\n').length : 0));
   protected readonly byteSize = computed(() => TEXT_ENCODER.encode(this.draftContent()).length);
   protected readonly modifiedRef = computed(() => {
@@ -249,8 +244,8 @@ export class NoteEditorOverlayComponent {
   });
 
   /**
-   * Vide pour une note permanente. C'est ce champ, et lui seul, qui alimente le
-   * filtre « À trier » et l'indice « à trier bientôt » des sections.
+   * Empty for a permanent note. This field, and only this one, feeds the
+   * "untriaged" filter and the sections' "due soon" hint.
    */
   protected readonly expiryInputValue = computed(() => {
     const lifecycle = this.note()?.lifecycle;
@@ -258,8 +253,8 @@ export class NoteEditorOverlayComponent {
   });
 
   /**
-   * Replier le panneau referme l'aperçu : la bascule vit dedans, et laisser le
-   * corps en lecture seule sans le bouton qui l'y a mis serait un piège.
+   * Folding the panel closes the preview: the toggle lives inside it, and
+   * leaving the body read-only without the button that put it there is a trap.
    */
   protected toggleFieldsPanel(): void {
     const next = !this.fieldsPanelOpen();
@@ -281,8 +276,8 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * Une valeur a changé. L'aperçu suit la frappe — c'est ce qu'on lui demande —
-   * mais rien n'est écrit : le panneau confirme à la sortie du champ.
+   * A value changed. The preview follows the typing, but nothing is written:
+   * the panel commits on field exit.
    */
   protected onPlaceholderValuesChanged(): void {
     if (this.previewingFilled()) {
@@ -291,8 +286,8 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * Le corps ne peut pas bouger pendant l'aperçu — le champ de saisie n'est pas
-   * là — donc seules les valeurs déclenchent une nouvelle demande.
+   * The body cannot move during the preview — the input is not there — so only
+   * the values trigger a new request.
    */
   private requestFillPreview(): void {
     this.fillPreviewRequested.emit({
@@ -302,9 +297,9 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * Copie le corps **rempli**. Le texte est composé au moment du clic, et non
-   * tenu à jour en permanence : une frappe dans le corps ou dans un champ
-   * rendrait périmé tout ce qui aurait été calculé d'avance.
+   * Copies the **filled** body. The text is composed at click time rather than
+   * kept up to date: a keystroke in the body or in a field would make anything
+   * computed ahead of time stale.
    */
   protected requestFilledCopy(): void {
     this.filledCopyRequested.emit({
@@ -324,13 +319,11 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * Un **collage** est confirmé tout de suite, la frappe reste différée au blur.
+   * A **paste** is committed at once; typing stays deferred to blur.
    *
-   * C'est le collage qui donne son langage à une note vide (`domain::detect`),
-   * et le langage n'est connu qu'une fois le contenu persisté : attendre la
-   * sortie du champ laisserait le badge sur TXT, ce qui se lit comme « rien n'a
-   * été reconnu ». Une frappe, elle, ne justifie toujours pas un aller-retour
-   * IPC par caractère.
+   * The paste is what gives an empty note its language, and the language is
+   * only known once the content is persisted: waiting for field exit would
+   * leave the badge on TXT, which reads as "nothing was recognised".
    */
   protected onBodyInput(event: Event, value: string): void {
     this.draftContent.set(value);
@@ -341,13 +334,11 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * Une image collée devient une **pièce jointe** : le corps est un `<textarea>`,
-   * il ne peut rien afficher d'autre que du texte, et y laisser tomber le
-   * collage ne ferait rien du tout.
+   * A pasted image becomes an **attachment**: the body is a `<textarea>` and can
+   * show nothing but text, so letting the paste through would do nothing at all.
    *
-   * Seul le *type* du contenu est lu ici — les octets sont relus côté natif, où
-   * le presse-papier système les rend déjà décodés. Un collage qui porte du
-   * texte reste traité nativement par le champ.
+   * Only the content *type* is read here — the bytes are re-read natively,
+   * where the system clipboard hands them over already decoded.
    */
   protected onPaste(event: ClipboardEvent): void {
     const data = event.clipboardData;
@@ -362,7 +353,7 @@ export class NoteEditorOverlayComponent {
     this.imagePasted.emit();
   }
 
-  /** N'émet que si le corps a réellement changé. */
+  /** Emits only when the body actually changed. */
   protected commitContent(): void {
     const note = this.note();
     if (note && this.draftContent() !== note.content) {
@@ -385,9 +376,9 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * Un champ vidé rend la note permanente : c'est la façon naturelle de dire
-   * « finalement, je la garde ». Une date illisible est ignorée plutôt que
-   * transformée en `Invalid Date`, que le DTO rejetterait à la sérialisation.
+   * Clearing the field makes the note permanent — the natural way to say "on
+   * second thoughts, I am keeping it". An unreadable date is ignored rather
+   * than turned into an `Invalid Date`, which the DTO would reject.
    */
   protected onExpiryChange(value: string): void {
     if (!value) {
@@ -402,8 +393,8 @@ export class NoteEditorOverlayComponent {
   }
 
   protected onLanguageChange(value: string): void {
-    // Le <select> ne propose que des langages connus ; la garde protège du cas
-    // où la table des options et le type divergeraient.
+    // The select only offers known languages; the guard covers the option table
+    // and the type drifting apart.
     if (isLanguageTag(value)) {
       this.languageChanged.emit(value);
     }
@@ -427,13 +418,13 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * Échap quitte d'abord le corps, puis ferme la modale : sinon une frappe
-   * destinée au champ referait disparaître l'éditeur entier. Le `blur` confirme
-   * le brouillon au passage.
+   * Escape leaves the body first, then closes the modal: otherwise a keystroke
+   * meant for the field would make the whole editor disappear. The `blur`
+   * commits the draft on the way.
    */
   protected onEscape(): void {
-    // La vue agrandie est ouverte **par-dessus** l'éditeur : elle est la
-    // première à devoir se refermer, et les deux écoutent le même document.
+    // The lightbox opens **above** the editor: it has to close first, and both
+    // listen on the same document.
     if (!this.note() || this.imageZoomed()) return;
 
     const editor = this.bodyEditor()?.nativeElement;
@@ -445,11 +436,11 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * Seul chemin de fermeture : il confirme les brouillons avant de sortir.
+   * The only closing path: it commits the drafts before leaving.
    *
-   * La liste de tâches est confirmée de la même façon et pour la même raison :
-   * Échap, le fond et le bouton de fermeture ne produisent aucun `blur`, la
-   * dernière ligne tapée serait sinon perdue.
+   * ⚠️ Escape, the backdrop and the close button produce no `blur`, so the last
+   * line typed would otherwise be lost — which is why the checklist commits
+   * here too.
    */
   protected requestClose(): void {
     this.commitTitle();

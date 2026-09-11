@@ -9,9 +9,8 @@
       aria-labelledby="overlay-title-input"
     >
       <div class="overlay-toolbar">
-        <!-- Le titre est confirmé au blur et à la fermeture, pas à chaque
-             frappe : une note enregistrée par caractère, c'est un aller-retour
-             IPC par caractère. -->
+        <!-- The title commits on blur and on close, not on every keystroke: a
+             note saved per character is one IPC round trip per character. -->
         <input
           #titleInput
           id="overlay-title-input"
@@ -23,8 +22,8 @@
           (blur)="commitTitle()"
         />
 
-        <!-- Pas de format pour une todolist : elle n'a pas de corps à colorier,
-             et un sélecteur sans effet vaut moins que pas de sélecteur. -->
+        <!-- No format for a todo list: it has no body to colour, and a picker
+             with no effect is worth less than no picker. -->
         @if (!isChecklist()) {
           <select
             #languageSelect
@@ -51,9 +50,9 @@
           <span aria-hidden="true">📌</span>
           {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
         </button>
-        <!-- Une note à champs se copie remplie : c'est la seule forme dont on
-             fasse quelque chose. Le texte est composé au clic, par le back, et
-             « Copier tel quel » reste à portée dans le panneau. -->
+        <!-- A note with fields copies filled: the only form anything is done
+             with. The text is composed at click time, by the back end, and
+             "Copy as is" stays within reach in the panel. -->
         @if (hasPlaceholders()) {
           <button type="button" class="toolbar-btn" (click)="requestFilledCopy()">
             <span aria-hidden="true">⚡</span>
@@ -91,8 +90,8 @@
       </div>
 
       <div class="overlay-meta-row">
-        <!-- Fil d'Ariane libre ("API Gateway / Auth"). C'est lui que le pied
-             d'une carte épinglée affiche à la place de son âge. -->
+        <!-- A free-form breadcrumb ("API Gateway / Auth"). It is what a pinned
+             card's footer shows instead of its age. -->
         <input
           #sourceInput
           class="overlay-source-input"
@@ -129,8 +128,8 @@
             />
           </form>
         </div>
-        <!-- Le badge dit l'état, le champ le change. Vider le champ rend la note
-             permanente ; y poser une date la fait entrer dans « À trier ». -->
+        <!-- The badge says the state, the field changes it. Clearing the field
+             makes the note permanent; setting a date puts it in "untriaged". -->
         <span class="overlay-expiry">
           <app-lifecycle-badge [lifecycle]="note.lifecycle" [expiringSoon]="note.expiringSoon" />
           <input
@@ -157,8 +156,8 @@
         (zoomRequested)="imageZoomRequested.emit()"
       />
 
-      <!-- Rien pour une note sans jeton : un en-tête toujours là et toujours
-           vide serait une fonction qu'on n'utilise jamais. -->
+      <!-- Nothing for a note with no token: a header always present and always
+           empty would be a feature nobody ever uses. -->
       @if (hasPlaceholders()) {
         <app-placeholder-panel
           [placeholders]="placeholders()"
@@ -173,16 +172,15 @@
         />
       }
 
-      <!-- Deux couches superposées plutôt qu'une bascule aperçu/édition : le
-           visualiseur colorie le brouillon en dessous, le <textarea> reçoit la
-           frappe par-dessus avec un texte transparent et un curseur visible.
-           C'est lui qui porte le texte accessible ; le visualiseur est masqué
-           aux lecteurs d'écran, qui liraient sinon le contenu deux fois. -->
+      <!-- Two stacked layers rather than a preview/edit toggle: the viewer
+           colours the draft underneath, and the <textarea> takes the typing on
+           top with transparent text and a visible caret. The textarea carries
+           the accessible text; the viewer is hidden from screen readers, which
+           would otherwise read the content twice. -->
       <div class="overlay-body" [class.previewing]="showingPreview()">
         @if (showingPreview()) {
-          <!-- Le corps rempli, en lecture seule : le champ de saisie n'est pas
-               masqué mais absent, sinon la frappe irait dans un texte que
-               personne ne conserve. -->
+          <!-- The filled body, read-only: the input is absent rather than
+               hidden, or typing would go into text nobody keeps. -->
           <app-code-viewer [content]="filledContent() ?? ''" [language]="note.language" />
         } @else if (isChecklist()) {
           <app-checklist-editor

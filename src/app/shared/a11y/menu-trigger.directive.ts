@@ -1,17 +1,15 @@
 import { Directive, ElementRef, inject, output, signal } from '@angular/core';
 
 /**
- * État ouvert/fermé d'un menu déroulant, et les deux façons d'en sortir sans
- * cliquer une entrée : clic hors-zone et Échap.
+ * A dropdown's open/closed state, and the two ways out of it without clicking
+ * an entry: a click outside and Escape.
  *
- * Posée sur l'élément racine du composant et lue via `exportAs` :
- * `<div appMenuTrigger #menu="appMenu">` puis `menu.open()`. Le déclencheur se
- * désigne par `[appMenuAnchor]` — c'est à lui que le focus revient à la
- * fermeture, sans quoi il disparaîtrait avec l'élément détruit et repartirait
- * sur `<body>`.
+ * Placed on the component's root element and read through `exportAs`. The
+ * trigger is named by `[appMenuAnchor]` — focus returns to it on close, which
+ * it would otherwise lose to `<body>` along with the destroyed element.
  *
- * Échap n'est pas traité ici mais émis : un menu à plusieurs niveaux doit
- * pouvoir replier son panneau avant de se fermer (cf. `SpaceSwitcher`).
+ * Escape is emitted rather than handled here: a multi-level menu must be able
+ * to fold its panel before closing (see `SpaceSwitcher`).
  */
 @Directive({
   selector: '[appMenuTrigger]',
@@ -27,9 +25,9 @@ export class MenuTriggerDirective {
   private readonly _open = signal(false);
   readonly open = this._open.asReadonly();
 
-  /** Échap pressé alors que le menu est ouvert. */
+  /** Escape pressed while the menu is open. */
   readonly escaped = output<void>();
-  /** Le menu vient de se fermer, quelle qu'en soit la cause. */
+  /** The menu has just closed, whatever the cause. */
   readonly closed = output<void>();
 
   toggle(): void {
@@ -41,8 +39,8 @@ export class MenuTriggerDirective {
   }
 
   /**
-   * `restoreFocus` est laissé à `false` quand la fermeture ouvre autre chose qui
-   * prendra le focus — la fiche « À propos », par exemple.
+   * `restoreFocus` is left `false` when closing opens something else that will
+   * take focus — the "About" card, say.
    */
   close(restoreFocus = true): void {
     if (!this._open()) return;
@@ -54,7 +52,7 @@ export class MenuTriggerDirective {
     }
   }
 
-  /** Ramène le focus sur le déclencheur, seul point de repère encore à l'écran. */
+  /** Returns focus to the trigger, the only landmark still on screen. */
   focusAnchor(): void {
     this.host.nativeElement.querySelector<HTMLElement>('[appMenuAnchor]')?.focus();
   }

@@ -5,10 +5,10 @@ import { Attachment } from '../model/note.model';
 import { toAttachment } from './note.dto';
 
 /**
- * Point d'accès aux pièces jointes. Les octets ne sont lus qu'à la demande :
- * `read` renvoie un `data:` URI, seule forme qu'un `<img>` accepte sous le CSP
- * de la WebView, mais qui pèse un tiers de plus que le fichier — une vignette se
- * demande à l'ouverture d'une note, jamais pour toute une liste.
+ * The way in to the attachments. The bytes are only read on demand: `read`
+ * answers a `data:` URI, the one form an `<img>` accepts under the WebView's
+ * CSP, and it weighs a third more than the file — a thumbnail is asked for when
+ * a note opens, never for a whole list.
  */
 @Injectable({ providedIn: 'root' })
 export class AttachmentsRepository {
@@ -16,7 +16,7 @@ export class AttachmentsRepository {
     return unwrap('list_attachments', await commands.listAttachments(noteId)).map(toAttachment);
   }
 
-  /** `path` vient du sélecteur de fichiers natif ; la copie est faite côté Rust. */
+  /** `path` comes from the native file picker; the copy happens on the Rust side. */
   async attach(noteId: string, path: string): Promise<Attachment> {
     return toAttachment(unwrap('attach_file', await commands.attachFile(noteId, path)));
   }
@@ -25,19 +25,19 @@ export class AttachmentsRepository {
     return unwrap('read_attachment', await commands.readAttachment(id));
   }
 
-  /** Ouvre le fichier avec l'application par défaut du système. */
+  /** Opens the file with the system's default application. */
   async open(id: string): Promise<void> {
     unwrap('open_attachment', await commands.openAttachment(id));
   }
 
-  /** Recopie le fichier là où l'utilisateur l'a demandé. */
+  /** Copies the file where the user asked. */
   async saveAs(id: string, path: string): Promise<void> {
     unwrap('save_attachment', await commands.saveAttachment(id, path));
   }
 
   /**
-   * Joint l'image du presse-papier. Les octets ne montent pas jusqu'ici : le
-   * natif lit le presse-papier, encode en PNG et écrit le fichier lui-même.
+   * Attaches the clipboard image. The bytes do not travel up here: the native
+   * side reads the clipboard, encodes to PNG and writes the file itself.
    */
   async attachClipboardImage(noteId: string, fileName: string): Promise<Attachment> {
     return toAttachment(

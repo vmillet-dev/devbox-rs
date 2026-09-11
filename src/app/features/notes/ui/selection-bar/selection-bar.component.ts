@@ -3,11 +3,10 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Space } from '@features/notes/model/space.model';
 
 /**
- * Barre d'actions de la sélection multiple : déplacer, taguer, partager,
- * mettre à la corbeille.
+ * The multi-selection action bar: move, tag, share, trash.
  *
- * N'apparaît que lorsqu'il y a une sélection — une barre vide en permanence
- * mangerait de la hauteur au canevas pour ne rien proposer.
+ * Only appears when there is a selection — a permanently empty bar would eat
+ * canvas height to offer nothing.
  */
 @Component({
   selector: 'app-selection-bar',
@@ -22,7 +21,7 @@ export class SelectionBarComponent {
 
   readonly moveRequested = output<string>();
   readonly tagRequested = output<string>();
-  /** Le libellé annonce le format : le Markdown ne doit pas être une surprise. */
+  /** The label announces the format: Markdown must not be a surprise. */
   readonly copyRequested = output<void>();
   readonly deleteRequested = output<void>();
   readonly cleared = output<void>();
@@ -30,8 +29,8 @@ export class SelectionBarComponent {
   protected readonly tagDraft = signal('');
 
   /**
-   * Suppression en deux temps, comme ailleurs : la WebView bloque tout pendant
-   * un `confirm()` natif, et une action de masse mérite plus qu'un clic.
+   * Deletion in two steps, as elsewhere: the WebView blocks on a native
+   * `confirm()`, and a bulk action deserves more than one click.
    */
   protected readonly confirmingDelete = signal(false);
 

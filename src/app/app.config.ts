@@ -26,9 +26,8 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
 
-    // Routage par fragment : les fichiers sont servis depuis le protocole
-    // interne de Tauri, où une URL profonde rechargée n'a pas de serveur pour la
-    // réécrire vers index.html.
+    // Hash routing: the files are served from Tauri's internal protocol, where
+    // a reloaded deep URL has no server to rewrite it to index.html.
     provideRouter(routes, withHashLocation()),
 
     provideTransloco({
@@ -41,13 +40,13 @@ export const appConfig: ApplicationConfig = {
       loader: AppTranslocoLoader,
     }),
 
-    // Un seul initialiseur pour les deux étapes, et non deux enchaînés : Angular
-    // les lance ensemble et n'attend leurs promesses qu'en bloc, donc
-    // `restore()` lirait un cache encore vide.
+    // One initialiser for both steps rather than two chained: Angular starts
+    // them together and only awaits their promises as a block, so `restore()`
+    // would read a still-empty cache.
     provideAppInitializer(async () => {
-      // ⚠️ Tout est injecté **avant** le premier `await` : un `inject()` placé
-      // après sort du contexte d'injection et fait échouer le démarrage
-      // (NG0203), écran noir à la clé.
+      // ⚠️ Everything is injected **before** the first `await`: an `inject()`
+      // after one leaves the injection context and fails the bootstrap
+      // (NG0203), black window included.
       const preferences = inject(PreferencesService);
       const locale = inject(LocaleService);
       const settings = inject(SettingsStore);
@@ -58,31 +57,28 @@ export const appConfig: ApplicationConfig = {
 
       await preferences.hydrate();
       locale.restore();
-      // Avant le premier rendu : lire après ferait apparaître l'interface dans
-      // un thème puis dans l'autre.
+      // Before the first render: reading later would show the interface in one
+      // theme then the other.
       settings.restore();
-      // Après `restore()` : c'est le front qui crée la barre système, en lui
-      // donnant ses libellés, et la créer avant aurait affiché la langue par
-      // défaut le temps d'un aller-retour.
+      // After `restore()`: the front creates the tray by giving it its labels,
+      // and creating it earlier would have shown the default language for a
+      // round trip.
       tray.start();
 
-      // Après `settings.restore()` aussi : ces trois-là suivent une préférence,
-      // et partir sur la valeur par défaut enverrait au natif un réglage que
-      // l'utilisateur avait changé — le temps d'une bascule visible.
-      //
-      // Un raccourci déjà pris par une autre application ne fait rien et ne dit
-      // rien : ce service est ce qui le signale.
+      // After `settings.restore()` too: these three follow a preference, and
+      // starting from the default would push a setting the user had changed to
+      // the native side — for the length of a visible flip.
       shortcuts.start();
       windowBehavior.start();
-      // Pas attendu : l'état réel appartient au système, et l'interroger ne doit
-      // pas retarder le premier rendu.
+      // Not awaited: the real state belongs to the system, and asking it must
+      // not delay the first render.
       void autostart.start();
     }),
 
-    // Recherche de mise à jour au lancement. La promesse n'est délibérément pas
-    // retournée : Angular attend celles d'un initialiseur, et l'application
-    // resterait sur un écran vide le temps d'un appel réseau — indéfiniment si
-    // l'endpoint ne répond pas. La pop-in apparaît quand la réponse arrive.
+    // Update check at launch. ⚠️ The promise is deliberately not returned:
+    // Angular awaits an initialiser's, and the application would sit on a blank
+    // screen for the length of a network call — indefinitely if the endpoint
+    // never answers. The prompt appears when the answer arrives.
     provideAppInitializer(() => {
       void inject(UpdateStore).check();
     }),

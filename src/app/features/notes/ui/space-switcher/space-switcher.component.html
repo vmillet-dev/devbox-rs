@@ -15,9 +15,9 @@
   @if (menu.open()) {
     <div class="space-dropdown">
       @if (editing(); as edited) {
-        <!-- Panneau d'édition : il remplace le menu, comme le formulaire de
-             création. Deux actions distinctes sur le même espace, donc deux
-             groupes séparés plutôt qu'un formulaire unique. -->
+        <!-- The edit panel: it replaces the menu, like the create form. Two
+             distinct actions on the same space, hence two separate groups
+             rather than one form. -->
         <div class="space-edit-panel">
           <p class="space-edit-title">{{ edited.name }}</p>
 
@@ -40,8 +40,8 @@
                 {{ 'notes.moveNotesTo' | transloco }}
               </label>
               <div class="space-delete-row">
-                <!-- La cible est obligatoire : l'espace part avec ses notes
-                     (ON DELETE CASCADE) si personne ne les recueille. -->
+                <!-- The target is mandatory: the space leaves with its notes
+                     (ON DELETE CASCADE) if nobody takes them in. -->
                 <select #targetSelect id="space-move-target" class="space-create-input">
                   @for (target of moveTargets(); track target.id) {
                     <option [value]="target.id">{{ target.name }}</option>
@@ -62,9 +62,9 @@
           }
         </div>
       } @else if (creating()) {
-        <!-- Le formulaire remplace le menu au lieu de s'y ajouter : un champ de
-             saisie dans un role="menu" n'est ni valide ARIA, ni navigable de la
-             même façon que des options. -->
+        <!-- The form replaces the menu rather than adding to it: an input
+             inside a role="menu" is neither valid ARIA nor navigable the way
+             options are. -->
         <form class="space-create-form" (submit)="submitNewSpace($event, nameInput.value)">
           <input
             #nameInput
@@ -91,8 +91,8 @@
             {{ 'notes.allSpaces' | transloco }}
           </button>
           @for (space of spaces(); track space.id) {
-            <!-- `role="none"` : un conteneur nu entre le menu et ses items
-                 casserait la relation attendue par les lecteurs d'écran. -->
+            <!-- `role="none"`: a bare container between the menu and its items
+                 would break the relationship screen readers expect. -->
             <div class="space-row" role="none">
               <button
                 appMenuItem

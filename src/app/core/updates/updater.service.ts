@@ -2,35 +2,37 @@ import { Injectable } from '@angular/core';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { Update, check } from '@tauri-apps/plugin-updater';
 
-/** Mise à jour proposée, réduite à ce que l'interface a besoin d'afficher. */
+/** An offered update, reduced to what the interface has to display. */
 export interface AvailableUpdate {
   readonly version: string;
   readonly currentVersion: string;
-  /** Notes de version telles que publiées dans le manifeste. */
-  readonly notes?: string;
+  /**
+   * Release notes as published in the manifest. Explicitly `| undefined`:
+   * the plugin may omit them, and `exactOptionalPropertyTypes` tells an absent
+   * key from a present-but-undefined one.
+   */
+  readonly notes?: string | undefined;
 }
 
-/** Avancement entre 0 et 1, ou `null` quand la taille totale est inconnue. */
+/** Progress between 0 and 1, or `null` when the total size is unknown. */
 export type DownloadProgress = number | null;
 
 /**
- * Seul point de passage vers le plugin de mise à jour.
+ * The only way through to the updater plugin.
  *
- * `bindings.ts` couvre les commandes que nous écrivons ; celles-ci appartiennent
- * au plugin et n'y figurent donc pas. Le principe reste le même : ni composant ni store n'importe
- * `@tauri-apps/plugin-updater`, ce qui rend le store testable en doublant cette
- * classe — sans quoi il faudrait un pont Tauri dans jsdom.
+ * `bindings.ts` covers the commands we write; these belong to the plugin, so
+ * no component or store imports `@tauri-apps/plugin-updater` directly — which
+ * is what makes the store testable by doubling this class.
  *
- * L'objet `Update` rendu par le plugin est une **ressource native** : il porte
- * un identifiant côté Rust et doit être refermé s'il n'est pas installé. Il est
- * retenu ici plutôt que remonté au store, qui n'aurait rien à en faire sinon le
- * faire fuir.
+ * ⚠️ The `Update` the plugin returns is a **native resource**: it holds an
+ * identifier on the Rust side and must be closed when it is not installed. It
+ * is kept here rather than handed to the store, which would only leak it.
  */
 @Injectable({ providedIn: 'root' })
 export class UpdaterService {
   private pending: Update | null = null;
 
-  /** `null` quand l'application est déjà à jour. */
+  /** `null` when the application is already up to date. */
   async check(): Promise<AvailableUpdate | null> {
     await this.discard();
 
@@ -46,13 +48,13 @@ export class UpdaterService {
   }
 
   /**
-   * Télécharge puis installe la mise à jour retenue par le dernier `check()`.
-   * Sur Windows, l'installateur arrête l'application lui-même : ce qui suit cet
-   * appel n'est pas garanti de s'exécuter.
+   * Downloads then installs the update held by the last `check()`. On Windows
+   * the installer stops the application itself, so nothing after this call is
+   * guaranteed to run.
    */
   async install(onProgress: (progress: DownloadProgress) => void): Promise<void> {
     const update = this.pending;
-    if (!update) throw new Error('Aucune mise à jour en attente.');
+    if (!update) throw new Error('No update pending.');
 
     let total: number | null = null;
     let downloaded = 0;
@@ -60,8 +62,8 @@ export class UpdaterService {
     await update.downloadAndInstall((event) => {
       switch (event.event) {
         case 'Started':
-          // `contentLength` est absent si le serveur ne l'annonce pas : la barre
-          // reste alors indéterminée plutôt que d'afficher un faux pourcentage.
+          // Absent when the server does not announce it: the bar stays
+          // indeterminate rather than showing a made-up percentage.
           total = event.data.contentLength ?? null;
           onProgress(null);
           break;
@@ -82,7 +84,7 @@ export class UpdaterService {
     await relaunch();
   }
 
-  /** Referme la ressource native sans installer. */
+  /** Closes the native resource without installing. */
   async discard(): Promise<void> {
     const update = this.pending;
     this.pending = null;

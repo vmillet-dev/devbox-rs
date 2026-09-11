@@ -17,10 +17,10 @@ const SNIPPET_LINES = 2;
 /**
  * Palette de collage rapide : chercher, choisir, coller ailleurs.
  *
- * Pas de piège à focus ici, contrairement aux autres modales : le champ garde le
- * focus du début à la fin, et la liste se parcourt aux flèches sans jamais le
- * lui prendre — d'où `aria-activedescendant` plutôt qu'un focus déplacé, qui
- * ferait perdre la frappe en cours.
+ * No focus trap here, unlike the other modals: the field keeps focus from start
+ * to finish, and the list is walked with the arrows without ever taking it —
+ * hence `aria-activedescendant` rather than a moved focus, which would lose
+ * what is being typed.
  */
 @Component({
   selector: 'app-quick-palette',
@@ -33,7 +33,7 @@ export class QuickPaletteComponent {
   readonly query = input('');
   readonly results = input.required<readonly Note[]>();
   readonly highlighted = input(0);
-  /** La ligne « créer une note » ferme la liste : elle en est la dernière. */
+  /** The "create a note" row closes the list: it is the last one. */
   readonly canCreate = input(false);
 
   readonly queryChanged = output<string>();
@@ -46,8 +46,8 @@ export class QuickPaletteComponent {
   private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
 
   constructor() {
-    // Une palette ouverte sans focus obligerait à attraper le champ à la souris,
-    // ce qui lui retirerait tout intérêt.
+    // A palette opened without focus would mean grabbing the field with the
+    // mouse, which removes the point of it.
     afterNextRender(() => this.searchInput().nativeElement.focus());
   }
 
@@ -74,9 +74,9 @@ export class QuickPaletteComponent {
         this.chosen.emit();
         break;
       case 'Tab': {
-        // Ouvrir plutôt que copier : la palette sert aussi à retrouver une note
-        // pour l'éditer. Tab n'a rien d'autre à faire ici, le champ est seul —
-        // et rien à ouvrir sur la ligne de création, qui ne désigne aucune note.
+        // Open rather than copy: the palette also serves to find a note to
+        // edit. Tab has nothing else to do here, the field being alone — and
+        // nothing to open on the create row, which names no note.
         const note = this.results()[this.highlighted()];
         if (note) {
           event.preventDefault();

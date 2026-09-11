@@ -225,14 +225,14 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
     });
   }
 
-  deleteTag(tag: string): Promise<number> {
+  deleteTags(tags: readonly string[]): Promise<number> {
     return guard(this, () => {
-      this.deletedTags.push(tag);
+      this.deletedTags.push(...tags);
       this.notes = this.notes.map((note) => ({
         ...note,
-        tags: note.tags.filter((existing) => existing !== tag),
+        tags: note.tags.filter((existing) => !tags.includes(existing)),
       }));
-      return 1;
+      return tags.length;
     });
   }
 

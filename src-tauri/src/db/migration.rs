@@ -253,9 +253,9 @@ mod tests {
 
     #[test]
     fn an_existing_note_becomes_a_snippet_when_todo_lists_arrive() {
-        // Le vrai chemin de mise à jour : une base déjà peuplée, pas une base
-        // neuve. `ADD COLUMN kind` n'a de valeur pour ces lignes que par son
-        // `DEFAULT`, et sans lui SQLite refuserait la colonne `NOT NULL`.
+        // The real upgrade path: an already populated database, not a fresh one.
+        // `ADD COLUMN kind` only gives these rows a value through its `DEFAULT`,
+        // and without it SQLite would refuse a `NOT NULL` column.
         let mut connection = legacy_database(
             &[
                 LEGACY_SCHEMA,
@@ -278,7 +278,7 @@ mod tests {
                 .unwrap(),
             "snippet"
         );
-        // Le contenu n'est pas réécrit : la migration ajoute, elle ne touche à rien.
+        // The content is not rewritten: the migration adds, it touches nothing.
         assert_eq!(
             schema::notes::table
                 .select(schema::notes::content)

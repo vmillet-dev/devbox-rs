@@ -1,14 +1,13 @@
--- Ce qu'on a déjà tapé dans les `{{champs}}` d'une note : `host = db.internal`
--- survit à la fermeture de l'éditeur, sinon le panneau ne vaudrait pas mieux que
--- la modale qu'il remplace.
+-- What has already been typed into a note's `{{fields}}`: `host = db.internal`
+-- survives closing the editor.
 --
--- Table à part plutôt qu'une colonne sérialisée, comme `note_tags` et
--- `note_items` : le nom porte l'identité, et une écriture réécrit l'ensemble.
+-- A table of its own rather than a serialised column, like `note_tags` and
+-- `note_items`: the name carries the identity, and a write rewrites the whole set.
 --
--- ⚠️ Pas de `COLLATE NOCASE` ici, contrairement à `note_tags` : c'est
--- `notes::placeholder::fill` qui décide ce qu'un jeton vaut, et il compare le
--- nom **tel quel** — `{{Host}}` et `{{host}}` sont deux champs distincts dans le
--- texte, les confondre en base remplirait l'un avec la valeur de l'autre.
+-- ⚠️ No `COLLATE NOCASE` here, unlike `note_tags`: `notes::placeholder::fill`
+-- decides what a token is worth and compares the name **as written** —
+-- `{{Host}}` and `{{host}}` are two distinct fields in the text, and conflating
+-- them in the database would fill one with the other's value.
 CREATE TABLE note_placeholders (
     note_id TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
     name    TEXT NOT NULL,

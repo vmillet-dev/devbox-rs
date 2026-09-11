@@ -1090,17 +1090,18 @@ describe('NotesPageComponent', () => {
       await vi.waitFor(() => expect(store.visibleNotes().map((note) => note.id)).toContain('n1'));
     });
 
-    it('reloads the canvas when the trash panel closes', async () => {
-      // Purging behind the panel changes nothing on the canvas, but restoring
-      // does — and closing is the one moment that covers both.
+    it('closes the trash panel without re-querying, since nothing changed', async () => {
+      // Restoring and purging bump `NotesRevision` where they happen, so
+      // closing no longer has to stand in for "something may have changed".
       await TestBed.inject(TrashStore).open();
       await fixture.whenStable();
       const queries = repository.queryCount;
 
       child(TrashPanelComponent).closed.emit();
+      await fixture.whenStable();
 
-      await vi.waitFor(() => expect(repository.queryCount).toBeGreaterThan(queries));
       expect(TestBed.inject(TrashStore).isOpen()).toBe(false);
+      expect(repository.queryCount).toBe(queries);
     });
 
     it('renames a tag across the corpus and reloads', async () => {

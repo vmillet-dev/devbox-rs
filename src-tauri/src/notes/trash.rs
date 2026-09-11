@@ -1,7 +1,7 @@
-//! La corbeille : une note supprimée porte une date au lieu de disparaître.
+//! The trash: a deleted note carries a date instead of disappearing.
 //!
-//! La rétention est une règle produit, donc elle vit ici et non dans le SQL —
-//! `store` se contente d'écrire et de lire `deleted_at`.
+//! Retention is a product rule, so it lives here and not in the SQL — `store`
+//! only writes and reads `deleted_at`.
 
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::Serialize;
@@ -9,19 +9,19 @@ use specta::Type;
 
 use super::model::Note;
 
-/// Au-delà, la note part pour de bon. Seuil unique : le panneau affiche
-/// l'échéance que la purge applique.
+/// Past this the note goes for good. Single threshold: the panel shows the
+/// deadline the purge applies.
 pub const RETENTION: TimeDelta = TimeDelta::days(30);
 
-/// `flatten` : le front lit une note, avec deux dates de plus.
+/// `flatten`: the front reads a note, with two extra dates.
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TrashedNote {
     #[serde(flatten)]
     pub note: Note,
     pub deleted_at: DateTime<Utc>,
-    /// Dérivée, jamais stockée : la rétention peut changer d'une version à
-    /// l'autre et une échéance figée en base ne suivrait pas.
+    /// Derived, never stored: retention can change between versions, and a
+    /// deadline frozen in the database would not follow.
     pub purge_at: DateTime<Utc>,
 }
 

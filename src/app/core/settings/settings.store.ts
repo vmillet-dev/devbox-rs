@@ -11,159 +11,177 @@ import {
   ThemeChoice,
 } from './app-settings.model';
 
-/** Ce que la WebView tient de l'OS ; absente hors navigateur (jsdom en a une inerte). */
+/** What the WebView gets from the OS; absent outside a browser (jsdom has an inert one). */
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
-function isOneOf<T extends string>(values: readonly T[], candidate: string | null): candidate is T {
-  return (values as readonly string[]).includes(candidate ?? '');
+/** A setting read back the way it is written: `preferences.json` holds strings. */
+interface SettingCodec<T> {
+  /** `null` rejects the stored value, and the setting keeps its default. */
+  parse(stored: string): T | null;
+  format(value: T): string;
 }
 
+const asBoolean: SettingCodec<boolean> = {
+  parse: (stored) => (stored === 'true' ? true : stored === 'false' ? false : null),
+  format: String,
+};
+
+/** A blank accelerator would leave the palette unreachable without saying so. */
+const asAccelerator: SettingCodec<string> = {
+  parse: (stored) => stored.trim() || null,
+  format: (value) => value,
+};
+
+function asOneOf<T extends string>(values: readonly T[]): SettingCodec<T> {
+  return {
+    parse: (stored) => ((values as readonly string[]).includes(stored) ? (stored as T) : null),
+    format: (value) => value,
+  };
+}
+
+/** A readable signal that also knows how to persist what it is given. */
+export type SettingSignal<T> = Signal<T> & { write(value: T): void };
+
 /**
- * Les réglages de l'application : source de vérité pour l'interface, adossée à
- * `PreferencesService` — donc à un vrai fichier, qui survit à un vidage de la
- * WebView.
+ * The application's settings: the source of truth for the interface, backed by
+ * `PreferencesService` — so by a real file, which survives a WebView wipe.
  *
- * **Les écritures s'appliquent tout de suite.** Pas d'« OK / Annuler » : c'est
- * déjà l'idiome de l'application (l'éditeur enregistre au blur, le sélecteur de
- * langue bascule au clic), et un thème qu'on ne voit qu'après validation ne se
- * choisit pas, il se devine.
+ * **Writes apply immediately.** No "OK / Cancel": it is already the idiom here
+ * (the editor saves on blur, the language picker switches on click), and a
+ * theme you only see after confirming is guessed at rather than chosen.
  *
- * Ce store ne parle à personne d'autre : ce sont les services natifs qui
- * *lisent* ces signaux et poussent vers le Rust ([`GlobalShortcutsService`],
- * [`WindowBehaviorService`], [`AutostartService`]). L'inverse mettrait l'IPC
- * dans un store de préférences, qui doit rester lisible hors Tauri.
+ * This store talks to nobody: the native services *read* these signals and push
+ * to Rust (`GlobalShortcutsService`, `WindowBehaviorService`, `AutostartService`).
+ * The other way round would put IPC in a preferences store, which has to stay
+ * readable outside Tauri.
  */
 @Injectable({ providedIn: 'root' })
 export class SettingsStore {
   private readonly preferences = inject(PreferencesService);
 
-  private readonly _theme = signal<ThemeChoice>(DEFAULT_SETTINGS.theme);
-  private readonly _density = signal<Density>(DEFAULT_SETTINGS.density);
-  private readonly _startWithSystem = signal(DEFAULT_SETTINGS.startWithSystem);
-  private readonly _minimizeToTray = signal(DEFAULT_SETTINGS.minimizeToTray);
-  private readonly _closeToTray = signal(DEFAULT_SETTINGS.closeToTray);
-  private readonly _paletteShortcut = signal(DEFAULT_SETTINGS.paletteShortcut);
-  private readonly _showPinnedFirst = signal(DEFAULT_SETTINGS.showPinnedFirst);
-  private readonly _copyConfirmation = signal(DEFAULT_SETTINGS.copyConfirmation);
+  /**
+   * ⚠️ Declared before the settings below: class fields initialise in order,
+   * and `setting()` pushes into this on the way.
+   */
+  private readonly restorers: (() => void)[] = [];
 
-  readonly theme = this._theme.asReadonly();
-  readonly density = this._density.asReadonly();
-  readonly startWithSystem = this._startWithSystem.asReadonly();
-  readonly minimizeToTray = this._minimizeToTray.asReadonly();
-  readonly closeToTray = this._closeToTray.asReadonly();
-  readonly paletteShortcut = this._paletteShortcut.asReadonly();
-  readonly showPinnedFirst = this._showPinnedFirst.asReadonly();
-  readonly copyConfirmation = this._copyConfirmation.asReadonly();
+  readonly theme = this.setting('theme', asOneOf(THEME_CHOICES));
+  readonly density = this.setting('density', asOneOf(DENSITIES));
+  readonly startWithSystem = this.setting('startWithSystem', asBoolean);
+  readonly minimizeToTray = this.setting('minimizeToTray', asBoolean);
+  readonly closeToTray = this.setting('closeToTray', asBoolean);
+  readonly paletteShortcut = this.setting('paletteShortcut', asAccelerator);
+  readonly showPinnedFirst = this.setting('showPinnedFirst', asBoolean);
+  readonly copyConfirmation = this.setting('copyConfirmation', asBoolean);
 
-  /** Ce que l'OS demande, suivi en direct : un thème « système » doit basculer sans relancer l'application. */
+  /** What the OS asks for, followed live: a "system" theme must switch without a restart. */
   private readonly systemPrefersDark = signal(false);
 
-  /** Le thème une fois `system` tranché — c'est cette valeur que le CSS lit. */
+  /** The theme once `system` is resolved — this is the value the CSS reads. */
   readonly resolvedTheme: Signal<ResolvedTheme> = computed(() => {
-    const choice = this._theme();
-    if (choice !== 'system') return choice;
+    const choice = this.theme();
 
-    return this.systemPrefersDark() ? 'dark' : 'light';
+    return choice === 'system' ? (this.systemPrefersDark() ? 'dark' : 'light') : choice;
   });
 
   constructor() {
     this.watchSystemTheme();
 
-    // `<html>` porte le thème et la densité : les variables CSS vivent sur
-    // `:root`, et une classe posée plus bas ne les atteindrait pas.
+    // `<html>` carries the theme and the density: the CSS variables live on
+    // `:root`, and a class set any lower would not reach them.
     effect(() => {
       const root = document.documentElement;
       root.dataset['theme'] = this.resolvedTheme();
-      root.dataset['density'] = this._density();
+      root.dataset['density'] = this.density();
     });
   }
 
   /**
-   * Relit les réglages enregistrés. Appelée depuis `provideAppInitializer`,
-   * **après** `PreferencesService.hydrate()` : lire avant rendrait les valeurs
-   * par défaut, et l'interface apparaîtrait dans un thème puis dans l'autre.
+   * Reads the stored settings back. Called from `provideAppInitializer`,
+   * **after** `PreferencesService.hydrate()`: reading before would yield the
+   * defaults, and the interface would appear in one theme then the other.
    */
   restore(): void {
-    const theme = this.preferences.read(SETTINGS_KEYS.theme);
-    if (isOneOf(THEME_CHOICES, theme)) this._theme.set(theme);
-
-    const density = this.preferences.read(SETTINGS_KEYS.density);
-    if (isOneOf(DENSITIES, density)) this._density.set(density);
-
-    this._startWithSystem.set(this.readFlag('startWithSystem'));
-    this._minimizeToTray.set(this.readFlag('minimizeToTray'));
-    this._closeToTray.set(this.readFlag('closeToTray'));
-    this._showPinnedFirst.set(this.readFlag('showPinnedFirst'));
-    this._copyConfirmation.set(this.readFlag('copyConfirmation'));
-
-    // Une combinaison vide désarmerait la palette sans rien dire : mieux vaut
-    // celle d'origine, que le panneau affiche et que l'on peut rechanger.
-    const shortcut = this.preferences.read(SETTINGS_KEYS.paletteShortcut)?.trim();
-    if (shortcut) this._paletteShortcut.set(shortcut);
+    for (const restore of this.restorers) {
+      restore();
+    }
   }
 
   setTheme(theme: ThemeChoice): void {
-    this._theme.set(theme);
-    this.preferences.write(SETTINGS_KEYS.theme, theme);
+    this.theme.write(theme);
   }
 
   setDensity(density: Density): void {
-    this._density.set(density);
-    this.preferences.write(SETTINGS_KEYS.density, density);
+    this.density.write(density);
   }
 
   setStartWithSystem(enabled: boolean): void {
-    this._startWithSystem.set(enabled);
-    this.writeFlag('startWithSystem', enabled);
+    this.startWithSystem.write(enabled);
   }
 
   setMinimizeToTray(enabled: boolean): void {
-    this._minimizeToTray.set(enabled);
-    this.writeFlag('minimizeToTray', enabled);
+    this.minimizeToTray.write(enabled);
   }
 
   setCloseToTray(enabled: boolean): void {
-    this._closeToTray.set(enabled);
-    this.writeFlag('closeToTray', enabled);
+    this.closeToTray.write(enabled);
   }
 
-  /** Une combinaison vide est refusée : elle laisserait la palette sans appel. */
+  /** A blank combination is refused: it would leave the palette with no call. */
   setPaletteShortcut(accelerator: string): void {
-    const trimmed = accelerator.trim();
-    if (!trimmed) return;
-
-    this._paletteShortcut.set(trimmed);
-    this.preferences.write(SETTINGS_KEYS.paletteShortcut, trimmed);
+    this.paletteShortcut.write(accelerator);
   }
 
   setShowPinnedFirst(enabled: boolean): void {
-    this._showPinnedFirst.set(enabled);
-    this.writeFlag('showPinnedFirst', enabled);
+    this.showPinnedFirst.write(enabled);
   }
 
   setCopyConfirmation(enabled: boolean): void {
-    this._copyConfirmation.set(enabled);
-    this.writeFlag('copyConfirmation', enabled);
+    this.copyConfirmation.write(enabled);
   }
 
-  private readFlag(key: keyof AppSettings): boolean {
-    const stored = this.preferences.read(SETTINGS_KEYS[key]);
+  /**
+   * One setting: its signal, its restore step and its write-through, from a
+   * single declaration. Adding a setting is a line here and a field on
+   * `AppSettings` — nothing else.
+   */
+  private setting<K extends keyof AppSettings>(
+    key: K,
+    codec: SettingCodec<AppSettings[K]>,
+  ): SettingSignal<AppSettings[K]> {
+    const current = signal(DEFAULT_SETTINGS[key]);
 
-    // Rien d'enregistré n'est pas « faux » : c'est le défaut du réglage.
-    return stored === null ? Boolean(DEFAULT_SETTINGS[key]) : stored === 'true';
-  }
+    this.restorers.push(() => {
+      const stored = this.preferences.read(SETTINGS_KEYS[key]);
+      // Nothing stored is not "false": it is the setting's default.
+      const parsed = stored === null ? null : codec.parse(stored);
+      if (parsed !== null) {
+        current.set(parsed);
+      }
+    });
 
-  private writeFlag(key: keyof AppSettings, value: boolean): void {
-    this.preferences.write(SETTINGS_KEYS[key], String(value));
+    const write = (value: AppSettings[K]): void => {
+      // Through the codec both ways, so a value the restore path would reject
+      // is refused on the way in too.
+      const accepted = codec.parse(codec.format(value));
+      if (accepted === null) return;
+
+      current.set(accepted);
+      this.preferences.write(SETTINGS_KEYS[key], codec.format(accepted));
+    };
+
+    return Object.assign(current.asReadonly(), { write });
   }
 
   private watchSystemTheme(): void {
-    // `matchMedia` manque à certains environnements de test ; sans lui le thème
-    // « système » retombe sur le clair, ce que le défaut du CSS assume.
+    // `matchMedia` is missing from some test environments; without it the
+    // "system" theme falls back to light, which the CSS default assumes.
     const media = window.matchMedia?.(DARK_QUERY);
     if (!media) return;
 
     this.systemPrefersDark.set(media.matches);
-    media.addEventListener('change', (event) => this.systemPrefersDark.set(event.matches));
+    media.addEventListener('change', (event) => {
+      this.systemPrefersDark.set(event.matches);
+    });
   }
 }

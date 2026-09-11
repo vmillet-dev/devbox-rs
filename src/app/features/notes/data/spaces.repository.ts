@@ -4,14 +4,16 @@ import { unwrap } from '@core/ipc/ipc.error';
 import { Space, SpaceDraft } from '../model/space.model';
 
 /**
- * Point d'accès aux espaces : ni composant ni store ne touche une source de
- * données autrement.
+ * The way in to the spaces: no component or store touches a data source
+ * otherwise.
  *
- * `create` et `rename` renvoient l'espace **tel que persisté** — c'est la
- * persistance qui attribue l'`id`. `delete` prend un espace **refuge** : le
- * schéma emporte les notes d'un espace supprimé (`ON DELETE CASCADE`), donc une
- * signature à un argument aurait fait de la perte de données le défaut. Le
- * transfert et la suppression sont atomiques côté Rust.
+ * `create` and `rename` return the space **as persisted** — persistence assigns
+ * the `id`.
+ *
+ * ⚠️ `delete` takes a **refuge** space: the schema takes a deleted space's
+ * notes with it (`ON DELETE CASCADE`), so a one-argument signature would have
+ * made data loss the default. The transfer and the deletion are atomic on the
+ * Rust side.
  */
 @Injectable({ providedIn: 'root' })
 export class SpacesRepository {
@@ -27,7 +29,7 @@ export class SpacesRepository {
     return unwrap('rename_space', await commands.renameSpace(id, draft));
   }
 
-  /** `targetSpaceId` recueille les notes de l'espace supprimé. */
+  /** `targetSpaceId` receives the deleted space's notes. */
   async delete(id: string, targetSpaceId: string): Promise<void> {
     unwrap('delete_space', await commands.deleteSpace(id, targetSpaceId));
   }

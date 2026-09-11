@@ -41,12 +41,11 @@ pub struct Note {
     /// Empty for a snippet. A checklist has these **instead of** `content`.
     #[serde(default)]
     pub items: Vec<ChecklistItem>,
-    /// Ce qui a été saisi dans les `{{champs}}` du contenu, par nom de champ.
+    /// What was typed into the content's `{{fields}}`, by field name.
     ///
-    /// Écrit par `set_placeholder_values` et par lui seul : remplir un champ
-    /// n'est pas modifier la note, et ne touche donc pas `updated_at`. `default`
-    /// pour la raison qui vaut déjà pour `kind` — un export écrit avant ce
-    /// champ doit rester lisible.
+    /// Written by `set_placeholder_values` and by nothing else: filling a field
+    /// is not editing the note, so it leaves `updated_at` alone. `default` for
+    /// the reason that already applies to `kind`.
     #[serde(default)]
     pub placeholder_values: BTreeMap<String, String>,
 }
@@ -140,8 +139,8 @@ impl NoteDraft {
             lifecycle: self.lifecycle,
             kind: self.kind,
             items,
-            // Une note qui vient de naître n'a rien à retenir : les valeurs se
-            // saisissent dans l'éditeur, une fois les champs écrits.
+            // A note just born has nothing to remember: the values are typed in
+            // the editor, once the fields exist.
             placeholder_values: BTreeMap::new(),
         }
     }
@@ -227,12 +226,11 @@ pub struct DisplayNote {
     pub note: Note,
     pub footer: NoteFooter,
     pub expiring_soon: bool,
-    /// Champs `{{…}}` du contenu, munis de ce qui a déjà été saisi pour eux :
-    /// l'éditeur les remplit, la carte propose de les remplir avant de copier.
-    /// La **liste** est dérivée du texte ; les valeurs, elles, sont persistées.
+    /// The content's `{{…}}` fields, carrying what has already been typed for
+    /// them. The **list** is derived from the text; the values are persisted.
     pub placeholders: Vec<Placeholder>,
-    /// Renseigné après coup par ce qui dispose d'une connexion — `decorate` ne
-    /// lit pas la base. Zéro tant que personne ne l'a rempli.
+    /// Filled in afterwards by whoever holds a connection — `decorate` reads no
+    /// database. Zero until someone sets it.
     pub attachment_count: u32,
 }
 
@@ -261,16 +259,13 @@ pub fn decorate_now(note: Note) -> DisplayNote {
     decorate(note, Utc::now())
 }
 
-/// Pose les **variables globales** en valeur proposée sur les champs d'une note
-/// déjà décorée.
+/// Lays the **global variables** on an already decorated note's fields, as
+/// proposed values.
 ///
-/// Séparé de [`decorate`], qui ne lit pas la base : les variables viennent
-/// d'une seconde requête, exactement comme le compteur de pièces jointes.
-///
-/// Elles écrasent la valeur par défaut du texte et **ne touchent pas** à ce qui
-/// a été saisi sur la note : le panneau les affiche donc en gris, comme une
-/// suggestion. Les recopier dans `value` figerait la variable le jour où elle
-/// change, ce que `set_placeholder_values` écrirait ensuite en base.
+/// ⚠️ They override the default written in the text but **do not touch** what
+/// was typed on the note, which is why the panel shows them in grey. Copying
+/// one into `value` would freeze the variable the day it changes, and
+/// `set_placeholder_values` would then write that copy to the database.
 pub fn apply_global_defaults(note: &mut DisplayNote, globals: &BTreeMap<String, String>) {
     for placeholder in &mut note.placeholders {
         if let Some(value) = globals.get(&placeholder.name) {
@@ -312,8 +307,7 @@ fn expires_soon(note: &Note, now: DateTime<Utc>) -> bool {
     at.signed_duration_since(now) <= EXPIRING_SOON
 }
 
-/// Un tag du corpus et le nombre de notes vivantes qui le portent : de quoi
-/// décider quoi renommer, fusionner ou jeter.
+/// A tag of the corpus and the number of living notes carrying it.
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TagUsage {
@@ -321,14 +315,26 @@ pub struct TagUsage {
     pub note_count: u32,
 }
 
-/// Un tag saisi pour être **écrit sur tout le corpus** (renommage, fusion) passe
-/// par la même normalisation que les autres, mais son échec est une erreur : un
-/// silence renommerait vers rien.
+/// A tag typed to be **written across the whole corpus** (rename, merge) goes
+/// through the same normalisation as any other, but its failure is an error:
+/// staying silent would rename onto nothing.
 pub fn validated_tag(raw: &str) -> Result<String, crate::error::ValidationError> {
     normalize_tags(std::slice::from_ref(&raw.to_string()))
         .into_iter()
         .next()
         .ok_or_else(|| crate::error::ValidationError::new("tag", "a tag must have a readable name"))
+}
+
+/// The cleaned spelling of **one** tag, or `None` when nothing readable is
+/// left.
+///
+/// Split out of [`normalize_tags`] so a caller that only needs to know whether
+/// a tag was selected can ask without building the list — and without carrying
+/// a second copy of the rule.
+pub fn normalize_tag(tag: &str) -> Option<&str> {
+    let cleaned = tag.trim().trim_start_matches('#').trim();
+
+    (!cleaned.is_empty()).then_some(cleaned)
 }
 
 /// Trim, leading `#`, blanks, and duplicates.
@@ -342,10 +348,9 @@ pub fn normalize_tags(tags: &[String]) -> Vec<String> {
     let mut normalized: Vec<String> = Vec::new();
 
     for tag in tags {
-        let cleaned = tag.trim().trim_start_matches('#').trim();
-        if cleaned.is_empty() {
+        let Some(cleaned) = normalize_tag(tag) else {
             continue;
-        }
+        };
 
         let folded = cleaned.to_lowercase();
         if seen.contains(&folded) {

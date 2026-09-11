@@ -1,7 +1,7 @@
 <section class="canvas-section" [attr.aria-labelledby]="headingId()">
   <h2 class="canvas-section-title" [id]="headingId()">
     {{ titleKey() | transloco }}
-    <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). D'où le prettier-ignore, qui réintroduirait ces sauts de ligne. -->
+    <!-- Deliberately compact: a line break between the interpolations would leave a stray space in the rendered text (Angular does not fully collapse it). Hence the prettier-ignore, which would put those breaks back. -->
     <!-- prettier-ignore -->
     <span class="n">· {{ section().notes.length }}@if (section().hasExpiringNotes) { · {{ 'sections.expiringHint' | transloco }}}</span>
   </h2>

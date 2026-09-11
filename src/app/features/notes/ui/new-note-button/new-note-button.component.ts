@@ -5,18 +5,17 @@ import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 
 /**
- * Bouton scindé : l'action par défaut crée une note ordinaire, le chevron
- * déroule le choix du type.
+ * A split button: the default action creates an ordinary note, the chevron
+ * drops down the kind picker.
  *
- * Scindé et non purement déroulant, parce que les deux gestes n'ont pas la même
- * fréquence : créer une note reste le cas courant et garde un clic, choisir un
- * type en demande deux. Un menu qui s'ouvrirait à chaque création aurait
- * transformé le geste le plus fréquent en le plus lent.
+ * Split rather than purely a dropdown because the two gestures do not share a
+ * frequency: creating a note stays the common case and keeps one click, picking
+ * a kind takes two. A menu opening on every creation would have turned the most
+ * frequent gesture into the slowest.
  *
- * Même mécanique que le sélecteur d'espaces — `MenuTriggerDirective` pour
- * l'ouverture, le clic hors-zone et Échap, `MenuPanelDirective` pour les
- * flèches. Il n'existe volontairement pas de composant déroulant partagé : ce
- * qui se factorise ici, c'est le comportement, pas la présentation.
+ * Same mechanics as the space switcher. There is deliberately no shared
+ * dropdown component: what factors out here is the behaviour, not the
+ * presentation.
  */
 @Component({
   selector: 'app-new-note-button',
@@ -32,8 +31,8 @@ export class NewNoteButtonComponent {
   protected readonly menu = inject(MenuTriggerDirective);
 
   constructor() {
-    // La directive émet Échap sans le traiter : ici il n'y a qu'un niveau à
-    // replier, contrairement au sélecteur d'espaces.
+    // The directive emits Escape without handling it: there is only one level
+    // to fold here, unlike the space switcher.
     this.menu.escaped.subscribe(() => this.menu.close());
   }
 

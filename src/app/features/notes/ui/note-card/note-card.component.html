@@ -1,14 +1,14 @@
-<!-- Le libellé de remplacement est déjà celui qu'affiche la carte : le résoudre
-     ici évite que le menu ait à connaître une seconde fois la règle. -->
+<!-- The placeholder label is already the one the card shows: resolving it here
+     saves the menu from knowing the rule a second time. -->
 @let menuTitle = note().title || ('notes.untitled' | transloco);
 
-<!-- Enveloppe et non `<button>` racine : le menu d'actions est lui-même un
-     bouton, et le modèle de contenu d'un <button> interdit d'en imbriquer un.
-     C'est aussi elle qui ancre le menu (`position: relative`). -->
+<!-- A wrapper and not a root `<button>`: the action menu is itself a button,
+     and a <button>'s content model forbids nesting one. It also anchors the
+     menu (`position: relative`). -->
 <div class="card-shell" [class.checked]="checked()" [class.checklist]="isChecklist()">
-  <!-- Contenu en <span> et non en <div> : le modèle de contenu d'un <button>
-       n'admet que du contenu de phrasé. Un <div> imbriqué produit un HTML
-       invalide, au comportement d'accessibilité indéfini selon les navigateurs. -->
+  <!-- Content in <span> and not <div>: a <button>'s content model admits only
+       phrasing content. A nested <div> produces invalid HTML, whose
+       accessibility behaviour is undefined across browsers. -->
   <button
     #cardButton
     type="button"
@@ -18,13 +18,13 @@
     (click)="onOpen($event)"
   >
     @if (note().pinned) {
-      <!-- L'épinglage n'est signalé que par une pastille décorative : sans ce
-           doublon textuel, l'information n'existe pas pour un lecteur d'écran. -->
+      <!-- Pinning is signalled only by a decorative dot: without this text
+           twin, the information does not exist for a screen reader. -->
       <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
     }
     <span class="card-top">
-      <!-- Pas de format pour une todolist : elle n'a pas de corps à colorier, et un
-           badge « TXT » y annonce un langage que rien ne montre. -->
+      <!-- No format for a todo list: it has no body to colour, and a "TXT"
+           badge would announce a language nothing shows. -->
       @if (!isChecklist()) {
         <app-language-badge [language]="note().language" />
       }
@@ -52,8 +52,8 @@
       }
     </span>
     @if (isChecklist()) {
-      <!-- Barre décorative : le décompte juste à côté porte la même information
-           en texte, sans quoi elle n'existerait que graphiquement. -->
+      <!-- A decorative bar: the count beside it carries the same information as
+           text, without which it would exist only graphically. -->
       <span class="card-progress">
         <span class="progress-track" aria-hidden="true">
           <span class="progress-fill" [style.width.%]="progress().percent"></span>
@@ -62,8 +62,8 @@
           {{ 'notes.checklistProgress' | transloco: { done: progress().done, total: progress().total } }}
         </span>
       </span>
-      <!-- Place réservée aux items, qui sont posés par-dessus : ils portent des
-           boutons, et un <button> ne peut pas en contenir un autre. -->
+      <!-- Space reserved for the items, which are laid over the top: they carry
+           buttons, and a <button> cannot contain another. -->
       <span class="card-items-space"></span>
     } @else {
       <app-code-viewer
@@ -75,7 +75,7 @@
       />
     }
     <span class="card-footer">
-      <!-- Contenu compact volontairement : un saut de ligne entre les interpolations laisserait un espace résiduel dans le texte rendu (Angular ne le collapse pas entièrement). D'où le prettier-ignore, qui réintroduirait ces sauts de ligne. -->
+      <!-- Deliberately compact: a line break between the interpolations would leave a stray space in the rendered text (Angular does not fully collapse it). Hence the prettier-ignore, which would put those breaks back. -->
       <!-- prettier-ignore -->
       <span [class.stale]="note().expiringSoon"
         >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
@@ -88,9 +88,9 @@
     </span>
   </button>
 
-  <!-- Case à cocher de la sélection multiple. Un vrai bouton à `aria-pressed`
-       plutôt qu'un `<input type=checkbox>` : la carte parente est un bouton, et
-       un contrôle natif y hériterait de ses styles. -->
+  <!-- The multi-selection checkbox. A real button with `aria-pressed` rather
+       than an `<input type=checkbox>`: the parent card is a button, and a
+       native control would inherit its styles. -->
   <button
     type="button"
     class="card-check"
@@ -102,10 +102,10 @@
     <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
   </button>
 
-  <!-- Les items d'une todolist : sœurs du bouton de carte et non ses enfants,
-       parce que ce sont des boutons. La couche est transparente aux clics, seules
-       les cases en reçoivent — tout le reste tombe sur la carte, qui ouvre la
-       note. Même mécanique que le visualiseur sous le textarea de l'éditeur. -->
+  <!-- A todo list's items: siblings of the card button and not its children,
+       because they are buttons. The layer is transparent to clicks and only the
+       boxes take them — everything else falls through to the card, which opens
+       the note. Same trick as the viewer under the editor's textarea. -->
   @if (isChecklist() && note().items.length > 0) {
     <ul class="card-items">
       @for (item of visibleItems(); track $index) {
@@ -132,8 +132,8 @@
     </ul>
   }
 
-  <!-- Un snippet à champs ne se copie pas tel quel : le bouton ouvre la saisie
-       au lieu de poser `psql -h {{ '{{host}}' }}` dans le presse-papier. -->
+  <!-- A snippet with fields does not copy as is: the button opens the form
+       instead of putting `psql -h {{ '{{host}}' }}` on the clipboard. -->
   @if (hasPlaceholders()) {
     <button
       type="button"

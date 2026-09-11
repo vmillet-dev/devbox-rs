@@ -17,6 +17,7 @@ use specta::Type;
 
 use super::language::Language;
 use super::model::{self, DisplayNote, Note};
+use crate::count::saturating_u32;
 
 /// Neither clock nor time zone read here: everything is explicit, thus reproducible in tests.
 #[derive(Debug, Clone, Deserialize, Type)]
@@ -37,13 +38,11 @@ pub struct NotesQuery {
     /// (UTC+2 gives −120). Sections reason in local days: at 11 PM in
     /// Paris, `now` in UTC is already tomorrow.
     pub tz_offset_minutes: i32,
-    /// Les notes épinglées remontent en tête : leur propre section quand la vue
-    /// est chronologique, le haut de la liste quand elle est plate.
+    /// Hoists pinned notes: their own section when the view is chronological,
+    /// the head of the list when it is flat.
     ///
-    /// Le canevas dit toujours `true` — l'épinglage y est justement ce qui
-    /// garde une note à portée. La palette de collage rapide, elle, suit la
-    /// préférence : chercher un snippet parmi huit résultats n'a pas les mêmes
-    /// priorités que retrouver une note sur le canevas.
+    /// The canvas always says `true` — pinning is precisely what keeps a note
+    /// within reach there. The quick-paste palette follows the preference.
     pub pinned_first: bool,
 }
 
@@ -99,13 +98,11 @@ pub enum NoteSectionKey {
     Results,
 }
 
-/// An empty view is a valid response: first launch, or unsuccessful
-/// search — `is_filtering` distinguishes the two.
-/// Pose le nombre de pièces jointes sur les notes d'une vue déjà construite.
+/// Lays the attachment count on the notes of an already built view.
 ///
-/// Séparé de [`build`], qui ne lit pas la base : le compteur vient d'une
-/// seconde requête, et le faire descendre jusqu'ici imposerait une table de
-/// hachage à chaque test de découpage en sections.
+/// Separate from [`build`], which reads no database: the counter comes from a
+/// second query, and pushing it down there would force a hash map into every
+/// section-splitting test.
 pub fn apply_attachment_counts<S: std::hash::BuildHasher>(
     view: &mut NotesView,
     counts: &HashMap<String, u32, S>,
@@ -117,8 +114,8 @@ pub fn apply_attachment_counts<S: std::hash::BuildHasher>(
     }
 }
 
-/// Pose les variables globales sur toutes les notes d'une vue — même raison
-/// d'être séparée de [`build`] que [`apply_attachment_counts`].
+/// Lays the global variables on every note of a view — separate from [`build`]
+/// for the same reason as [`apply_attachment_counts`].
 pub fn apply_global_defaults(view: &mut NotesView, globals: &BTreeMap<String, String>) {
     if globals.is_empty() {
         return;
@@ -141,11 +138,16 @@ pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesVie
 
     // A quick filter restricts a view that remains chronological; a search
     // or a facet, on the other hand, switches to a flat list.
+    // Asked rather than built: `store::fetch` has already normalised the same
+    // list for its `WHERE`, and this only needs to know whether one was picked.
     let is_filtering = !needle.is_empty()
-        || !model::normalize_tags(&request.tags).is_empty()
+        || request
+            .tags
+            .iter()
+            .any(|tag| model::normalize_tag(tag).is_some())
         || !request.languages.is_empty();
     // Saturating is better than panicking: this counter is only used for a label.
-    let matched = u32::try_from(notes.len()).unwrap_or(u32::MAX);
+    let matched = saturating_u32(notes.len());
 
     let offset = offset_from_minutes(request.tz_offset_minutes);
 
@@ -164,38 +166,46 @@ pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesVie
     }
 }
 
-/// `needle` est attendu **déjà replié en minuscules et détouré**.
+/// `needle` is expected **already folded to lowercase and trimmed**.
 ///
-/// ⚠️ Le repliage est en Rust et non en SQL : sans ICU, le `LOWER()` de SQLite ne
-/// traite que l'ASCII, donc `Étape` ne correspondrait pas à `étape`. D'où une
-/// recherche qui ne descend pas dans le `WHERE`, contrairement aux filtres
-/// grossiers, qui eux y restent indexés.
+/// ⚠️ The folding is in Rust and not in SQL: without ICU, SQLite's `LOWER()`
+/// only handles ASCII, so `Étape` would not match `étape`. Hence a search that
+/// does not descend into the `WHERE`, unlike the coarse filters, which stay
+/// indexed there.
 ///
-/// Les items comptent autant que le contenu : une todolist n'a pas de corps,
-/// elle serait sinon introuvable autrement que par son titre.
+/// The items count as much as the content: a todo list has no body, and would
+/// otherwise be findable only by its title.
 fn matches_search(note: &Note, needle: &str) -> bool {
-    note.title.to_lowercase().contains(needle)
-        || note
-            .tags
-            .iter()
-            .any(|tag| tag.to_lowercase().contains(needle))
-        || note.content.to_lowercase().contains(needle)
+    contains_folded(&note.title, needle)
+        || note.tags.iter().any(|tag| contains_folded(tag, needle))
+        || contains_folded(&note.content, needle)
         || note
             .items
             .iter()
-            .any(|item| item.text.to_lowercase().contains(needle))
+            .any(|item| contains_folded(&item.text, needle))
+}
+
+/// Case-insensitive `contains`.
+///
+/// ⚠️ Do **not** "optimise" this into a hand-rolled fold-as-you-compare scan to
+/// save the copy: measured on 800 notes of 13 kB, a needle matching nothing
+/// took 11.0 ms that way against 6.3 ms here. `str::contains` runs Two-Way,
+/// which is O(n+m); a window scan is O(n·m), and searching is precisely the
+/// case where most notes do not match.
+fn contains_folded(haystack: &str, needle: &str) -> bool {
+    haystack.to_lowercase().contains(needle)
 }
 
 const A_WEEK: TimeDelta = TimeDelta::days(7);
 
-/// Amplitude des fuseaux réels : UTC−12 à UTC+14.
+/// The span of real time zones: UTC−12 to UTC+14.
 const MAX_TZ_OFFSET_MINUTES: u32 = 14 * 60;
 
-/// ⚠️ Le signe s'inverse : JavaScript compte les minutes à **ajouter** à l'heure
-/// locale pour obtenir UTC (−120 pour UTC+2), chrono attend le décalage à l'est.
+/// ⚠️ The sign flips: JavaScript counts the minutes to **add** to local time to
+/// get UTC (−120 for UTC+2), where chrono expects the offset east.
 ///
-/// La borne est vérifiée **avant** la multiplication : la valeur vient du pont,
-/// et `-i32::MIN` comme `i32::MAX * 60` déborderaient — d'où `unsigned_abs`.
+/// The bound is checked **before** the multiplication: the value crosses the
+/// bridge unvalidated, and both `-i32::MIN` and `i32::MAX * 60` would overflow.
 fn offset_from_minutes(tz_offset_minutes: i32) -> FixedOffset {
     let utc = FixedOffset::east_opt(0).expect("UTC est un décalage valide");
 
@@ -234,12 +244,12 @@ fn section(
     }
 }
 
-/// Répartis par date, les résultats se diluent et semblent absents quand tout
-/// tombe en bas de page.
+/// Spread over dates, results dilute and read as absent when everything lands
+/// at the bottom of the page.
 ///
-/// L'épinglage remonte ici aussi, faute de quoi le réglage n'aurait d'effet que
-/// sur une palette encore vide de toute frappe. Partition **stable** : à
-/// épinglage égal, l'ordre reçu du SQL fait toujours autorité.
+/// Pinning hoists here too, otherwise the setting would only ever show before
+/// the first keystroke. The partition is **stable**: at equal pinning, the
+/// order received from SQL still decides.
 fn results(notes: Vec<Note>, pinned_first: bool, now: DateTime<Utc>) -> Vec<NoteSection> {
     let mut notes = notes;
     if pinned_first {
@@ -249,8 +259,8 @@ fn results(notes: Vec<Note>, pinned_first: bool, now: DateTime<Utc>) -> Vec<Note
     vec![section(NoteSectionKey::Results, notes, false, now)]
 }
 
-/// `is_filtering` bascule en liste plate. L'ordre reçu est conservé dans chaque
-/// section : c'est celui du tri SQL, et il fait autorité.
+/// `is_filtering` switches to a flat list. The order received is kept within
+/// each section: it is the SQL sort, and it decides.
 fn build_sections(
     notes: Vec<Note>,
     is_filtering: bool,
@@ -269,9 +279,8 @@ fn build_sections(
     let mut older = Vec::new();
 
     for note in notes {
-        // Sans remontée, une note épinglée reste une note comme les autres et
-        // suit sa date : la section « épinglées » disparaît, elle n'est pas
-        // seulement vide.
+        // Without the hoist a pinned note follows its date like any other, and
+        // the "pinned" section disappears rather than merely being empty.
         if pinned_first && note.pinned {
             pinned.push(note);
             continue;
@@ -296,7 +305,7 @@ fn build_sections(
         sections.push(section(NoteSectionKey::Today, today, false, now));
     }
 
-    // Toujours présente : c'est elle qui héberge la carte « coller ou créer ».
+    // Always present: it hosts the "paste or create" ghost card.
     sections.push(section(NoteSectionKey::Week, this_week, true, now));
 
     if !older.is_empty() {
@@ -628,8 +637,8 @@ mod tests {
 
         #[test]
         fn without_the_hoist_a_pinned_note_follows_its_date_like_any_other() {
-            // La section « épinglées » disparaît alors, elle n'est pas vide :
-            // une section vide n'est jamais émise.
+            // The "pinned" section then disappears rather than being empty: an
+            // empty section is never emitted.
             let offset = utc();
             let mut pinned = note("pinned", "2026-07-25T08:00:00.000Z");
             pinned.pinned = true;
@@ -642,8 +651,8 @@ mod tests {
 
         #[test]
         fn the_hoist_reaches_the_flat_list_too() {
-            // Sans ça, le réglage de la palette n'aurait d'effet qu'avant la
-            // première frappe — or c'est en cherchant qu'on s'en sert.
+            // Without this the palette setting would only show before the first
+            // keystroke — and searching is exactly when it is used.
             let offset = utc();
             let mut pinned = note("pinned", "2019-05-05T08:00:00.000Z");
             pinned.pinned = true;
@@ -656,7 +665,7 @@ mod tests {
                 ids_in(&hoisted, NoteSectionKey::Results),
                 ["pinned", "recent"]
             );
-            // L'ordre reçu du SQL fait autorité : la partition est stable.
+            // The order received from SQL decides: the partition is stable.
             assert_eq!(
                 ids_in(&untouched, NoteSectionKey::Results),
                 ["recent", "pinned"]

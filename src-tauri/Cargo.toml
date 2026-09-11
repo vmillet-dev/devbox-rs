@@ -81,22 +81,22 @@ strip = true
 [lints.rust]
 unsafe_code = "forbid"
 rust_2018_idioms = { level = "warn", priority = -1 }
-# Signale les `pub` que rien n'atteint depuis l'extérieur du crate.
+# Flags `pub` items nothing reaches from outside the crate.
 unreachable_pub = "warn"
 
 [lints.clippy]
 all = { level = "deny", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-# Ces deux-là réclament une section `# Errors` / `# Panics` sur chaque fonction
-# publique qui renvoie un `Result` ou peut paniquer. Le crate n'est publié nulle
-# part et sa documentation tient dans `docs/architecture.md` : ce serait des
-# dizaines de sections à écrire, et à tenir à jour, pour personne.
+pedantic = { level = "deny", priority = -1 }
+# These two demand an `# Errors` / `# Panics` section on every public function
+# that returns a `Result` or can panic. The crate is published nowhere and its
+# documentation lives in `docs/architecture.md`: that would be dozens of
+# sections to write, and to keep in step, for nobody.
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
-# Même raison : `#[must_use]` protège les appelants d'un crate publié. Ici chaque
-# fonction a son unique appelant, dans le même dépôt.
+# Same reason: `#[must_use]` protects the callers of a published crate. Here
+# every function has its one caller, in this repository.
 must_use_candidate = "allow"
-# `storage::notes::…` ou `domain::note::Note` : la répétition vient du découpage
-# par sujet, elle est voulue.
+# `notes::store::…` or `notes::model::Note`: the repetition comes from the
+# split by subject, and is deliberate.
 module_name_repetitions = "allow"
 

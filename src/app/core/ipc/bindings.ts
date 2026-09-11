@@ -12,66 +12,64 @@ export const commands = {
 	createNote: (draft: NoteDraft) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("create_note", { draft })),
 	updateNote: (id: string, patch: NotePatch) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("update_note", { id, patch })),
 	/**
-	 *  **Met à la corbeille** : la note revient par [`restore_notes`] pendant
-	 *  [`trash::RETENTION`]. Rien ne supprime définitivement sans passer par là.
+	 *  **Moves to the trash**: the note comes back through [`restore_notes`] for
+	 *  [`trash::RETENTION`]. Nothing deletes for good without going through there.
 	 */
 	deleteNote: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_note", { id })),
-	/**
-	 *  Renvoie le nombre de notes réellement mises à la corbeille : c'est ce que
-	 *  l'annulation propose de reprendre.
-	 */
+	/**  The number of notes actually trashed: that is what undo offers to take back. */
 	deleteNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("delete_notes", { ids })),
 	restoreNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("restore_notes", { ids })),
 	/**
-	 *  Purge d'abord ce que la rétention a rattrapé : la corbeille ne doit jamais
-	 *  montrer une note qu'un redémarrage effacerait.
+	 *  Purges what retention has caught up with **first**: the trash must never
+	 *  show a note a restart would erase.
 	 */
 	listTrash: () => typedError<TrashedNote[], AppError>(__TAURI_INVOKE("list_trash")),
 	purgeNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("purge_notes", { ids })),
 	emptyTrash: () => typedError<number, AppError>(__TAURI_INVOKE("empty_trash")),
 	moveNotes: (ids: string[], spaceId: string) => typedError<number, AppError>(__TAURI_INVOKE("move_notes", { ids, spaceId })),
 	/**
-	 *  Ajoute des tags à toute une sélection. Normalisés ici comme partout ailleurs,
-	 *  sinon un `#urgent` saisi dans la barre d'actions ne rejoindrait pas le
-	 *  `urgent` déjà en base.
+	 *  Normalised here as everywhere else, otherwise an `#urgent` typed in the
+	 *  action bar would not join the `urgent` already stored.
 	 */
 	tagNotes: (ids: string[], tags: string[]) => typedError<number, AppError>(__TAURI_INVOKE("tag_notes", { ids, tags })),
 	listTags: () => typedError<TagUsage[], AppError>(__TAURI_INVOKE("list_tags")),
 	/**
-	 *  Un renommage vers un tag déjà existant **est** une fusion : la base ne peut
-	 *  pas porter deux fois le même tag sur une note.
+	 *  Renaming onto an existing tag **is** a merge: a note cannot carry the same
+	 *  tag twice.
 	 */
 	renameTag: (tag: string, into: string) => typedError<number, AppError>(__TAURI_INVOKE("rename_tag", { tag, into })),
 	mergeTags: (tags: string[], into: string) => typedError<number, AppError>(__TAURI_INVOKE("merge_tags", { tags, into })),
-	/**  Retire l'étiquette du corpus ; les notes, elles, restent. */
-	deleteTag: (tag: string) => typedError<number, AppError>(__TAURI_INVOKE("delete_tag", { tag })),
 	/**
-	 *  Remplit les `{{champs}}` d'un contenu.
+	 *  Removes labels from the corpus; the notes themselves stay.
 	 * 
-	 *  Aucun identifiant de note : la palette remplit aussi bien un brouillon non
-	 *  enregistré que la note qu'elle vient d'ouvrir. La base n'est lue que pour les
-	 *  **variables globales**, qui ne dépendent d'aucune note — sans elles, un champ
-	 *  laissé vide retomberait sur la valeur par défaut du texte alors que
-	 *  l'utilisateur en a réglé une pour sa machine.
+	 *  A list rather than one tag at a time, like [`merge_tags`]: the panel deletes
+	 *  a whole selection, and one round trip per tag was one lock and one
+	 *  transaction per tag.
+	 */
+	deleteTags: (tags: string[]) => typedError<number, AppError>(__TAURI_INVOKE("delete_tags", { tags })),
+	/**
+	 *  Fills the `{{fields}}` of a piece of content.
+	 * 
+	 *  No note identifier: the palette fills an unsaved draft as readily as the
+	 *  note it just opened. The database is read only for the **global variables**,
+	 *  which depend on no note.
 	 */
 	fillPlaceholders: (content: string, values: { [key in string]: string }) => typedError<string, AppError>(__TAURI_INVOKE("fill_placeholders", { content, values })),
 	/**
-	 *  Enregistre les valeurs des `{{champs}}` d'une note : rouvrir la note les
-	 *  retrouve, et la carte comme la palette copient avec.
+	 *  Stores what was typed into a note's `{{fields}}`.
 	 * 
-	 *  Commande à part plutôt qu'un champ de `NotePatch` : remplir un champ ne
-	 *  modifie pas la note — `updated_at` reste où il est, faute de quoi le canevas
-	 *  remonterait la note en tête à chaque valeur tapée.
+	 *  ⚠️ A command of its own rather than a `NotePatch` field: filling a field is
+	 *  not editing the note, so `updated_at` stays put — the canvas sorts on it and
+	 *  would otherwise float the note to the top on every value typed.
 	 */
 	setPlaceholderValues: (id: string, values: { [key in string]: string }) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("set_placeholder_values", { id, values })),
-	/**  Les variables globales, telles que le panneau de préférences les affiche. */
+	/**  The global variables, as the preferences panel shows them. */
 	listGlobalPlaceholders: () => typedError<{ [key in string]: string }, AppError>(__TAURI_INVOKE("list_global_placeholders")),
 	/**
-	 *  Enregistre le jeu complet de variables : ce qui n'est pas envoyé est ce que
-	 *  l'utilisateur a retiré.
+	 *  Stores the **whole** set: what is not sent is what the user removed.
 	 * 
-	 *  Aucune note n'est touchée — pas même leur `updated_at` : régler une variable
-	 *  n'est pas modifier une note, et le canevas trie sur cette colonne.
+	 *  No note is touched, not even its `updated_at`: setting a variable is not
+	 *  editing a note, and the canvas sorts on that column.
 	 */
 	setGlobalPlaceholders: (values: { [key in string]: string }) => typedError<{ [key in string]: string }, AppError>(__TAURI_INVOKE("set_global_placeholders", { values })),
 	listSpaces: () => typedError<Space[], AppError>(__TAURI_INVOKE("list_spaces")),
@@ -81,48 +79,44 @@ export const commands = {
 	deleteSpace: (id: string, targetSpaceId: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_space", { id, targetSpaceId })),
 	attachFile: (noteId: string, path: string) => typedError<Attachment, AppError>(__TAURI_INVOKE("attach_file", { noteId, path })),
 	/**
-	 *  Attache l'image du presse-papier.
+	 *  Attaches the clipboard image.
 	 * 
-	 *  Les octets ne traversent **pas** le pont : le presse-papier est lu côté
-	 *  natif, où l'image arrive en RGBA brut, puis encodée en PNG. La faire monter
-	 *  jusqu'au front pour la redescendre coûterait deux conversions et plusieurs
-	 *  mégaoctets de JSON.
+	 *  The bytes do **not** cross the bridge: the clipboard is read natively, where
+	 *  the image arrives as raw RGBA, then encoded to PNG. Sending it up to the
+	 *  front and back would cost two conversions and several megabytes of JSON.
 	 */
 	attachClipboardImage: (noteId: string, fileName: string) => typedError<Attachment, AppError>(__TAURI_INVOKE("attach_clipboard_image", { noteId, fileName })),
 	listAttachments: (noteId: string) => typedError<Attachment[], AppError>(__TAURI_INVOKE("list_attachments", { noteId })),
-	/**
-	 *  `data:<mime>;base64,…`, directement affichable dans un `<img>` ou
-	 *  téléchargeable par le front.
-	 */
+	/**  `data:<mime>;base64,…`, ready for an `<img>` or a front-side download. */
 	readAttachment: (id: string) => typedError<string, AppError>(__TAURI_INVOKE("read_attachment", { id })),
 	/**
-	 *  Ouvre la pièce jointe avec l'application par défaut du système.
+	 *  Opens the attachment with the system's default application.
 	 * 
-	 *  L'appel part du **Rust**, pas de la `WebView` : les capacités contrôlent
-	 *  l'API que la `WebView` invoque, et ouvrir un chemin depuis le front aurait
-	 *  demandé d'autoriser `opener:allow-open-path` sur un dossier entier.
+	 *  The call starts from **Rust**, not the `WebView`: capabilities control the API
+	 *  the `WebView` invokes, and opening a path from the front would have meant
+	 *  allowing `opener:allow-open-path` over a whole directory.
 	 */
 	openAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("open_attachment", { id })),
 	/**
-	 *  Recopie la pièce jointe là où l'utilisateur l'a demandé. Le chemin vient d'un
-	 *  sélecteur natif ; l'écriture reste ici, seul endroit qui connaît le dossier.
+	 *  Copies the attachment where the user asked. The path comes from a native
+	 *  picker; the write stays here, the only place that knows the directory.
 	 */
 	saveAttachment: (id: string, path: string) => typedError<null, AppError>(__TAURI_INVOKE("save_attachment", { id, path })),
 	deleteAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_attachment", { id })),
 	/**
-	 *  Tout le corpus, ou le seul espace actif. Les espaces voyagent avec les notes :
-	 *  sans eux, l'import n'aurait qu'un identifiant à ranger nulle part.
+	 *  The whole corpus, or the active space alone. The spaces travel with the
+	 *  notes: without them an import would hold an id with nowhere to file it.
 	 */
 	exportNotes: (path: string, spaceId: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_notes", { path, spaceId })),
 	/**
-	 *  Même fichier, mêmes règles, mais restreint aux notes désignées : c'est ce
-	 *  qu'on envoie à quelqu'un plutôt que toute sa bibliothèque.
+	 *  Same file, same rules, restricted to the named notes: what one sends to
+	 *  someone rather than a whole library.
 	 */
 	exportSelection: (path: string, ids: string[]) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_selection", { path, ids })),
 	importNotes: (path: string) => typedError<ImportReport, AppError>(__TAURI_INVOKE("import_notes", { path })),
 	/**
-	 *  Rendu Markdown d'une sélection, que le front pose dans le presse-papier.
-	 *  Rien n'est envoyé nulle part : « partager » s'arrête au presse-papier.
+	 *  Markdown rendering of a selection, which the front puts on the clipboard.
+	 *  Nothing is sent anywhere: "share" stops at the clipboard.
 	 */
 	shareNotes: (ids: string[]) => typedError<string, AppError>(__TAURI_INVOKE("share_notes", { ids })),
 	/**  Newest release first, as the file lists them. */
@@ -139,12 +133,12 @@ export const commands = {
 	 */
 	syncTray: (labels: TrayLabels) => __TAURI_INVOKE<void>("sync_tray", { labels }),
 	/**
-	 *  Règle les raccourcis globaux et rend ceux qu'une autre application garde.
+	 *  Sets the global shortcuts and returns the ones another application keeps.
 	 * 
-	 *  Le front l'appelle au démarrage puis à chaque changement de préférence, et
-	 *  **affiche** ce qui revient : le natif ne peut qu'échouer en silence, et une
-	 *  ligne de journal n'est pas une interface — sans ce retour, presser la touche
-	 *  ne ferait rien et rien ne dirait pourquoi.
+	 *  ⚠️ The front calls this at startup and on every preference change, and
+	 *  **displays** what comes back: the native side can only fail silently, and a
+	 *  log line is not an interface — without this return, pressing the key would
+	 *  do nothing and nothing would say why.
 	 */
 	setGlobalShortcuts: (bindings: ShortcutBindings) => __TAURI_INVOKE<string[]>("set_global_shortcuts", { bindings }),
 	setWindowBehavior: (behavior: WindowBehavior) => __TAURI_INVOKE<void>("set_window_behavior", { behavior }),
@@ -162,12 +156,12 @@ export type AppError = {
 export type Attachment = {
 	id: string,
 	noteId: string,
-	/**  Nom d'origine, celui qu'on affiche. Jamais utilisé comme chemin. */
+	/**  The original name, the one displayed. Never used as a path. */
 	fileName: string,
 	mimeType: string,
 	/**
-	 *  `u32` et non `u64` : Specta refuse ce que JSON ne rend pas sans perte, et
-	 *  [`MAX_BYTES`] tient largement dedans.
+	 *  `u32` and not `u64`: Specta refuses what JSON cannot carry without loss,
+	 *  and [`MAX_BYTES`] fits comfortably.
 	 */
 	byteSize: number,
 	createdAt: string,
@@ -213,14 +207,13 @@ export type DisplayNote = {
 	footer: NoteFooter,
 	expiringSoon: boolean,
 	/**
-	 *  Champs `{{…}}` du contenu, munis de ce qui a déjà été saisi pour eux :
-	 *  l'éditeur les remplit, la carte propose de les remplir avant de copier.
-	 *  La **liste** est dérivée du texte ; les valeurs, elles, sont persistées.
+	 *  The content's `{{…}}` fields, carrying what has already been typed for
+	 *  them. The **list** is derived from the text; the values are persisted.
 	 */
 	placeholders: Placeholder[],
 	/**
-	 *  Renseigné après coup par ce qui dispose d'une connexion — `decorate` ne
-	 *  lit pas la base. Zéro tant que personne ne l'a rempli.
+	 *  Filled in afterwards by whoever holds a connection — `decorate` reads no
+	 *  database. Zero until someone sets it.
 	 */
 	attachmentCount: number,
 } & Note;
@@ -248,8 +241,8 @@ export type ExportReport = {
 };
 
 /**
- *  `skipped` : notes déjà présentes (même identifiant) ou dont l'espace manque
- *  au fichier. Un import doit pouvoir être rejoué sans dupliquer.
+ *  `skipped`: notes already present (same id) or whose space is missing from the
+ *  file. An import has to be replayable without duplicating.
  */
 export type ImportReport = {
 	spacesCreated: number,
@@ -292,12 +285,11 @@ export type Note = {
 	/**  Empty for a snippet. A checklist has these **instead of** `content`. */
 	items?: ChecklistItem[],
 	/**
-	 *  Ce qui a été saisi dans les `{{champs}}` du contenu, par nom de champ.
+	 *  What was typed into the content's `{{fields}}`, by field name.
 	 * 
-	 *  Écrit par `set_placeholder_values` et par lui seul : remplir un champ
-	 *  n'est pas modifier la note, et ne touche donc pas `updated_at`. `default`
-	 *  pour la raison qui vaut déjà pour `kind` — un export écrit avant ce
-	 *  champ doit rester lisible.
+	 *  Written by `set_placeholder_values` and by nothing else: filling a field
+	 *  is not editing the note, so it leaves `updated_at` alone. `default` for
+	 *  the reason that already applies to `kind`.
 	 */
 	placeholderValues?: { [key in string]: string },
 };
@@ -403,13 +395,11 @@ export type NotesQuery = {
 	 */
 	tzOffsetMinutes: number,
 	/**
-	 *  Les notes épinglées remontent en tête : leur propre section quand la vue
-	 *  est chronologique, le haut de la liste quand elle est plate.
+	 *  Hoists pinned notes: their own section when the view is chronological,
+	 *  the head of the list when it is flat.
 	 * 
-	 *  Le canevas dit toujours `true` — l'épinglage y est justement ce qui
-	 *  garde une note à portée. La palette de collage rapide, elle, suit la
-	 *  préférence : chercher un snippet parmi huit résultats n'a pas les mêmes
-	 *  priorités que retrouver une note sur le canevas.
+	 *  The canvas always says `true` — pinning is precisely what keeps a note
+	 *  within reach there. The quick-paste palette follows the preference.
 	 */
 	pinnedFirst: boolean,
 };
@@ -433,23 +423,24 @@ export type NotesView = {
 
 export type Placeholder = {
 	name: string,
-	/**  Vide quand le snippet n'en propose pas. */
+	/**  Empty when the snippet offers none. */
 	defaultValue: string,
 	/**
-	 *  Ce que l'utilisateur a déjà saisi pour ce champ, vide s'il n'a rien
-	 *  saisi. Rapporté ici plutôt que laissé dans la carte des valeurs pour
-	 *  qu'une seule liste réponde à « quels champs, et où en sont-ils » — et
-	 *  pour qu'une valeur devenue orpheline (le jeton a été renommé dans le
-	 *  texte) reste hors de vue sans être effacée.
+	 *  What has already been typed for this field, empty otherwise.
+	 * 
+	 *  Reported here rather than left in the value map so that one list answers
+	 *  "which fields, and where are they up to" — and so a value gone orphan
+	 *  (its token was renamed in the text) stays out of sight without being
+	 *  erased.
 	 */
 	value: string,
 };
 
 /**
- *  Les trois raccourcis globaux, tels que le front les règle.
+ *  The three global shortcuts, as the front end sets them.
  * 
- *  Trois champs plutôt qu'une carte : un raccourci absent serait une action
- *  qu'aucune touche n'atteint plus, et une carte laisserait le compilateur muet.
+ *  Three fields rather than a map: a missing shortcut would be an action no key
+ *  reaches any more, and a map would leave the compiler silent about it.
  */
 export type ShortcutBindings = {
 	capture: string,
@@ -468,21 +459,18 @@ export type SpaceDraft = {
 	name: string,
 };
 
-/**
- *  Un tag du corpus et le nombre de notes vivantes qui le portent : de quoi
- *  décider quoi renommer, fusionner ou jeter.
- */
+/**  A tag of the corpus and the number of living notes carrying it. */
 export type TagUsage = {
 	tag: string,
 	noteCount: number,
 };
 
-/**  `flatten` : le front lit une note, avec deux dates de plus. */
+/**  `flatten`: the front reads a note, with two extra dates. */
 export type TrashedNote = {
 	deletedAt: string,
 	/**
-	 *  Dérivée, jamais stockée : la rétention peut changer d'une version à
-	 *  l'autre et une échéance figée en base ne suivrait pas.
+	 *  Derived, never stored: retention can change between versions, and a
+	 *  deadline frozen in the database would not follow.
 	 */
 	purgeAt: string,
 } & Note;
@@ -501,9 +489,9 @@ export type TrayLabels = {
 };
 
 /**
- *  Réglé depuis le panneau de préférences et poussé ici, comme les libellés de
- *  la barre système : la préférence vit dans `preferences.json`, côté front, et
- *  la relire depuis Rust ferait une seconde source à tenir en phase.
+ *  Set from the preferences panel and pushed here, like the tray labels: the
+ *  preference lives in `preferences.json` on the front side, and reading it
+ *  back from Rust would be a second source to keep in step.
  */
 export type WindowBehavior = {
 	closeToTray: boolean,

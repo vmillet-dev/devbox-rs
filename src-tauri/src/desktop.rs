@@ -39,10 +39,10 @@ fn reveal_and_emit(app: &AppHandle, topic: &str) {
 
 // --- Shortcuts active outside the window ------------------------------------
 
-/// Les trois raccourcis globaux, tels que le front les règle.
+/// The three global shortcuts, as the front end sets them.
 ///
-/// Trois champs plutôt qu'une carte : un raccourci absent serait une action
-/// qu'aucune touche n'atteint plus, et une carte laisserait le compilateur muet.
+/// Three fields rather than a map: a missing shortcut would be an action no key
+/// reaches any more, and a map would leave the compiler silent about it.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ShortcutBindings {
@@ -52,16 +52,16 @@ pub struct ShortcutBindings {
 }
 
 impl ShortcutBindings {
-    /// ⚠️ Miroir de `DEFAULT_SHORTCUTS` (`core/shortcuts/shortcut.model.ts`).
+    /// ⚠️ Mirror of `DEFAULT_SHORTCUTS` (`core/shortcuts/shortcut.model.ts`).
     ///
-    /// Ce doublon est voulu : ces valeurs servent **avant** que le front ait
-    /// démarré, et sans elles `Ctrl+Alt+P` serait mort le temps du premier
-    /// rendu — précisément la seconde où l'on s'en sert depuis une autre
-    /// application.
+    /// The duplication is deliberate: these values are taken **before** the
+    /// front has started, and without them `Ctrl+Alt+P` would be dead for the
+    /// length of the first render — precisely the second it is used from
+    /// another application.
     ///
-    /// ⚠️ Pas `Ctrl+Alt+Espace` pour la palette : ce raccourci est déjà pris par
-    /// des applications très répandues (Claude, entre autres), et le premier
-    /// arrivé gagne — DevBox n'aurait qu'une touche morte.
+    /// ⚠️ Not `Ctrl+Alt+Space` for the palette: that one is already taken by
+    /// widely installed applications, and first come first served — DevBox
+    /// would be left with a dead key.
     fn defaults() -> Self {
         Self {
             capture: "Ctrl+Alt+V".to_string(),
@@ -79,17 +79,17 @@ impl ShortcutBindings {
     }
 }
 
-/// Ce qui est enregistré à l'instant, et l'action que chacun déclenche.
+/// What is registered right now, and the action each one triggers.
 ///
-/// Une liste plutôt que trois constantes : les combinaisons changent au gré des
-/// préférences, et le gestionnaire ne peut donc pas les comparer à des valeurs
-/// capturées une fois pour toutes.
+/// A list rather than three constants: the combinations change with the
+/// preferences, so the handler cannot compare them against values captured once
+/// and for all.
 type ActiveShortcuts = Mutex<Vec<(Shortcut, &'static str)>>;
 
-/// Installe le greffon et prend les raccourcis par défaut.
+/// Installs the plugin and takes the default shortcuts.
 ///
-/// Un raccourci déjà pris par une autre application est journalisé mais **pas
-/// fatal** : DevBox doit démarrer sans lui.
+/// One already taken by another application is logged but **not fatal**:
+/// DevBox has to start without it.
 pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
     app.manage(ActiveShortcuts::default());
 
@@ -131,11 +131,11 @@ fn topic_of(app: &AppHandle, shortcut: &Shortcut) -> Option<&'static str> {
         .map(|(_, topic)| *topic)
 }
 
-/// Reprend les trois raccourcis depuis zéro et rend **ce qui n'a pas pu être
-/// pris** : une combinaison illisible comme une combinaison déjà prise.
+/// Takes the three shortcuts from scratch and returns **what could not be
+/// taken**: an unreadable combination as much as one already held elsewhere.
 ///
-/// Tout est relâché d'abord — régler un raccourci en laisse forcément un autre
-/// derrière, et la combinaison abandonnée continuerait sinon de répondre.
+/// Everything is released first — setting one shortcut necessarily leaves
+/// another behind, and the abandoned combination would otherwise keep firing.
 fn apply_shortcuts(app: &AppHandle, bindings: &ShortcutBindings) -> Vec<String> {
     if let Err(error) = app.global_shortcut().unregister_all() {
         log::warn!("Global shortcuts not released: {error}");
@@ -169,12 +169,12 @@ fn apply_shortcuts(app: &AppHandle, bindings: &ShortcutBindings) -> Vec<String> 
     unavailable
 }
 
-/// Règle les raccourcis globaux et rend ceux qu'une autre application garde.
+/// Sets the global shortcuts and returns the ones another application keeps.
 ///
-/// Le front l'appelle au démarrage puis à chaque changement de préférence, et
-/// **affiche** ce qui revient : le natif ne peut qu'échouer en silence, et une
-/// ligne de journal n'est pas une interface — sans ce retour, presser la touche
-/// ne ferait rien et rien ne dirait pourquoi.
+/// ⚠️ The front calls this at startup and on every preference change, and
+/// **displays** what comes back: the native side can only fail silently, and a
+/// log line is not an interface — without this return, pressing the key would
+/// do nothing and nothing would say why.
 #[tauri::command]
 #[specta::specta]
 #[allow(clippy::needless_pass_by_value)]
@@ -184,9 +184,9 @@ pub fn set_global_shortcuts(bindings: ShortcutBindings, app: AppHandle) -> Vec<S
 
 // --- What the close and minimise buttons do ----------------------------------
 
-/// Réglé depuis le panneau de préférences et poussé ici, comme les libellés de
-/// la barre système : la préférence vit dans `preferences.json`, côté front, et
-/// la relire depuis Rust ferait une seconde source à tenir en phase.
+/// Set from the preferences panel and pushed here, like the tray labels: the
+/// preference lives in `preferences.json` on the front side, and reading it
+/// back from Rust would be a second source to keep in step.
 #[derive(Debug, Clone, Copy, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowBehavior {
@@ -194,9 +194,9 @@ pub struct WindowBehavior {
     pub minimize_to_tray: bool,
 }
 
-/// Ce que fait DevBox tant que le front n'a rien dit : la croix range la fenêtre
-/// dans la barre système — l'application est faite pour rester à portée d'un
-/// raccourci — et « réduire » réduit, comme partout ailleurs.
+/// What DevBox does until the front says otherwise: the close button files the
+/// window into the tray — the application is meant to stay within reach of a
+/// shortcut — and "minimise" minimises, as everywhere else.
 impl Default for WindowBehavior {
     fn default() -> Self {
         Self {
@@ -228,14 +228,14 @@ fn window_behavior(app: &AppHandle) -> WindowBehavior {
         .unwrap_or_default()
 }
 
-/// ⚠️ Les deux exigent une barre système : sans elle, cacher la fenêtre
-/// laisserait un processus que plus rien ne peut rappeler.
+/// ⚠️ Both require a tray: without one, hiding the window would leave a process
+/// nothing can call back.
 pub(crate) fn hides_on_close(app: &AppHandle) -> bool {
     window_behavior(app).close_to_tray && tray_exists(app)
 }
 
-/// Tauri n'émet pas d'événement « réduite » : seul `Resized` passe, et c'est à
-/// l'appelant de demander ensuite à la fenêtre où elle en est.
+/// Tauri emits no "minimised" event: only `Resized` comes through, and it is up
+/// to the caller to ask the window where it stands.
 pub(crate) fn hides_on_minimize(app: &AppHandle) -> bool {
     window_behavior(app).minimize_to_tray && tray_exists(app)
 }

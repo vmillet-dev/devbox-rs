@@ -5,16 +5,14 @@ import { Attachment } from '@features/notes/model/note.model';
 const BYTES_PER_KB = 1024;
 
 /**
- * Bandeau des pièces jointes d'une note : ajouter, ouvrir, enregistrer ailleurs,
- * prévisualiser, retirer.
+ * A note's attachment strip: add, open, save elsewhere, preview, remove.
  *
- * Un fichier joint qu'on ne peut que lire de nom ne sert à rien : « ouvrir »
- * (application par défaut du système) et « enregistrer sous » sont ce qui le
- * rend récupérable.
+ * An attached file one can only read the name of is no use: "open" (the
+ * system's default application) and "save as" are what make it recoverable.
  *
- * L'aperçu est demandé **à la volée** et une seule à la fois : un `data:` URI
- * pèse un tiers de plus que le fichier, en précharger la liste ferait entrer
- * plusieurs mégaoctets dans la WebView pour une vignette.
+ * The preview is fetched **on demand** and one at a time: a `data:` URI weighs
+ * a third more than the file, and preloading the list would pull several
+ * megabytes into the WebView for one thumbnail.
  */
 @Component({
   selector: 'app-attachment-strip',
@@ -27,7 +25,7 @@ export class AttachmentStripComponent {
   readonly attachments = input.required<readonly Attachment[]>();
   readonly isBusy = input(false);
   readonly previewId = input<string | null>(null);
-  /** `null` tant que les octets n'ont pas été lus : l'aperçu affiche un vide. */
+  /** `null` until the bytes are read: the preview then shows a blank. */
   readonly previewData = input<string | null>(null);
 
   readonly addRequested = output<void>();
@@ -35,12 +33,12 @@ export class AttachmentStripComponent {
   readonly saveRequested = output<string>();
   readonly removeRequested = output<string>();
   readonly previewToggled = output<string>();
-  /** L'aperçu est bordé en hauteur : la vue agrandie montre l'image entière. */
+  /** The preview is height-bounded: the lightbox shows the whole image. */
   readonly zoomRequested = output<void>();
 
   protected readonly confirmingRemove = signal<string | null>(null);
 
-  /** Résolu ici pour que l'aperçu porte le **nom** du fichier, pas son identifiant. */
+  /** Resolved here so the preview carries the file's **name**, not its id. */
   protected readonly previewed = computed<Attachment | null>(() => {
     const id = this.previewId();
     return this.attachments().find((attachment) => attachment.id === id) ?? null;
@@ -50,7 +48,7 @@ export class AttachmentStripComponent {
     return attachment.mimeType.startsWith('image/');
   }
 
-  /** Arrondi au Ko supérieur : « 0 Ko » pour un fichier non vide serait faux. */
+  /** Rounded up to the next kB: "0 kB" for a non-empty file would be wrong. */
   protected sizeInKb(attachment: Attachment): number {
     return Math.max(1, Math.ceil(attachment.byteSize / BYTES_PER_KB));
   }

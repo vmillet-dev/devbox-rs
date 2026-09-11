@@ -6,11 +6,11 @@ import { AttachmentsRepository } from '../data/attachments.repository';
 import { Attachment } from '../model/note.model';
 
 /**
- * Pièces jointes de la note ouverte.
+ * The open note's attachments.
  *
- * Les octets ne sont jamais chargés en masse : `preview` en demande **une** à la
- * fois, et un `data:` URI pèse un tiers de plus que le fichier — précharger la
- * liste ferait entrer plusieurs mégaoctets dans la WebView pour une vignette.
+ * ⚠️ The bytes are never loaded in bulk: `preview` asks for **one** at a time,
+ * and a `data:` URI weighs a third more than the file — preloading the list
+ * would pull several megabytes into the WebView for one thumbnail.
  */
 @Injectable({ providedIn: 'root' })
 export class AttachmentsStore {
@@ -32,9 +32,9 @@ export class AttachmentsStore {
   readonly count = computed(() => this._attachments().length);
 
   /**
-   * La pièce jointe dont l'aperçu est ouvert. Résolue ici et non dans le
-   * bandeau : la vue agrandie vit dans la page, au-dessus de l'éditeur, et n'a
-   * pas accès à ce que le bandeau a calculé pour lui-même.
+   * The attachment whose preview is open. Resolved here and not in the strip:
+   * the lightbox lives in the page, above the editor, and cannot see what the
+   * strip computed for itself.
    */
   readonly previewed = computed<Attachment | null>(() => {
     const id = this._previewId();
@@ -42,8 +42,8 @@ export class AttachmentsStore {
   });
 
   /**
-   * Appelé à chaque changement de note ouverte. Une note différente vide
-   * l'aperçu : afficher la capture d'écran de la précédente serait pire que rien.
+   * Called whenever the open note changes. A different note clears the preview:
+   * showing the previous one's screenshot would be worse than nothing.
    */
   async openFor(noteId: string | null): Promise<void> {
     if (this._noteId() === noteId) return;
@@ -56,7 +56,7 @@ export class AttachmentsStore {
     }
   }
 
-  /** `false` quand rien n'a été ajouté — annulation du sélecteur comprise. */
+  /** `false` when nothing was added — a cancelled picker included. */
   async attach(): Promise<boolean> {
     const path = await this.dialog.pickAttachment();
     if (path === null) return false;
@@ -65,58 +65,58 @@ export class AttachmentsStore {
   }
 
   /**
-   * Squelette des trois façons d'ajouter une pièce jointe. Le nom du fichier
-   * ajouté est annoncé : sans retour, joindre une capture d'écran ne se voit
-   * qu'en cherchant dans le bandeau.
+   * The shape shared by the three ways of adding an attachment. The file name
+   * is announced: without it, attaching a screenshot is only visible by looking
+   * for it in the strip.
    */
   private async write(action: (noteId: string) => Promise<Attachment>): Promise<boolean> {
     const noteId = this._noteId();
     if (noteId === null || this._isBusy()) return false;
 
     this._isBusy.set(true);
+    let added;
     try {
-      const added = await action(noteId);
-      await this.load(noteId);
-      this.status.notify({ key: 'attachments.added', params: { name: added.fileName } });
-      // Une image jointe s'affiche tout de suite : c'est ce qu'on veut voir.
-      if (added.mimeType.startsWith('image/')) {
-        await this.togglePreview(added.id);
-      }
-      return true;
+      added = await action(noteId);
     } catch (error) {
       this.notifier.reportFailure('errors.attachFailed', error);
       return false;
     } finally {
+      // Bracketing flag: see `TrashStore.load`.
       this._isBusy.set(false);
     }
+
+    await this.load(noteId);
+    this.status.notify({ key: 'attachments.added', params: { name: added.fileName } });
+    // An attached image shows straight away: it is what one wants to see.
+    if (added.mimeType.startsWith('image/')) {
+      await this.togglePreview(added.id);
+    }
+
+    return true;
   }
 
   /**
-   * Joint un fichier **déjà désigné** — celui qu'on vient de déposer sur
-   * l'éditeur. Le sélecteur de fichiers n'est pas rouvert.
+   * Attaches an **already named** file — the one just dropped on the editor.
+   * The file picker is not reopened.
    */
   async attachPath(path: string): Promise<boolean> {
     return this.write((noteId) => this.repository.attach(noteId, path));
   }
 
   /**
-   * Joint l'image du presse-papier. `Ctrl+V` dans l'éditeur passe par ici quand
-   * le presse-papier ne contient pas de texte.
+   * Attaches the clipboard image. `Ctrl+V` in the editor comes through here
+   * when the clipboard holds no text.
    */
   async attachClipboardImage(now: Date): Promise<boolean> {
     return this.write((noteId) => this.repository.attachClipboardImage(noteId, screenshotName(now)));
   }
 
-  /** Ouvre la pièce jointe avec l'application par défaut du système. */
+  /** Opens the attachment with the system's default application. */
   async open(id: string): Promise<void> {
-    try {
-      await this.repository.open(id);
-    } catch (error) {
-      this.notifier.reportFailure('errors.attachmentOpenFailed', error);
-    }
+    await this.notifier.attempt('errors.attachmentOpenFailed', () => this.repository.open(id));
   }
 
-  /** `null` quand rien n'a été enregistré — annulation du sélecteur comprise. */
+  /** `null` when nothing was saved — a cancelled picker included. */
   async saveAs(id: string): Promise<string | null> {
     const attachment = this._attachments().find((candidate) => candidate.id === id);
     if (!attachment) return null;
@@ -124,33 +124,30 @@ export class AttachmentsStore {
     const path = await this.dialog.chooseDestination(attachment.fileName);
     if (path === null) return null;
 
-    try {
-      await this.repository.saveAs(id, path);
-      return path;
-    } catch (error) {
-      this.notifier.reportFailure('errors.attachmentSaveFailed', error);
-      return null;
-    }
+    const saved = await this.notifier.attempt('errors.attachmentSaveFailed', () =>
+      this.repository.saveAs(id, path),
+    );
+
+    return saved === null ? null : path;
   }
 
   async remove(id: string): Promise<boolean> {
     const noteId = this._noteId();
     if (noteId === null) return false;
 
-    try {
-      await this.repository.delete(id);
-      if (this._previewId() === id) {
-        this.closePreview();
-      }
-      await this.load(noteId);
-      return true;
-    } catch (error) {
-      this.notifier.reportFailure('errors.attachmentDeleteFailed', error);
-      return false;
+    const removed = await this.notifier.attempt('errors.attachmentDeleteFailed', () =>
+      this.repository.delete(id),
+    );
+    if (removed === null) return false;
+
+    if (this._previewId() === id) {
+      this.closePreview();
     }
+    await this.load(noteId);
+    return true;
   }
 
-  /** Bascule : redemander l'aperçu ouvert le referme, sans nouvel aller-retour. */
+  /** A toggle: asking again for the open preview closes it, with no round trip. */
   async togglePreview(id: string): Promise<void> {
     if (this._previewId() === id) {
       this.closePreview();
@@ -161,8 +158,7 @@ export class AttachmentsStore {
     this._previewData.set(null);
     try {
       const data = await this.repository.read(id);
-      // La note a pu changer pendant la lecture : n'afficher que ce qui est
-      // encore demandé.
+      // The note may have changed during the read: show only what is still asked for.
       if (this._previewId() === id) {
         this._previewData.set(data);
       }
@@ -178,17 +174,14 @@ export class AttachmentsStore {
   }
 
   private async load(noteId: string): Promise<void> {
-    try {
-      this._attachments.set(await this.repository.loadFor(noteId));
-    } catch (error) {
-      this.notifier.reportFailure('errors.attachFailed', error);
-    }
+    const loaded = await this.notifier.attempt('errors.attachFailed', () => this.repository.loadFor(noteId));
+    if (loaded) this._attachments.set(loaded);
   }
 }
 
 /**
- * Nom d'une image collée : daté à la seconde, pour que deux captures de suite ne
- * se ressemblent pas dans la liste. L'extension est ajoutée côté Rust.
+ * The name of a pasted image: dated to the second, so two captures in a row do
+ * not look alike in the list. The extension is added on the Rust side.
  */
 function screenshotName(now: Date): string {
   const stamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '-');

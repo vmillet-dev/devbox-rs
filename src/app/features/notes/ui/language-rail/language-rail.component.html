@@ -2,8 +2,8 @@
   <div class="language-rail" role="group" [attr.aria-label]="'notes.languagesGroupLabel' | transloco">
     <span class="language-rail-label">{{ 'notes.languages' | transloco }}</span>
     @for (language of languages(); track language) {
-      <!-- Le badge porte la teinte du langage, le bouton porte l'interaction :
-           on garde ainsi une seule table couleur ↔ langage, celle du badge. -->
+      <!-- The badge carries the language's hue, the button carries the
+           interaction: one colour-per-language table, the badge's. -->
       <button
         type="button"
         class="language-chip"

@@ -9,19 +9,19 @@ import {
 } from '../placeholder-fields/placeholder-fields.component';
 
 /**
- * Saisie des `{{champs}}` d'un snippet avant copie, depuis une carte ou la
- * palette — là où il n'y a pas d'éditeur ouvert pour porter le panneau.
+ * Typing a snippet's `{{fields}}` before copying, from a card or the palette —
+ * where there is no open editor to carry the panel.
  *
- * Amorcée par les valeurs **déjà enregistrées** sur la note : il n'y a qu'un jeu
- * de valeurs par note, et le formulaire les propose plutôt que de reposer la
- * question. Ce qui en sort est copié *et* gardé.
+ * Seeded with the values **already stored** on the note: there is one set per
+ * note, and the form offers them rather than asking again. What comes out is
+ * copied *and* kept.
  *
- * Les valeurs partent brutes : c'est `notes::placeholder::fill`, côté Rust, qui
- * décide ce qu'un champ vide vaut (sa valeur par défaut) et ce qui n'est pas un
- * champ du tout. Refaire ce choix ici, c'est en avoir deux.
+ * The values leave raw: `notes::placeholder::fill` decides what an empty field
+ * is worth and what is not a field at all. Making that choice here would be
+ * making it twice.
  *
- * « Copier tel quel » existe pour la note qui contient du template sans en être
- * un — le back est prudent, il n'est pas infaillible.
+ * "Copy as is" exists for the note that contains template code without being
+ * one — the back end is careful, not infallible.
  */
 @Component({
   selector: 'app-placeholder-form',
@@ -41,9 +41,9 @@ export class PlaceholderFormComponent {
   readonly cancelled = output<void>();
 
   /**
-   * Saisie en cours. `null` tant que rien n'a été tapé : la note fournit alors
-   * ses propres valeurs, et les recopier ici les figerait le jour où le
-   * formulaire s'ouvre sur une note dont les valeurs ont changé entre-temps.
+   * What is being typed. `null` until something is: the note then supplies its
+   * own values, and copying them here would freeze them the day the form opens
+   * on a note whose values changed in between.
    */
   private readonly typed = signal<Record<string, string> | null>(null);
 

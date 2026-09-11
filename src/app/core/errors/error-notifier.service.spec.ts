@@ -60,7 +60,7 @@ describe('ipcNotice', () => {
 
   it('keeps the technical detail as secondary text in every case', () => {
     expect(ipcNotice(failure('noteNotFound'), FALLBACK).detail).toBe(
-      'La commande Tauri « update_note » a échoué : détail technique',
+      'Tauri command "update_note" failed: détail technique',
     );
   });
 

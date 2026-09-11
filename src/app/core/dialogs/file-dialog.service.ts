@@ -3,10 +3,9 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import type { OpenDialogOptions, SaveDialogOptions } from '@tauri-apps/plugin-dialog';
 
 /**
- * Ce que ce service attend du plugin. Un jeton plutôt qu'un appel direct, pour
- * la même raison pratique que `CLIPBOARD_ADAPTER` : le builder Angular regroupe
- * les modules avant que Vitest ne les voie, et `vi.mock` sur un paquet externe
- * n'intercepte alors qu'une fois sur deux.
+ * What this service needs from the plugin. A token rather than a direct call,
+ * for the same practical reason as `CLIPBOARD_ADAPTER`: the Angular builder
+ * bundles the modules before Vitest sees them.
  */
 export interface FileDialogAdapter {
   open(options: OpenDialogOptions): Promise<string | string[] | null>;
@@ -18,15 +17,15 @@ export const FILE_DIALOG_ADAPTER = new InjectionToken<FileDialogAdapter>('FILE_D
   factory: () => ({ open, save }),
 });
 
-/** Filtre du format d'échange, partagé par l'import et l'export. */
+/** The exchange format's filter, shared by import and export. */
 const BUNDLE_FILTER = { name: 'DevBox', extensions: ['json'] };
 
 /**
- * Sélecteur de fichiers natif.
+ * The native file picker.
  *
- * `null` couvre aussi bien l'annulation que l'indisponibilité du plugin (hors
- * Tauri, il lève) : dans les deux cas l'appelant n'a rien à ouvrir, et une
- * exception l'obligerait à distinguer deux non-choix.
+ * `null` covers both a cancellation and the plugin being unavailable (outside
+ * Tauri it throws): either way the caller has nothing to open, and an exception
+ * would force it to tell two non-choices apart.
  */
 @Injectable({ providedIn: 'root' })
 export class FileDialogService {
@@ -45,8 +44,8 @@ export class FileDialogService {
   }
 
   /**
-   * Sans filtre : une pièce jointe peut être de n'importe quel type, et en
-   * imposer un renommerait le fichier que l'utilisateur veut récupérer tel quel.
+   * No filter: an attachment can be of any type, and imposing one would rename
+   * the file the user wants back as it is.
    */
   async chooseDestination(defaultPath: string): Promise<string | null> {
     return this.destination({ defaultPath });
@@ -61,9 +60,8 @@ export class FileDialogService {
   }
 
   /**
-   * `multiple: false` est demandé au plugin, mais son type de retour reste une
-   * union : le tableau est écarté ici pour que les appelants n'aient qu'un
-   * chemin à traiter.
+   * `multiple: false` is asked of the plugin, but its return type stays a
+   * union: the array is ruled out here so callers handle one path only.
    */
   private async pick(options: OpenDialogOptions): Promise<string | null> {
     try {

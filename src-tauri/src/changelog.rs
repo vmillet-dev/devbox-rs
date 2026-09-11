@@ -1,4 +1,4 @@
-//! The changelog shipped with the binary: what "Nouveautés" shows.
+//! The changelog shipped with the binary: what the release-notes panel shows.
 //!
 //! This file holds the command; [`model`] holds the types and the reading of the
 //! Markdown. There is no `store.rs`: nothing is persisted, the whole feature is

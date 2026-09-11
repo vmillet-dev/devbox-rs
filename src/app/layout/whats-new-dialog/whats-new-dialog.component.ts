@@ -9,7 +9,8 @@ import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 const RELEASES_LABEL = RELEASES_URL.replace(/^https:\/\//, '');
 
 /**
- * "Nouveautés": the `CHANGELOG.md` shipped with the binary, release by release.
+ * The release-notes panel: the `CHANGELOG.md` shipped with the binary, release
+ * by release.
  *
  * Read through the bridge and **not** rendered from Markdown: the Rust side
  * returns releases, categories and entries already separated, so there is no

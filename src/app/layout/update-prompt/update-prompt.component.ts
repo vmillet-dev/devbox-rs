@@ -6,13 +6,12 @@ import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive'
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 
 /**
- * Pop-in proposant une mise à jour, affichée dès qu'une version plus récente
- * est publiée.
+ * The prompt offering an update, shown as soon as a newer version is published.
  *
- * Le composant ne décide de rien : il rend l'état de `UpdateStore` et lui
- * renvoie le choix de l'utilisateur. Une fois l'installation lancée, les deux
- * boutons disparaissent — Échap et le clic sur le fond aussi — parce qu'il n'y
- * a plus rien à annuler : l'installateur est en train de remplacer les fichiers.
+ * The component decides nothing: it renders `UpdateStore`'s state and hands
+ * back the user's choice. Once installing starts both buttons disappear — and
+ * so do Escape and the backdrop click — because there is nothing left to
+ * cancel: the installer is replacing the files.
  */
 @Component({
   selector: 'app-update-prompt',
@@ -48,9 +47,10 @@ export class UpdatePromptComponent {
     void this.store.dismiss();
   }
 
-  /** Échap et clic sur le fond : deux façons de reporter, refusées pendant
-   * l'installation — interrompre à mi-parcours laisserait un binaire à moitié
-   * remplacé. */
+  /**
+   * Escape and the backdrop click: two ways to postpone, refused while
+   * installing — interrupting halfway would leave a half-replaced binary.
+   */
   protected onEscape(): void {
     if (this.store.update() && !this.busy()) {
       this.later();

@@ -8,16 +8,16 @@ function typedValue(event: Event): string {
 }
 
 /**
- * Page « Variables » du panneau de préférences : les valeurs de `{{champs}}`
- * valables pour tout le corpus.
+ * The preferences panel's "Variables" page: the `{{field}}` values valid across
+ * the whole corpus.
  *
- * Elle vit dans `features/notes/` et non dans `layout/` : un `{{champ}}` est du
- * vocabulaire de notes. Le panneau l'affiche sans la connaître, par
- * [`SettingsRegistry`] — c'est `NotesPageComponent` qui l'y inscrit.
+ * It lives in `features/notes/` and not in `layout/`: a `{{field}}` is notes
+ * vocabulary. The panel shows it without knowing it, through
+ * [`SettingsRegistry`], where `NotesPageComponent` registers it.
  *
- * Ces valeurs ne sont qu'une **proposition** : ce qui a été saisi sur une note
- * passe devant, et le champ resté vide dans l'éditeur affiche la variable en
- * gris plutôt que de la recopier.
+ * These values are only a **suggestion**: what was typed on a note wins, and a
+ * field left empty in the editor shows the variable in grey rather than copying
+ * it.
  */
 @Component({
   selector: 'app-variables-page',
@@ -33,7 +33,7 @@ export class VariablesPageComponent {
     void this.store.load();
   }
 
-  /** Vide tant qu'on n'a rien tapé : une ligne neuve n'est pas une faute. */
+  /** Empty until something is typed: a new row is not a mistake. */
   protected isRejected(variable: Variable): boolean {
     return variable.name !== '' && !isVariableName(variable.name);
   }

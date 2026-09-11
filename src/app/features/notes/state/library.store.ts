@@ -4,27 +4,25 @@ import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { FileDialogService } from '@core/dialogs/file-dialog.service';
 import { StatusNotifier } from '@core/notifications/status.service';
 import { TransferRepository } from '../data/transfer.repository';
+import { NotesRevision } from './notes-revision';
 
-/** Nom proposé au sélecteur : daté, pour que deux exports ne se recouvrent pas. */
+/** The name offered to the picker: dated, so two exports do not overlap. */
 function defaultFileName(now: Date): string {
   return `devbox-${now.toISOString().slice(0, 10)}.json`;
 }
 
-/**
- * Le chemin complet est long et sans intérêt dans un bandeau ; le nom du fichier
- * suffit à reconnaître ce qu'on vient d'écrire ou de lire.
- */
+/** The full path is long and uninteresting in a banner; the file name is enough. */
 function fileNameOf(path: string): string {
   return path.split(/[/\\]/).pop() ?? path;
 }
 
 /**
- * Import, export et partage — ce que le menu « Fichier » déclenche.
+ * Import, export and share — what the "File" menu triggers.
  *
- * **Chaque opération rend compte**, y compris quand elle n'a rien changé : un
- * import qui n'ajoute rien parce que tout est déjà là et un import qui échoue se
- * ressemblent trop à l'écran pour rester silencieux. Le compte rendu passe par
- * `StatusNotifier`, sous la barre de titre — le menu, lui, se referme.
+ * **Every operation reports**, including when it changed nothing: an import
+ * that adds nothing because everything is already there and an import that
+ * fails look too alike on screen to stay silent. Reports go through
+ * `StatusNotifier`, under the titlebar — the menu itself closes on the click.
  */
 @Injectable({ providedIn: 'root' })
 export class LibraryStore {
@@ -33,12 +31,13 @@ export class LibraryStore {
   private readonly clipboard = inject(ClipboardService);
   private readonly status = inject(StatusNotifier);
   private readonly notifier = inject(ErrorNotifier);
+  private readonly revision = inject(NotesRevision);
 
   private readonly _isBusy = signal(false);
 
   readonly isBusy = this._isBusy.asReadonly();
 
-  /** `true` quand des notes sont entrées : la page recharge alors le canevas. */
+  /** `true` when notes came in, which is what bumps the canvas revision. */
   async import(): Promise<boolean> {
     const path = await this.dialog.pickBundle();
     if (path === null) return false;
@@ -51,18 +50,21 @@ export class LibraryStore {
         path: fileNameOf(path),
       };
 
-      // Le geste le plus courant — exporter puis réimporter aussitôt — n'ajoute
-      // rien du tout. Le dire explicitement évite de croire à une panne.
+      // The most common gesture — export then re-import at once — adds nothing
+      // at all. Saying so explicitly stops it looking like a breakdown.
       this.status.notify({
         key: report.notesImported === 0 ? 'file.importedNothing' : 'file.imported',
         params,
       });
 
-      return report.notesImported > 0 || report.spacesCreated > 0;
+      const changed = report.notesImported > 0 || report.spacesCreated > 0;
+      if (changed) this.revision.bump();
+
+      return changed;
     }, 'errors.importFailed');
   }
 
-  /** `spaceId` à `null` exporte tout le corpus. */
+  /** A `null` `spaceId` exports the whole corpus. */
   async export(spaceId: string | null, now: Date): Promise<void> {
     await this.write((path) => this.repository.export(path, spaceId), now);
   }
@@ -74,9 +76,8 @@ export class LibraryStore {
   }
 
   /**
-   * Le partage s'arrête au presse-papier : rien n'est envoyé nulle part, ce qui
-   * est aussi la raison pour laquelle il n'y a rien à confirmer. Le libellé du
-   * menu annonce le format, faute de quoi le Markdown est une surprise.
+   * Sharing stops at the clipboard: nothing is sent anywhere, which is also why
+   * there is nothing to confirm. The menu label announces the format.
    */
   async copyAsMarkdown(ids: readonly string[]): Promise<void> {
     if (!this.requireSelection(ids)) return;
@@ -112,8 +113,8 @@ export class LibraryStore {
         return false;
       }
 
-      // Le nom du fichier fait partie du compte rendu : un export réussi dont on
-      // ne sait pas où il a atterri ne sert à rien.
+      // The file name is part of the report: a successful export whose landing
+      // place is unknown is no use.
       this.status.notify({
         key: 'file.exported',
         params: { notes: String(report.notes), path: fileNameOf(path) },

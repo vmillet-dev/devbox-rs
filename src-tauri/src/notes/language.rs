@@ -6,90 +6,31 @@
 //! first content — [`for_draft`] at creation, [`after_patch`] upon the first
 //! paste. After this point, nothing is guessed anymore.
 
-use std::fmt;
-use std::str::FromStr;
-
-use serde::{Deserialize, Serialize};
-use specta::Type;
+use crate::closed_enum::closed_enum;
 
 use super::model::{Note, NoteDraft, NotePatch};
 
-/// **Closed** list, which is the whole point: the front end receives it as a
-/// generated TypeScript union, so an unknown value no longer compiles there
-/// instead of being refused at runtime.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
-#[serde(rename_all = "lowercase")]
-pub enum Language {
-    Json,
-    Js,
-    Ts,
-    Py,
-    Sql,
-    Yml,
-    Toml,
-    Xml,
-    Html,
-    Css,
-    Sh,
-    Md,
-    /// Default, and a **signal that the front end hasn't chosen anything**:
-    /// creation replaces it with a detection.
-    #[default]
-    Txt,
-}
-
-impl Language {
-    pub const ALL: [Self; 13] = [
-        Self::Json,
-        Self::Js,
-        Self::Ts,
-        Self::Py,
-        Self::Sql,
-        Self::Yml,
-        Self::Toml,
-        Self::Xml,
-        Self::Html,
-        Self::Css,
-        Self::Sh,
-        Self::Md,
-        Self::Txt,
-    ];
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Json => "json",
-            Self::Js => "js",
-            Self::Ts => "ts",
-            Self::Py => "py",
-            Self::Sql => "sql",
-            Self::Yml => "yml",
-            Self::Toml => "toml",
-            Self::Xml => "xml",
-            Self::Html => "html",
-            Self::Css => "css",
-            Self::Sh => "sh",
-            Self::Md => "md",
-            Self::Txt => "txt",
-        }
-    }
-}
-
-impl fmt::Display for Language {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-/// `notes.language` carries no `CHECK` (migration 3): a database written by
-/// a newer version may contain a language unknown to this version.
-impl FromStr for Language {
-    type Err = ();
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::ALL
-            .into_iter()
-            .find(|language| language.as_str() == value)
-            .ok_or(())
+closed_enum! {
+    /// **Closed** list, which is the whole point: the front end receives it as a
+    /// generated TypeScript union, so an unknown value no longer compiles there
+    /// instead of being refused at runtime.
+    pub enum Language {
+        Json = "json",
+        Js = "js",
+        Ts = "ts",
+        Py = "py",
+        Sql = "sql",
+        Yml = "yml",
+        Toml = "toml",
+        Xml = "xml",
+        Html = "html",
+        Css = "css",
+        Sh = "sh",
+        Md = "md",
+        /// Default, and a **signal that the front end hasn't chosen anything**:
+        /// creation replaces it with a detection.
+        #[default]
+        Txt = "txt",
     }
 }
 
@@ -125,7 +66,7 @@ pub fn after_patch(before: &Note, patch: &NotePatch) -> Option<Language> {
     Some(from_content(content))
 }
 
-/// L'ordre des essais va du signal le plus discriminant au plus vague.
+/// The order of attempts runs from the most discriminating signal to the vaguest.
 pub fn from_content(content: &str) -> Language {
     let trimmed = content.trim();
     if trimmed.is_empty() {
@@ -182,8 +123,7 @@ fn starts_with_any(line: &str, prefixes: &[&str]) -> bool {
     prefixes.iter().any(|prefix| line.starts_with(prefix))
 }
 
-/// Le guillemet écarte un bloc de code dont l'accolade serait celle d'un corps
-/// de fonction.
+/// The quote rules out a code block whose brace is a function body's.
 fn is_json(content: &str) -> bool {
     let wrapped = (content.starts_with('{') && content.ends_with('}'))
         || (content.starts_with('[') && content.ends_with(']'));
@@ -228,8 +168,8 @@ fn is_sql(lower: &str) -> bool {
     starts_with_any(lower, &STATEMENTS)
 }
 
-/// Une section **et** une affectation : `[…]` seul se confondrait avec un
-/// tableau sur sa propre ligne dans n'importe quel langage.
+/// A section **and** an assignment: `[…]` alone would be indistinguishable from
+/// an array on its own line in any language.
 fn is_toml(content: &str) -> bool {
     any_line(content, is_toml_section) && any_line(content, is_assignment)
 }
@@ -254,7 +194,7 @@ fn is_identifier_char(c: char) -> bool {
     c.is_alphanumeric() || matches!(c, '_' | '-' | '.')
 }
 
-/// `class` demande son deux-points final : sans lui c'est celui de TypeScript.
+/// `class` needs its trailing colon: without it, this is TypeScript's.
 fn is_python(content: &str) -> bool {
     content.contains("__name__")
         || any_line(content, |line| {
@@ -292,14 +232,14 @@ fn is_javascript(content: &str) -> bool {
         || any_line(content, |line| starts_with_any(line, &KEYWORDS))
 }
 
-/// Un sélecteur **et** une déclaration : l'accolade seule ne distinguerait pas
-/// une feuille de style d'un corps de fonction.
+/// A selector **and** a declaration: the brace alone would not tell a
+/// stylesheet from a function body.
 fn is_css(content: &str) -> bool {
     if !content.contains('{') || !content.contains('}') {
         return false;
     }
 
-    // Où qu'il soit dans la ligne : une règle compacte tient sur une seule.
+    // Anywhere in the line: a compact rule fits on one.
     let has_declaration = any_line(content, |line| {
         line.find(':')
             .zip(line.find(';'))
@@ -316,8 +256,8 @@ fn is_css(content: &str) -> bool {
 }
 
 fn is_yaml(content: &str) -> bool {
-    // Ils appartiennent aux langages déjà écartés plus haut : les revoir ici
-    // signifie qu'on s'est trompé de piste.
+    // These belong to languages already ruled out above: seeing them here means
+    // we are on the wrong track.
     if content.contains(';') || content.contains('{') {
         return false;
     }
@@ -326,8 +266,8 @@ fn is_yaml(content: &str) -> bool {
         || any_line(content, |line| line.starts_with("- ") || is_mapping(line))
 }
 
-/// L'espace exigé après le deux-points écarte une URL, dont le `http://…`
-/// passerait sinon pour une clé.
+/// The space required after the colon rules out a URL, whose `http://…` would
+/// otherwise read as a key.
 fn is_mapping(line: &str) -> bool {
     let Some((key, value)) = line.split_once(':') else {
         return false;
@@ -346,7 +286,7 @@ fn is_markdown(content: &str) -> bool {
         || any_line(content, |line| starts_with_any(line, &LINE_MARKERS))
 }
 
-/// Volontairement pauvre : une liste large attraperait de la prose.
+/// Deliberately thin: a wide list would catch prose.
 fn is_shell(content: &str) -> bool {
     const COMMANDS: [&str; 10] = [
         "echo ", "cd ", "ls ", "cat ", "grep ", "sudo ", "npm ", "git ", "docker ", "curl ",

@@ -4,13 +4,12 @@ import { LanguageTag } from '@core/language/language.model';
 import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
 
 /**
- * Rail de facettes « Format », jumeau de `TagRailComponent` : même sémantique
- * d'union (une note passe si elle est écrite dans **l'un** des langages
- * sélectionnés), même portée à l'espace actif.
+ * The "Format" facet rail, twin of `TagRailComponent`: same union semantics (a
+ * note passes if it is written in **one** of the selected languages), same
+ * scope to the active space.
  *
- * Les langages proposés viennent du backend et non de `LANGUAGE_LABELS` :
- * proposer une facette qui ne filtrerait rien dans l'espace courant serait du
- * bruit.
+ * The languages offered come from the back end and not from `LANGUAGE_LABELS`:
+ * offering a facet that would filter nothing in the current space is noise.
  */
 @Component({
   selector: 'app-language-rail',

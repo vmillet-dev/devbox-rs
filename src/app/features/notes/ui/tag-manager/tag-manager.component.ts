@@ -7,9 +7,9 @@ import { TagUsage } from '@features/notes/model/note.model';
 /**
  * Gestion globale des tags : cocher, puis renommer, fusionner ou supprimer.
  *
- * Un seul champ de destination pour le renommage **et** la fusion : côté base
- * c'est la même opération, et deux champs feraient croire à deux mécanismes.
- * Le libellé du bouton suit le nombre de tags cochés.
+ * One destination field for both renaming **and** merging: in the database it
+ * is the same operation, and two fields would suggest two mechanisms. The
+ * button label follows the number of tags ticked.
  */
 @Component({
   selector: 'app-tag-manager',
@@ -37,7 +37,7 @@ export class TagManagerComponent {
   protected readonly selectionCount = computed(() => this.selected().size);
   protected readonly canApply = computed(() => this.selectionCount() > 0);
 
-  /** Un seul tag coché : c'est un renommage. Plusieurs : c'est une fusion. */
+  /** One tag ticked is a rename. Several is a merge. */
   protected readonly applyKey = computed(() =>
     this.selectionCount() > 1 ? 'tagManager.merge' : 'tagManager.rename',
   );

@@ -2,19 +2,21 @@ import { Injectable, Signal, computed, effect, inject, resource, signal } from '
 import { SpacesRepository } from '../data/spaces.repository';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { Space } from '../model/space.model';
+import { NotesRevision } from './notes-revision';
 
 /**
- * Espaces disponibles et espace actif. L'espace actif est un **filtre** :
- * `NotesStore` le lit pour restreindre la vue, et `createNote` y range la note.
+ * The available spaces and the active one. The active space is a **filter**:
+ * `NotesStore` reads it to narrow the view, and `createNote` files there.
  *
- * `null` n'est pas un état d'attente mais un choix — « tous les espaces ». Aucune
- * entrée « Tous » n'existe côté données : ce serait un espace fantôme dans lequel
- * des notes pourraient être rangées par erreur.
+ * `null` is not a waiting state but a choice — "all spaces". No "All" entry
+ * exists on the data side: it would be a phantom space notes could be filed
+ * into by mistake.
  */
 @Injectable({ providedIn: 'root' })
 export class SpacesStore {
   private readonly repository = inject(SpacesRepository);
   private readonly notifier = inject(ErrorNotifier);
+  private readonly revision = inject(NotesRevision);
 
   private readonly spacesResource = resource({
     loader: () => this.repository.loadAll(),
@@ -31,8 +33,8 @@ export class SpacesStore {
   private readonly _activeSpaceId = signal<string | null>(null);
 
   /**
-   * `null` vaut « tous les espaces ». Un identifiant inconnu y retombe plutôt
-   * que de masquer toutes les notes.
+   * `null` means "all spaces". An unknown id falls back to it rather than
+   * hiding every note.
    */
   readonly activeSpaceId = computed<string | null>(() => this.activeSpace()?.id ?? null);
 
@@ -42,8 +44,8 @@ export class SpacesStore {
   });
 
   constructor() {
-    // Contrairement aux notes, un échec ici ne vide aucun écran : le sélecteur
-    // affiche « tous les espaces ». Sans bandeau, la panne passerait inaperçue.
+    // Unlike the notes, a failure here empties no screen: the picker shows "all
+    // spaces". Without a banner the breakdown would go unnoticed.
     effect(() => {
       const error = this.loadError();
       if (error) {
@@ -56,79 +58,80 @@ export class SpacesStore {
     this.spacesResource.reload();
   }
 
-  /** `null` sélectionne « tous les espaces ». */
+  /** `null` selects "all spaces". */
   selectSpace(id: string | null): void {
     this._activeSpaceId.set(id);
   }
 
   /**
-   * Crée un espace et le rend actif ; l'identifiant vient de la persistance.
+   * Creates a space and makes it active; the id comes from persistence.
    *
-   * Un nom vide est ignoré silencieusement. L'unicité n'est **pas** vérifiée
-   * ici : seul le stockage voit l'état réel de la base, et son refus revient
-   * sous forme de code traduit.
+   * An empty name is ignored silently. Uniqueness is **not** checked here: only
+   * storage sees the real state of the database, and its refusal comes back as
+   * a translated code.
    */
   async createSpace(name: string): Promise<Space | null> {
     const trimmed = name.trim();
     if (!trimmed) return null;
 
-    try {
-      const created = await this.repository.create({ name: trimmed });
-      this.spacesResource.set([...this.spaces(), created]);
-      this.selectSpace(created.id);
-      return created;
-    } catch (error) {
-      // Le nom saisi sert de repli d'interpolation si le back n'en fournit pas :
-      // « Un espace nommé {{name}} existe déjà » doit rester lisible.
-      this.notifier.reportFailure('errors.spaceCreateFailed', error, { name: trimmed });
-      return null;
-    }
+    // The typed name is the interpolation fallback when the back end supplies
+    // none: "A space named {{name}} already exists" has to stay readable.
+    const created = await this.notifier.attempt(
+      'errors.spaceCreateFailed',
+      () => this.repository.create({ name: trimmed }),
+      { name: trimmed },
+    );
+    if (!created) return null;
+
+    this.spacesResource.set([...this.spaces(), created]);
+    this.selectSpace(created.id);
+    return created;
   }
 
   /**
-   * L'écriture n'est pas optimiste : la liste n'adopte que ce que la
-   * persistance a renvoyé. L'unicité y exclut l'espace renommé — corriger la
-   * casse d'un nom est légitime.
+   * The write is not optimistic: the list adopts only what persistence
+   * returned. Uniqueness there excludes the renamed space — correcting a name's
+   * case is legitimate.
    */
   async renameSpace(id: string, name: string): Promise<boolean> {
     const trimmed = name.trim();
     const current = this.spaces().find((space) => space.id === id);
     if (!trimmed || !current || current.name === trimmed) return false;
 
-    try {
-      const renamed = await this.repository.rename(id, { name: trimmed });
-      this.spacesResource.set(this.spaces().map((space) => (space.id === id ? renamed : space)));
-      return true;
-    } catch (error) {
-      this.notifier.reportFailure('errors.spaceRenameFailed', error, { name: trimmed });
-      return false;
-    }
+    const renamed = await this.notifier.attempt(
+      'errors.spaceRenameFailed',
+      () => this.repository.rename(id, { name: trimmed }),
+      { name: trimmed },
+    );
+    if (!renamed) return false;
+
+    this.spacesResource.set(this.spaces().map((space) => (space.id === id ? renamed : space)));
+    return true;
   }
 
   /**
-   * Supprime un espace en transférant ses notes vers `targetSpaceId`, qui
-   * devient actif : les notes viennent d'y atterrir, et retomber sur « tous les
-   * espaces » ferait perdre de vue où elles sont passées.
-   *
-   * Ne recharge **pas** les notes — ce store ne connaît pas `NotesStore`,
-   * l'inverse serait un cycle d'injection. D'où le booléen renvoyé.
+   * Deletes a space, moving its notes to `targetSpaceId`, which becomes active:
+   * the notes have just landed there, and falling back to "all spaces" would
+   * lose sight of where they went.
    */
   async deleteSpace(id: string, targetSpaceId: string): Promise<boolean> {
-    // Un espace ne peut pas être son propre refuge : la cascade emporterait les
-    // notes juste après le transfert. Le back refuse aussi ; ce garde évite
-    // seulement un aller-retour.
+    // A space cannot be its own refuge: the cascade would take the notes right
+    // after the transfer. The back end refuses too; this guard only saves a
+    // round trip.
     if (id === targetSpaceId || !this.spaces().some((space) => space.id === targetSpaceId)) {
       return false;
     }
 
-    try {
-      await this.repository.delete(id, targetSpaceId);
-      this.spacesResource.set(this.spaces().filter((space) => space.id !== id));
-      this.selectSpace(targetSpaceId);
-      return true;
-    } catch (error) {
-      this.notifier.reportFailure('errors.spaceDeleteFailed', error);
-      return false;
-    }
+    const deleted = await this.notifier.attempt('errors.spaceDeleteFailed', () =>
+      this.repository.delete(id, targetSpaceId),
+    );
+    if (deleted === null) return false;
+
+    this.spacesResource.set(this.spaces().filter((space) => space.id !== id));
+    this.selectSpace(targetSpaceId);
+    // The absorbed notes changed `spaceId` in the database, which a query on an
+    // unrelated space would not otherwise notice.
+    this.revision.bump();
+    return true;
   }
 }

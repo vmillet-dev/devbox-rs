@@ -32,8 +32,8 @@
           [class.highlighted]="index === highlighted()"
           [attr.aria-selected]="index === highlighted()"
         >
-          <!-- Le clic remonte le choix ; le clavier passe par le champ, qui ne
-               perd jamais le focus. -->
+          <!-- A click reports the choice; the keyboard goes through the field,
+               which never loses focus. -->
           <button
             type="button"
             class="palette-option-button"
@@ -55,8 +55,8 @@
         </li>
       }
 
-      <!-- Après les résultats : retrouver un snippet reste le geste le plus
-           fréquent, et garde donc la première place. -->
+      <!-- After the results: finding a snippet stays the most frequent gesture,
+           and so keeps first place. -->
       @if (canCreate()) {
         <li
           class="palette-option palette-create"

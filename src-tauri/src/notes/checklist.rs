@@ -8,54 +8,23 @@
 //! why `to_markdown` lives here — sharing or copying such a note has to render
 //! something, and an empty fenced block would be a useless paste.
 
-use std::fmt;
-use std::str::FromStr;
-
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-/// **Closed** list, like `Language`: the front end receives it as a generated
-/// TypeScript union, so an unknown value stops compiling there rather than
-/// being refused at runtime.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
-#[serde(rename_all = "lowercase")]
-pub enum NoteKind {
-    /// The ordinary note: a title and a coloured body. Default, and what every
-    /// note written before todo-lists existed reads back as.
-    #[default]
-    Snippet,
-    /// A todo list: no body, an ordered list of items instead.
-    Checklist,
-}
+use crate::closed_enum::closed_enum;
+use crate::count::saturating_u32 as count;
 
-impl NoteKind {
-    pub const ALL: [Self; 2] = [Self::Snippet, Self::Checklist];
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Snippet => "snippet",
-            Self::Checklist => "checklist",
-        }
-    }
-}
-
-impl fmt::Display for NoteKind {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
-/// `notes.kind` carries no `CHECK`, for the same reason `notes.language` does
-/// not: a database written by a newer version may hold a kind this one has
-/// never heard of, and falling back beats failing the read.
-impl FromStr for NoteKind {
-    type Err = ();
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::ALL
-            .into_iter()
-            .find(|kind| kind.as_str() == value)
-            .ok_or(())
+closed_enum! {
+    /// **Closed** list, like `Language`: the front end receives it as a generated
+    /// TypeScript union, so an unknown value stops compiling there rather than
+    /// being refused at runtime.
+    pub enum NoteKind {
+        /// The ordinary note: a title and a coloured body. Default, and what every
+        /// note written before todo-lists existed reads back as.
+        #[default]
+        Snippet = "snippet",
+        /// A todo list: no body, an ordered list of items instead.
+        Checklist = "checklist",
     }
 }
 
@@ -103,12 +72,6 @@ pub fn to_markdown(items: &[ChecklistItem]) -> String {
         .map(|item| format!("- [{}] {}", if item.done { 'x' } else { ' ' }, item.text))
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-/// Saturates rather than wrapping: a truncated count would be worse than a
-/// capped one, and neither is reachable in practice.
-fn count(value: usize) -> u32 {
-    u32::try_from(value).unwrap_or(u32::MAX)
 }
 
 #[cfg(test)]

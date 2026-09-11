@@ -19,8 +19,8 @@ export const RELEASES_URL = `${REPOSITORY_URL}/releases`;
  * in jsdom, which has neither a Tauri bridge nor the `opener` plugin.
  *
  * The reading is **not** a `resource` held here. Nothing needs the changelog
- * until someone opens "Nouveautés", and a root service would have fetched it on
- * every launch instead.
+ * until someone opens the release-notes panel, and a root service would fetch
+ * it on every launch instead.
  */
 @Injectable({ providedIn: 'root' })
 export class ChangelogService {

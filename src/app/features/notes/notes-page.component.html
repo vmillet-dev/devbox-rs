@@ -13,8 +13,8 @@
     (queryChange)="store.setSearchQuery($event)"
   />
   <app-filter-chips [active]="store.activeFilter()" (filterChanged)="store.setFilter($event)" />
-  <!-- La corbeille est une **vue des notes**, pas une opération sur un fichier :
-       sa place est près des filtres, pas dans le menu « Fichier ». -->
+  <!-- The trash is a **view on the notes**, not a file operation: its place is
+       next to the filters, not in the "File" menu. -->
   <button type="button" class="trash-btn" (click)="trash.open()">
     <span aria-hidden="true">🗑</span>
     {{ 'notes.trash' | transloco }}
@@ -51,8 +51,8 @@
 
 <div class="canvas" [attr.aria-busy]="store.isLoading()">
   @if (error) {
-    <!-- Le chargement est la seule opération dont l'échec vide entièrement
-         l'écran : elle mérite sa propre reprise, pas seulement le bandeau global. -->
+    <!-- Loading is the one operation whose failure empties the whole screen: it
+         deserves its own retry, not only the global banner. -->
     <div class="canvas-state" role="alert">
       <p class="canvas-state-text">{{ 'errors.notesLoadFailed' | transloco }}</p>
       <p class="canvas-state-detail">{{ error.message }}</p>
@@ -85,9 +85,9 @@
   }
 </div>
 
-<!-- L'identifiant vient du store, jamais d'une émission de l'éditeur : c'est le
-     store qui décide de la note ouverte. Elle peut être un brouillon encore
-     absent de la base — l'éditeur ne fait pas la différence. -->
+<!-- The id comes from the store and never from an editor emission: the store
+     decides which note is open. It may be a draft with no row yet — the editor
+     does not tell the difference. -->
 @if (store.selectedNote(); as note) {
   <app-note-editor-overlay
     [note]="note"
@@ -121,8 +121,8 @@
   />
 }
 
-<!-- Au-dessus de l'éditeur : la vue agrandie montre les octets que l'aperçu a
-     déjà chargés, elle ne relit rien. -->
+<!-- Above the editor: the lightbox shows the bytes the preview already loaded,
+     it re-reads nothing. -->
 @if (imageZoomed() && attachments.previewed(); as attachment) {
   @if (attachments.previewData(); as data) {
     <app-image-lightbox [source]="data" [fileName]="attachment.fileName" (closed)="imageZoomed.set(false)" />
@@ -130,8 +130,8 @@
 }
 
 @if (palette.isOpen()) {
-  <!-- Le formulaire de champs passe **devant** la palette : c'est elle qui
-       l'ouvre, et elle reste en dessous le temps de la saisie. -->
+  <!-- The fields form sits **in front of** the palette: the palette opens it,
+       and stays underneath while it is being filled. -->
   @if (palette.pendingFill(); as note) {
     <app-placeholder-form
       [placeholders]="note.placeholders"
@@ -167,7 +167,7 @@
   <app-trash-panel
     [notes]="trash.notes()"
     [isLoading]="trash.isLoading()"
-    (closed)="onCloseTrash()"
+    (closed)="trash.close()"
     (restoreRequested)="onRestore($event)"
     (purgeRequested)="trash.purge($event)"
     (emptyRequested)="trash.emptyTrash()"
@@ -186,7 +186,7 @@
   />
 }
 
-<!-- Le bandeau s'efface après quelques secondes ; `Ctrl+Z` reste possible. -->
+<!-- The banner fades after a few seconds; `Ctrl+Z` still works. -->
 @if (store.undoBanner(); as deletion) {
   <app-undo-bar [count]="deletion.count" (undone)="store.undoDeletion()" (dismissed)="store.dismissUndo()" />
 }

@@ -20,14 +20,13 @@ import {
 } from './note.dto';
 
 /**
- * Point d'accès aux notes : ni composant ni store ne touche une source de
- * données autrement. Les signatures viennent de `bindings.ts`, généré depuis le
- * Rust — un argument mal nommé ou un type qui a bougé est une erreur de build.
+ * The way in to the notes: no component or store touches a data source
+ * otherwise. The signatures come from `bindings.ts`, generated from the Rust —
+ * a misnamed argument or a type that moved is a build error.
  *
- * `query` renvoie une **vue déjà filtrée et regroupée** ; il n'existe pas de
- * méthode rendant la liste brute, précisément pour qu'aucun appelant ne soit
- * tenté de refiltrer. `create` et `update` renvoient la note **telle que
- * persistée** — l'`id` et les horodatages viennent du back, jamais du front.
+ * `query` returns a view **already filtered and grouped**; there is deliberately
+ * no method handing back the raw list, so no caller is tempted to re-filter.
+ * `create` and `update` return the note **as persisted**.
  */
 @Injectable({ providedIn: 'root' })
 export class NotesRepository {
@@ -43,12 +42,12 @@ export class NotesRepository {
     return toNote(unwrap('update_note', await commands.updateNote(id, toNotePatchDto(patch))));
   }
 
-  /** Met à la corbeille : la note est récupérable pendant 30 jours. */
+  /** Moves to the trash: the note is recoverable for 30 days. */
   async delete(id: string): Promise<void> {
     unwrap('delete_note', await commands.deleteNote(id));
   }
 
-  /** Renvoie le nombre de notes réellement mises à la corbeille. */
+  /** The number of notes actually trashed. */
   async deleteMany(ids: readonly string[]): Promise<number> {
     return unwrap('delete_notes', await commands.deleteNotes([...ids]));
   }
@@ -73,7 +72,7 @@ export class NotesRepository {
     return unwrap('move_notes', await commands.moveNotes([...ids], spaceId));
   }
 
-  /** Ajoute sans remplacer : une action de masse enrichit l'étiquetage. */
+  /** Adds without replacing: a bulk action enriches the labelling. */
   async tagMany(ids: readonly string[], tags: readonly string[]): Promise<number> {
     return unwrap('tag_notes', await commands.tagNotes([...ids], [...tags]));
   }
@@ -90,37 +89,38 @@ export class NotesRepository {
     return unwrap('merge_tags', await commands.mergeTags([...tags], into));
   }
 
-  async deleteTag(tag: string): Promise<number> {
-    return unwrap('delete_tag', await commands.deleteTag(tag));
+  /** Removes a whole selection in one round trip. */
+  async deleteTags(tags: readonly string[]): Promise<number> {
+    return unwrap('delete_tags', await commands.deleteTags([...tags]));
   }
 
   /**
-   * Enregistre ce qui a été saisi dans les `{{champs}}` d'une note. Renvoie la
-   * note telle que persistée : `updatedAt` y est **inchangé**, remplir un champ
-   * n'étant pas modifier la note.
+   * Stores what was typed into a note's `{{fields}}`. Returns the note as
+   * persisted: `updatedAt` is **unchanged** there, filling a field not being
+   * editing the note.
    */
   async setPlaceholderValues(id: string, values: Record<string, string>): Promise<Note> {
     return toNote(unwrap('set_placeholder_values', await commands.setPlaceholderValues(id, values)));
   }
 
   /**
-   * Remplit les `{{champs}}` d'un contenu, **variables globales comprises** :
-   * un champ laissé vide retombe sur la variable avant de retomber sur la
-   * valeur par défaut du texte. D'où la lecture en base, et donc le `Result`.
+   * Fills a content's `{{fields}}`, **global variables included**: a field left
+   * empty falls back to the variable before falling back to the default written
+   * in the text. Hence the database read, and hence the `Result`.
    */
   async fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
     return unwrap('fill_placeholders', await commands.fillPlaceholders(content, values));
   }
 
-  /** Les variables globales, telles que le panneau de préférences les édite. */
+  /** The global variables, as the preferences panel edits them. */
   async loadVariables(): Promise<Record<string, string>> {
     return unwrap('list_global_placeholders', await commands.listGlobalPlaceholders());
   }
 
   /**
-   * Enregistre le **jeu complet** : ce qui n'est pas envoyé est ce que
-   * l'utilisateur a retiré. Renvoie ce qui a été retenu — une valeur vide n'est
-   * pas stockée, elle veut dire « je garde ce que le snippet propose ».
+   * Stores the **whole** set: what is not sent is what the user removed.
+   * Returns what was kept — an empty value is not stored, it means "I keep what
+   * the snippet offers".
    */
   async saveVariables(values: Record<string, string>): Promise<Record<string, string>> {
     return unwrap('set_global_placeholders', await commands.setGlobalPlaceholders(values));

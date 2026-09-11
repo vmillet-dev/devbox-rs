@@ -1,14 +1,14 @@
--- Schéma initial. Deux choix rendent le filtrage requêtable : `lifecycle`
--- éclaté en deux colonnes plutôt qu'en JSON, et les tags dans leur propre table
--- plutôt qu'en colonne sérialisée.
+-- Initial schema. Two choices make filtering queryable: `lifecycle` split into
+-- two columns rather than JSON, and the tags in their own table rather than a
+-- serialised column.
 
 CREATE TABLE spaces (
     id   TEXT PRIMARY KEY,
     name TEXT NOT NULL
 );
 
--- `spaces::create` vérifie l'unicité pour produire une erreur lisible, cet index
--- la garantit même si une écriture passait à côté. NOCASE ne replie que l'ASCII.
+-- `spaces::create` checks uniqueness to produce a readable error; this index
+-- guarantees it even if a write slipped past. NOCASE only folds ASCII.
 CREATE UNIQUE INDEX spaces_name_unique ON spaces (name COLLATE NOCASE);
 
 CREATE TABLE notes (
@@ -23,7 +23,7 @@ CREATE TABLE notes (
     updated_at           TEXT NOT NULL,
     lifecycle_kind       TEXT NOT NULL CHECK (lifecycle_kind IN ('permanent', 'expires')),
     lifecycle_expires_at TEXT,
-    -- Garantit que la lecture peut reconstruire l'enum sans cas ambigu.
+    -- Guarantees a read can rebuild the enum with no ambiguous case.
     CHECK ((lifecycle_kind = 'expires') = (lifecycle_expires_at IS NOT NULL))
 );
 

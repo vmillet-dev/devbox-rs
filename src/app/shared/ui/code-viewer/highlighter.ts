@@ -15,21 +15,24 @@ import { LanguageTag } from '@core/language/language.model';
 /**
  * Seul point de contact avec highlight.js.
  *
- * Les grammaires sont importées **une par une** depuis `highlight.js/lib/` : le
- * paquet complet embarque près de 200 langages, ce qui ferait exploser le budget
- * de bundle initial pour les douze qui servent ici.
+ * Grammars are imported **one by one** from `highlight.js/lib/`: the full
+ * package carries close to 200 languages, which would blow the initial bundle
+ * budget for the twelve used here.
  *
- * Aucune feuille de style de highlight.js n'est importée : elles codent leurs
- * couleurs en dur. Le thème vit dans `src/styles/_code-theme.scss`, qui traduit
- * les classes `.hljs-*` en variables du thème.
+ * No highlight.js stylesheet is imported — they hard-code their colours. The
+ * theme lives in the global `src/styles/_code-theme.scss`.
  */
 
 /**
- * Grammaire highlight.js correspondant à chaque langage de note. Trois n'ont pas
- * le même nom des deux côtés (`toml` est décrit par `ini`, `html` par `xml`), et
- * `txt` n'en a volontairement aucune : du texte libre n'a rien à colorer.
+ * The highlight.js grammar for each note language. Three do not share a name
+ * across the two sides (`toml` is described by `ini`, `html` by `xml`), and `txt`
+ * deliberately has none: free text has nothing to colour.
+ *
+ * ⚠️ `Record`, not `Partial<Record>`: a language added to the Rust enum has to
+ * break this build. Left partial it would simply come back uncoloured, and
+ * nothing would say so.
  */
-const GRAMMARS: Readonly<Partial<Record<LanguageTag, string>>> = {
+const GRAMMARS: Readonly<Record<LanguageTag, string | null>> = {
   json: 'json',
   js: 'javascript',
   ts: 'typescript',
@@ -42,6 +45,7 @@ const GRAMMARS: Readonly<Partial<Record<LanguageTag, string>>> = {
   css: 'css',
   sh: 'bash',
   md: 'markdown',
+  txt: null,
 };
 
 for (const [name, grammar] of Object.entries({
@@ -67,25 +71,23 @@ const HTML_ESCAPES: Readonly<Record<string, string>> = {
 };
 
 function escapeHtml(text: string): string {
-  return text.replace(/[&<>]/g, (character) => HTML_ESCAPES[character]);
+  return text.replace(/[&<>]/g, (character) => HTML_ESCAPES[character] ?? character);
 }
 
 /** Ouverture ou fermeture de balise dans la sortie de highlight.js. */
 const SPAN_PATTERN = /<span class="([^"]*)">|<\/span>/g;
 
 /**
- * Redécoupe la sortie de highlight.js en une chaîne HTML par ligne source.
+ * Re-splits highlight.js output into one HTML string per source line.
  *
- * highlight.js colore le bloc **entier** — c'est précisément ce qui lui permet
- * de traiter un commentaire ou une chaîne s'étendant sur plusieurs lignes. Mais
- * le visualiseur rend une ligne par élément, pour sa gouttière de numéros : un
- * simple `split('\n')` couperait au milieu des `<span>` qui chevauchent une fin
- * de ligne et produirait du HTML déséquilibré.
+ * highlight.js colours the **whole** block — which is what lets it handle a
+ * comment or a string spanning several lines. But the viewer renders one line
+ * per element for its number gutter, and a plain split would cut through the
+ * spans that straddle a line ending, producing unbalanced HTML.
  *
- * D'où ce parcours : on tient la pile des balises ouvertes, on la referme en fin
- * de ligne et on la rouvre au début de la suivante. La grammaire à traverser est
- * étroite — highlight.js n'émet que `<span class="…">`, `</span>` et du texte
- * déjà échappé — ce qui rend le parcours par expression régulière suffisant.
+ * Hence this walk: hold the stack of open tags, close it at the end of a line
+ * and reopen it at the start of the next. highlight.js emits only spans and
+ * already-escaped text, which is what makes a regular expression enough.
  */
 export function splitHighlightedLines(html: string): string[] {
   const lines: string[] = [];
@@ -121,12 +123,11 @@ export function splitHighlightedLines(html: string): string[] {
 }
 
 /**
- * Contenu colorié, une chaîne HTML par ligne source.
+ * Coloured content, one HTML string per source line.
  *
- * Le HTML renvoyé ne contient que des `<span class="hljs-…">` autour de texte
- * échappé par highlight.js : il traverse le sanitizer d'Angular sans perte, et
- * il ne faut surtout pas le marquer comme sûr — le contenu d'une note est saisi
- * par l'utilisateur.
+ * ⚠️ The HTML returned holds only `<span class="hljs-…">` around text
+ * highlight.js has escaped: it passes Angular's sanitizer intact, and must
+ * **never** be marked as safe — a note's content is typed by the user.
  */
 export function highlightLines(content: string, language: LanguageTag): string[] {
   const grammar = GRAMMARS[language];
@@ -134,9 +135,9 @@ export function highlightLines(content: string, language: LanguageTag): string[]
     return content.split('\n').map(escapeHtml);
   }
 
-  // `ignoreIllegals` : une note est du texte libre, souvent un fragment qui ne
-  // respecte pas la grammaire de bout en bout. Sans ça highlight.js lèverait,
-  // et un extrait de JSON tronqué ne s'afficherait plus du tout.
+  // `ignoreIllegals`: a note is free text, often a fragment that does not obey
+  // the grammar end to end. Without it highlight.js would throw, and a
+  // truncated JSON excerpt would stop rendering altogether.
   const highlighted = hljs.highlight(content, { language: grammar, ignoreIllegals: true }).value;
 
   return splitHighlightedLines(highlighted);

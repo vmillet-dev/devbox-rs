@@ -1,16 +1,16 @@
--- Corbeille et pièces jointes.
+-- Trash and attachments.
 --
--- `deleted_at` plutôt qu'un booléen : la purge à 30 jours a besoin de la date,
--- et le panneau de corbeille affiche l'échéance. NULL = note vivante, ce qui
--- laisse l'index partiel ne porter que sur les lignes supprimées.
+-- `deleted_at` rather than a boolean: the 30-day purge needs the date, and the
+-- trash panel shows the deadline. NULL means a living note, which lets the
+-- partial index cover only the deleted rows.
 
 ALTER TABLE notes ADD COLUMN deleted_at TEXT;
 
 CREATE INDEX notes_deleted_at ON notes (deleted_at) WHERE deleted_at IS NOT NULL;
 
--- Les octets ne sont pas ici : ils vivent dans `app_data_dir()/attachments/`,
--- sous un nom dérivé de l'identifiant. Une base qui grossit de 10 Mo par capture
--- d'écran rendrait chaque lecture de note plus lente.
+-- The bytes are not here: they live in `app_data_dir()/attachments/` under a
+-- name derived from the id. A database growing by 10 MB per screenshot would
+-- make every note read slower.
 CREATE TABLE attachments (
     id         TEXT PRIMARY KEY,
     note_id    TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,

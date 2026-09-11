@@ -2,13 +2,14 @@ import { InjectionToken, Injectable, inject } from '@angular/core';
 import { listen } from '@tauri-apps/api/event';
 
 /**
- * Événements poussés par le moteur natif. Miroir de `mod events` dans
- * `src-tauri/src/lib.rs` : une faute de frappe d'un côté produit un abonnement
- * silencieusement inerte, que rien ne signale.
+ * Events pushed by the native engine.
+ *
+ * ⚠️ Mirror of the topic constants in `src-tauri/src/desktop.rs`: a typo on
+ * either side produces a silently inert subscription that nothing reports.
  */
 export type AppEventTopic = 'devbox:capture' | 'devbox:new-note' | 'devbox:palette';
 
-/** Se désabonne. Rien à faire si l'abonnement n'a jamais abouti. */
+/** Unsubscribes. A no-op when the subscription never landed. */
 export type Unlisten = () => void;
 
 export type EventSubscriber = (topic: string, handler: () => void) => Promise<Unlisten>;
@@ -19,20 +20,20 @@ export const EVENT_SUBSCRIBER = new InjectionToken<EventSubscriber>('EVENT_SUBSC
 });
 
 /**
- * Sens **descendant** du pont : le natif prévient, le front réagit. Le sens
- * montant passe par les commandes générées dans `bindings.ts`.
+ * The bridge's **downward** direction: the native side notifies, the front
+ * reacts. Upward goes through the commands generated in `bindings.ts`.
  *
- * Hors Tauri (jsdom), `listen` échoue : l'abonnement est alors inerte plutôt que
- * fatal, comme pour les préférences et le presse-papier.
+ * Outside Tauri (jsdom) `listen` fails, and the subscription is then inert
+ * rather than fatal — as for the preferences and the clipboard.
  */
 @Injectable({ providedIn: 'root' })
 export class AppEventsService {
   private readonly subscribe = inject(EVENT_SUBSCRIBER);
 
   /**
-   * Rend de quoi se désabonner **immédiatement**, alors que l'abonnement lui
-   * n'est acquis qu'au tour suivant : sans le drapeau, un composant détruit
-   * avant la résolution resterait abonné pour la durée de la session.
+   * Hands back an unsubscribe **immediately**, where the subscription itself is
+   * only acquired on the next turn: without the flag, a component destroyed
+   * before it resolves would stay subscribed for the session.
    */
   on(topic: AppEventTopic, handler: () => void): Unlisten {
     let unlisten: Unlisten | null = null;

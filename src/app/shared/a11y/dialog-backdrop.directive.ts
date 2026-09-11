@@ -1,12 +1,12 @@
 import { Directive, output } from '@angular/core';
 
 /**
- * Fond d'une modale : émet `dismissed` quand le clic tombe sur le fond lui-même
- * et non sur le panneau posé dessus.
+ * A modal's backdrop: emits `dismissed` when the click lands on the backdrop
+ * itself and not on the panel above it.
  *
- * L'écouteur vit ici plutôt que dans le template, ce qui évite d'y désactiver
- * `click-events-have-key-events` : l'équivalent clavier existe, c'est Échap, et
- * chaque modale le gère déjà.
+ * The listener lives here rather than in the template, which avoids disabling
+ * `click-events-have-key-events` there: the keyboard equivalent exists — it is
+ * Escape, and every modal already handles it.
  */
 @Directive({
   selector: '[appDialogBackdrop]',

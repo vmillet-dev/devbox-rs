@@ -1,30 +1,28 @@
-import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { ClipboardService } from '@core/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { SettingsStore } from '@core/settings/settings.store';
+import { SEARCH_DEBOUNCE_MS, debounced } from '@core/time/debounce';
 import { ClockService } from '@core/time/clock.service';
 import { AppWindowService } from '@core/window/app-window.service';
 import { NotesRepository } from '../data/notes.repository';
 import { noteCopyText } from '../model/checklist.model';
 import { Note } from '../model/note.model';
-import { SEARCH_DEBOUNCE_MS } from './notes.store';
 
-/** Au-delà, la liste ne tient plus à l'écran et le clavier n'y navigue plus. */
+/** Beyond this the list no longer fits on screen and the keyboard loses it. */
 const MAX_RESULTS = 8;
 
 /**
- * Palette de collage rapide, ouverte par `Ctrl+Alt+P` depuis n'importe quelle
- * application.
+ * The quick-paste palette, opened from any application by a global shortcut.
  *
- * Elle **capture autant qu'elle retrouve** : ce qui est tapé sans correspondre à
- * un snippet peut devenir une note, ce qui en fait le chemin le plus court entre
- * une idée et une note enregistrée.
+ * It **captures as much as it retrieves**: what is typed without matching a
+ * snippet can become a note, which makes it the shortest path between an idea
+ * and a saved note.
  *
- * Elle interroge **tous les espaces** et ignore les filtres du canevas : quand
- * on rappelle un snippet, on ne se souvient pas de l'espace où on l'a rangé.
- *
- * Elle ne réutilise pas `NotesStore` pour la même raison — sa recherche
- * modifierait ce que le canevas affiche derrière elle.
+ * It queries **every space** and ignores the canvas filters: when recalling a
+ * snippet one does not remember which space it was filed in. It does not reuse
+ * `NotesStore` for the same reason — its search would change what the canvas
+ * shows behind it.
  */
 @Injectable({ providedIn: 'root' })
 export class PaletteStore {
@@ -47,17 +45,16 @@ export class PaletteStore {
   readonly pendingFill = this._pendingFill.asReadonly();
 
   /**
-   * Ce qui a été tapé peut devenir une note : la palette sert autant à
-   * **capturer** qu'à retrouver. La ligne de création est proposée dès qu'il y a
-   * quelque chose à écrire, et elle vient **après** les résultats — retrouver un
-   * snippet reste le geste le plus fréquent, et il garde la première place.
+   * What was typed can become a note. The create row is offered as soon as
+   * there is something to write, and it comes **after** the results — finding a
+   * snippet stays the most frequent gesture and keeps first place.
    */
   readonly canCreate = computed(() => this._query().trim().length > 0);
 
-  /** Résultats plus, éventuellement, la ligne de création. */
+  /** The results plus, possibly, the create row. */
   readonly optionCount = computed(() => this._results().length + (this.canCreate() ? 1 : 0));
 
-  /** Borné : une liste qui rétrécit ne doit pas laisser l'index dehors. */
+  /** Bounded: a shrinking list must not leave the index outside it. */
   readonly highlighted = computed(() => Math.min(this._highlighted(), Math.max(0, this.optionCount() - 1)));
 
   readonly isCreateHighlighted = computed(
@@ -66,13 +63,9 @@ export class PaletteStore {
 
   readonly highlightedNote = computed<Note | null>(() => this._results()[this.highlighted()] ?? null);
 
-  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+  private readonly scheduleSearch = debounced((query: string) => void this.search(query), SEARCH_DEBOUNCE_MS);
 
-  constructor() {
-    inject(DestroyRef).onDestroy(() => this.cancelPendingSearch());
-  }
-
-  /** Ouvre sur les notes les plus récentes : rouvrir sans taper a un sens. */
+  /** Opens on the most recent notes: reopening without typing has a meaning. */
   async open(): Promise<void> {
     this._isOpen.set(true);
     this._query.set('');
@@ -82,7 +75,7 @@ export class PaletteStore {
   }
 
   close(): void {
-    this.cancelPendingSearch();
+    this.scheduleSearch.cancel();
     this._isOpen.set(false);
     this._pendingFill.set(null);
   }
@@ -90,14 +83,10 @@ export class PaletteStore {
   setQuery(query: string): void {
     this._query.set(query);
     this._highlighted.set(0);
-    this.cancelPendingSearch();
-    this.searchTimeout = setTimeout(() => {
-      this.searchTimeout = null;
-      void this.search(query);
-    }, SEARCH_DEBOUNCE_MS);
+    this.scheduleSearch(query);
   }
 
-  /** Butée en haut comme en bas : reboucler ferait perdre de vue où on en est. */
+  /** Stops at both ends: wrapping around would lose track of where one is. */
   moveHighlight(step: number): void {
     const last = this.optionCount() - 1;
     this._highlighted.set(Math.max(0, Math.min(last, this.highlighted() + step)));
@@ -108,12 +97,11 @@ export class PaletteStore {
   }
 
   /**
-   * Contenu de la note à créer quand c'est la ligne de création qui est
-   * retenue, sinon `null` — et la palette se referme au passage.
+   * The content of the note to create when the create row is the one picked,
+   * otherwise `null` — and the palette closes on the way.
    *
-   * Le store ne crée pas lui-même : il ne connaît pas `NotesStore`, et
-   * l'inverse serait un cycle. C'est la page qui enchaîne, comme partout
-   * ailleurs ici.
+   * The store does not create anything itself: it does not know `NotesStore`,
+   * and the other way round would be a cycle. The page chains it.
    */
   takeNewNoteContent(): string | null {
     if (!this.isCreateHighlighted()) return null;
@@ -125,8 +113,8 @@ export class PaletteStore {
   }
 
   /**
-   * Copie et s'efface. Un snippet à champs passe d'abord par le formulaire :
-   * copier `psql -h {{host}}` tel quel donnerait une commande inutilisable.
+   * Copies and disappears. A snippet with fields goes through the form first:
+   * copying `psql -h {{host}}` as is would give an unusable command.
    */
   async chooseHighlighted(): Promise<void> {
     const note = this.highlightedNote();
@@ -137,12 +125,12 @@ export class PaletteStore {
       return;
     }
 
-    // Une todolist n'a pas de contenu : sans ce rendu, la palette poserait une
-    // chaîne vide dans le presse-papier.
+    // A todo list has no content: without this rendering the palette would put
+    // an empty string on the clipboard.
     await this.copyAndDismiss(noteCopyText(note));
   }
 
-  /** Sortie du formulaire de champs, ou choix explicite de copier le brut. */
+  /** Out of the fields form, or an explicit choice to copy the raw text. */
   async copyAndDismiss(content: string): Promise<void> {
     if (!(await this.clipboard.copy(content))) {
       this.notifier.notify({ ref: { key: 'errors.copyFailed' } });
@@ -150,7 +138,7 @@ export class PaletteStore {
     }
 
     this.close();
-    // La fenêtre s'efface : l'utilisateur repart coller là où il était.
+    // The window disappears: the user goes back to paste where they were.
     await this.window.hide();
   }
 
@@ -163,7 +151,7 @@ export class PaletteStore {
 
     try {
       const view = await this.repository.query({
-        // Tous les espaces, aucun filtre : la palette cherche partout.
+        // Every space, no filter: the palette searches everywhere.
         spaceId: null,
         search: query.trim(),
         filter: 'all',
@@ -171,9 +159,8 @@ export class PaletteStore {
         languages: [],
         now,
         tzOffsetMinutes: now.getTimezoneOffset(),
-        // Le seul endroit où la remontée des épinglées se règle : sur le
-        // canevas elle fait la section du haut, ici elle décide juste de ce
-        // qu'on trouve sous la main en premier.
+        // The one place the pinned hoist is a setting: on the canvas it makes
+        // the top section, here it only decides what comes to hand first.
         pinnedFirst: this.settings.showPinnedFirst(),
       });
 
@@ -181,13 +168,6 @@ export class PaletteStore {
     } catch (error) {
       this.notifier.reportFailure('errors.notesLoadFailed', error);
       this._results.set([]);
-    }
-  }
-
-  private cancelPendingSearch(): void {
-    if (this.searchTimeout !== null) {
-      clearTimeout(this.searchTimeout);
-      this.searchTimeout = null;
     }
   }
 }
