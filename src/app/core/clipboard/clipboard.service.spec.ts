@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { StatusNotifier } from '@core/notifications/status.service';
+import { SettingsStore } from '@core/settings/settings.store';
 import { CLIPBOARD_ADAPTER, ClipboardAdapter, ClipboardService } from './clipboard.service';
 
 function fakeAdapter(overrides: Partial<ClipboardAdapter> = {}): ClipboardAdapter {
@@ -46,6 +48,28 @@ describe('ClipboardService', () => {
     setUp(fakeAdapter({ readText: vi.fn(async () => Promise.reject(new Error('no plugin'))) }));
 
     await expect(service.paste()).resolves.toBe('');
+  });
+
+  it('acknowledges the copy, which is the only feedback four of its callers have', async () => {
+    await service.copy('SELECT 1');
+
+    expect(TestBed.inject(StatusNotifier).status()).toEqual({ key: 'settings.copied' });
+  });
+
+  it('stays quiet when the acknowledgement is turned off', async () => {
+    TestBed.inject(SettingsStore).setCopyConfirmation(false);
+
+    await service.copy('SELECT 1');
+
+    expect(TestBed.inject(StatusNotifier).status()).toBeNull();
+  });
+
+  it('says nothing about a copy that did not happen', async () => {
+    setUp(fakeAdapter({ writeText: vi.fn(async () => Promise.reject(new Error('no plugin'))) }));
+
+    await service.copy('x');
+
+    expect(TestBed.inject(StatusNotifier).status()).toBeNull();
   });
 
   it('reads an empty clipboard as an empty string rather than null', async () => {

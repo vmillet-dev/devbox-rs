@@ -104,10 +104,25 @@ export class NotesRepository {
   }
 
   /**
-   * `fill_placeholders` ne renvoie pas de `Result` : c'est une fonction pure
-   * côté Rust, sans base ni fichier à toucher, donc rien à rapporter.
+   * Remplit les `{{champs}}` d'un contenu, **variables globales comprises** :
+   * un champ laissé vide retombe sur la variable avant de retomber sur la
+   * valeur par défaut du texte. D'où la lecture en base, et donc le `Result`.
    */
-  fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
-    return commands.fillPlaceholders(content, values);
+  async fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
+    return unwrap('fill_placeholders', await commands.fillPlaceholders(content, values));
+  }
+
+  /** Les variables globales, telles que le panneau de préférences les édite. */
+  async loadVariables(): Promise<Record<string, string>> {
+    return unwrap('list_global_placeholders', await commands.listGlobalPlaceholders());
+  }
+
+  /**
+   * Enregistre le **jeu complet** : ce qui n'est pas envoyé est ce que
+   * l'utilisateur a retiré. Renvoie ce qui a été retenu — une valeur vide n'est
+   * pas stockée, elle veut dire « je garde ce que le snippet propose ».
+   */
+  async saveVariables(values: Record<string, string>): Promise<Record<string, string>> {
+    return unwrap('set_global_placeholders', await commands.setGlobalPlaceholders(values));
   }
 }

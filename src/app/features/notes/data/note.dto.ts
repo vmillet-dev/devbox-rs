@@ -198,6 +198,7 @@ export function toNotesQueryDto(query: NotesQuery): NotesQueryDto {
     languages: [...query.languages],
     now: toIsoString(query.now, 'now'),
     tzOffsetMinutes: query.tzOffsetMinutes,
+    pinnedFirst: query.pinnedFirst,
   };
 }
 

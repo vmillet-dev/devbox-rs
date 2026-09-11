@@ -81,8 +81,11 @@ pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, Ap
     let (notes, facets) = store::fetch(&mut connection, &query)?;
     let counts = attachments::store::counts(&mut connection)?;
 
+    let globals = store::global_placeholder_values(&mut connection)?;
+
     let mut view = view::build(notes, facets, &query);
     view::apply_attachment_counts(&mut view, &counts);
+    view::apply_global_defaults(&mut view, &globals);
 
     Ok(view)
 }
@@ -93,7 +96,7 @@ pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<DisplayNote, A
     let mut connection = lock(&db)?;
     let note = store::create(&mut connection, draft, Utc::now())?;
 
-    Ok(model::decorate_now(note))
+    Ok(display(&mut connection, note)?)
 }
 
 #[tauri::command]
@@ -105,9 +108,8 @@ pub fn update_note(
 ) -> Result<DisplayNote, AppError> {
     let mut connection = lock(&db)?;
     let note = store::update(&mut connection, &id, &patch, Utc::now())?;
-    let decorated = model::decorate_now(note);
 
-    Ok(with_attachment_count(&mut connection, decorated)?)
+    Ok(display(&mut connection, note)?)
 }
 
 /// **Met à la corbeille** : la note revient par [`restore_notes`] pendant
@@ -267,17 +269,59 @@ pub fn set_placeholder_values(
 
     let mut connection = lock(&db)?;
     let note = store::set_placeholder_values(&mut connection, &id, &retained)?;
-    let decorated = model::decorate_now(note);
 
-    Ok(with_attachment_count(&mut connection, decorated)?)
+    Ok(display(&mut connection, note)?)
 }
 
-/// Remplit les `{{champs}}` d'un contenu. Pas de base ici : la palette remplit
-/// aussi bien un brouillon non enregistré que la note qu'elle vient d'ouvrir.
+/// Remplit les `{{champs}}` d'un contenu.
+///
+/// Aucun identifiant de note : la palette remplit aussi bien un brouillon non
+/// enregistré que la note qu'elle vient d'ouvrir. La base n'est lue que pour les
+/// **variables globales**, qui ne dépendent d'aucune note — sans elles, un champ
+/// laissé vide retomberait sur la valeur par défaut du texte alors que
+/// l'utilisateur en a réglé une pour sa machine.
 #[tauri::command]
 #[specta::specta]
-pub fn fill_placeholders(content: String, values: BTreeMap<String, String>) -> String {
-    placeholder::fill(&content, &values)
+pub fn fill_placeholders(
+    content: String,
+    values: BTreeMap<String, String>,
+    db: State<'_, Db>,
+) -> Result<String, AppError> {
+    let mut connection = lock(&db)?;
+    let globals = store::global_placeholder_values(&mut connection)?;
+
+    Ok(placeholder::fill(
+        &content,
+        &placeholder::resolve(&globals, &values),
+    ))
+}
+
+/// Les variables globales, telles que le panneau de préférences les affiche.
+#[tauri::command]
+#[specta::specta]
+pub fn list_global_placeholders(db: State<'_, Db>) -> Result<BTreeMap<String, String>, AppError> {
+    let mut connection = lock(&db)?;
+
+    Ok(store::global_placeholder_values(&mut connection)?)
+}
+
+/// Enregistre le jeu complet de variables : ce qui n'est pas envoyé est ce que
+/// l'utilisateur a retiré.
+///
+/// Aucune note n'est touchée — pas même leur `updated_at` : régler une variable
+/// n'est pas modifier une note, et le canevas trie sur cette colonne.
+#[tauri::command]
+#[specta::specta]
+pub fn set_global_placeholders(
+    values: BTreeMap<String, String>,
+    db: State<'_, Db>,
+) -> Result<BTreeMap<String, String>, AppError> {
+    let retained = placeholder::normalize_values(values);
+
+    let mut connection = lock(&db)?;
+    store::replace_global_placeholder_values(&mut connection, &retained)?;
+
+    Ok(retained)
 }
 
 /// `usize` ne traverse pas le pont (Specta refuse ce que JSON ne rend pas sans
@@ -327,11 +371,21 @@ pub fn sweep_trash_at_startup(app: &AppHandle, db: &Db) {
 
 /// `decorate` ne lit pas la base : le compteur de pièces jointes est posé après
 /// coup, par ce qui tient la connexion.
-fn with_attachment_count(
+/// Décore une note avec ce que seule la base sait : le nombre de pièces
+/// jointes, et les variables globales posées en valeur proposée sur ses champs.
+///
+/// Les deux sont des requêtes à part, d'où leur absence de [`model::decorate`],
+/// qui ne lit rien.
+fn display(
     connection: &mut SqliteConnection,
-    mut note: DisplayNote,
+    note: model::Note,
 ) -> Result<DisplayNote, StorageError> {
-    note.attachment_count = count(attachments::store::list(connection, &note.id)?.len());
+    let mut decorated = model::decorate_now(note);
+    decorated.attachment_count = count(attachments::store::list(connection, &decorated.id)?.len());
+    model::apply_global_defaults(
+        &mut decorated,
+        &store::global_placeholder_values(connection)?,
+    );
 
-    Ok(note)
+    Ok(decorated)
 }

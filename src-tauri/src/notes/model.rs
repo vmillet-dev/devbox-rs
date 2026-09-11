@@ -261,6 +261,24 @@ pub fn decorate_now(note: Note) -> DisplayNote {
     decorate(note, Utc::now())
 }
 
+/// Pose les **variables globales** en valeur proposée sur les champs d'une note
+/// déjà décorée.
+///
+/// Séparé de [`decorate`], qui ne lit pas la base : les variables viennent
+/// d'une seconde requête, exactement comme le compteur de pièces jointes.
+///
+/// Elles écrasent la valeur par défaut du texte et **ne touchent pas** à ce qui
+/// a été saisi sur la note : le panneau les affiche donc en gris, comme une
+/// suggestion. Les recopier dans `value` figerait la variable le jour où elle
+/// change, ce que `set_placeholder_values` écrirait ensuite en base.
+pub fn apply_global_defaults(note: &mut DisplayNote, globals: &BTreeMap<String, String>) {
+    for placeholder in &mut note.placeholders {
+        if let Some(value) = globals.get(&placeholder.name) {
+            placeholder.default_value.clone_from(value);
+        }
+    }
+}
+
 fn footer_of(note: &Note) -> NoteFooter {
     if let NoteLifecycle::Expires { at } = note.lifecycle {
         return NoteFooter::Expiry { at };

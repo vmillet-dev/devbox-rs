@@ -46,10 +46,15 @@ export const commands = {
 	/**  Retire l'étiquette du corpus ; les notes, elles, restent. */
 	deleteTag: (tag: string) => typedError<number, AppError>(__TAURI_INVOKE("delete_tag", { tag })),
 	/**
-	 *  Remplit les `{{champs}}` d'un contenu. Pas de base ici : la palette remplit
-	 *  aussi bien un brouillon non enregistré que la note qu'elle vient d'ouvrir.
+	 *  Remplit les `{{champs}}` d'un contenu.
+	 * 
+	 *  Aucun identifiant de note : la palette remplit aussi bien un brouillon non
+	 *  enregistré que la note qu'elle vient d'ouvrir. La base n'est lue que pour les
+	 *  **variables globales**, qui ne dépendent d'aucune note — sans elles, un champ
+	 *  laissé vide retomberait sur la valeur par défaut du texte alors que
+	 *  l'utilisateur en a réglé une pour sa machine.
 	 */
-	fillPlaceholders: (content: string, values: { [key in string]: string }) => __TAURI_INVOKE<string>("fill_placeholders", { content, values }),
+	fillPlaceholders: (content: string, values: { [key in string]: string }) => typedError<string, AppError>(__TAURI_INVOKE("fill_placeholders", { content, values })),
 	/**
 	 *  Enregistre les valeurs des `{{champs}}` d'une note : rouvrir la note les
 	 *  retrouve, et la carte comme la palette copient avec.
@@ -59,6 +64,16 @@ export const commands = {
 	 *  remonterait la note en tête à chaque valeur tapée.
 	 */
 	setPlaceholderValues: (id: string, values: { [key in string]: string }) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("set_placeholder_values", { id, values })),
+	/**  Les variables globales, telles que le panneau de préférences les affiche. */
+	listGlobalPlaceholders: () => typedError<{ [key in string]: string }, AppError>(__TAURI_INVOKE("list_global_placeholders")),
+	/**
+	 *  Enregistre le jeu complet de variables : ce qui n'est pas envoyé est ce que
+	 *  l'utilisateur a retiré.
+	 * 
+	 *  Aucune note n'est touchée — pas même leur `updated_at` : régler une variable
+	 *  n'est pas modifier une note, et le canevas trie sur cette colonne.
+	 */
+	setGlobalPlaceholders: (values: { [key in string]: string }) => typedError<{ [key in string]: string }, AppError>(__TAURI_INVOKE("set_global_placeholders", { values })),
 	listSpaces: () => typedError<Space[], AppError>(__TAURI_INVOKE("list_spaces")),
 	createSpace: (draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("create_space", { draft })),
 	renameSpace: (id: string, draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("rename_space", { id, draft })),
@@ -122,11 +137,15 @@ export const commands = {
 	 */
 	syncTray: (labels: TrayLabels) => __TAURI_INVOKE<void>("sync_tray", { labels }),
 	/**
-	 *  Ce que le front affiche au démarrage quand un raccourci n'a pas pu être pris.
+	 *  Règle les raccourcis globaux et rend ceux qu'une autre application garde.
 	 * 
-	 *  Une liste vide est le cas courant ; elle ne produit aucun message.
+	 *  Le front l'appelle au démarrage puis à chaque changement de préférence, et
+	 *  **affiche** ce qui revient : le natif ne peut qu'échouer en silence, et une
+	 *  ligne de journal n'est pas une interface — sans ce retour, presser la touche
+	 *  ne ferait rien et rien ne dirait pourquoi.
 	 */
-	unavailableShortcuts: () => __TAURI_INVOKE<string[]>("unavailable_shortcuts"),
+	setGlobalShortcuts: (bindings: ShortcutBindings) => __TAURI_INVOKE<string[]>("set_global_shortcuts", { bindings }),
+	setWindowBehavior: (behavior: WindowBehavior) => __TAURI_INVOKE<void>("set_window_behavior", { behavior }),
 };
 
 /* Types */
@@ -359,6 +378,16 @@ export type NotesQuery = {
 	 *  Paris, `now` in UTC is already tomorrow.
 	 */
 	tzOffsetMinutes: number,
+	/**
+	 *  Les notes épinglées remontent en tête : leur propre section quand la vue
+	 *  est chronologique, le haut de la liste quand elle est plate.
+	 * 
+	 *  Le canevas dit toujours `true` — l'épinglage y est justement ce qui
+	 *  garde une note à portée. La palette de collage rapide, elle, suit la
+	 *  préférence : chercher un snippet parmi huit résultats n'a pas les mêmes
+	 *  priorités que retrouver une note sur le canevas.
+	 */
+	pinnedFirst: boolean,
 };
 
 export type NotesView = {
@@ -390,6 +419,18 @@ export type Placeholder = {
 	 *  texte) reste hors de vue sans être effacée.
 	 */
 	value: string,
+};
+
+/**
+ *  Les trois raccourcis globaux, tels que le front les règle.
+ * 
+ *  Trois champs plutôt qu'une carte : un raccourci absent serait une action
+ *  qu'aucune touche n'atteint plus, et une carte laisserait le compilateur muet.
+ */
+export type ShortcutBindings = {
+	capture: string,
+	newNote: string,
+	palette: string,
 };
 
 export type Space = {
@@ -433,6 +474,16 @@ export type TrayLabels = {
 	capture: string,
 	palette: string,
 	quit: string,
+};
+
+/**
+ *  Réglé depuis le panneau de préférences et poussé ici, comme les libellés de
+ *  la barre système : la préférence vit dans `preferences.json`, côté front, et
+ *  la relire depuis Rust ferait une seconde source à tenir en phase.
+ */
+export type WindowBehavior = {
+	closeToTray: boolean,
+	minimizeToTray: boolean,
 };
 
 /* Tauri Specta runtime */

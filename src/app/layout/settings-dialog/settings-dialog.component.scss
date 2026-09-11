@@ -1,0 +1,116 @@
+@use 'mixins' as *;
+
+// Juste au-dessus de la fiche « À propos » (55), sous la pop-in de mise à jour
+// (60) : une mise à jour qui se propose pendant un réglage doit passer devant.
+.settings-backdrop {
+  @include backdrop(56);
+}
+
+.settings-panel {
+  @include dialog-panel(760px);
+  // Une hauteur fixe plutôt qu'ajustée au contenu : changer de page ne doit pas
+  // faire sauter le panneau sous le curseur.
+  height: min(560px, 86vh);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.settings-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.settings-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.settings-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  min-height: 0;
+}
+
+.settings-rail {
+  border-right: 1px solid var(--line-soft);
+  background: var(--bg-0);
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.settings-rail-option {
+  @include unstyled-control;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--text-1);
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-rail-option:hover {
+  color: var(--text-0);
+  background: var(--bg-2);
+}
+
+.settings-rail-option.active {
+  color: var(--amber);
+  background: rgba(var(--amber-rgb), 0.12);
+}
+
+.settings-rail-option:focus-visible,
+.settings-close:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+.settings-content {
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.settings-content-title {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--bg-0);
+}
+
+// Il n'y a ni « OK » ni « Annuler » : le dire évite de chercher le bouton qui
+// validerait.
+.settings-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.settings-close {
+  @include unstyled-control;
+  @include surface($radius: 7px);
+  padding: 7px 14px;
+  font-size: 12.5px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.settings-close:hover {
+  @include accent-state(var(--text-0), var(--amber-dim));
+}

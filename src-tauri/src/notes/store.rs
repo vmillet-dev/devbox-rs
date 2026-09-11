@@ -17,7 +17,7 @@ use super::placeholder;
 use super::trash;
 use super::view::{Facets, NoteFilter, NotesQuery};
 use crate::db::iso8601;
-use crate::db::schema::{note_items, note_placeholders, note_tags, notes};
+use crate::db::schema::{global_placeholders, note_items, note_placeholders, note_tags, notes};
 use crate::error::StorageError;
 use crate::spaces::store as spaces;
 
@@ -320,6 +320,54 @@ fn replace_placeholder_values(
     }
 
     Ok(())
+}
+
+/// Les **variables globales** : des valeurs de `{{champs}}` sans note pour les
+/// porter, valables pour tout le corpus.
+///
+/// Triées par nom : c'est l'ordre du panneau de préférences, et le `BTreeMap`
+/// le tiendrait de toute façon — l'`ORDER BY` dit simplement que cet ordre est
+/// voulu plutôt que subi.
+pub fn global_placeholder_values(
+    connection: &mut SqliteConnection,
+) -> Result<BTreeMap<String, String>, StorageError> {
+    Ok(global_placeholders::table
+        .select((global_placeholders::name, global_placeholders::value))
+        .order(global_placeholders::name.asc())
+        .load::<(String, String)>(connection)?
+        .into_iter()
+        .collect())
+}
+
+/// Écrit les variables **déjà normalisées** par le domaine.
+///
+/// Table rasée puis réinsérée, comme les tags et les valeurs d'une note : ce qui
+/// n'est plus envoyé est ce que l'utilisateur a retiré, et une écriture
+/// partielle laisserait une variable effacée continuer à remplir les jetons.
+pub fn replace_global_placeholder_values(
+    connection: &mut SqliteConnection,
+    values: &BTreeMap<String, String>,
+) -> Result<(), StorageError> {
+    connection.transaction(|connection| {
+        diesel::delete(global_placeholders::table).execute(connection)?;
+
+        if !values.is_empty() {
+            let rows: Vec<_> = values
+                .iter()
+                .map(|(name, value)| {
+                    (
+                        global_placeholders::name.eq(name),
+                        global_placeholders::value.eq(value),
+                    )
+                })
+                .collect();
+            diesel::insert_into(global_placeholders::table)
+                .values(rows)
+                .execute(connection)?;
+        }
+
+        Ok(())
+    })
 }
 
 /// Portées à l'espace et non au filtre courant — voir [`NotesView`].

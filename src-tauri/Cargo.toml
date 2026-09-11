@@ -66,6 +66,10 @@ thiserror = "2.0.20"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-global-shortcut = "2"
+# « Démarrer avec Windows » : la clé de registre Run est du ressort du système,
+# pas du nôtre — l'écrire à la main marcherait sur une seule plateforme et
+# survivrait à une désinstallation.
+tauri-plugin-autostart = "2"
 
 # Pas de `panic = "abort"` : la détection de mutex empoisonné de `commands::lock`
 # repose sur le déroulement de pile, et l'abandon la rendrait inatteignable.

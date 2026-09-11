@@ -16,11 +16,12 @@ use attachments::{
     attach_clipboard_image, attach_file, delete_attachment, list_attachments, open_attachment,
     read_attachment, save_attachment,
 };
-use desktop::{sync_tray, unavailable_shortcuts};
+use desktop::{set_global_shortcuts, set_window_behavior, sync_tray};
 use notes::{
-    create_note, delete_note, delete_notes, delete_tag, empty_trash, fill_placeholders, list_tags,
-    list_trash, merge_tags, move_notes, purge_notes, query_notes, rename_tag, restore_notes,
-    set_placeholder_values, tag_notes, update_note,
+    create_note, delete_note, delete_notes, delete_tag, empty_trash, fill_placeholders,
+    list_global_placeholders, list_tags, list_trash, merge_tags, move_notes, purge_notes,
+    query_notes, rename_tag, restore_notes, set_global_placeholders, set_placeholder_values,
+    tag_notes, update_note,
 };
 use spaces::{create_space, delete_space, list_spaces, rename_space};
 use transfer::{export_notes, export_selection, import_notes, share_notes};
@@ -63,6 +64,8 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         delete_tag,
         fill_placeholders,
         set_placeholder_values,
+        list_global_placeholders,
+        set_global_placeholders,
         list_spaces,
         create_space,
         rename_space,
@@ -79,7 +82,8 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         import_notes,
         share_notes,
         sync_tray,
-        unavailable_shortcuts,
+        set_global_shortcuts,
+        set_window_behavior,
     ])
 }
 
@@ -115,6 +119,15 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
 
+            // « Démarrer avec Windows ». Aucun argument de lancement : DevBox
+            // démarrée par le système s'ouvre comme démarrée à la main, et la
+            // préférence « fermer dans la barre système » suffit à la ranger.
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                None,
+            ))?;
+
             // Same. The tray itself is not created here: it waits for its
             // translated labels to arrive from the front end.
             #[cfg(desktop)]
@@ -139,21 +152,31 @@ pub fn run() {
 
             Ok(())
         })
-        // Closing files the window away in the tray instead of quitting — the
-        // application is meant to stay within reach of a shortcut.
-        //
-        // ⚠️ Only when there is a tray to find it in: without one, hiding the
-        // window would leave a process that nothing can call back.
+        // Closing — and, if asked for, minimising — files the window away in the
+        // tray instead of quitting: the application is meant to stay within
+        // reach of a shortcut. Both are preferences, and both are refused when
+        // there is no tray to find the window in (see `desktop`).
         .on_window_event(
             // The `_` prefix keeps the mobile build quiet.
             #[allow(clippy::used_underscore_binding)]
             |_window, _event| {
                 #[cfg(desktop)]
-                if let tauri::WindowEvent::CloseRequested { api, .. } = _event
-                    && desktop::tray_exists(_window.app_handle())
-                {
-                    api.prevent_close();
-                    let _ = _window.hide();
+                match _event {
+                    tauri::WindowEvent::CloseRequested { api, .. }
+                        if desktop::hides_on_close(_window.app_handle()) =>
+                    {
+                        api.prevent_close();
+                        let _ = _window.hide();
+                    }
+                    // Tauri n'émet rien pour « réduite » : `Resized` est le seul
+                    // passage, et c'est à la fenêtre de dire où elle en est.
+                    tauri::WindowEvent::Resized(_)
+                        if desktop::hides_on_minimize(_window.app_handle())
+                            && _window.is_minimized().unwrap_or(false) =>
+                    {
+                        let _ = _window.hide();
+                    }
+                    _ => {}
                 }
             },
         )

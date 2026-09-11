@@ -132,7 +132,9 @@
     "attachmentDeleteFailed": "Could not remove the attachment.",
     "copyFailed": "Copying to the clipboard failed.",
     "attachmentOpenFailed": "Could not open the attachment with an application.",
-    "attachmentSaveFailed": "Could not save the attachment to that location."
+    "attachmentSaveFailed": "Could not save the attachment to that location.",
+    "variablesLoadFailed": "Could not load the variables.",
+    "variablesSaveFailed": "Could not save the variables."
   },
   "tray": {
     "open": "Open DevBox",
@@ -278,9 +280,65 @@
     "exported": "{{notes}} note(s) exported to {{path}}.",
     "copied": "{{notes}} note(s) copied as Markdown to the clipboard.",
     "needsSelection": "Select at least one note.",
-    "emptyLibrary": "Nothing to export: this library has no notes."
+    "emptyLibrary": "Nothing to export: this library has no notes.",
+    "preferences": "Preferences…"
   },
   "shortcuts": {
     "unavailable": "Global shortcut(s) unavailable: {{list}}. Another application is already using them."
+  },
+  "settings": {
+    "title": "Preferences",
+    "pagesLabel": "Preference sections",
+    "pages": {
+      "general": "Settings",
+      "variables": "Variables"
+    },
+    "close": "Close",
+    "appliedImmediately": "Changes apply immediately.",
+    "copied": "Copied to the clipboard.",
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "density": "Density"
+    },
+    "theme": {
+      "system": "System",
+      "dark": "Dark",
+      "light": "Light"
+    },
+    "density": {
+      "comfortable": "Comfortable",
+      "compact": "Compact"
+    },
+    "behavior": {
+      "title": "Behavior",
+      "startWithSystem": "Start with the system",
+      "minimizeToTray": "Minimize to tray",
+      "closeToTray": "Close to tray",
+      "trayNote": "Without a system tray the window minimizes and closes as usual: DevBox refuses to hide where nothing could call it back."
+    },
+    "quickPaste": {
+      "title": "Quick paste",
+      "shortcut": "Global shortcut",
+      "shortcutHint": "Click the field, then press the combination. A shortcut another application already holds is reported at startup.",
+      "shortcutReset": "Reset",
+      "showPinnedFirst": "Show pinned first"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "copyConfirmation": "Confirm every copy"
+    },
+    "variables": {
+      "intro": "Default values for your snippets' fields, across every note. What you type on a note wins; elsewhere the variable is offered in grey, never copied in.",
+      "name": "Name",
+      "value": "Value",
+      "namePlaceholder": "host",
+      "valuePlaceholder": "db.internal",
+      "add": "Add a variable",
+      "remove": "Remove {{name}}",
+      "empty": "No variables yet.",
+      "duplicate": "Duplicate name: {{names}}. Only the last row will be kept.",
+      "nameRule": "A name is limited to letters, digits, dashes and underscores."
+    }
   }
 }

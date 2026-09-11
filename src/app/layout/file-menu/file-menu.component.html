@@ -30,6 +30,10 @@
         <hr class="file-separator" />
       }
 
+      <button appMenuItem type="button" role="menuitem" class="file-option" (click)="openSettings()">
+        {{ 'file.preferences' | transloco }}
+      </button>
+
       <button
         appMenuItem
         type="button"
@@ -43,3 +47,7 @@
     </div>
   }
 </div>
+
+@if (settingsOpen()) {
+  <app-settings-dialog (closed)="closeSettings()" />
+}

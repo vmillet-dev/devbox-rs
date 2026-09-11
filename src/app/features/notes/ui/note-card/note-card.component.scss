@@ -10,7 +10,7 @@
 .card {
   @include unstyled-control;
   @include surface(var(--bg-1), 10px);
-  padding: 14px;
+  padding: var(--space-card);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -162,7 +162,7 @@ app-copy-button:focus-within {
   position: absolute;
   inset: 0;
   // 14px de marge de carte, plus la bande du pied en bas.
-  padding: 14px 14px 34px;
+  padding: var(--space-card) var(--space-card) 34px;
   z-index: 1;
   margin: 0;
   list-style: none;

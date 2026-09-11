@@ -217,7 +217,8 @@ fn a_query_is_read_from_the_camel_case_payload_the_front_sends() {
         "tags": ["urgent"],
         "languages": ["json", "yml"],
         "now": NOW,
-        "tzOffsetMinutes": -120
+        "tzOffsetMinutes": -120,
+        "pinnedFirst": true
     }))
     .unwrap();
 
@@ -225,6 +226,7 @@ fn a_query_is_read_from_the_camel_case_payload_the_front_sends() {
     assert_eq!(query.filter, NoteFilter::Untriaged);
     assert_eq!(query.languages, [Language::Json, Language::Yml]);
     assert_eq!(query.tz_offset_minutes, -120);
+    assert!(query.pinned_first);
 }
 
 #[test]
@@ -238,7 +240,8 @@ fn a_null_space_is_read_as_every_space() {
         "tags": [],
         "languages": [],
         "now": NOW,
-        "tzOffsetMinutes": 0
+        "tzOffsetMinutes": 0,
+        "pinnedFirst": false
     }))
     .unwrap();
 

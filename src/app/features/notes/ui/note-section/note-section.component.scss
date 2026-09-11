@@ -1,7 +1,7 @@
 @use 'mixins' as *;
 
 .canvas-section {
-  margin-bottom: 28px;
+  margin-bottom: var(--space-section);
 }
 
 // <h2> : la taille par défaut du navigateur doit être écrasée explicitement.
@@ -28,7 +28,7 @@
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  gap: var(--space-grid);
 }
 
 .card.ghost {

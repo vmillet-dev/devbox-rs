@@ -1,0 +1,75 @@
+@use 'mixins' as *;
+
+.setting-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.setting-group-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.setting-row {
+  @include setting-row;
+}
+
+.setting-label {
+  @include setting-label;
+}
+
+.setting-select {
+  @include setting-field(150px);
+}
+
+.setting-switch {
+  @include setting-switch;
+}
+
+.setting-note {
+  @include setting-note;
+}
+
+.setting-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+// Monospace : une combinaison se lit touche par touche.
+.setting-shortcut-input {
+  @include setting-field(130px);
+  font-family: var(--font-mono), serif;
+  text-align: center;
+  color: var(--amber);
+  cursor: pointer;
+}
+
+.setting-shortcut-reset {
+  @include unstyled-control;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.setting-shortcut-reset:hover:not(:disabled) {
+  color: var(--text-0);
+  background: var(--bg-2);
+}
+
+.setting-shortcut-reset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.setting-shortcut-reset:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}

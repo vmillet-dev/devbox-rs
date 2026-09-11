@@ -31,10 +31,12 @@ yet — a round trip per keystroke), and plain UI concerns like keyboard shortcu
 src/                Angular front-end
 ├── app/
 │   ├── core/       cross-cutting infrastructure, one folder per subject: IPC, i18n,
-│   │               errors, time, preferences, updates, app-info, language, clipboard,
-│   │               dialogs (native file picker), window (hide / quit)
+│   │               errors, time, preferences, settings, updates, app-info, language,
+│   │               clipboard, dialogs (native file picker), window (hide / quit /
+│   │               close-to-tray), shortcuts, autostart
 │   ├── features/   one folder per tool, owning its data/, model/, state/ and ui/
-│   ├── layout/     the app chrome: shell, titlebar, about, error banner, update prompt
+│   ├── layout/     the app chrome: shell, titlebar, about, preferences, error banner,
+│   │               update prompt
 │   └── shared/     presentation kit — a11y directives and components that inject nothing
 ├── assets/         static images
 ├── styles/         global theme (styles.scss) and SCSS partials
@@ -631,6 +633,27 @@ stored but out of sight until the token comes back; and writing a value **does n
 A field left empty is not stored (`normalize_values`): empty means "keep what the text
 suggests", and storing it would freeze that answer the day the default changes.
 
+**A value can also belong to no note at all.** The preferences panel's "Variables" page edits
+`global_placeholders` (migration 7, `name` as the primary key, case-sensitive for the same
+reason as `note_placeholders`): a `{{host}}` that means the same thing in every snippet is
+worth saying once. Resolution order is **note value → global variable → default written in the
+text**, which `notes::placeholder::resolve` builds by overlaying the non-empty typed values on
+top of the globals. The text default comes last on purpose: `{{host=localhost}}` was a
+suggestion noted the day the snippet was written, the variable was set for this machine.
+
+Two things follow, and both matter:
+
+- A global variable reaches a card as its field's **`default_value`**, never as `value`
+  (`model::apply_global_defaults`). So the editor shows it in grey, as a suggestion — copying
+  it into `value` would let `set_placeholder_values` freeze it in the note the day the
+  variable changes. It is applied in a pass of its own, like the attachment counter, because
+  `decorate` reads no database.
+- `fill_placeholders` therefore **does** touch the database now, and returns a `Result`. It
+  still takes no note id: the palette fills an unsaved draft as readily as a stored note.
+
+Writing the set replaces it whole, like tags and checklist items: what is no longer sent is
+what the user removed. No note is touched, `updated_at` included.
+
 Three places offer the same single set of values. The editor carries `PlaceholderPanelComponent`,
 a fold-away drawer between the metadata row and the body, mounted only for a note that has
 fields — and its header is **three affordances rather than a chevron**: the whole bar is the
@@ -743,13 +766,17 @@ broken thumbnail; a file without a record is swept at the next startup
 ### The "Fichier" menu, and where the rest lives
 
 The titlebar carries a **File menu** next to "À propos" — the convention of a desktop
-application. It holds import, export, "copy the selection as Markdown", and quitting.
+application. It holds import, export, "copy the selection as Markdown", the preferences and
+quitting.
 
 `layout/` still knows no feature. `AppMenuRegistry` (`core/menu/`) holds the entries, and
 `NotesPageComponent` **contributes** its own on construction and takes them back on
 destruction. The titlebar renders whatever is registered plus its own "Quitter"; the hashing
 tool will add its entries without touching that component. `disabled` is a `Signal` because
 "Exporter la sélection" follows what is checked at that instant.
+
+"Préférences…" and "Quitter" are **not** registered entries: they act on the application
+itself rather than on a tool, so the menu offers them whatever is loaded.
 
 Two things deliberately did **not** go in that menu, because they are views on the notes and
 not operations on a file:
@@ -758,6 +785,70 @@ not operations on a file:
   looking at the notes.
 - **Tag management** sits at the end of the tag rail, which is exactly what it acts on. The
   rail disappears when no tag exists, and so does the button: there is nothing to manage.
+
+### Preferences
+
+"Préférences…" opens `SettingsDialogComponent` (`layout/settings-dialog/`): a rail of pages on
+the left, the chosen page on the right, one "Fermer" at the bottom.
+
+**No "OK / Cancel / Apply".** Every control writes straight into `SettingsStore`, and the
+interface follows on the spot. That is already the idiom everywhere else in the app — the
+editor commits on blur, the locale switch flips on click — and a theme you only see after
+validating is not chosen, it is guessed.
+
+**The panel knows one page, its own.** The others come from `SettingsRegistry`
+(`core/settings/`), the exact counterpart of `AppMenuRegistry`: `NotesPageComponent`
+contributes "Variables" on construction and takes it back on destruction, and
+`NgComponentOutlet` renders a component the panel knows nothing about. A `{{field}}` is notes
+vocabulary; importing it from `layout/` would break the rule that deleting a feature folder
+deletes the feature.
+
+`SettingsStore` holds one signal per setting, backed by `PreferencesService` — one key per
+setting, not one serialised object, so a setting added later cannot make a file written by the
+previous version unreadable. `restore()` runs from the app initializer, after
+`PreferencesService.hydrate()` and before the first render.
+
+**Three services read those signals and push them to the native side**, rather than the store
+reaching for the IPC itself — a preferences store has to stay readable outside Tauri:
+
+| Service                  | Effect                                         | Native side                         |
+| ------------------------ | ---------------------------------------------- | ----------------------------------- |
+| `GlobalShortcutsService` | `set_global_shortcuts` on every change         | re-registers, returns what is taken |
+| `WindowBehaviorService`  | `set_window_behavior`                          | what close and minimise do          |
+| `AutostartService`       | `tauri-plugin-autostart` (`autostart:default`) | the system's own startup entry      |
+
+Each starts from the app initializer, and each builds its `effect` with an **explicit
+injector**: they are started outside a constructor, where `effect()` would have nothing to
+attach to. For the same reason the initializer injects **everything before its first `await`** —
+an `inject()` after one is outside the injection context, and the whole bootstrap fails with
+NG0203 and a black window.
+
+⚠️ `ShortcutBindings::defaults()` (Rust) and `DEFAULT_SHORTCUTS` (front) are a **deliberate
+mirror**, commented on both sides. The native side takes the shortcuts before the front has
+started: without them `Ctrl+Alt+P` would be dead for the length of the first render, which is
+exactly the second one uses it from another application.
+
+`AutostartService` reads the system **first** and aligns the preference on what it finds:
+turning the entry off from the task manager has to uncheck the box, not see DevBox put it back.
+
+**What the settings actually change**
+
+- **Theme** — `system` / `dark` / `light`, resolved into a `data-theme` attribute on
+  `<html>` (see _Theming_). `system` follows `prefers-color-scheme` live.
+- **Density** — `data-density`, which swaps four spacing variables.
+- **Start with the system, minimise to tray, close to tray** — the last one was DevBox's fixed
+  behaviour and stays the default; both tray settings are still refused when there is no tray
+  (`desktop::hides_on_close` / `hides_on_minimize`), since hiding a window nothing can call
+  back is worse than closing it.
+- **Quick paste** — the palette's accelerator, captured from a **keystroke** rather than typed
+  (`acceleratorFromEvent` reads `KeyboardEvent.code`, so a combination set on AZERTY stays in
+  the same place on QWERTY, and a combination the native parser could not read is refused
+  before it is stored). And "show pinned first", the only consumer of `NotesQuery.pinnedFirst`
+  that ever sends `false`.
+- **Copy confirmation** — the acknowledgement lives in `ClipboardService` itself rather than in
+  its five callers, four of which show nothing today: copying from the canvas with `Ctrl+C`
+  said not a word. Callers with something better to say — "3 notes copied as Markdown" — speak
+  after, and the banner keeps the last message.
 
 ### Import, export and copying out
 
@@ -1025,9 +1116,10 @@ Each reveals the window and emits `devbox:capture`, `devbox:new-note` or `devbox
 ⚠️ **A global shortcut is first-come, first-served across the whole machine**, and the loser
 gets no error — the key simply does nothing. `Ctrl+Alt+Space` was the palette's first choice
 and lost it to a widely installed application, which is why it is now `Ctrl+Alt+P`. Losing one
-is still possible, so `register_shortcuts` records what it could not take and
-`unavailable_shortcuts` hands the list to the front, which says so once at startup. A log line
-is not an interface.
+is still possible, so `set_global_shortcuts` **returns** what it could not take and the front
+says so. A log line is not an interface. The same command re-registers the three from scratch
+whenever the preference changes — everything is released first, or an abandoned combination
+would keep answering.
 
 - **Rust does not create the note.** Keeping creation on the front means one creation path
   (`create_note`), so a captured note gets language detection without a second implementation,
@@ -1045,7 +1137,9 @@ is not an interface.
 
 DevBox stays resident in the notification area, and **the window's close button only hides it**
 — quitting goes through the tray menu. An app made to be one shortcut away would be pointless
-if closing it killed the shortcut.
+if closing it killed the shortcut. It is a preference now (see _Preferences_), still on by
+default; minimising to the tray is the same idea, off by default. Tauri emits nothing for
+"minimised", so `lib.rs` watches `Resized` and asks the window where it stands.
 
 - **The front creates the tray, not the native startup.** `TrayService` (`core/tray/`) pushes
   the menu labels through `sync_tray`, and Rust holds **no user-visible string at all**: the
@@ -1249,6 +1343,10 @@ installed or shipped alongside the executable. The database file lives in Tauri'
     clears it. Without that, updating the app would silently reset the interface language.
   - Adding a plugin also means declaring its permission (`store:default`) in
     `src-tauri/capabilities/default.json`, or the call is refused at runtime.
+- **`SettingsStore`** (`core/settings/`) is the application's own settings, on top of
+  `PreferencesService`. It writes as it is read — there is no draft to validate — and it talks
+  to nobody: `GlobalShortcutsService`, `WindowBehaviorService` and `AutostartService` read its
+  signals and carry each change to the native side. See _Preferences_.
 - **`ErrorNotifier` + `AppErrorHandler`** (`core/errors/`) surface failures on screen through
   `ErrorBannerComponent`. On a desktop app the console is not an interface: an uncaught
   exception or a failed write has to be visible, or the app just looks unresponsive.
@@ -1335,6 +1433,22 @@ also exposed as RGB triplets (e.g. `--amber-rgb`) so `rgba()` never hard-codes a
 
 `styles.scss` also carries the `.visually-hidden` utility and a `prefers-reduced-motion`
 block.
+
+**Light theme.** `:root` stays the dark palette and `:root[data-theme='light']` redefines the
+colours only — fonts, shadows and spacing are shared. Dark stays the base on purpose: the
+preference lives in a file nothing can read before Angular has booted, so any other order would
+flash white at launch. `color-scheme` switches with the palette, which is what repaints the
+native `<select>`s, scrollbars and autofill. The accent is a **separate hue** in light mode:
+the dark `--amber` (#e8a33d) falls to 2:1 on white, and `--amber-ink` — the text laid on a
+solid amber button — flips with it. The syntax-highlighting theme needs nothing: it only ever
+consumed these variables.
+
+**Density.** `:root[data-density='compact']` tightens four variables — `--space-card`,
+`--space-grid`, `--space-section`, `--space-canvas` — and nothing else. Typography is
+untouched: shrinking the text would be a zoom, not a density. Four named gaps rather than a
+global factor, because these four are what decide how many cards fit on screen; everywhere else
+the spacing stays hard-coded, since compressing all of it would cost legibility without buying
+a line.
 
 Fonts are self-hosted through the `@fontsource` packages listed in `angular.json`'s `styles`
 array. They used to come from Google Fonts, which on a desktop app meant degraded typography
