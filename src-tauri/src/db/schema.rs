@@ -51,6 +51,17 @@ diesel::table! {
     }
 }
 
+// The name *is* the identity, and it is compared byte for byte: `notes::placeholder`
+// tells `{{Host}}` from `{{host}}`, so this key stays case-sensitive where
+// `note_tags` folds case.
+diesel::table! {
+    note_placeholders (note_id, name) {
+        note_id -> Text,
+        name -> Text,
+        value -> Text,
+    }
+}
+
 diesel::table! {
     attachments (id) {
         id -> Text,
@@ -65,6 +76,14 @@ diesel::table! {
 diesel::joinable!(notes -> spaces (space_id));
 diesel::joinable!(note_tags -> notes (note_id));
 diesel::joinable!(note_items -> notes (note_id));
+diesel::joinable!(note_placeholders -> notes (note_id));
 diesel::joinable!(attachments -> notes (note_id));
 
-diesel::allow_tables_to_appear_in_same_query!(spaces, notes, note_tags, note_items, attachments);
+diesel::allow_tables_to_appear_in_same_query!(
+    spaces,
+    notes,
+    note_tags,
+    note_items,
+    note_placeholders,
+    attachments
+);

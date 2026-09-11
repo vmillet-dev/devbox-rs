@@ -4,7 +4,7 @@
 //! sections and tag normalization are rules: `super::view` and
 //! `super::model`.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use diesel::prelude::*;
 use uuid::Uuid;
@@ -13,16 +13,17 @@ use chrono::{DateTime, Utc};
 
 use super::checklist::{self, ChecklistItem};
 use super::model::{self, Note, NoteDraft, NoteLifecycle, NotePatch};
+use super::placeholder;
 use super::trash;
 use super::view::{Facets, NoteFilter, NotesQuery};
 use crate::db::iso8601;
-use crate::db::schema::{note_items, note_tags, notes};
+use crate::db::schema::{note_items, note_placeholders, note_tags, notes};
 use crate::error::StorageError;
 use crate::spaces::store as spaces;
 
-/// `lifecycle` is split into two columns here; tags and checklist items are
-/// absent: they live in `note_tags` and `note_items`, then get attached in a
-/// single query for the whole list.
+/// `lifecycle` is split into two columns here; tags, checklist items and filled
+/// fields are absent: they live in `note_tags`, `note_items` and
+/// `note_placeholders`, then get attached in a single query for the whole list.
 #[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = notes)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -80,6 +81,7 @@ impl TryFrom<NoteRow> for Note {
             source: row.source,
             tags: Vec::new(),
             items: Vec::new(),
+            placeholder_values: BTreeMap::new(),
             pinned: row.pinned,
             lifecycle,
         })
@@ -233,6 +235,93 @@ fn replace_items(
     Ok(())
 }
 
+/// Rattache à chaque note ce qui vit dans les tables voisines : une requête par
+/// table pour toute la liste, jamais une par note.
+///
+/// Les trois comptent : la recherche du domaine porte sur les items — seul
+/// contenu d'une todolist — et la carte d'un snippet à champs propose de les
+/// remplir, ce qu'elle ne peut pas faire sans les valeurs déjà saisies.
+fn attach_related(
+    connection: &mut SqliteConnection,
+    notes: &mut [Note],
+) -> Result<(), StorageError> {
+    let mut tags = all_tags(connection)?;
+    let mut items = all_items(connection)?;
+    let mut values = all_placeholder_values(connection)?;
+
+    for note in notes {
+        note.tags = tags.remove(&note.id).unwrap_or_default();
+        note.items = items.remove(&note.id).unwrap_or_default();
+        note.placeholder_values = values.remove(&note.id).unwrap_or_default();
+    }
+
+    Ok(())
+}
+
+/// Une requête pour toute la liste, comme `all_tags`.
+fn all_placeholder_values(
+    connection: &mut SqliteConnection,
+) -> Result<HashMap<String, BTreeMap<String, String>>, StorageError> {
+    let rows = note_placeholders::table
+        .select((
+            note_placeholders::note_id,
+            note_placeholders::name,
+            note_placeholders::value,
+        ))
+        .load::<(String, String, String)>(connection)?;
+
+    let mut grouped: HashMap<String, BTreeMap<String, String>> = HashMap::new();
+    for (note_id, name, value) in rows {
+        grouped.entry(note_id).or_default().insert(name, value);
+    }
+
+    Ok(grouped)
+}
+
+fn placeholder_values_of(
+    connection: &mut SqliteConnection,
+    note_id: &str,
+) -> Result<BTreeMap<String, String>, StorageError> {
+    Ok(note_placeholders::table
+        .filter(note_placeholders::note_id.eq(note_id))
+        .select((note_placeholders::name, note_placeholders::value))
+        .load::<(String, String)>(connection)?
+        .into_iter()
+        .collect())
+}
+
+/// Écrit les valeurs **déjà normalisées** par le domaine.
+///
+/// Table rasée puis réinsérée, comme les tags : ce qui n'est plus envoyé est ce
+/// que l'utilisateur a effacé, et une écriture partielle laisserait une valeur
+/// vidée continuer à remplir le texte.
+fn replace_placeholder_values(
+    connection: &mut SqliteConnection,
+    note_id: &str,
+    values: &BTreeMap<String, String>,
+) -> Result<(), StorageError> {
+    diesel::delete(note_placeholders::table.filter(note_placeholders::note_id.eq(note_id)))
+        .execute(connection)?;
+
+    if !values.is_empty() {
+        let rows: Vec<_> = values
+            .iter()
+            .map(|(name, value)| {
+                (
+                    note_placeholders::note_id.eq(note_id),
+                    note_placeholders::name.eq(name),
+                    note_placeholders::value.eq(value),
+                )
+            })
+            .collect();
+        diesel::insert_into(note_placeholders::table)
+            .values(rows)
+            .execute(connection)?;
+    }
+
+    Ok(())
+}
+
 /// Portées à l'espace et non au filtre courant — voir [`NotesView`].
 ///
 /// La jointure sur `notes` est inconditionnelle : toute ligne de `note_tags`
@@ -326,14 +415,7 @@ pub fn fetch(
         .map(Note::try_from)
         .collect::<Result<Vec<_>, _>>()?;
 
-    // La recherche du domaine porte dessus — et sur les items, seul contenu
-    // d'une todolist.
-    let mut grouped = all_tags(connection)?;
-    let mut items = all_items(connection)?;
-    for note in &mut notes {
-        note.tags = grouped.remove(&note.id).unwrap_or_default();
-        note.items = items.remove(&note.id).unwrap_or_default();
-    }
+    attach_related(connection, &mut notes)?;
 
     Ok((notes, facets(connection, request.space_id.as_deref())?))
 }
@@ -352,6 +434,7 @@ fn find(connection: &mut SqliteConnection, id: &str) -> Result<Option<Note>, Sto
     Ok(Some(Note {
         tags: tags_of(connection, id)?,
         items: items_of(connection, id)?,
+        placeholder_values: placeholder_values_of(connection, id)?,
         ..Note::try_from(row)?
     }))
 }
@@ -431,6 +514,31 @@ pub fn update(
         if patch.items.is_some() {
             replace_items(connection, &note.id, &note.items)?;
         }
+
+        Ok(note)
+    })
+}
+
+/// Enregistre ce qui a été saisi dans les `{{champs}}` de la note.
+///
+/// ⚠️ **`updated_at` n'est pas touché**, et c'est le cœur du geste : remplir un
+/// champ n'est pas modifier la note. Le canevas trie sur cette colonne, et une
+/// valeur tapée dans le panneau ferait sinon remonter la note en tête pour rien.
+///
+/// Identifiant inconnu — ou en corbeille — ⇒ `Err`, comme partout ailleurs : le
+/// front croirait sinon avoir enregistré.
+pub fn set_placeholder_values(
+    connection: &mut SqliteConnection,
+    id: &str,
+    values: &BTreeMap<String, String>,
+) -> Result<Note, StorageError> {
+    connection.transaction(|connection| {
+        let Some(mut note) = find(connection, id)? else {
+            return Err(StorageError::NoteNotFound(id.to_string()));
+        };
+
+        replace_placeholder_values(connection, id, values)?;
+        note.placeholder_values = values.clone();
 
         Ok(note)
     })
@@ -732,12 +840,7 @@ pub fn all(
         .map(Note::try_from)
         .collect::<Result<Vec<_>, _>>()?;
 
-    let mut grouped = all_tags(connection)?;
-    let mut items = all_items(connection)?;
-    for note in &mut notes {
-        note.tags = grouped.remove(&note.id).unwrap_or_default();
-        note.items = items.remove(&note.id).unwrap_or_default();
-    }
+    attach_related(connection, &mut notes)?;
 
     Ok(notes)
 }
@@ -762,12 +865,7 @@ pub fn by_ids(
         .map(Note::try_from)
         .collect::<Result<Vec<_>, _>>()?;
 
-    let mut grouped = all_tags(connection)?;
-    let mut items = all_items(connection)?;
-    for note in &mut notes {
-        note.tags = grouped.remove(&note.id).unwrap_or_default();
-        note.items = items.remove(&note.id).unwrap_or_default();
-    }
+    attach_related(connection, &mut notes)?;
 
     Ok(notes)
 }
@@ -798,6 +896,11 @@ pub fn insert_imported(
             connection,
             &note.id,
             &checklist::normalize_items(&note.items),
+        )?;
+        replace_placeholder_values(
+            connection,
+            &note.id,
+            &placeholder::normalize_values(note.placeholder_values.clone()),
         )?;
 
         Ok(true)

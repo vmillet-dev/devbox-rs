@@ -1186,5 +1186,51 @@ describe('NotesStore', () => {
 
       expect(filled).toBe('psql -h db');
     });
+
+    it('saves the values and adopts the note that comes back', async () => {
+      const snippet = createNote({
+        id: 'snippet',
+        content: 'psql -h {{host}}',
+        placeholders: [{ name: 'host', defaultValue: '', value: '' }],
+      });
+      const { store } = await createStore([snippet]);
+      store.openNote('snippet');
+
+      await store.setPlaceholderValues('snippet', { host: 'db.internal' });
+
+      expect(store.selectedNote()?.placeholders[0].value).toBe('db.internal');
+    });
+
+    it('gives the draft a real row before writing its values', async () => {
+      // Une note qui porte des champs porte du contenu : elle vaut d'être
+      // enregistrée, et une valeur ne s'écrit pas sur une ligne qui n'existe pas.
+      const { store, repository } = await createStore();
+      store.createNote();
+      await store.updateContent(DRAFT_ID, 'psql -h {{host}}');
+
+      await store.setPlaceholderValues(DRAFT_ID, { host: 'db.internal' });
+
+      expect(store.selectedNoteId()).not.toBe(DRAFT_ID);
+      expect(repository.failNext).toBeNull();
+    });
+
+    it('reports a failed write rather than pretending it was kept', async () => {
+      const snippet = createNote({
+        id: 'snippet',
+        placeholders: [{ name: 'host', defaultValue: '', value: '' }],
+      });
+      const { store, repository } = await createStore([snippet]);
+      repository.failNext = new IpcError('set_placeholder_values', {
+        code: 'noteNotFound',
+        params: { id: 'snippet' },
+        detail: 'Note introuvable : snippet',
+      });
+
+      await store.setPlaceholderValues('snippet', { host: 'db.internal' });
+
+      // La cause nommée par le back prime sur « impossible d'enregistrer » :
+      // une note disparue ne se réenregistre pas en réessayant.
+      expect(TestBed.inject(ErrorNotifier).notice()?.ref.key).toBe('errors.noteGone');
+    });
   });
 });

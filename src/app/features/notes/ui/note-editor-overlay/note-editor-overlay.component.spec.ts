@@ -813,4 +813,159 @@ describe('NoteEditorOverlayComponent', () => {
       expect(panel().classList.contains('fullscreen')).toBe(false);
     });
   });
+  describe('placeholder fields', () => {
+    const FIELDS = [
+      { name: 'host', defaultValue: '', value: 'db.internal' },
+      { name: 'port', defaultValue: '5432', value: '' },
+    ];
+
+    async function openTemplated(): Promise<void> {
+      fixture.componentRef.setInput(
+        'note',
+        createNote({ content: 'psql -h {{host}} -p {{port}}', placeholders: FIELDS }),
+      );
+      await fixture.whenStable();
+    }
+
+    function panel(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('.panel');
+    }
+
+    function panelAction(label: string): HTMLButtonElement | undefined {
+      return [...fixture.nativeElement.querySelectorAll('.panel-action')].find((button) =>
+        (button as HTMLElement).textContent?.includes(label),
+      ) as HTMLButtonElement | undefined;
+    }
+
+    function fieldInputs(): HTMLInputElement[] {
+      return [...fixture.nativeElement.querySelectorAll('.field-input')];
+    }
+
+    it('shows no panel for a note without a single token', async () => {
+      // Un en-tête toujours présent et toujours vide serait une fonction que
+      // personne n'utilise.
+      fixture.componentRef.setInput('note', createNote());
+      await fixture.whenStable();
+
+      expect(panel()).toBeNull();
+    });
+
+    it('opens the panel on the values the note already carries', async () => {
+      await openTemplated();
+
+      expect(panel()).not.toBeNull();
+      expect(fieldInputs().map((input) => input.value)).toEqual(['db.internal', '']);
+    });
+
+    it('emits the values to save when a field is left', async () => {
+      await openTemplated();
+      let emitted: Record<string, string> | undefined;
+      fixture.componentInstance.placeholderValuesChanged.subscribe((values) => (emitted = values));
+
+      await type(fieldInputs()[1], '6543');
+      fixture.nativeElement
+        .querySelector('.panel-body')
+        .dispatchEvent(new Event('focusout', { bubbles: true }));
+      await fixture.whenStable();
+
+      expect(emitted).toEqual({ host: 'db.internal', port: '6543' });
+    });
+
+    it('confirms the pending values before closing', async () => {
+      // Ni la croix, ni Échap, ni le fond ne produisent de blur : sans ce
+      // rattrapage, la dernière valeur tapée serait perdue.
+      await openTemplated();
+      let emitted: Record<string, string> | undefined;
+      fixture.componentInstance.placeholderValuesChanged.subscribe((values) => (emitted = values));
+
+      await type(fieldInputs()[1], '6543');
+      toolbarButton('.close-btn').click();
+      await fixture.whenStable();
+
+      expect(emitted).toEqual({ host: 'db.internal', port: '6543' });
+    });
+
+    it('folds the panel and remembers it for the next session', async () => {
+      await openTemplated();
+
+      fixture.nativeElement.querySelector('.panel-toggle').click();
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.querySelector('.panel-body')).toBeNull();
+      expect(preferences().read('devbox.editorFieldsPanel')).toBe('false');
+    });
+
+    it('copies filled rather than raw, and composes the text at the click', async () => {
+      await openTemplated();
+      const requests: { content: string; values: Record<string, string> }[] = [];
+      fixture.componentInstance.filledCopyRequested.subscribe((request) => requests.push(request));
+
+      await type(fieldInputs()[1], '6543');
+      await type(bodyEditor(), 'psql -h {{host}} -p {{port}} -d app');
+      const copyButton = [...fixture.nativeElement.querySelectorAll('.toolbar-btn')].find((button) =>
+        (button as HTMLElement).textContent?.includes('Copier rempli'),
+      ) as HTMLButtonElement;
+      copyButton.click();
+      await fixture.whenStable();
+
+      // Le corps en cours de frappe et les valeurs en cours de saisie : rien de
+      // tout cela n'est encore enregistré, et la copie doit rendre ce qu'on voit.
+      expect(requests).toEqual([
+        {
+          content: 'psql -h {{host}} -p {{port}} -d app',
+          values: { host: 'db.internal', port: '6543' },
+        },
+      ]);
+    });
+
+    it('asks for a preview only once it is turned on, then at every keystroke', async () => {
+      await openTemplated();
+      const requests: { values: Record<string, string> }[] = [];
+      fixture.componentInstance.fillPreviewRequested.subscribe((request) => requests.push(request));
+
+      await type(fieldInputs()[1], '5');
+      expect(requests).toHaveLength(0);
+
+      panelAction('Aperçu')?.click();
+      await fixture.whenStable();
+      await type(fieldInputs()[1], '54');
+
+      expect(requests.map((request) => request.values['port'])).toEqual(['5', '54']);
+    });
+
+    it('shows the filled body in place of the editable one while previewing', async () => {
+      await openTemplated();
+      panelAction('Aperçu')?.click();
+      fixture.componentRef.setInput('filledContent', 'psql -h db.internal -p 5432');
+      await fixture.whenStable();
+
+      expect(bodyEditor()).toBeNull();
+      expect(codeViewer().content()).toBe('psql -h db.internal -p 5432');
+    });
+
+    it('leaves the body editable while the filled text has not come back', async () => {
+      await openTemplated();
+
+      panelAction('Aperçu')?.click();
+      await fixture.whenStable();
+
+      // Rien n'est encore revenu du back : mieux vaut le texte qu'on édite
+      // qu'un corps vide le temps d'un aller-retour.
+      expect(bodyEditor()).not.toBeNull();
+    });
+
+    it('closes the preview when the panel is folded', async () => {
+      await openTemplated();
+      panelAction('Aperçu')?.click();
+      fixture.componentRef.setInput('filledContent', 'psql -h db.internal -p 5432');
+      await fixture.whenStable();
+
+      fixture.nativeElement.querySelector('.panel-toggle').click();
+      await fixture.whenStable();
+
+      // La bascule vit dans le panneau : la replier en laissant le corps en
+      // lecture seule enfermerait l'utilisateur dans un mode sans issue.
+      expect(bodyEditor()).not.toBeNull();
+    });
+  });
 });

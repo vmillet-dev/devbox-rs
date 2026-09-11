@@ -231,7 +231,15 @@
     "fieldLabel": "Value for {{name}}",
     "copy": "Copy filled",
     "copyRaw": "Copy as is",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "panelTitle": "Fields",
+    "panelHint": "A field left empty keeps the value the text suggests.",
+    "filledCount": "{{filled}} of {{total}} field(s) filled",
+    "show": "Show",
+    "summaryMore": "+{{count}}",
+    "preview": "Preview",
+    "reset": "Clear",
+    "copiedFilled": "Copied with your field values."
   },
   "attachments": {
     "title": "Attachments",

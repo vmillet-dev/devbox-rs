@@ -1,0 +1,69 @@
+<section class="panel" [class.open]="open()">
+  <div class="panel-head">
+    <!-- Toute la bande est le bouton, jusqu'aux actions : une ligne qui
+         s'éclaire au survol se lit comme un contrôle, un libellé seul se lit
+         comme un titre de section — c'est ce qu'il était. -->
+    <button type="button" class="panel-toggle" [attr.aria-expanded]="open()" (click)="toggled.emit()">
+      <!-- Un seul glyphe qui pivote, jamais deux : le mouvement dit à lui seul
+           qu'il y a quelque chose à ouvrir. -->
+      <span class="panel-caret" aria-hidden="true">▸</span>
+      <span class="panel-title">{{ 'placeholders.panelTitle' | transloco }}</span>
+      <span class="panel-count" [class.complete]="filled() === total()" aria-hidden="true">
+        {{ filled() }}/{{ total() }}
+      </span>
+      <span class="visually-hidden">
+        {{ 'placeholders.filledCount' | transloco: { filled: filled(), total: total() } }}
+      </span>
+
+      @if (!open()) {
+        <span class="panel-summary">
+          @for (entry of visibleSummary(); track entry.name) {
+            <span class="panel-pair">
+              <span class="panel-pair-name">{{ entry.name }}</span> = {{ entry.value }}
+            </span>
+          }
+          @if (hiddenSummary() > 0) {
+            <span class="panel-pair">
+              {{ 'placeholders.summaryMore' | transloco: { count: hiddenSummary() } }}
+            </span>
+          }
+        </span>
+        <span class="panel-verb">{{ 'placeholders.show' | transloco }}</span>
+      }
+    </button>
+
+    @if (open()) {
+      <div class="panel-actions">
+        <button
+          type="button"
+          class="panel-action"
+          [class.active]="previewing()"
+          [attr.aria-pressed]="previewing()"
+          (click)="previewToggled.emit()"
+        >
+          <span aria-hidden="true">👁</span>
+          {{ 'placeholders.preview' | transloco }}
+        </button>
+        <app-copy-button [value]="rawContent()" [showLabel]="true" label="placeholders.copyRaw" />
+        @if (filled() > 0) {
+          <button type="button" class="panel-action" (click)="reset()">
+            {{ 'placeholders.reset' | transloco }}
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+  @if (open()) {
+    <!-- `focusout` et non `blur` : il remonte, un seul écouteur couvre donc
+         toutes les lignes, y compris celles qu'une saisie vient d'ajouter. -->
+    <div class="panel-body" (focusout)="commit()">
+      <app-placeholder-fields
+        [placeholders]="placeholders()"
+        [values]="values()"
+        (changed)="onChanged($event)"
+      />
+      <p class="panel-hint">{{ 'placeholders.panelHint' | transloco }}</p>
+    </div>
+  }
+</section>

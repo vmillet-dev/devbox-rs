@@ -3,6 +3,8 @@
 //! Rassemblés ici plutôt que dispersés près de chaque type : c'est **un** seul
 //! contrat, et le compilateur n'en vérifie rien.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 
 use devbox_lib::attachments::model::Attachment;
@@ -42,6 +44,7 @@ fn sample() -> Note {
         lifecycle: NoteLifecycle::Permanent,
         kind: NoteKind::Snippet,
         items: Vec::new(),
+        placeholder_values: BTreeMap::new(),
     }
 }
 
@@ -408,11 +411,16 @@ fn a_trashed_note_is_a_note_with_two_dates_more() {
 fn a_decorated_note_announces_its_fields_and_its_attachments() {
     let mut note = sample();
     note.content = "psql -h {{host}} -p {{port=5432}}".to_string();
+    note.placeholder_values = BTreeMap::from([("host".to_string(), "db.internal".to_string())]);
 
     let json = serde_json::to_value(displayed(note)).unwrap();
 
     assert_eq!(json["placeholders"][0]["name"], "host");
     assert_eq!(json["placeholders"][1]["defaultValue"], "5432");
+    // Le panneau de l'éditeur lit la valeur **sur le champ** : sans elle, il
+    // rouvrirait vide une note dont les valeurs sont pourtant en base.
+    assert_eq!(json["placeholders"][0]["value"], "db.internal");
+    assert_eq!(json["placeholders"][1]["value"], "");
     // Renseigné par ce qui tient la connexion ; zéro par défaut.
     assert_eq!(json["attachmentCount"], 0);
 }
@@ -538,6 +546,24 @@ fn an_export_written_before_todo_lists_existed_still_reads() {
 
     assert_eq!(read.notes[0].kind, NoteKind::Snippet);
     assert!(read.notes[0].items.is_empty());
+    // Même garantie, même raison : `placeholderValues` est arrivé après ces
+    // fichiers-là.
+    assert!(read.notes[0].placeholder_values.is_empty());
+}
+
+#[test]
+fn the_values_of_the_fields_cross_as_a_named_map() {
+    let mut note = sample();
+    note.placeholder_values = BTreeMap::from([("host".to_string(), "db.internal".to_string())]);
+
+    let json = serde_json::to_value(note).unwrap();
+
+    // Un tableau de paires obligerait le front à le reconstruire pour chercher
+    // un nom ; l'export, lui, relit exactement cette forme.
+    assert_eq!(
+        json["placeholderValues"],
+        serde_json::json!({ "host": "db.internal" })
+    );
 }
 
 #[test]

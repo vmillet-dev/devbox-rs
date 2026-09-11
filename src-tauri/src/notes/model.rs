@@ -7,6 +7,8 @@
 //! `space_id` and `{"Expires":{…}}`, which the front end cannot read back.
 //! `tests/ipc_contract.rs` freezes them.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -39,6 +41,14 @@ pub struct Note {
     /// Empty for a snippet. A checklist has these **instead of** `content`.
     #[serde(default)]
     pub items: Vec<ChecklistItem>,
+    /// Ce qui a été saisi dans les `{{champs}}` du contenu, par nom de champ.
+    ///
+    /// Écrit par `set_placeholder_values` et par lui seul : remplir un champ
+    /// n'est pas modifier la note, et ne touche donc pas `updated_at`. `default`
+    /// pour la raison qui vaut déjà pour `kind` — un export écrit avant ce
+    /// champ doit rester lisible.
+    #[serde(default)]
+    pub placeholder_values: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -130,6 +140,9 @@ impl NoteDraft {
             lifecycle: self.lifecycle,
             kind: self.kind,
             items,
+            // Une note qui vient de naître n'a rien à retenir : les valeurs se
+            // saisissent dans l'éditeur, une fois les champs écrits.
+            placeholder_values: BTreeMap::new(),
         }
     }
 }
@@ -214,8 +227,9 @@ pub struct DisplayNote {
     pub note: Note,
     pub footer: NoteFooter,
     pub expiring_soon: bool,
-    /// Champs `{{…}}` du contenu : la carte propose de les remplir avant de
-    /// copier. Dérivés, jamais écrits.
+    /// Champs `{{…}}` du contenu, munis de ce qui a déjà été saisi pour eux :
+    /// l'éditeur les remplit, la carte propose de les remplir avant de copier.
+    /// La **liste** est dérivée du texte ; les valeurs, elles, sont persistées.
     pub placeholders: Vec<Placeholder>,
     /// Renseigné après coup par ce qui dispose d'une connexion — `decorate` ne
     /// lit pas la base. Zéro tant que personne ne l'a rempli.
@@ -235,7 +249,7 @@ pub fn decorate(note: Note, now: DateTime<Utc>) -> DisplayNote {
     DisplayNote {
         footer: footer_of(&note),
         expiring_soon: expires_soon(&note, now),
-        placeholders: placeholder::parse(&note.content),
+        placeholders: placeholder::parse(&note.content, &note.placeholder_values),
         attachment_count: 0,
         note,
     }

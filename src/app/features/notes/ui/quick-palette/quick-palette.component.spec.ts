@@ -10,7 +10,7 @@ const RESULTS = [
     id: 'note-2',
     title: 'Templated',
     content: 'psql -h {{host}}',
-    placeholders: [{ name: 'host', defaultValue: '' }],
+    placeholders: [{ name: 'host', defaultValue: '', value: '' }],
   }),
 ];
 

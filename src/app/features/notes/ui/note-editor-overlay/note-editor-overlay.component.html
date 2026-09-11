@@ -51,7 +51,17 @@
           <span aria-hidden="true">📌</span>
           {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
         </button>
-        <app-copy-button [value]="copyText()" [showLabel]="true" />
+        <!-- Une note à champs se copie remplie : c'est la seule forme dont on
+             fasse quelque chose. Le texte est composé au clic, par le back, et
+             « Copier tel quel » reste à portée dans le panneau. -->
+        @if (hasPlaceholders()) {
+          <button type="button" class="toolbar-btn" (click)="requestFilledCopy()">
+            <span aria-hidden="true">⚡</span>
+            {{ 'placeholders.copy' | transloco }}
+          </button>
+        } @else {
+          <app-copy-button [value]="copyText()" [showLabel]="true" />
+        }
         <button
           type="button"
           class="toolbar-btn delete-btn"
@@ -147,13 +157,34 @@
         (zoomRequested)="imageZoomRequested.emit()"
       />
 
+      <!-- Rien pour une note sans jeton : un en-tête toujours là et toujours
+           vide serait une fonction qu'on n'utilise jamais. -->
+      @if (hasPlaceholders()) {
+        <app-placeholder-panel
+          [placeholders]="placeholders()"
+          [noteId]="note.id"
+          [open]="fieldsPanelOpen()"
+          [previewing]="previewingFilled()"
+          [rawContent]="draftContent()"
+          (toggled)="toggleFieldsPanel()"
+          (previewToggled)="togglePreview()"
+          (valuesChanged)="onPlaceholderValuesChanged()"
+          (valuesCommitted)="placeholderValuesChanged.emit($event)"
+        />
+      }
+
       <!-- Deux couches superposées plutôt qu'une bascule aperçu/édition : le
            visualiseur colorie le brouillon en dessous, le <textarea> reçoit la
            frappe par-dessus avec un texte transparent et un curseur visible.
            C'est lui qui porte le texte accessible ; le visualiseur est masqué
            aux lecteurs d'écran, qui liraient sinon le contenu deux fois. -->
-      <div class="overlay-body">
-        @if (isChecklist()) {
+      <div class="overlay-body" [class.previewing]="showingPreview()">
+        @if (showingPreview()) {
+          <!-- Le corps rempli, en lecture seule : le champ de saisie n'est pas
+               masqué mais absent, sinon la frappe irait dans un texte que
+               personne ne conserve. -->
+          <app-code-viewer [content]="filledContent() ?? ''" [language]="note.language" />
+        } @else if (isChecklist()) {
           <app-checklist-editor
             [items]="note.items"
             [noteId]="note.id"

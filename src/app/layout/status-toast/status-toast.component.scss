@@ -1,5 +1,15 @@
 @use 'mixins' as *;
 
+// Au-dessus de **toutes** les modales (l'éditeur est à 50, la vue agrandie, la
+// plus haute, à 75) : un accusé déclenché depuis l'éditeur — copier rempli — se
+// retrouverait sinon derrière son fond flouté, c'est-à-dire nulle part. Le
+// bandeau reste dans le flux : il pousse le contenu comme avant, il ne fait que
+// cesser d'être recouvert.
+:host {
+  position: relative;
+  z-index: 80;
+}
+
 .status-toast {
   display: flex;
   align-items: center;

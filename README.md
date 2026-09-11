@@ -110,8 +110,6 @@ owns its model, its SQL and the commands that expose it: `<feature>.rs` holds th
 - [x] Global tag management: rename, merge, drop across the library
 - [x] `{{fields}}` in snippets, and a quick-paste palette on a global shortcut
 - [x] Attachments (drop, paste, open, save), and import / export / share
-- [ ] `crypto` module: SHA-256, MD5, UUID generation
-- [ ] `formatters` module: base64 encode/decode, JSON formatting
 
 ## Conventions
 

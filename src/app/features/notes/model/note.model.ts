@@ -114,10 +114,16 @@ export interface NoteSection {
 /**
  * Champ `{{nom}}` d'un snippet, éventuellement muni d'une valeur par défaut
  * (`{{port=5432}}`). Repéré par le back, qui décide seul de ce qui en est un.
+ *
+ * Pas de carte des valeurs à côté : la liste des champs vient du texte, les
+ * valeurs viennent de la base, et le back les réunit ici — une valeur dont le
+ * jeton a disparu du contenu n'est pas un champ, elle attend qu'il revienne.
  */
 export interface Placeholder {
   readonly name: string;
   readonly defaultValue: string;
+  /** Vide tant que rien n'a été saisi : le back lit alors `defaultValue`. */
+  readonly value: string;
 }
 
 /**

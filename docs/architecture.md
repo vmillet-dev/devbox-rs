@@ -218,7 +218,15 @@ Escape, and the template no longer declares a bare `(click)` for the linter to f
 
 The matching CSS lives in `src/styles/_mixins.scss` as `backdrop($z-index)` and
 `dialog-panel($width)`. The z-index stays with the caller: the stacking order (editor 50,
-about 55, update 60) is a decision, not an implementation detail.
+about 55, update 60, palette 65, fields form 70, enlarged image 75) is a decision, not an
+implementation detail.
+
+**80 is reserved for the two banners** in `layout/` — `StatusToastComponent` and
+`ErrorBannerComponent`. They sit in the flow under the titlebar, so without it a modal's fixed,
+blurred backdrop covers them; and it is precisely from a modal that they get raised ("copied
+with your field values" from the editor, "could not save the note" while editing). They keep
+their place in the flow and only stop being painted over. A new modal therefore goes **below**
+that line, never above it.
 
 ### Syntax highlighting
 
@@ -613,10 +621,38 @@ as a field is decided in `notes::placeholder` and nowhere else: the name is rest
 into a form on every copy. Values arrive parsed on `DisplayNote.placeholders`, and
 `fill_placeholders` — a pure command, no database — does the substitution.
 
-The form seeds each field with its default value (they exist to be kept) and submits **every**
-field, empty ones included: the back-end decides what an empty value means. "Copy as is"
-stays available for the note that only looks templated — the heuristic is careful, not
-infallible.
+**The values are the note's, and they are kept.** `note_placeholders` stores them per note
+(`(note_id, name)`, case-sensitive — `notes::placeholder::fill` tells `{{Host}}` from
+`{{host}}`, where `note_tags` folds case), `set_placeholder_values` writes them, and
+`placeholder::parse` merges them into the fields it finds in the text. Two consequences worth
+stating: the **text** decides which fields exist, so a value whose token was renamed stays
+stored but out of sight until the token comes back; and writing a value **does not touch
+`updated_at`** — filling a field is not editing the note, and the canvas sorts on that column.
+A field left empty is not stored (`normalize_values`): empty means "keep what the text
+suggests", and storing it would freeze that answer the day the default changes.
+
+Three places offer the same single set of values. The editor carries `PlaceholderPanelComponent`,
+a fold-away drawer between the metadata row and the body, mounted only for a note that has
+fields — and its header is **three affordances rather than a chevron**: the whole bar is the
+button (it lights up on hover), a single caret rotates instead of two glyphs swapping, and the
+collapsed bar names its gesture ("Afficher") next to a summary of what it hides
+(`host = db.internal · port = 5432 · +1`, capped at two). That is not decoration: with a small
+caret and a monospace small-caps label — the vocabulary this app uses for inert section
+headings — the bar read as a title, and nobody thought to click it; the card's ⚡ and the palette open `PlaceholderFormComponent`, seeded with the same
+stored values. Both render the same rows (`PlaceholderFieldsComponent`) so the two paths cannot
+drift on what an empty field means: it is a **suggestion** shown as the input's placeholder,
+never a typed value.
+
+The panel holds a local draft like the title and the body — reset on the note **id**, confirmed
+on `focusout` (which bubbles, unlike `blur`) and by the editor before it closes. Its preview
+toggle swaps the body for the filled text, read-only: the overlay asks (`fillPreviewRequested`),
+the page fills through the back-end and hands the text back down (`filledContent`), the way
+attachment previews already work. For a note with fields the toolbar's copy composes the text
+**at the click** — `filledCopyRequested`, since a keystroke in the body or in a value would
+make anything precomputed stale — and reports through `StatusNotifier` rather than the copy
+button's tick, which would claim success before the bridge answered. "Copy as is" stays one
+click away in the panel, for the note that only looks templated — the heuristic is careful,
+not infallible.
 
 ### The quick-paste palette
 
@@ -1025,13 +1061,13 @@ if closing it killed the shortcut.
 
 The commands, grouped by the feature that owns them:
 
-| Feature       | Commands                                                                                                                                                                                                                                       |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `notes`       | `query_notes`, `create_note`, `update_note`, `delete_note`, `delete_notes`, `restore_notes`, `list_trash`, `purge_notes`, `empty_trash`, `move_notes`, `tag_notes`, `list_tags`, `rename_tag`, `merge_tags`, `delete_tag`, `fill_placeholders` |
-| `spaces`      | `list_spaces`, `create_space`, `rename_space`, `delete_space`                                                                                                                                                                                  |
-| `attachments` | `attach_file`, `attach_clipboard_image`, `list_attachments`, `read_attachment`, `open_attachment`, `save_attachment`, `delete_attachment`                                                                                                      |
-| `transfer`    | `export_notes`, `export_selection`, `import_notes`, `share_notes`                                                                                                                                                                              |
-| `desktop`     | `sync_tray`, `unavailable_shortcuts`                                                                                                                                                                                                           |
+| Feature       | Commands                                                                                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `notes`       | `query_notes`, `create_note`, `update_note`, `delete_note`, `delete_notes`, `restore_notes`, `list_trash`, `purge_notes`, `empty_trash`, `move_notes`, `tag_notes`, `list_tags`, `rename_tag`, `merge_tags`, `delete_tag`, `fill_placeholders`, `set_placeholder_values` |
+| `spaces`      | `list_spaces`, `create_space`, `rename_space`, `delete_space`                                                                                                                                                                                                            |
+| `attachments` | `attach_file`, `attach_clipboard_image`, `list_attachments`, `read_attachment`, `open_attachment`, `save_attachment`, `delete_attachment`                                                                                                                                |
+| `transfer`    | `export_notes`, `export_selection`, `import_notes`, `share_notes`                                                                                                                                                                                                        |
+| `desktop`     | `sync_tray`, `unavailable_shortcuts`                                                                                                                                                                                                                                     |
 
 The guarantees the front-end relies on (persisted value returned, `Err` on an unknown id,
 "absent field means unchanged" for patches) are implemented in each feature, and tested there.
@@ -1130,6 +1166,11 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   the list of kinds lives in the domain and can move between versions. Its `DEFAULT 'snippet'`
   is not a convenience either — SQLite refuses an `ADD COLUMN NOT NULL` without one, and it is
   what gives every note already in the database its value.
+- **Filled `{{fields}}` are a child table too.** `note_placeholders` is keyed `(note_id, name)`
+  and rewritten whole, like `note_tags` and `note_items` — what is no longer sent is what the
+  user cleared, and a partial write would leave an emptied value still filling the text. Its
+  key is **case-sensitive**, unlike `note_tags.tag`: `notes::placeholder` distinguishes
+  `{{Host}}` from `{{host}}` in the text, and folding here would fill one with the other's value.
 - **Schema choices that made filtering movable to the back-end.** `lifecycle` is split into
   `lifecycle_kind` + `lifecycle_expires_at` columns rather than stored as JSON, and tags live
   in their own `note_tags` table rather than in a serialised column. Both exist so that
@@ -1178,8 +1219,10 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   make every note read slower, for data no query ever looks inside.
 - **`updated_at` is not touched by operations the user did not aim at a note.** Deleting a
   space moves its notes, a global retag rewrites their tags, restoring pulls one back out of
-  the trash — none of the three refreshes it. The canvas sorts on that column, and touching it
-  would float notes nobody reopened to the top.
+  the trash, filling a `{{field}}` records a value — none of the four refreshes it. The canvas
+  sorts on that column, and touching it would float notes nobody reopened to the top. It is
+  also why the field values are a command of their own rather than a `NotePatch` field: the
+  patch path exists to refresh that column.
 
 ## Cross-cutting services
 
@@ -1190,7 +1233,9 @@ installed or shipped alongside the executable. The database file lives in Tauri'
 - **`PreferencesService`** (`core/preferences/`) stores UI preferences in a real file through
   `tauri-plugin-store` (`preferences.json` in `app_config_dir()`), readable from Rust and
   immune to a WebView cache wipe — unlike the `localStorage` it replaced. Two consumers:
-  `LocaleService`, and the editor overlay's fullscreen toggle (`devbox.editorFullscreen`).
+  `LocaleService`, and the editor overlay's two display toggles — fullscreen
+  (`devbox.editorFullscreen`) and the fields drawer (`devbox.editorFieldsPanel`, open by
+  default: a drawer folded on first sight hides the feature from whoever does not know it yet).
   - **The API stays synchronous** although the plugin's is not: both consumers read at
     construction time, and an async read would show the interface in one state then the
     other. The file is loaded **once** by `hydrate()` from an app initializer, into an

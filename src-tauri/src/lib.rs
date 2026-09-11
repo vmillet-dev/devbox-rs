@@ -20,7 +20,7 @@ use desktop::{sync_tray, unavailable_shortcuts};
 use notes::{
     create_note, delete_note, delete_notes, delete_tag, empty_trash, fill_placeholders, list_tags,
     list_trash, merge_tags, move_notes, purge_notes, query_notes, rename_tag, restore_notes,
-    tag_notes, update_note,
+    set_placeholder_values, tag_notes, update_note,
 };
 use spaces::{create_space, delete_space, list_spaces, rename_space};
 use transfer::{export_notes, export_selection, import_notes, share_notes};
@@ -62,6 +62,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         merge_tags,
         delete_tag,
         fill_placeholders,
+        set_placeholder_values,
         list_spaces,
         create_space,
         rename_space,

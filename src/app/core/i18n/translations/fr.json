@@ -231,7 +231,15 @@
     "fieldLabel": "Valeur de {{name}}",
     "copy": "Copier rempli",
     "copyRaw": "Copier tel quel",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "panelTitle": "Champs",
+    "panelHint": "Un champ laissé vide garde la valeur proposée par le texte.",
+    "filledCount": "{{filled}} champ(s) rempli(s) sur {{total}}",
+    "show": "Afficher",
+    "summaryMore": "+{{count}}",
+    "preview": "Aperçu",
+    "reset": "Vider",
+    "copiedFilled": "Copié avec les valeurs des champs."
   },
   "attachments": {
     "title": "Pièces jointes",

@@ -889,8 +889,8 @@ describe('NotesPageComponent', () => {
       id: 'snippet',
       content: 'psql -h {{host}} -p {{port}}',
       placeholders: [
-        { name: 'host', defaultValue: '' },
-        { name: 'port', defaultValue: '5432' },
+        { name: 'host', defaultValue: '', value: '' },
+        { name: 'port', defaultValue: '5432', value: '' },
       ],
     });
 
@@ -921,6 +921,74 @@ describe('NotesPageComponent', () => {
 
       await vi.waitFor(() => expect(clipboard.content).toBe('psql -h db.internal -p 5432'));
       expect(maybeChild(PlaceholderFormComponent)).toBeNull();
+    });
+
+    it('keeps what was typed, so the next copy does not ask again', async () => {
+      // Il n'y a qu'un jeu de valeurs par note : celui de la carte, celui de la
+      // palette et celui du panneau de l'éditeur sont le même.
+      sections()[0].fillRequested.emit('snippet');
+      await fixture.whenStable();
+
+      child(PlaceholderFormComponent).submitted.emit({ host: 'db.internal', port: '' });
+      await vi.waitFor(() => expect(store.visibleNotes()[0].placeholders[0].value).toBe('db.internal'));
+
+      sections()[0].fillRequested.emit('snippet');
+      await fixture.whenStable();
+      expect(child(PlaceholderFormComponent).placeholders()[0].value).toBe('db.internal');
+    });
+
+    it('saves the values from the editor panel without touching the note', async () => {
+      store.openNote('snippet');
+      await fixture.whenStable();
+
+      child(NoteEditorOverlayComponent).placeholderValuesChanged.emit({ host: 'db.internal' });
+
+      await vi.waitFor(() => expect(store.selectedNote()?.placeholders[0].value).toBe('db.internal'));
+    });
+
+    it('fills the editor preview and hands the text back to the overlay', async () => {
+      store.openNote('snippet');
+      await fixture.whenStable();
+
+      child(NoteEditorOverlayComponent).fillPreviewRequested.emit({
+        content: 'psql -h {{host}}',
+        values: { host: 'db.internal' },
+      });
+
+      await vi.waitFor(() =>
+        expect(child(NoteEditorOverlayComponent).filledContent()).toBe('psql -h db.internal'),
+      );
+    });
+
+    it('copies the filled body from the editor and says so', async () => {
+      store.openNote('snippet');
+      await fixture.whenStable();
+
+      child(NoteEditorOverlayComponent).filledCopyRequested.emit({
+        content: 'psql -h {{host}}',
+        values: { host: 'db.internal' },
+      });
+
+      await vi.waitFor(() => expect(clipboard.content).toBe('psql -h db.internal'));
+      // L'accusé passe par le bandeau : le texte n'existe qu'une fois le pont
+      // traversé, et la coche du bouton mentirait en attendant.
+      expect(TestBed.inject(StatusNotifier).status()?.key).toBe('placeholders.copiedFilled');
+    });
+
+    it('says nothing when the clipboard refuses the filled copy', async () => {
+      store.openNote('snippet');
+      await fixture.whenStable();
+      clipboard.failNext = new Error('no clipboard');
+
+      child(NoteEditorOverlayComponent).filledCopyRequested.emit({
+        content: 'psql -h {{host}}',
+        values: { host: 'db.internal' },
+      });
+
+      await vi.waitFor(() =>
+        expect(TestBed.inject(ErrorNotifier).notice()?.ref.key).toBe('errors.copyFailed'),
+      );
+      expect(TestBed.inject(StatusNotifier).status()).toBeNull();
     });
 
     it('copies the snippet untouched when the raw option is taken', async () => {
@@ -990,7 +1058,7 @@ describe('NotesPageComponent', () => {
         createNote({
           id: 'snippet',
           content: 'ssh {{user}}@host',
-          placeholders: [{ name: 'user', defaultValue: '' }],
+          placeholders: [{ name: 'user', defaultValue: '', value: '' }],
         }),
       ]);
       palette = TestBed.inject(PaletteStore);

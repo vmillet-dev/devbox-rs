@@ -26,8 +26,14 @@
 }
 
 // Fond d'une modale. Le z-index reste à l'appelant : c'est la seule chose qui
-// distingue les trois modales, et leur ordre d'empilement est une décision
-// (l'éditeur 50, la fiche À propos 55, la mise à jour 60).
+// distingue les modales entre elles, et leur ordre d'empilement est une décision
+// (l'éditeur et ses panneaux 50, la fiche À propos 55, la mise à jour 60, la
+// palette 65, le formulaire de champs 70, la vue agrandie 75).
+//
+// ⚠️ **80 est réservé aux bandeaux** de `layout/` (accusé de réussite, erreur) :
+// ils vivent dans le flux, sous la barre de titre, et un fond flouté les
+// recouvrirait — or c'est précisément depuis une modale qu'ils sont déclenchés.
+// Une nouvelle modale se range donc en dessous, pas au-dessus.
 @mixin backdrop($z-index) {
   position: fixed;
   inset: 0;

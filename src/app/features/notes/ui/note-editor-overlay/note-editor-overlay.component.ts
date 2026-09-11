@@ -30,6 +30,7 @@ import { AttachmentStripComponent } from '../attachment-strip/attachment-strip.c
 import { ChecklistEditorComponent } from '../checklist-editor/checklist-editor.component';
 import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { LifecycleBadgeComponent } from '../lifecycle-badge/lifecycle-badge.component';
+import { PlaceholderPanelComponent } from '../placeholder-panel/placeholder-panel.component';
 import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
 
 /** Sans état : en recréer un à chaque recalcul serait inutile. */
@@ -37,11 +38,25 @@ const TEXT_ENCODER = new TextEncoder();
 
 const FULLSCREEN_STORAGE_KEY = 'devbox.editorFullscreen';
 
+const FIELDS_PANEL_STORAGE_KEY = 'devbox.editorFieldsPanel';
+
 /** Dérivées de la table des libellés pour ne pas la dupliquer. */
 const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({
   value: value as LanguageTag,
   label,
 }));
+
+/**
+ * Une demande de remplissage : le texte et les valeurs à y poser.
+ *
+ * L'éditeur ne remplit pas lui-même — c'est `notes::placeholder::fill`, côté
+ * Rust, qui décide ce qu'un champ vaut. Il dit donc *quoi* remplir, et la page
+ * lui rend le résultat.
+ */
+export interface FillRequest {
+  readonly content: string;
+  readonly values: Record<string, string>;
+}
 
 /**
  * `yyyy-MM-dd` d'un `<input type="date">` vers l'échéance correspondante.
@@ -85,6 +100,7 @@ function toDateInputValue(date: Date): string {
     CopyButtonComponent,
     TagPillComponent,
     LifecycleBadgeComponent,
+    PlaceholderPanelComponent,
     CodeViewerComponent,
     FocusTrapDirective,
     TranslocoPipe,
@@ -114,6 +130,13 @@ export class NoteEditorOverlayComponent {
   /** Vue agrandie ouverte par-dessus : elle capte Échap avant l'éditeur. */
   readonly imageZoomed = input(false);
 
+  /**
+   * Le corps une fois ses `{{champs}}` remplis, tel que la page l'a obtenu du
+   * back. `null` tant que rien n'a été demandé : l'aperçu n'affiche alors rien
+   * plutôt qu'un texte encore truffé de jetons.
+   */
+  readonly filledContent = input<string | null>(null);
+
   readonly closed = output<void>();
   readonly titleChanged = output<string>();
   readonly contentChanged = output<string>();
@@ -132,6 +155,12 @@ export class NoteEditorOverlayComponent {
   readonly attachmentSaveRequested = output<string>();
   /** L'aperçu a été cliqué : la page ouvre la vue agrandie, au-dessus d'ici. */
   readonly imageZoomRequested = output<void>();
+  /** Valeurs des `{{champs}}` à enregistrer sur la note. */
+  readonly placeholderValuesChanged = output<Record<string, string>>();
+  /** Ce que l'aperçu doit montrer : la page remplit et redescend le texte. */
+  readonly fillPreviewRequested = output<FillRequest>();
+  /** Copier le corps rempli — c'est ce que « Copier » veut dire ici. */
+  readonly filledCopyRequested = output<FillRequest>();
   /** Une image a été collée dans le corps : la page la joint à la note. */
   readonly imagePasted = output<void>();
 
@@ -166,8 +195,22 @@ export class NoteEditorOverlayComponent {
    */
   protected readonly fullscreen = signal(this.preferences.read(FULLSCREEN_STORAGE_KEY) === 'true');
 
+  /**
+   * Même nature que `fullscreen` : une préférence d'affichage, ouverte par
+   * défaut. Un panneau replié d'office cacherait la fonction à qui ne sait pas
+   * encore qu'elle existe.
+   */
+  protected readonly fieldsPanelOpen = signal(this.preferences.read(FIELDS_PANEL_STORAGE_KEY) !== 'false');
+
+  /** L'aperçu est propre à la note ouverte : il retombe en passant à la suivante. */
+  protected readonly previewingFilled = linkedSignal({
+    source: this.noteId,
+    computation: () => false,
+  });
+
   private readonly bodyEditor = viewChild<ElementRef<HTMLTextAreaElement>>('bodyEditor');
   private readonly checklistEditor = viewChild(ChecklistEditorComponent);
+  private readonly fieldsPanel = viewChild(PlaceholderPanelComponent);
 
   /** Une todolist n'a pas de corps : ni bloc coloré, ni sélecteur de format. */
   protected readonly isChecklist = computed(() => this.note()?.kind === 'checklist');
@@ -180,6 +223,18 @@ export class NoteEditorOverlayComponent {
    */
   protected readonly copyText = computed(() =>
     this.isChecklist() ? checklistToText(this.note()?.items ?? []) : this.draftContent(),
+  );
+
+  /**
+   * Une todolist n'a pas de corps, donc pas de jeton : `placeholders` est vide
+   * et le panneau n'est jamais monté — inutile de traiter le cas à part.
+   */
+  protected readonly placeholders = computed(() => this.note()?.placeholders ?? []);
+  protected readonly hasPlaceholders = computed(() => this.placeholders().length > 0);
+
+  /** Ce que l'aperçu montre : le corps rempli, en lecture seule. */
+  protected readonly showingPreview = computed(
+    () => this.previewingFilled() && this.filledContent() !== null,
   );
 
   protected readonly languageLabel = computed(
@@ -201,6 +256,66 @@ export class NoteEditorOverlayComponent {
     const lifecycle = this.note()?.lifecycle;
     return lifecycle?.kind === 'expires' ? toDateInputValue(lifecycle.at) : '';
   });
+
+  /**
+   * Replier le panneau referme l'aperçu : la bascule vit dedans, et laisser le
+   * corps en lecture seule sans le bouton qui l'y a mis serait un piège.
+   */
+  protected toggleFieldsPanel(): void {
+    const next = !this.fieldsPanelOpen();
+    this.fieldsPanelOpen.set(next);
+    this.preferences.write(FIELDS_PANEL_STORAGE_KEY, String(next));
+
+    if (!next) {
+      this.previewingFilled.set(false);
+    }
+  }
+
+  protected togglePreview(): void {
+    const next = !this.previewingFilled();
+    this.previewingFilled.set(next);
+
+    if (next) {
+      this.requestFillPreview();
+    }
+  }
+
+  /**
+   * Une valeur a changé. L'aperçu suit la frappe — c'est ce qu'on lui demande —
+   * mais rien n'est écrit : le panneau confirme à la sortie du champ.
+   */
+  protected onPlaceholderValuesChanged(): void {
+    if (this.previewingFilled()) {
+      this.requestFillPreview();
+    }
+  }
+
+  /**
+   * Le corps ne peut pas bouger pendant l'aperçu — le champ de saisie n'est pas
+   * là — donc seules les valeurs déclenchent une nouvelle demande.
+   */
+  private requestFillPreview(): void {
+    this.fillPreviewRequested.emit({
+      content: this.draftContent(),
+      values: this.placeholderValues(),
+    });
+  }
+
+  /**
+   * Copie le corps **rempli**. Le texte est composé au moment du clic, et non
+   * tenu à jour en permanence : une frappe dans le corps ou dans un champ
+   * rendrait périmé tout ce qui aurait été calculé d'avance.
+   */
+  protected requestFilledCopy(): void {
+    this.filledCopyRequested.emit({
+      content: this.draftContent(),
+      values: this.placeholderValues(),
+    });
+  }
+
+  private placeholderValues(): Record<string, string> {
+    return this.fieldsPanel()?.values() ?? {};
+  }
 
   protected toggleFullscreen(): void {
     const next = !this.fullscreen();
@@ -341,6 +456,7 @@ export class NoteEditorOverlayComponent {
     this.commitSource();
     this.commitContent();
     this.checklistEditor()?.commit();
+    this.fieldsPanel()?.commit();
     this.closed.emit();
   }
 }
