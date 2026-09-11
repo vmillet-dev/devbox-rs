@@ -30,7 +30,10 @@ import { CardBox, FocusDirection, nextFocusIndex } from './ui/grid-navigation.ut
 import { LanguageRailComponent } from './ui/language-rail/language-rail.component';
 import { NewNoteButtonComponent } from './ui/new-note-button/new-note-button.component';
 import { NoteActivation } from './ui/note-card/note-card.component';
-import { NoteEditorOverlayComponent } from './ui/note-editor-overlay/note-editor-overlay.component';
+import {
+  FillRequest,
+  NoteEditorOverlayComponent,
+} from './ui/note-editor-overlay/note-editor-overlay.component';
 import { NoteSectionComponent } from './ui/note-section/note-section.component';
 import { PlaceholderFormComponent } from './ui/placeholder-form/placeholder-form.component';
 import { ImageLightboxComponent } from './ui/image-lightbox/image-lightbox.component';
@@ -120,6 +123,16 @@ export class NotesPageComponent {
   /** Note dont on remplit les `{{champs}}` avant copie, hors palette. */
   protected readonly fillTarget = signal<Note | null>(null);
 
+  /** Corps rempli que l'aperçu de l'éditeur affiche ; `null` avant la première demande. */
+  protected readonly filledPreview = signal<string | null>(null);
+
+  /**
+   * Dernière demande d'aperçu partie. Le remplissage traverse le pont, et deux
+   * réponses peuvent revenir dans le désordre : seule celle de la demande
+   * courante a le droit de s'afficher.
+   */
+  private latestPreviewRequest: FillRequest | null = null;
+
   private readonly sectionElements = viewChildren(NoteSectionComponent, { read: ElementRef });
 
   /**
@@ -160,6 +173,15 @@ export class NotesPageComponent {
     // Les pièces jointes suivent la note **persistée** : un brouillon n'existe
     // pas encore en base, et rien n'y est attachable.
     effect(() => void this.attachments.openFor(this.store.persistedNoteId()));
+
+    // Un aperçu appartient à la note qui l'a demandé. Le garder en ouvrant la
+    // suivante afficherait le corps rempli de la précédente, le temps d'un
+    // aller-retour — et la réponse en vol n'a plus rien à dire.
+    effect(() => {
+      this.store.selectedNoteId();
+      this.latestPreviewRequest = null;
+      this.filledPreview.set(null);
+    });
   }
 
   // --- Menu « Fichier » ------------------------------------------------------
@@ -347,13 +369,44 @@ export class NotesPageComponent {
     this.fillTarget.set(this.store.visibleNotes().find((note) => note.id === noteId) ?? null);
   }
 
-  /** Remplit puis copie : le remplissage est une règle du back, pas d'ici. */
+  /**
+   * Remplit puis copie : le remplissage est une règle du back, pas d'ici.
+   *
+   * Les valeurs sont **gardées** au passage. Il n'y a qu'un jeu de valeurs par
+   * note : celui du panneau de l'éditeur, celui de la carte et celui de la
+   * palette sont le même, sinon remplir deux fois de suite au même endroit
+   * demanderait deux fois la même chose.
+   */
   protected async onFillSubmitted(values: Record<string, string>): Promise<void> {
     const note = this.fillTarget();
     if (!note) return;
 
     this.fillTarget.set(null);
     await this.copy(await this.store.fillPlaceholders(note.content, values));
+    await this.store.setPlaceholderValues(note.id, values);
+  }
+
+  /** L'aperçu de l'éditeur : la page remplit, l'éditeur affiche. */
+  protected async onFillPreviewRequested(request: FillRequest): Promise<void> {
+    this.latestPreviewRequest = request;
+    const filled = await this.store.fillPlaceholders(request.content, request.values);
+
+    if (this.latestPreviewRequest === request) {
+      this.filledPreview.set(filled);
+    }
+  }
+
+  /**
+   * Copie depuis l'éditeur. L'accusé passe par le bandeau d'état plutôt que par
+   * la coche du bouton : le texte n'existe qu'une fois le pont traversé, et
+   * cocher avant d'avoir la réponse annoncerait une copie qui n'a pas eu lieu.
+   */
+  protected async onFilledCopyRequested(request: FillRequest): Promise<void> {
+    const filled = await this.store.fillPlaceholders(request.content, request.values);
+
+    if (await this.copy(filled)) {
+      this.status.notify({ key: 'placeholders.copiedFilled' });
+    }
   }
 
   protected async onFillRaw(): Promise<void> {
@@ -371,6 +424,8 @@ export class NotesPageComponent {
     if (!note) return;
 
     await this.palette.copyAndDismiss(await this.store.fillPlaceholders(note.content, values));
+    // Gardées comme ailleurs : la palette remplit la même note que l'éditeur.
+    await this.store.setPlaceholderValues(note.id, values);
   }
 
   protected onPaletteOpen(noteId: string): void {
@@ -504,9 +559,11 @@ export class NotesPageComponent {
       });
   }
 
-  private async copy(content: string): Promise<void> {
-    if (!(await this.clipboard.copy(content))) {
-      this.notifier.notify({ ref: { key: 'errors.copyFailed' } });
-    }
+  /** Rend ce que le presse-papier a réellement accepté : un accusé se mérite. */
+  private async copy(content: string): Promise<boolean> {
+    if (await this.clipboard.copy(content)) return true;
+
+    this.notifier.notify({ ref: { key: 'errors.copyFailed' } });
+    return false;
   }
 }

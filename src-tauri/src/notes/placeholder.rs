@@ -18,6 +18,21 @@ pub struct Placeholder {
     pub name: String,
     /// Vide quand le snippet n'en propose pas.
     pub default_value: String,
+    /// Ce que l'utilisateur a déjà saisi pour ce champ, vide s'il n'a rien
+    /// saisi. Rapporté ici plutôt que laissé dans la carte des valeurs pour
+    /// qu'une seule liste réponde à « quels champs, et où en sont-ils » — et
+    /// pour qu'une valeur devenue orpheline (le jeton a été renommé dans le
+    /// texte) reste hors de vue sans être effacée.
+    pub value: String,
+}
+
+/// Un nom de champ, et rien d'autre : c'est cette restriction qui empêche
+/// `{{ user.name }}` de réclamer un formulaire.
+fn is_field_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 fn parse_token(inner: &str) -> Option<Placeholder> {
@@ -26,17 +41,14 @@ fn parse_token(inner: &str) -> Option<Placeholder> {
         None => (inner.trim(), ""),
     };
 
-    if name.is_empty()
-        || !name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-    {
+    if !is_field_name(name) {
         return None;
     }
 
     Some(Placeholder {
         name: name.to_string(),
         default_value: default_value.to_string(),
+        value: String::new(),
     })
 }
 
@@ -57,18 +69,37 @@ fn scan(content: &str, mut on_token: impl FnMut(&str, Option<Placeholder>)) {
     }
 }
 
-pub fn parse(content: &str) -> Vec<Placeholder> {
+/// Les champs du texte, munis de ce qui a déjà été saisi pour eux.
+///
+/// C'est le **texte** qui dit quels champs existent, jamais la carte des
+/// valeurs : une valeur dont le jeton a disparu du contenu n'est pas un champ,
+/// elle attend simplement qu'il revienne.
+pub fn parse(content: &str, values: &BTreeMap<String, String>) -> Vec<Placeholder> {
     let mut found: Vec<Placeholder> = Vec::new();
 
     scan(content, |_, placeholder| {
-        if let Some(placeholder) = placeholder
+        if let Some(mut placeholder) = placeholder
             && !found.iter().any(|seen| seen.name == placeholder.name)
         {
+            placeholder.value = values.get(&placeholder.name).cloned().unwrap_or_default();
             found.push(placeholder);
         }
     });
 
     found
+}
+
+/// Ce qui mérite d'être écrit en base.
+///
+/// Une valeur vide est retirée plutôt que stockée : vide veut dire « je garde ce
+/// que le snippet propose », et la ligne figerait cette réponse le jour où la
+/// valeur par défaut du texte change. Un nom qui n'en est pas un ne peut
+/// désigner aucun jeton — l'écrire ne ferait que du remplissage mort.
+pub fn normalize_values(values: BTreeMap<String, String>) -> BTreeMap<String, String> {
+    values
+        .into_iter()
+        .filter(|(name, value)| is_field_name(name) && !value.is_empty())
+        .collect()
 }
 
 /// Remplace chaque jeton par la valeur fournie, à défaut par sa valeur par
@@ -119,7 +150,7 @@ mod tests {
     }
 
     fn names(content: &str) -> Vec<String> {
-        parse(content)
+        parse(content, &BTreeMap::new())
             .into_iter()
             .map(|placeholder| placeholder.name)
             .collect()
@@ -136,11 +167,49 @@ mod tests {
     #[test]
     fn a_default_value_is_read_after_the_equals_sign() {
         assert_eq!(
-            parse("{{ port = 5432 }}"),
+            parse("{{ port = 5432 }}", &BTreeMap::new()),
             [Placeholder {
                 name: "port".to_string(),
                 default_value: "5432".to_string(),
+                value: String::new(),
             }]
+        );
+    }
+
+    #[test]
+    fn a_field_carries_what_was_already_typed_for_it() {
+        assert_eq!(
+            parse("{{host}}", &values(&[("host", "db.internal")])),
+            [Placeholder {
+                name: "host".to_string(),
+                default_value: String::new(),
+                value: "db.internal".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_value_whose_token_left_the_text_is_not_a_field() {
+        // Le jeton a été renommé dans le corps : la valeur reste en base — elle
+        // revient si le renommage était une faute de frappe — mais le panneau
+        // n'a aucune raison de proposer un champ que le texte ne porte plus.
+        let fields = parse("{{hostname}}", &values(&[("host", "db")]));
+
+        assert_eq!(names("{{hostname}}"), ["hostname"]);
+        assert!(fields[0].value.is_empty());
+    }
+
+    #[test]
+    fn only_what_can_designate_a_token_is_kept_for_writing() {
+        assert_eq!(
+            normalize_values(values(&[
+                ("host", "db.internal"),
+                // Vide = « je garde ce que le snippet propose » : l'écrire
+                // figerait cette réponse.
+                ("port", ""),
+                ("user.name", "x"),
+            ])),
+            values(&[("host", "db.internal")])
         );
     }
 

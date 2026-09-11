@@ -13,20 +13,11 @@
     <p class="fields-hint">{{ 'placeholders.hint' | transloco: { count: count() } }}</p>
 
     <div class="fields-list">
-      @for (placeholder of placeholders(); track placeholder.name) {
-        <label class="fields-row">
-          <span class="fields-name">{{ placeholder.name }}</span>
-          <input
-            #valueInput
-            type="text"
-            class="fields-input"
-            [attr.aria-label]="'placeholders.fieldLabel' | transloco: { name: placeholder.name }"
-            [placeholder]="placeholder.defaultValue"
-            [value]="valueOf(placeholder)"
-            (input)="setValue(placeholder.name, valueInput.value)"
-          />
-        </label>
-      }
+      <app-placeholder-fields
+        [placeholders]="placeholders()"
+        [values]="values()"
+        (changed)="setValue($event)"
+      />
     </div>
 
     <div class="fields-actions">

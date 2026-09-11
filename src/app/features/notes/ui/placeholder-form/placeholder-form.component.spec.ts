@@ -2,18 +2,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
+import { Placeholder } from '@features/notes/model/note.model';
 import { PlaceholderFormComponent } from './placeholder-form.component';
 
-const FIELDS = [
-  { name: 'host', defaultValue: '' },
-  { name: 'port', defaultValue: '5432' },
+const FIELDS: Placeholder[] = [
+  { name: 'host', defaultValue: '', value: '' },
+  { name: 'port', defaultValue: '5432', value: '' },
 ];
 
 describe('PlaceholderFormComponent', () => {
   let fixture: ComponentFixture<PlaceholderFormComponent>;
 
   function inputs(): HTMLInputElement[] {
-    return [...fixture.nativeElement.querySelectorAll('.fields-input')];
+    return [...fixture.nativeElement.querySelectorAll('.field-input')];
   }
 
   async function type(index: number, value: string): Promise<void> {
@@ -24,6 +25,11 @@ describe('PlaceholderFormComponent', () => {
 
   async function submit(): Promise<void> {
     fixture.debugElement.query(By.css('.fields-panel')).triggerEventHandler('submit', new Event('submit'));
+    await fixture.whenStable();
+  }
+
+  async function open(placeholders: readonly Placeholder[]): Promise<void> {
+    fixture.componentRef.setInput('placeholders', placeholders);
     await fixture.whenStable();
   }
 
@@ -41,38 +47,48 @@ describe('PlaceholderFormComponent', () => {
 
   it('renders one row per field, named', () => {
     expect(
-      [...fixture.nativeElement.querySelectorAll('.fields-name')].map((el) =>
+      [...fixture.nativeElement.querySelectorAll('.field-name')].map((el) =>
         (el as HTMLElement).textContent?.trim(),
       ),
     ).toEqual(['host', 'port']);
   });
 
-  it('seeds each field with its default value', () => {
-    // Elles sont là pour être gardées : retaper « 5432 » à chaque copie serait
-    // exactement ce que le snippet évite.
-    expect(inputs().map((input) => input.value)).toEqual(['', '5432']);
+  it('offers the values the note already holds', async () => {
+    // Il n'y a qu'un jeu de valeurs par note : le formulaire les propose au
+    // lieu de reposer la question à chaque copie.
+    await open([{ name: 'host', defaultValue: '', value: 'db.internal' }]);
+
+    expect(inputs().map((input) => input.value)).toEqual(['db.internal']);
   });
 
-  it('submits every field, defaults included', async () => {
+  it('leaves a default as a suggestion rather than a typed value', () => {
+    // La recopier figerait `5432` le jour où le snippet en propose un autre :
+    // vide veut dire « je garde ce que le texte propose ».
+    expect(inputs().map((input) => input.value)).toEqual(['', '']);
+    expect(inputs()[1].placeholder).toBe('5432');
+  });
+
+  it('submits every field, untouched ones included', async () => {
     let emitted: Record<string, string> | undefined;
     fixture.componentInstance.submitted.subscribe((values) => (emitted = values));
     await type(0, 'db.internal');
 
     await submit();
 
-    expect(emitted).toEqual({ host: 'db.internal', port: '5432' });
-  });
-
-  it('lets a value be emptied on purpose', async () => {
     // C'est le back qui décide ce qu'un champ vide vaut : le formulaire
     // transmet, il n'interprète pas.
+    expect(emitted).toEqual({ host: 'db.internal', port: '' });
+  });
+
+  it('lets a stored value be emptied on purpose', async () => {
+    await open([{ name: 'host', defaultValue: '', value: 'db.internal' }]);
     let emitted: Record<string, string> | undefined;
     fixture.componentInstance.submitted.subscribe((values) => (emitted = values));
-    await type(1, '');
 
+    await type(0, '');
     await submit();
 
-    expect(emitted).toEqual({ host: '', port: '' });
+    expect(emitted).toEqual({ host: '' });
   });
 
   it('offers a raw copy for a note that only looks templated', async () => {

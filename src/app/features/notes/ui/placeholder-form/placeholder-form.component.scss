@@ -24,36 +24,10 @@
   color: var(--text-2);
 }
 
+// Les lignes elles-mêmes viennent d'`app-placeholder-fields`, partagé avec le
+// panneau de l'éditeur : seul le défilement est une affaire de modale.
 .fields-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   overflow-y: auto;
-}
-
-.fields-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.fields-name {
-  width: 110px;
-  flex-shrink: 0;
-  font-family: var(--font-mono), serif;
-  font-size: 11.5px;
-  color: var(--amber);
-  overflow-wrap: anywhere;
-}
-
-.fields-input {
-  @include unstyled-control;
-  @include surface($radius: 7px);
-  flex: 1;
-  padding: 7px 10px;
-  font-family: var(--font-mono), serif;
-  font-size: 12px;
-  color: var(--text-0);
 }
 
 .fields-actions {

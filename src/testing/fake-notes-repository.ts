@@ -233,6 +233,30 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
     });
   }
 
+  /**
+   * Stores the values on the note's fields. `updatedAt` is deliberately left
+   * alone — that is the whole point of the command it stands for.
+   */
+  setPlaceholderValues(id: string, values: Record<string, string>): Promise<Note> {
+    return guard(this, () => {
+      const existing = this.notes.find((note) => note.id === id);
+      if (!existing) {
+        throw new Error(`Unknown note: ${id}`);
+      }
+      const updated: Note = {
+        ...existing,
+        // The fields come from the content, which only Rust parses: the double
+        // fills in the ones the note already announces.
+        placeholders: existing.placeholders.map((placeholder) => ({
+          ...placeholder,
+          value: values[placeholder.name] ?? '',
+        })),
+      };
+      this.notes = this.notes.map((note) => (note.id === id ? updated : note));
+      return updated;
+    });
+  }
+
   /** The real one delegates to Rust; the double does the substitution naively. */
   fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
     return guard(this, () =>

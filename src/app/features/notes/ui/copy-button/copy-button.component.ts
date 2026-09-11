@@ -25,6 +25,13 @@ export class CopyButtonComponent {
   /** Ajoute le libellé à côté de l'icône, pour une barre d'outils. */
   readonly showLabel = input(false);
 
+  /**
+   * Clé de traduction du libellé. Paramétrable parce que le même bouton dit
+   * « Copier » dans une barre d'outils et « Copier tel quel » à côté d'un
+   * panneau de champs, où c'est le **tel quel** qui porte l'information.
+   */
+  readonly label = input('notes.copyContent');
+
   protected readonly copied = signal(false);
 
   private timeout: ReturnType<typeof setTimeout> | null = null;

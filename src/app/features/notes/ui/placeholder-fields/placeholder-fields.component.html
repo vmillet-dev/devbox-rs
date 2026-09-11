@@ -1,0 +1,26 @@
+<ul class="fields">
+  @for (placeholder of placeholders(); track placeholder.name) {
+    <li>
+      <label class="field">
+        <!-- Les accolades sont dessinées en CSS : elles rattachent la ligne au
+             jeton du texte, mais un lecteur d'écran n'a que faire de la
+             ponctuation d'un gabarit. -->
+        <span class="field-name">{{ placeholder.name }}</span>
+        <!-- La valeur par défaut est une suggestion, pas une saisie : le champ
+             vide vaut « je garde ce que le snippet propose », et c'est le back
+             qui applique cette règle au moment de remplir. -->
+        <input
+          #valueInput
+          type="text"
+          class="field-input"
+          spellcheck="false"
+          autocomplete="off"
+          [attr.aria-label]="'placeholders.fieldLabel' | transloco: { name: placeholder.name }"
+          [placeholder]="placeholder.defaultValue"
+          [value]="valueOf(placeholder.name)"
+          (input)="changed.emit({ name: placeholder.name, value: valueInput.value })"
+        />
+      </label>
+    </li>
+  }
+</ul>

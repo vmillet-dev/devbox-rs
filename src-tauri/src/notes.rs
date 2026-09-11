@@ -24,6 +24,8 @@ pub mod view;
 /// [`model::Note`] is declared here rather than in every module that builds one.
 #[cfg(test)]
 pub(crate) mod fixtures {
+    use std::collections::BTreeMap;
+
     use chrono::{DateTime, Utc};
 
     use super::checklist::NoteKind;
@@ -52,6 +54,7 @@ pub(crate) mod fixtures {
             lifecycle: NoteLifecycle::Permanent,
             kind: NoteKind::Snippet,
             items: Vec::new(),
+            placeholder_values: BTreeMap::new(),
         }
     }
 }
@@ -245,6 +248,28 @@ pub fn delete_tag(tag: String, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
 
     Ok(count(store::drop_tag(&mut connection, &tag)?))
+}
+
+/// Enregistre les valeurs des `{{champs}}` d'une note : rouvrir la note les
+/// retrouve, et la carte comme la palette copient avec.
+///
+/// Commande à part plutôt qu'un champ de `NotePatch` : remplir un champ ne
+/// modifie pas la note — `updated_at` reste où il est, faute de quoi le canevas
+/// remonterait la note en tête à chaque valeur tapée.
+#[tauri::command]
+#[specta::specta]
+pub fn set_placeholder_values(
+    id: String,
+    values: BTreeMap<String, String>,
+    db: State<'_, Db>,
+) -> Result<DisplayNote, AppError> {
+    let retained = placeholder::normalize_values(values);
+
+    let mut connection = lock(&db)?;
+    let note = store::set_placeholder_values(&mut connection, &id, &retained)?;
+    let decorated = model::decorate_now(note);
+
+    Ok(with_attachment_count(&mut connection, decorated)?)
 }
 
 /// Remplit les `{{champs}}` d'un contenu. Pas de base ici : la palette remplit

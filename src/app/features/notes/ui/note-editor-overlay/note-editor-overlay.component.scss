@@ -199,6 +199,14 @@
   overflow-y: auto;
 }
 
+// Aperçu : le liseré dit que ce qui est à l'écran est le **résultat**, pas le
+// texte qu'on modifie. Sans lui, un corps sans jeton se lit comme une note dont
+// les champs auraient disparu.
+.overlay-body.previewing {
+  border-left: 2px solid var(--amber-dim);
+  background: rgba(var(--amber-rgb), 0.02);
+}
+
 // C'est le visualiseur, dans le flux, qui donne sa hauteur à la pile ; le
 // <textarea> s'y cale en absolu. `min-height: 100%` pour que le clic dans la
 // zone vide sous le texte atteigne quand même le champ.

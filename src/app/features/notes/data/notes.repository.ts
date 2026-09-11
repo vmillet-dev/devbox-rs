@@ -95,6 +95,15 @@ export class NotesRepository {
   }
 
   /**
+   * Enregistre ce qui a été saisi dans les `{{champs}}` d'une note. Renvoie la
+   * note telle que persistée : `updatedAt` y est **inchangé**, remplir un champ
+   * n'étant pas modifier la note.
+   */
+  async setPlaceholderValues(id: string, values: Record<string, string>): Promise<Note> {
+    return toNote(unwrap('set_placeholder_values', await commands.setPlaceholderValues(id, values)));
+  }
+
+  /**
    * `fill_placeholders` ne renvoie pas de `Result` : c'est une fonction pure
    * côté Rust, sans base ni fichier à toucher, donc rien à rapporter.
    */

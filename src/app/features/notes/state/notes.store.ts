@@ -714,6 +714,35 @@ export class NotesStore {
   }
 
   /**
+   * Enregistre ce qui a été saisi dans les `{{champs}}` d'une note.
+   *
+   * En dehors d'`edit()` et de `NotePatch` : remplir un champ n'est pas modifier
+   * la note. Le back laisse `updatedAt` où il est, et la note ne remonte donc
+   * pas en tête du canevas pour une valeur tapée dans le panneau.
+   *
+   * Une note qui porte des champs porte du contenu : le brouillon vaut déjà
+   * d'être enregistré, et `materialiseDraft` lui donne la ligne que l'écriture
+   * réclame.
+   */
+  async setPlaceholderValues(id: string, values: Record<string, string>): Promise<void> {
+    const resolved = this.resolve(id);
+    const target = resolved === DRAFT_ID ? await this.materialiseDraft() : resolved;
+    if (!target) return;
+
+    try {
+      const saved = await this.repository.setPlaceholderValues(target, values);
+      if (this.persistedNoteId() === target) {
+        this._selectedNote.set(saved);
+      }
+      // Les cartes portent les mêmes valeurs : c'est d'elles que part la copie
+      // remplie depuis le canevas.
+      this.reload();
+    } catch (error) {
+      this.notifier.reportFailure('errors.noteSaveFailed', error);
+    }
+  }
+
+  /**
    * Remplit les `{{champs}}` d'un contenu. Le back en est le seul juge : ce qui
    * est un champ et ce qui est du template Angular s'y décide.
    */

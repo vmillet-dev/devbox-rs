@@ -3,12 +3,12 @@
   class="copy-btn"
   [class.with-label]="showLabel()"
   [class.copied]="copied()"
-  [attr.aria-label]="'notes.copyContent' | transloco"
+  [attr.aria-label]="label() | transloco"
   (click)="onCopy($event)"
 >
   <span aria-hidden="true">{{ copied() ? '✓' : '⧉' }}</span>
   @if (showLabel()) {
-    <span aria-hidden="true">{{ (copied() ? 'notes.copied' : 'notes.copyContent') | transloco }}</span>
+    <span aria-hidden="true">{{ (copied() ? 'notes.copied' : label()) | transloco }}</span>
   }
   <!-- L'accusé n'existe autrement que sous forme d'icône : sans ce doublon
        annoncé, un lecteur d'écran ne saurait pas que la copie a eu lieu. -->

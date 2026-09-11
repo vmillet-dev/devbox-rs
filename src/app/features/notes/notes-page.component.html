@@ -96,6 +96,7 @@
     [attachmentPreviewId]="attachments.previewId()"
     [attachmentPreviewData]="attachments.previewData()"
     [imageZoomed]="imageZoomed()"
+    [filledContent]="filledPreview()"
     (closed)="store.closeOverlay()"
     (titleChanged)="store.renameNote(note.id, $event)"
     (contentChanged)="store.updateContent(note.id, $event)"
@@ -114,6 +115,9 @@
     (attachmentSaveRequested)="onSaveAttachment($event)"
     (imagePasted)="onImagePasted()"
     (imageZoomRequested)="imageZoomed.set(true)"
+    (placeholderValuesChanged)="store.setPlaceholderValues(note.id, $event)"
+    (fillPreviewRequested)="onFillPreviewRequested($event)"
+    (filledCopyRequested)="onFilledCopyRequested($event)"
   />
 }
 

@@ -201,7 +201,7 @@ describe('NoteCardComponent', () => {
     it('offers the form instead of a copy, which would paste the raw snippet', async () => {
       fixture.componentRef.setInput(
         'note',
-        createNote({ id: 'note-42', placeholders: [{ name: 'host', defaultValue: '' }] }),
+        createNote({ id: 'note-42', placeholders: [{ name: 'host', defaultValue: '', value: '' }] }),
       );
       await fixture.whenStable();
       let filled: string | undefined;

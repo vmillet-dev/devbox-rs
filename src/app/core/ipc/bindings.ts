@@ -50,6 +50,15 @@ export const commands = {
 	 *  aussi bien un brouillon non enregistré que la note qu'elle vient d'ouvrir.
 	 */
 	fillPlaceholders: (content: string, values: { [key in string]: string }) => __TAURI_INVOKE<string>("fill_placeholders", { content, values }),
+	/**
+	 *  Enregistre les valeurs des `{{champs}}` d'une note : rouvrir la note les
+	 *  retrouve, et la carte comme la palette copient avec.
+	 * 
+	 *  Commande à part plutôt qu'un champ de `NotePatch` : remplir un champ ne
+	 *  modifie pas la note — `updated_at` reste où il est, faute de quoi le canevas
+	 *  remonterait la note en tête à chaque valeur tapée.
+	 */
+	setPlaceholderValues: (id: string, values: { [key in string]: string }) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("set_placeholder_values", { id, values })),
 	listSpaces: () => typedError<Space[], AppError>(__TAURI_INVOKE("list_spaces")),
 	createSpace: (draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("create_space", { draft })),
 	renameSpace: (id: string, draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("rename_space", { id, draft })),
@@ -161,8 +170,9 @@ export type DisplayNote = {
 	footer: NoteFooter,
 	expiringSoon: boolean,
 	/**
-	 *  Champs `{{…}}` du contenu : la carte propose de les remplir avant de
-	 *  copier. Dérivés, jamais écrits.
+	 *  Champs `{{…}}` du contenu, munis de ce qui a déjà été saisi pour eux :
+	 *  l'éditeur les remplit, la carte propose de les remplir avant de copier.
+	 *  La **liste** est dérivée du texte ; les valeurs, elles, sont persistées.
 	 */
 	placeholders: Placeholder[],
 	/**
@@ -238,6 +248,15 @@ export type Note = {
 	kind?: NoteKind,
 	/**  Empty for a snippet. A checklist has these **instead of** `content`. */
 	items?: ChecklistItem[],
+	/**
+	 *  Ce qui a été saisi dans les `{{champs}}` du contenu, par nom de champ.
+	 * 
+	 *  Écrit par `set_placeholder_values` et par lui seul : remplir un champ
+	 *  n'est pas modifier la note, et ne touche donc pas `updated_at`. `default`
+	 *  pour la raison qui vaut déjà pour `kind` — un export écrit avant ce
+	 *  champ doit rester lisible.
+	 */
+	placeholderValues?: { [key in string]: string },
 };
 
 /**  Neither identifier nor timestamps: persistence assigns them. */
@@ -363,6 +382,14 @@ export type Placeholder = {
 	name: string,
 	/**  Vide quand le snippet n'en propose pas. */
 	defaultValue: string,
+	/**
+	 *  Ce que l'utilisateur a déjà saisi pour ce champ, vide s'il n'a rien
+	 *  saisi. Rapporté ici plutôt que laissé dans la carte des valeurs pour
+	 *  qu'une seule liste réponde à « quels champs, et où en sont-ils » — et
+	 *  pour qu'une valeur devenue orpheline (le jeton a été renommé dans le
+	 *  texte) reste hors de vue sans être effacée.
+	 */
+	value: string,
 };
 
 export type Space = {

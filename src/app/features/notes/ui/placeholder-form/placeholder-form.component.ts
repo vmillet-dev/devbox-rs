@@ -3,9 +3,18 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
 import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
 import { Placeholder } from '@features/notes/model/note.model';
+import {
+  PlaceholderFieldsComponent,
+  PlaceholderValue,
+} from '../placeholder-fields/placeholder-fields.component';
 
 /**
- * Saisie des `{{champs}}` d'un snippet avant copie.
+ * Saisie des `{{champs}}` d'un snippet avant copie, depuis une carte ou la
+ * palette — là où il n'y a pas d'éditeur ouvert pour porter le panneau.
+ *
+ * Amorcée par les valeurs **déjà enregistrées** sur la note : il n'y a qu'un jeu
+ * de valeurs par note, et le formulaire les propose plutôt que de reposer la
+ * question. Ce qui en sort est copié *et* gardé.
  *
  * Les valeurs partent brutes : c'est `notes::placeholder::fill`, côté Rust, qui
  * décide ce qu'un champ vide vaut (sa valeur par défaut) et ce qui n'est pas un
@@ -16,7 +25,7 @@ import { Placeholder } from '@features/notes/model/note.model';
  */
 @Component({
   selector: 'app-placeholder-form',
-  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
+  imports: [DialogBackdropDirective, FocusTrapDirective, PlaceholderFieldsComponent, TranslocoPipe],
   templateUrl: './placeholder-form.component.html',
   styleUrl: './placeholder-form.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -32,19 +41,22 @@ export class PlaceholderFormComponent {
   readonly cancelled = output<void>();
 
   /**
-   * Amorcé par les valeurs par défaut : elles sont là pour être gardées, et un
-   * champ vide obligerait à retaper `5432` à chaque copie.
+   * Saisie en cours. `null` tant que rien n'a été tapé : la note fournit alors
+   * ses propres valeurs, et les recopier ici les figerait le jour où le
+   * formulaire s'ouvre sur une note dont les valeurs ont changé entre-temps.
    */
-  private readonly values = signal<Record<string, string>>({});
+  private readonly typed = signal<Record<string, string> | null>(null);
 
   protected readonly count = computed(() => this.placeholders().length);
 
-  protected valueOf(placeholder: Placeholder): string {
-    return this.values()[placeholder.name] ?? placeholder.defaultValue;
-  }
+  protected readonly values = computed(
+    () =>
+      this.typed() ??
+      Object.fromEntries(this.placeholders().map((placeholder) => [placeholder.name, placeholder.value])),
+  );
 
-  protected setValue(name: string, value: string): void {
-    this.values.update((current) => ({ ...current, [name]: value }));
+  protected setValue({ name, value }: PlaceholderValue): void {
+    this.typed.set({ ...this.values(), [name]: value });
   }
 
   protected submit(event: Event): void {
@@ -52,7 +64,7 @@ export class PlaceholderFormComponent {
 
     const filled: Record<string, string> = {};
     for (const placeholder of this.placeholders()) {
-      filled[placeholder.name] = this.valueOf(placeholder);
+      filled[placeholder.name] = this.values()[placeholder.name] ?? '';
     }
     this.submitted.emit(filled);
   }
