@@ -7,9 +7,8 @@ export { type ChecklistItem, type NoteKind } from './checklist.model';
 export type NoteLifecycle = { readonly kind: 'permanent' } | { readonly kind: 'expires'; readonly at: Date };
 
 /**
- * The back end picks the variant: "a pinned note shows its context rather than
- * its age" is a product rule. Two variants carry a date and not a label, so the
- * text can age on screen without a round trip.
+ * The back end picks the variant. Two carry a date and not a label, so the text can
+ * age on screen without a round trip.
  */
 export type NoteFooter =
   | { readonly kind: 'source'; readonly value: string }
@@ -17,15 +16,11 @@ export type NoteFooter =
   | { readonly kind: 'age'; readonly at: Date };
 
 /**
- * Immutable: every change produces a new object (see `NotesStore`).
- *
- * `footer`, `expiringSoon`, `placeholders`, `attachmentCount` and `copyText`
- * are **derived by the back end and never written** — they are what
- * `DisplayNote` adds.
+ * `footer`, `expiringSoon`, `placeholders`, `attachmentCount` and `copyText` are
+ * **derived by the back end and never written** — they are what `DisplayNote` adds.
  */
 export interface Note {
   readonly id: string;
-  /** Never empty: a note always lives in a space. */
   readonly spaceId: string;
   /** May be empty on a brand-new note; the UI then renders `notes.untitled`. */
   readonly title: string;
@@ -46,16 +41,13 @@ export interface Note {
   /** Empty for a snippet. A todo list has these **instead of** `content`. */
   readonly items: readonly ChecklistItem[];
   /**
-   * What copying puts on the clipboard when that is not `content`: the Markdown
-   * of a todo list's items. `null` for a snippet — see `noteCopyText`.
+   * What copying puts on the clipboard when that is not `content`: the Markdown of a
+   * todo list's items. `null` for a snippet — see `noteCopyText`.
    */
   readonly copyText: string | null;
 }
 
-/**
- * The id and the timestamps are assigned by persistence; the rest is derived —
- * sending either would suggest the front decides.
- */
+/** The id and the timestamps are assigned by persistence; the rest is derived. */
 export type NoteDraft = Omit<
   Note,
   | 'id'
@@ -73,7 +65,6 @@ export type NotePatch = Partial<NoteDraft>;
 /** `untriaged` = notes carrying a deadline, the ones whose fate is undecided. */
 export type NoteFilter = 'all' | 'pinned' | 'untriaged';
 
-/** Sent as is to `query_notes`: the front describes its intent. */
 export interface NotesQuery {
   /** `null` = "all spaces", a choice and not an absence of one. */
   readonly spaceId: string | null;
@@ -82,7 +73,6 @@ export interface NotesQuery {
   /** Union semantics, like `languages`: at least one of them. Empty = all. */
   readonly tags: readonly string[];
   readonly languages: readonly LanguageTag[];
-  /** Reference instant, read through `ClockService` to stay testable. */
   readonly now: Date;
   /**
    * ⚠️ `Date#getTimezoneOffset()`. The sections reason in **local** days:
@@ -90,47 +80,39 @@ export interface NotesQuery {
    */
   readonly tzOffsetMinutes: number;
   /**
-   * Hoists pinned notes: their own section when the view is chronological, the
-   * head of the list when it is flat. The canvas always says `true`; the
-   * quick-paste palette follows the preference.
+   * Hoists pinned notes: their own section when the view is chronological, the head of
+   * the list when it is flat. The canvas always says `true`.
    */
   readonly pinnedFirst: boolean;
 }
 
 /**
- * What the canvas displays. No flat list here: it would invite re-filtering or
- * re-sorting what the back end has already done.
+ * No flat list: it would invite re-filtering or re-sorting what the back end has
+ * already done.
  */
 export interface NotesView {
   readonly sections: readonly NoteSection[];
   /** Rail tags, scoped to the active space and not to the current filter. */
   readonly availableTags: readonly string[];
   readonly availableLanguages: readonly LanguageTag[];
-  /** A search or a facet selection is active. */
   readonly isFiltering: boolean;
   readonly matched: number;
 }
 
-/**
- * `pinned` / `today` / `week` / `older` group chronologically; `results` is the
- * flat list of a search. Doubles as a translation key (`'sections.' + key`).
- */
+/** Doubles as a translation key (`'sections.' + key`). */
 export type NoteSectionKey = 'pinned' | 'today' | 'week' | 'older' | 'results';
 
 export interface NoteSection {
   readonly key: NoteSectionKey;
   readonly notes: readonly Note[];
   readonly hasExpiringNotes: boolean;
-  /** Shows the "paste or create" ghost card at the end of the section. */
   readonly showCreateGhost: boolean;
 }
 
 /**
- * A snippet's `{{name}}` field, possibly with a default (`{{port=5432}}`).
- *
- * No value map beside it: the list of fields comes from the text, the values
- * come from the database, and the back end pairs them here — a value whose
- * token has left the content is not a field, it is waiting for it back.
+ * No value map beside it: the list of fields comes from the text, the values from the
+ * database, and the back end pairs them here — a value whose token has left the
+ * content is not a field, it is waiting for it back.
  */
 export interface Placeholder {
   readonly name: string;
@@ -140,11 +122,9 @@ export interface Placeholder {
 }
 
 /**
- * A trashed note. Deliberately **not** a `Note`: nothing here is decorated,
- * because a discarded note is restored or purged, never opened or copied.
- *
- * `purgeAt` is derived: retention can change between versions, and a deadline
- * frozen in the database would not follow.
+ * Deliberately **not** a `Note`: nothing here is decorated, a discarded note being
+ * restored or purged, never opened. `purgeAt` is derived — retention can change
+ * between versions.
  */
 export interface TrashedNote {
   readonly id: string;
@@ -164,10 +144,7 @@ export interface TagUsage {
   readonly noteCount: number;
 }
 
-/**
- * An attachment record. The bytes are not here: they arrive on demand, as a
- * `data:` URI, through `AttachmentsRepository.read`.
- */
+/** The bytes are not here: they arrive on demand, as a `data:` URI. */
 export interface Attachment {
   readonly id: string;
   readonly noteId: string;
@@ -179,8 +156,7 @@ export interface Attachment {
 }
 
 /**
- * Aliases of the **generated** types: both are plain counters and cross the
- * bridge as themselves, so re-declaring them would only be an identity mapper
- * kept for symmetry.
+ * Plain counters that cross the bridge as themselves: re-declaring them would only be
+ * an identity mapper kept for symmetry.
  */
 export type { ExportReport, ImportReport };

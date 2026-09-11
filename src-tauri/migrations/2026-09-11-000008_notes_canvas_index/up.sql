@@ -1,11 +1,5 @@
--- The canvas query is always the same shape: living notes of one space (or of
--- the whole corpus), most recently touched first.
---
--- `notes_space_id` served the filter and left SQLite to sort afterwards, which
--- shows from a few thousand notes on. This index carries the order with it, and
--- is partial so trashed rows keep it small.
---
--- `id` closes the ordering: the query ties on `updated_at` with `id ASC`, and
--- without it two notes written in the same millisecond could swap places
--- between two reads.
+-- `notes_space_id` served the filter and left SQLite to sort afterwards, which shows
+-- from a few thousand notes on. Partial, so trashed rows keep it small, and `id`
+-- closes the ordering: two notes written in the same millisecond could otherwise
+-- swap places between two reads.
 CREATE INDEX notes_canvas ON notes (space_id, updated_at DESC, id) WHERE deleted_at IS NULL;

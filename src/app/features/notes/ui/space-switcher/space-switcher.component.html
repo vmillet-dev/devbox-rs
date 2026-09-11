@@ -15,9 +15,7 @@
   @if (menu.open()) {
     <div class="space-dropdown">
       @if (editing(); as edited) {
-        <!-- The edit panel: it replaces the menu, like the create form. Two
-             distinct actions on the same space, hence two separate groups
-             rather than one form. -->
+        <!-- The edit panel replaces the menu, like the create form. -->
         <div class="space-edit-panel">
           <p class="space-edit-title">{{ edited.name }}</p>
 
@@ -62,9 +60,8 @@
           }
         </div>
       } @else if (creating()) {
-        <!-- The form replaces the menu rather than adding to it: an input
-             inside a role="menu" is neither valid ARIA nor navigable the way
-             options are. -->
+        <!-- The form replaces the menu rather than adding to it: an input inside a
+             role="menu" is neither valid ARIA nor navigable the way options are. -->
         <form class="space-create-form" (submit)="submitNewSpace($event, nameInput.value)">
           <input
             #nameInput
@@ -91,8 +88,8 @@
             {{ 'notes.allSpaces' | transloco }}
           </button>
           @for (space of spaces(); track space.id) {
-            <!-- `role="none"`: a bare container between the menu and its items
-                 would break the relationship screen readers expect. -->
+            <!-- `role="none"`: a bare container between the menu and its items would
+                 break the relationship screen readers expect. -->
             <div class="space-row" role="none">
               <button
                 appMenuItem

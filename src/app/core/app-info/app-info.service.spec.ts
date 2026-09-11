@@ -3,11 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppInfoService, APP_NAME, REPOSITORY_URL } from './app-info.service';
 
 /**
- * `getVersion()` and `openUrl()` belong to the Tauri core and to a plugin, so
- * neither appears in `bindings.ts` and there is no token to substitute. They are
- * not mocked either: `vi.mock` on a Tauri package is unreliable here (the
- * Angular builder bundles modules before Vitest sees them), and the case that
- * matters is precisely the one jsdom reproduces for free — no bridge at all.
+ * `getVersion()` and `openUrl()` belong to the Tauri core and to a plugin, so there is no
+ * token to substitute. They are not mocked either: `vi.mock` on a Tauri package is
+ * unreliable here, and the case that matters is the one jsdom reproduces for free — no
+ * bridge at all.
  */
 describe('AppInfoService', () => {
   beforeEach(() => {
@@ -16,11 +15,9 @@ describe('AppInfoService', () => {
   });
 
   it('reads null outside a Tauri runtime rather than making a version up', async () => {
-    // `ng serve` on its own: the about card shows a dash instead of lying.
     const info = TestBed.inject(AppInfoService);
 
     expect(info.version()).toBeNull();
-    // The resource settles into its error state without ever holding a value.
     await vi.waitFor(() => expect(info.version()).toBeNull());
   });
 

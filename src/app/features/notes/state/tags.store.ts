@@ -5,11 +5,9 @@ import { TagUsage } from '../model/note.model';
 import { NotesRevision } from './notes-revision';
 
 /**
- * Corpus-wide tag management: rename, merge, remove.
- *
- * Scoped to the **whole corpus** and not to the active space — a tag that
- * drifts (`auth`, `authentication`, `Auth`) drifts everywhere, and mending it
- * in one space would leave the other half in place.
+ * Scoped to the **whole corpus** and not to the active space: a tag that drifts (`auth`,
+ * `authentication`, `Auth`) drifts everywhere, and mending it in one space would leave
+ * the other half in place.
  */
 @Injectable({ providedIn: 'root' })
 export class TagsStore {
@@ -63,10 +61,7 @@ export class TagsStore {
     });
   }
 
-  /**
-   * Renaming onto an existing tag **is** a merge: a note cannot carry the same
-   * tag twice. The button label says so.
-   */
+  /** Renaming onto an existing tag **is** a merge: a note cannot carry one twice. */
   async renameSelected(into: string): Promise<boolean> {
     const selection = [...this._selected()];
     if (selection.length === 0 || !into.trim()) return false;

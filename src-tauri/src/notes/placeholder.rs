@@ -1,8 +1,6 @@
-//! Fields to fill in a snippet: `{{host}}`, `{{port=5432}}`.
-//!
-//! ⚠️ The name is restricted to `[A-Za-z0-9_-]` on purpose: without it a note
-//! holding Angular template code (`{{ user.name }}`) would demand a form on
-//! every copy.
+//! ⚠️ A field name is restricted to `[A-Za-z0-9_-]` on purpose: without it a note
+//! holding Angular template code (`{{ user.name }}`) would demand a form on every
+//! copy.
 
 use std::collections::BTreeMap;
 
@@ -16,19 +14,12 @@ const CLOSE: &str = "}}";
 #[serde(rename_all = "camelCase")]
 pub struct Placeholder {
     pub name: String,
-    /// Empty when the snippet offers none.
     pub default_value: String,
-    /// What has already been typed for this field, empty otherwise.
-    ///
-    /// Reported here rather than left in the value map so that one list answers
-    /// "which fields, and where are they up to" — and so a value gone orphan
-    /// (its token was renamed in the text) stays out of sight without being
-    /// erased.
+    /// A value gone orphan — its token renamed in the text — stays out of sight
+    /// here without being erased.
     pub value: String,
 }
 
-/// A field name, and nothing else: this restriction is what keeps
-/// `{{ user.name }}` from demanding a form.
 fn is_field_name(name: &str) -> bool {
     !name.is_empty()
         && name
@@ -53,25 +44,18 @@ fn parse_token(inner: &str) -> Option<Placeholder> {
     })
 }
 
-/// A piece of the text, as [`scan`] walks past it.
 enum Fragment<'a> {
     Literal(&'a str),
     Token {
-        /// Between the braces, as written.
         inner: &'a str,
         /// `None` when it is not a field: part of the text, not of the form.
         placeholder: Option<Placeholder>,
     },
 }
 
-/// Walks the text once, handing back every literal run and every `{{…}}` in
-/// order.
-///
-/// The single walk is the point: [`parse`] and [`fill`] would otherwise each
-/// carry their own idea of where a token starts and ends, and could drift.
-///
-/// An unterminated `{{` ends the walk, and the remainder — braces included —
-/// comes back as one last literal.
+/// The single walk is the point: [`parse`] and [`fill`] would otherwise each carry
+/// their own idea of where a token starts and ends. An unterminated `{{` ends the
+/// walk, and the remainder — braces included — comes back as one last literal.
 fn scan(content: &str, mut on_fragment: impl FnMut(Fragment<'_>)) {
     let mut rest = content;
 
@@ -95,11 +79,8 @@ fn scan(content: &str, mut on_fragment: impl FnMut(Fragment<'_>)) {
     on_fragment(Fragment::Literal(rest));
 }
 
-/// The fields of the text, carrying what has already been typed for them, in
-/// order of appearance and without duplicates.
-///
-/// The **text** says which fields exist, never the value map: a value whose
-/// token has left the content is not a field, it is simply waiting for it back.
+/// The **text** says which fields exist, never the value map: a value whose token
+/// has left the content is not a field, it is waiting for it to come back.
 pub fn parse(content: &str, values: &BTreeMap<String, String>) -> Vec<Placeholder> {
     let mut found: Vec<Placeholder> = Vec::new();
 
@@ -123,11 +104,8 @@ pub fn parse(content: &str, values: &BTreeMap<String, String>) -> Vec<Placeholde
     found
 }
 
-/// What deserves to be written to the database.
-///
 /// An empty value is dropped rather than stored: empty means "I keep what the
-/// snippet offers", and the row would freeze that answer the day the default
-/// written in the text changes. A name that is not one can designate no token.
+/// snippet offers", and a row would freeze that answer the day the default changes.
 pub fn normalize_values(values: BTreeMap<String, String>) -> BTreeMap<String, String> {
     values
         .into_iter()
@@ -135,14 +113,9 @@ pub fn normalize_values(values: BTreeMap<String, String>) -> BTreeMap<String, St
         .collect()
 }
 
-/// What actually fills the tokens: what was typed on the note first, the
-/// **global variable** next.
-///
-/// An empty entry does not overwrite the variable — empty means "I keep what I
-/// am offered", exactly as against a default written in the text. And the
-/// variable comes ahead of that default: it was set for this machine, where
-/// `{{host=localhost}}` was only a suggestion noted the day the snippet was
-/// written.
+/// What was typed on the note first, the **global variable** next, the default
+/// written in the text last: an empty entry overwrites nothing, empty meaning
+/// "I keep what I am offered".
 pub fn resolve(
     globals: &BTreeMap<String, String>,
     values: &BTreeMap<String, String>,
@@ -158,8 +131,7 @@ pub fn resolve(
     resolved
 }
 
-/// Replaces each token by the value supplied, failing that by its default. A
-/// token that is not a field is **left as it is**.
+/// A token that is not a field is **left as it is**.
 pub fn fill(content: &str, values: &BTreeMap<String, String>) -> String {
     let mut filled = String::with_capacity(content.len());
 
@@ -239,9 +211,6 @@ mod tests {
 
     #[test]
     fn a_value_whose_token_left_the_text_is_not_a_field() {
-        // The token was renamed in the body: the value stays in the database —
-        // it comes back if the rename was a typo — but the panel has no reason
-        // to offer a field the text no longer carries.
         let fields = parse("{{hostname}}", &values(&[("host", "db")]));
 
         assert_eq!(names("{{hostname}}"), ["hostname"]);
@@ -253,8 +222,6 @@ mod tests {
         assert_eq!(
             normalize_values(values(&[
                 ("host", "db.internal"),
-                // Empty means "I keep what the snippet offers": writing it would
-                // freeze that answer.
                 ("port", ""),
                 ("user.name", "x"),
             ])),
@@ -264,8 +231,6 @@ mod tests {
 
     #[test]
     fn a_template_expression_is_not_a_field() {
-        // The case that matters: a note of Angular code must not demand a form
-        // on every copy.
         assert!(names("<p>{{ user.name }}</p> {{ items[0] }}").is_empty());
     }
 
@@ -299,8 +264,6 @@ mod tests {
 
     #[test]
     fn an_empty_entry_leaves_the_global_variable_in_place() {
-        // Empty means "I keep what I am offered": without this filter, opening
-        // the panel without typing would erase the variable on the next copy.
         let globals = values(&[("host", "db.internal")]);
 
         assert_eq!(
@@ -337,8 +300,6 @@ mod tests {
 
     #[test]
     fn an_empty_value_falls_back_to_the_default_too() {
-        // The form sends every field: one left empty means "I keep what the
-        // snippet offers".
         assert_eq!(fill("{{port=5432}}", &values(&[("port", "")])), "5432");
     }
 

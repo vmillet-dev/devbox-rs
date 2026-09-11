@@ -119,8 +119,7 @@
   outline-offset: 2px;
 }
 
-// A todo list has no content: the trash says what it is rather than leaving an
-// empty preview, which would read as a lost note.
+// A todo list has no content: an empty preview would read as a lost note.
 .trash-row-kind {
   display: block;
   font-size: 11px;

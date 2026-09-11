@@ -1,7 +1,5 @@
 @use 'mixins' as *;
 
-// A drawer between the metadata and the body: it belongs to the text it fills,
-// and folds back to a single line when it is not wanted.
 .panel {
   flex-shrink: 0;
   border-bottom: 1px solid var(--line-soft);
@@ -14,8 +12,7 @@
   padding: 7px 20px;
 }
 
-// The whole free band, not just the label: a target the size of the row is what
-// tells a control from a caption.
+// The whole band is the target: a row-sized one tells a control from a caption.
 .panel-toggle {
   @include unstyled-control;
   display: flex;
@@ -42,8 +39,6 @@
   color: var(--amber);
 }
 
-// One glyph that rotates: the movement is noticed where two swapped characters
-// would go unseen.
 .panel-caret {
   display: inline-block;
   width: 10px;
@@ -57,8 +52,6 @@
   transform: rotate(90deg);
 }
 
-// Normal case and the interface font: monospace small caps are this
-// application's vocabulary for inert captions.
 .panel-title {
   font-size: 12px;
   font-weight: 600;
@@ -66,8 +59,6 @@
   white-space: nowrap;
 }
 
-// What the folded bar hides. Truncated rather than wrapped: the band's height
-// is what keeps it quiet.
 .panel-summary {
   min-width: 0;
   overflow: hidden;
@@ -87,8 +78,6 @@
   color: var(--amber-dim);
 }
 
-// Pushed to the end of the band: the verb is the last thing read, and leaves no
-// doubt about what the click will do.
 .panel-verb {
   margin-left: auto;
   padding-left: 8px;
@@ -97,8 +86,7 @@
   white-space: nowrap;
 }
 
-// The panel's only number: how many fields carry a value. Amber once they all
-// do, because that is when the copy becomes usable without retyping anything.
+// Amber once every field carries a value: that is when the copy becomes usable.
 .panel-count {
   @include surface(var(--bg-2), 999px);
   flex-shrink: 0;
@@ -120,7 +108,6 @@
   margin-left: auto;
 }
 
-// Aligned on `.copy-btn.with-label`, which stands next to them.
 .panel-action {
   @include unstyled-control;
   @include surface(var(--bg-2), 7px);
@@ -142,8 +129,6 @@
   border-color: var(--amber-dim);
 }
 
-// Recessed against the editor's panel: that step is what makes the area read as
-// a drawer rather than one more band.
 .panel-body {
   padding: 10px 20px 12px;
   background: var(--bg-0);

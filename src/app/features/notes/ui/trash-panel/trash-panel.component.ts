@@ -9,13 +9,11 @@ import { TrashedNote } from '@features/notes/model/note.model';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const SNIPPET_LINES = 2;
 
-/** What the row shows, resolved once rather than in the template. */
 interface TrashRow {
   readonly note: TrashedNote;
   /**
-   * Empty for a todo list: its items do not travel this far, a discarded note
-   * being neither opened nor ticked. The row then shows the `snippetKey` label
-   * rather than a blank preview.
+   * Empty for a todo list: its items do not travel this far, a discarded note being
+   * neither opened nor ticked.
    */
   readonly snippet: string;
   readonly snippetKey: string | null;
@@ -24,10 +22,8 @@ interface TrashRow {
 }
 
 /**
- * The trash panel: restore, or erase for good.
- *
- * The purge deadline is computed at render rather than received as a label —
- * like the cards' relative times, it has to age on screen without a round trip.
+ * The purge deadline is computed at render rather than received as a label: like the
+ * cards' relative times, it has to age on screen without a round trip.
  */
 @Component({
   selector: 'app-trash-panel',

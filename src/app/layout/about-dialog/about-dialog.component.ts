@@ -3,15 +3,9 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { AUTHOR_HANDLE, AUTHOR_NAME, AppInfoService, REPOSITORY_URL } from '@core/app-info/app-info.service';
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
-/** How the repository is displayed: the URL without its scheme. */
 const REPOSITORY_LABEL = REPOSITORY_URL.replace(/^https:\/\//, '');
 
-/**
- * The "About" card: version, project description, developer and repository.
- *
- * Purely informative — the update check lives in the menu that opens this card,
- * not here.
- */
+/** Purely informative — the update check lives in the menu that opens this card. */
 @Component({
   selector: 'app-about-dialog',
   imports: [DialogComponent, TranslocoPipe],

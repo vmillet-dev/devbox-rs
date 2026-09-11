@@ -56,8 +56,6 @@ describe('SelectionBarComponent', () => {
     await fixture.whenStable();
 
     expect(emitted).toBe('space-2');
-    // Otherwise the picker would stay stuck on the last destination, and doing it
-    // again would mean going back through "Move to".
     expect(select.value).toBe('');
   });
 

@@ -1,33 +1,23 @@
-//! Reading `CHANGELOG.md` into what a panel can render.
-//!
-//! The reading happens here rather than on the front end, for the usual reason:
-//! the front receives a typed structure and renders it with the components it
-//! already has — no Markdown renderer to pull in, no `innerHTML`, nothing for
-//! the CSP to forbid.
-//!
-//! The grammar is deliberately thin, and the file is written to match it:
-//! `## ` opens a release, `### ` opens a category, `- ` (or `* `) is an entry,
-//! and a line that continues one is appended to it. Everything else — the
-//! preamble, a blank line, a stray paragraph — is skipped rather than guessed
-//! at.
+//! The grammar is deliberately thin, and the file is written to match it: `## `
+//! opens a release, `### ` a category, `- ` (or `* `) an entry, and a line that
+//! continues one is appended to it. Anything else is skipped rather than guessed at.
 
 use serde::Serialize;
 use specta::Type;
 
-/// One `## ` heading of the file, with everything listed under it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangelogRelease {
-    /// `0.1.1`, or whatever the heading names — `Unreleased` included. The
-    /// square brackets of the Keep a Changelog style are dropped.
+    /// `0.1.1`, or whatever the heading names — `Unreleased` included. Keep a
+    /// Changelog's square brackets are dropped.
     pub version: String,
     /// `None` when the heading carries no date; never invented.
     pub date: Option<String>,
     pub sections: Vec<ChangelogSection>,
 }
 
-/// One `### ` heading, or the anonymous one a release gets when it lists its
-/// entries without a category.
+/// One `### ` heading, or the anonymous one a release gets when it lists its entries
+/// without a category.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangelogSection {
@@ -36,13 +26,11 @@ pub struct ChangelogSection {
     pub items: Vec<String>,
 }
 
-/// Newest release first — the order of the file, which is not re-sorted:
-/// versions are strings here, and sorting them as such would put `0.10` before
-/// `0.9`.
+/// Newest release first — the order of the file, which is not re-sorted: versions are
+/// strings here, and sorting them as such would put `0.10` before `0.9`.
 pub fn parse(markdown: &str) -> Vec<ChangelogRelease> {
     let mut releases: Vec<ChangelogRelease> = Vec::new();
-    // A continuation line belongs to the entry above it, and only while one is
-    // still open — a blank line closes it.
+    // A continuation line belongs to the entry above it, and only while one is open.
     let mut item_open = false;
 
     for line in markdown.lines() {
@@ -86,8 +74,6 @@ pub fn parse(markdown: &str) -> Vec<ChangelogRelease> {
     releases
 }
 
-/// The category entries land in, opening an anonymous one if the release lists
-/// them straight under its heading.
 fn section_of(release: &mut ChangelogRelease) -> &mut ChangelogSection {
     if release.sections.is_empty() {
         release.sections.push(ChangelogSection {
@@ -102,8 +88,8 @@ fn section_of(release: &mut ChangelogRelease) -> &mut ChangelogSection {
         .expect("a section was just pushed if there was none")
 }
 
-/// `- entry` or `* entry`, stripped of its marker. `None` for anything else —
-/// a `-` alone included, which carries no entry.
+/// `- entry` or `* entry`, stripped of its marker. `None` for anything else — a `-`
+/// alone included, which carries no entry.
 fn bullet(line: &str) -> Option<&str> {
     line.strip_prefix("- ")
         .or_else(|| line.strip_prefix("* "))
@@ -111,10 +97,8 @@ fn bullet(line: &str) -> Option<&str> {
         .filter(|entry| !entry.is_empty())
 }
 
-/// `[0.1.1] - 2026-08-27` → `("0.1.1", Some("2026-08-27"))`.
-///
-/// The separator is looked for **after** the version so a date is never taken
-/// from a version that carries a dash itself (`1.0.0-rc.1`).
+/// `[0.1.1] - 2026-08-27` → `("0.1.1", Some("2026-08-27"))`. The separator is looked
+/// for **after** the version, so `1.0.0-rc.1` never yields a date.
 fn split_heading(heading: &str) -> (String, Option<String>) {
     let heading = heading.trim();
     let (version, rest) = match heading.strip_prefix('[') {
@@ -195,7 +179,6 @@ Everything above the first release is preamble.
 
     #[test]
     fn gives_an_anonymous_category_to_entries_listed_without_one() {
-        // Without it those entries would have nowhere to go and would vanish.
         let releases = parse(SAMPLE);
 
         assert_eq!(releases[1].version, "0.1.0");
@@ -207,7 +190,6 @@ Everything above the first release is preamble.
 
     #[test]
     fn ignores_what_sits_above_the_first_release() {
-        // A preamble entry adopted by a release would be read as a change.
         let releases = parse("# Changelog\n\n- Read me first.\n\n## 0.1.0\n\n- Shipped.\n");
 
         assert_eq!(releases.len(), 1);

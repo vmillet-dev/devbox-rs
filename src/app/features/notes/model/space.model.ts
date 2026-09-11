@@ -3,8 +3,5 @@ export interface Space {
   readonly name: string;
 }
 
-/**
- * The fields supplied when creating a space. As for the notes, the `id` is
- * assigned by persistence and never by the front.
- */
+/** The `id` is assigned by persistence and never by the front end. */
 export type SpaceDraft = Omit<Space, 'id'>;

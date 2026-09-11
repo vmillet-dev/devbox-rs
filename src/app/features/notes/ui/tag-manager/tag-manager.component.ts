@@ -4,11 +4,8 @@ import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { TagUsage } from '@features/notes/model/note.model';
 
 /**
- * Corpus-wide tag management: tick, then rename, merge or delete.
- *
- * One destination field for both renaming **and** merging: in the database it
- * is the same operation, and two fields would suggest two mechanisms. The
- * button label follows the number of tags ticked.
+ * One destination field for both renaming **and** merging: in the database it is the
+ * same operation, and two fields would suggest two mechanisms.
  */
 @Component({
   selector: 'app-tag-manager',

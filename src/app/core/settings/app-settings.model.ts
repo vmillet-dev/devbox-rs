@@ -1,10 +1,9 @@
 import { DEFAULT_SHORTCUTS } from '@core/shortcuts/shortcut.model';
 
 /**
- * The application's settings, and nothing else: this file imports neither
- * Angular nor Tauri. A preference is stored **per key** rather than as one
- * serialised object, so a setting added later cannot make a file written by the
- * previous version unreadable.
+ * The application's settings, and nothing else: this file imports neither Angular nor
+ * Tauri. A preference is stored **per key** rather than as one serialised object, so a
+ * setting added later cannot make a file written by the previous version unreadable.
  */
 
 /** `system` follows `prefers-color-scheme`, which the WebView gets from the OS. */
@@ -15,8 +14,8 @@ export type ThemeChoice = (typeof THEME_CHOICES)[number];
 export type ResolvedTheme = Exclude<ThemeChoice, 'system'>;
 
 /**
- * `compact` tightens the spacing without touching type sizes: a density that
- * shrank the typography would be a zoom, not a density.
+ * `compact` tightens the spacing without touching type sizes: a density that shrank the
+ * typography would be a zoom, not a density.
  */
 export const DENSITIES = ['comfortable', 'compact'] as const;
 export type Density = (typeof DENSITIES)[number];
@@ -37,10 +36,9 @@ export interface AppSettings {
 }
 
 /**
- * ⚠️ `closeToTray` is `true`: that is what DevBox has always done, and flipping
- * it would quit the application for users who only expected it filed away. The
- * native side carries the same default, for a window closed before the front
- * has started (`desktop::WindowBehavior`).
+ * ⚠️ `closeToTray` is `true`: that is what DevBox has always done, and flipping it would
+ * quit the application for users who only expected it filed away. The native side carries
+ * the same default.
  */
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
@@ -48,17 +46,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   startWithSystem: false,
   minimizeToTray: false,
   closeToTray: true,
-  // Read rather than retyped: the accelerator already lives in two places
-  // (native and front), and a third copy would be one too many.
+  // Read rather than retyped: the accelerator already lives in two places.
   paletteShortcut: DEFAULT_SHORTCUTS.palette,
   showPinnedFirst: true,
   copyConfirmation: true,
 };
 
-/**
- * Derived rather than hand-written: the key **is** the field name, prefixed.
- * `PreferencesService` only adopts legacy `localStorage` values under `devbox.`.
- */
+/** Derived rather than hand-written: the key **is** the field name, prefixed. */
 export const SETTINGS_KEYS = Object.fromEntries(
   Object.keys(DEFAULT_SETTINGS).map((field) => [field, `devbox.${field}`]),
 ) as Readonly<Record<keyof AppSettings, string>>;

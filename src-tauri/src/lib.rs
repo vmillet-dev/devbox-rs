@@ -30,16 +30,13 @@ use notes::{
 use spaces::{create_space, delete_space, list_spaces, rename_space};
 use transfer::{export_notes, export_selection, import_notes, share_notes};
 
-/// Resolved from the manifest and not from the current directory: neither `tauri dev`
-/// nor `cargo run --manifest-path` guarantees which one that is, and a relative path
+/// Resolved from the manifest and not from the current directory: a relative path
 /// used to write the file next to the repository without saying a word.
 const BINDINGS_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../src/app/core/ipc/bindings.ts"
 );
 
-/// Rewrites `bindings.ts` without launching the application.
-///
 /// ⚠️ Not a `#[cfg(test)]`: on Windows the test executable lives in
 /// `target/debug/deps/`, without the `WebView2Loader.dll` that linking `export`
 /// then requires — the test binary no longer starts at all.
@@ -91,8 +88,8 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             set_global_shortcuts,
             set_window_behavior,
         ])
-        // Reachable from no command, so it has to be exported on its own — and
-        // with it the topic it travels on, which neither side then spells twice.
+        // Reachable from no command, so exported on its own — with the topic it
+        // travels on, which neither side then spells twice.
         .typ::<desktop::GlobalAction>()
         .constant("GLOBAL_ACTION_EVENT", desktop::ACTION_EVENT)
 }
@@ -129,17 +126,15 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
 
-            // "Start with Windows". No launch argument: DevBox started by the
-            // system opens as if started by hand, and the "close to tray"
-            // preference is enough to file it away.
+            // "Start with Windows". No launch argument: DevBox started by the system
+            // opens as if started by hand.
             #[cfg(desktop)]
             app.handle().plugin(tauri_plugin_autostart::init(
                 tauri_plugin_autostart::MacosLauncher::LaunchAgent,
                 None,
             ))?;
 
-            // Same. The tray itself is not created here: it waits for its
-            // translated labels to arrive from the front end.
+            // The tray waits for its translated labels to arrive from the front end.
             #[cfg(desktop)]
             desktop::register_shortcuts(app.handle())?;
 
@@ -150,9 +145,8 @@ pub fn run() {
             let connection = db::open(&directory.join(db::DB_FILE_NAME))?;
             app.manage(db::Db::new(connection));
 
-            // Trash retention applies even if nobody opens the panel, and the
-            // sweep collects files an interrupted copy would have left. Neither
-            // is fatal.
+            // Retention applies even if nobody opens the panel, and the sweep collects
+            // files an interrupted copy left behind. Neither is fatal.
             let handle = app.handle().clone();
             let db = handle.state::<db::Db>();
             notes::sweep_trash_at_startup(&handle, &db);
@@ -162,10 +156,9 @@ pub fn run() {
 
             Ok(())
         })
-        // Closing — and, if asked for, minimising — files the window away in the
-        // tray instead of quitting: the application is meant to stay within
-        // reach of a shortcut. Both are preferences, and both are refused when
-        // there is no tray to find the window in (see `desktop`).
+        // Closing — and, if asked for, minimising — files the window into the tray:
+        // both are preferences, and both are refused when there is no tray to find
+        // the window in (see `desktop`).
         .on_window_event(
             // The `_` prefix keeps the mobile build quiet.
             #[allow(clippy::used_underscore_binding)]
@@ -178,8 +171,7 @@ pub fn run() {
                         api.prevent_close();
                         let _ = _window.hide();
                     }
-                    // Tauri emits nothing for "minimised": `Resized` is the only
-                    // way through, and the window has to say where it stands.
+                    // Tauri emits nothing for "minimised": `Resized` is the only way through.
                     tauri::WindowEvent::Resized(_)
                         if desktop::hides_on_minimize(_window.app_handle())
                             && _window.is_minimized().unwrap_or(false) =>

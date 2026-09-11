@@ -175,7 +175,6 @@ describe('SpaceSwitcherComponent', () => {
 
       const input = nameInput() as HTMLInputElement;
       input.value = 'Side project';
-      // Submitting rather than clicking: the Enter key must work too.
       input.form?.dispatchEvent(new Event('submit', { cancelable: true }));
       await fixture.whenStable();
 
@@ -299,7 +298,6 @@ describe('SpaceSwitcherComponent', () => {
     it('offers one options button per space, none for "all spaces"', async () => {
       await open();
 
-      // "All spaces" is a display mode, not a space: it has nothing to rename.
       expect(editTriggers()).toHaveLength(SPACES.length);
       expect(editTriggers()[0].getAttribute('aria-label')).toBe("Options de l'espace Work");
     });
@@ -307,8 +305,6 @@ describe('SpaceSwitcherComponent', () => {
     it('replaces the menu with the edit panel rather than nesting inside it', async () => {
       await edit(0);
 
-      // A text field inside a role="menu" is neither valid ARIA nor navigable
-      // the way options are.
       expect(fixture.debugElement.query(By.css('.space-menu'))).toBeNull();
       expect(renameInput()?.value).toBe('Work');
     });
@@ -342,8 +338,6 @@ describe('SpaceSwitcherComponent', () => {
       await edit(0);
 
       const targets = [...targetSelect()!.options].map((option) => option.value);
-      // A space cannot be its own refuge: the cascade would take the notes back
-      // out one statement after the move.
       expect(targets).toEqual(['personal']);
     });
 
@@ -369,7 +363,6 @@ describe('SpaceSwitcherComponent', () => {
 
       await edit(0);
 
-      // Offering a button that could only fail is worse than explaining why.
       expect(deleteButton()).toBeNull();
       expect(targetSelect()).toBeNull();
       expect(fixture.nativeElement.querySelector('.space-delete-blocked')).not.toBeNull();

@@ -1,38 +1,31 @@
-// Patterns shared between components, so none of them rewrites its own variant
-// of "unstyled button", "card" or "tinted badge". Used through
-// `@use 'mixins' as *;` (resolved by `stylePreprocessorOptions.includePaths` in
-// `angular.json`).
+// Patterns shared between components, used through `@use 'mixins' as *;`.
 //
 // The modal frame is **not** here: backdrop, panel and stacking order belong to
 // `shared/ui/dialog/`, where one component owns them.
 
-// Strips the native rendering of a <button>/<input> used as the base of a
-// custom control (chip, card, search field...).
+// Strips the native rendering of a <button>/<input> used as a custom control.
 @mixin unstyled-control {
   all: unset;
   box-sizing: border-box;
 }
 
-// The "card" surface: background, border, radius. Used by cards, dropdowns,
-// overlay panels, search bars, toolbar buttons...
+// The "card" surface: background, border, radius.
 @mixin surface($bg: var(--bg-2), $radius: 8px, $border-color: var(--line-soft)) {
   background: $bg;
   border: 1px solid $border-color;
   border-radius: $radius;
 }
 
-// The "accent" state (hover, active, selected) shared by chips, tags, menu
-// options and the ghost card: amber border, amber text.
+// The "accent" state (hover, active, selected): amber border, amber text.
 @mixin accent-state($color: var(--amber), $border: var(--amber-dim)) {
   border-color: $border;
   color: $color;
 }
 
-// --- Preferences panel ------------------------------------------------------
+// --- Preferences panel ---
 //
-// Shared, and not written inside `layout/settings-dialog/`: the "Variables"
-// page lives in `features/notes/`, out of reach of a neighbour component's
-// SCSS, and two panels that did not look alike would read as two panels.
+// Shared rather than written inside `layout/settings-dialog/`: the "Variables" page lives
+// in `features/notes/`, out of reach of a neighbour component's SCSS.
 
 // One setting row: label on the left, control on the right.
 @mixin setting-row {
@@ -125,9 +118,8 @@
   color: var(--text-2);
 }
 
-// A tinted "pill" badge (lifecycle badge, language tag): translucent background
-// and solid text in the same hue, from an RGB CSS variable (e.g. `--amber-rgb`)
-// so each colour is not duplicated in hex.
+// A tinted "pill" badge: translucent background and solid text in the same hue, from an
+// RGB CSS variable so no colour is duplicated in hex.
 @mixin tint-badge($rgb-var, $bg-alpha: 0.15, $border-alpha: null) {
   background: rgba(var(#{$rgb-var}), $bg-alpha);
   color: rgb(var(#{$rgb-var}));
@@ -137,14 +129,11 @@
   }
 }
 
-// --- Help dialogs ------------------------------------------------------------
+// --- Help dialogs ---
 //
-// "Nouveautés", "Prise en main" and "Raccourcis clavier" are three views on the
-// same object: a fixed frame, a scrolling middle, one "Fermer" at the bottom.
-// Written here rather than in one of them because a component's SCSS is out of
-// reach of its neighbours, and three panels that do not look alike would read
-// as three unrelated windows. The frame itself is the dialog shell's `framed`
-// variant; what follows is only what fills it.
+// Three views on the same object: a fixed frame, a scrolling middle, one "Fermer" at the
+// bottom. Written here rather than in one of them because a component's SCSS is out of
+// reach of its neighbours.
 
 @mixin help-header {
   padding: 16px 20px 12px;
@@ -209,8 +198,7 @@
   }
 }
 
-// A key cap. Same look as the hint in the search field, which is the only other
-// place a key is drawn.
+// A key cap. Same look as the hint in the search field.
 @mixin key-cap {
   font-family: var(--font-mono), serif;
   background: var(--bg-3);

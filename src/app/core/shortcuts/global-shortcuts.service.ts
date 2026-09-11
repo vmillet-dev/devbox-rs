@@ -5,15 +5,12 @@ import { SettingsStore } from '@core/settings/settings.store';
 import { DEFAULT_SHORTCUTS, ShortcutBindings } from './shortcut.model';
 
 /**
- * The shortcuts active outside the window, and what to say when another
- * application keeps one.
+ * ⚠️ The native side can only fail silently — first come, first served — and a log line is
+ * not an interface: without this message, pressing the key does nothing and nothing says
+ * why.
  *
- * ⚠️ The native side can only fail silently — first come, first served — and a
- * log line is not an interface: without this message, pressing the key does
- * nothing and nothing says why.
- *
- * All three travel together because the native command takes them as a block.
- * Only the palette is settable; the other two stay at their original values.
+ * All three travel together because the native command takes them as a block; only the
+ * palette is settable.
  */
 @Injectable({ providedIn: 'root' })
 export class GlobalShortcutsService {
@@ -24,8 +21,8 @@ export class GlobalShortcutsService {
   /**
    * Pushes the shortcuts now, then on every preference change.
    *
-   * ⚠️ Called from `provideAppInitializer`, so outside a constructor: the
-   * injector is passed explicitly rather than inferred from the caller.
+   * ⚠️ Called from `provideAppInitializer`, so outside a constructor: the injector is
+   * passed explicitly rather than inferred from the caller.
    */
   start(): void {
     effect(
@@ -38,8 +35,7 @@ export class GlobalShortcutsService {
 
   private async apply(bindings: ShortcutBindings): Promise<void> {
     try {
-      // A command with no `Result` on the Rust side: it throws directly when
-      // the bridge is absent, like `sync_tray`.
+      // A command with no `Result` on the Rust side: it throws when the bridge is absent.
       const taken = await commands.setGlobalShortcuts(bindings);
       if (taken.length > 0) {
         this.notifier.notify({

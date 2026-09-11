@@ -31,8 +31,6 @@ const BASE_DTO: NoteDto = {
 
 describe('toNote', () => {
   it('parses ISO date strings into Date instances', () => {
-    // JSON has no date type: without this conversion every downstream
-    // `getTime()` would produce NaN.
     const note = toNote(BASE_DTO);
 
     expect(note.createdAt).toBeInstanceOf(Date);
@@ -62,9 +60,6 @@ describe('toNote', () => {
   });
 
   it('takes the language straight from the wire, with no narrowing left to do', () => {
-    // `language` used to be a free string in Rust, narrowed here at runtime. It
-    // is an enum now, so the generated bindings rule an unknown value out at
-    // compile time — `{ ...BASE_DTO, language: 'rust' }` no longer type-checks.
     const note = toNote({ ...BASE_DTO, language: 'sql' });
 
     expect(note.language).toBe('sql');
@@ -98,14 +93,12 @@ describe('toNote', () => {
     });
 
     it('throws a contract error on a footer variant this build does not know', () => {
-      // A newer backend variant must be reported, not rendered as a blank footer.
       const unknown = { ...BASE_DTO, footer: { kind: 'weather', at: '2026-01-01' } } as unknown as NoteDto;
 
       expect(() => toNote(unknown)).toThrow(ContractError);
     });
 
     it('carries the expiry proximity the backend decided', () => {
-      // The threshold lives in Rust only; the front must not recompute it.
       expect(toNote({ ...BASE_DTO, expiringSoon: true }).expiringSoon).toBe(true);
     });
   });
@@ -152,14 +145,10 @@ describe('toNotePatchDto', () => {
     const dto = toNotePatchDto({ items: outgoing });
     outgoing[0].text = 'Changed afterwards';
 
-    // The patch is the last place these objects are held: nothing downstream
-    // should be able to reach back into the caller's array.
     expect(dto.items).toEqual([{ text: 'Relire', done: true }]);
   });
 
   it('includes only the fields actually present in the patch', () => {
-    // An explicit `undefined` would serialise to null and overwrite the stored
-    // value instead of leaving it untouched.
     const dto = toNotePatchDto({ pinned: true });
 
     expect(dto).toEqual({ pinned: true });
@@ -212,7 +201,6 @@ describe('toTrashedNote', () => {
   });
 
   it('carries only what the panel shows', () => {
-    // Nothing here is decorated: a discarded note is neither opened nor copied.
     const note = toTrashedNote(DTO);
 
     expect(note).toEqual({
@@ -224,8 +212,6 @@ describe('toTrashedNote', () => {
       tags: ['auth'],
       deletedAt: new Date('2026-08-27T08:00:00.000Z'),
       purgeAt: new Date('2026-09-26T08:00:00.000Z'),
-      // The kind is all the panel needs: a discarded todo list shows a label rather
-      // than an empty preview. The items do not travel this far.
       kind: 'snippet',
     });
   });

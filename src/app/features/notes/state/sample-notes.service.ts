@@ -7,15 +7,13 @@ import { NotesRepository } from '../data/notes.repository';
 import { SpacesRepository } from '../data/spaces.repository';
 import { NoteDraft } from '../model/note.model';
 
-/** Written once the samples have been offered, whatever came of it. */
 const SEEDED_KEY = 'devbox.notes.samplesSeeded';
 
 const DEADLINE_DAYS = 7;
 
 /**
- * Bodies that are **code**, and so are not translated — they also could not be:
- * Transloco reads `{{name}}` as an interpolation and would replace a snippet's
- * fields with empty strings on the way out.
+ * Code, so untranslated — and untranslatable: Transloco reads `{{name}}` as an
+ * interpolation and would replace a snippet's fields with empty strings.
  */
 const PSQL_SNIPPET = 'psql -h {{host}} -p {{port=5432}} -U {{user}} -d {{database}}';
 
@@ -27,8 +25,8 @@ increment(): void {
 }`;
 
 /**
- * Keyed by name rather than positional: the whole set is translated in one go,
- * and inserting a key here can no longer shift every sample's text by one.
+ * Keyed by name rather than positional: inserting a key can no longer shift every
+ * sample's text by one.
  */
 const KEYS = {
   spaceName: 'notes.samples.space',
@@ -54,16 +52,10 @@ const KEYS = {
 type SampleTexts = Record<keyof typeof KEYS, string>;
 
 /**
- * The notes a brand-new installation opens on.
- *
- * An empty canvas is the worst possible introduction: a virgin database has no
- * space, so not even a note can be created. These four carry one feature each
- * (pin, `{{fields}}`, checklist, deadline) and are ordinary notes — editing or
- * trashing them is the point.
- *
- * The content comes from the front end because it is user-facing text, which
- * the back end never writes. It also means the samples arrive in the language
- * the application starts in.
+ * An empty canvas is the worst possible introduction, and a virgin database has no
+ * space, so not even a note can be created. These four carry one feature each and
+ * are ordinary notes — editing or trashing them is the point. Their text comes from
+ * the front end, so they arrive in the language the application starts in.
  */
 @Injectable({ providedIn: 'root' })
 export class SampleNotesService {
@@ -74,29 +66,24 @@ export class SampleNotesService {
   private readonly clock = inject(ClockService);
 
   /**
-   * Files the samples on a fresh installation, and says whether it did — the
-   * caller reloads its stores on a `true`.
-   *
-   * Two guards, not one. The marker alone would re-seed anyone whose
-   * preferences file went missing; "no space at all" alone would re-seed the
-   * day the last space disappears. Together they only ever match a database
-   * that has never been written to.
+   * Two guards, not one: the marker alone would re-seed anyone whose preferences
+   * file went missing, "no space at all" alone the day the last space disappears.
+   * Together they only ever match a database that has never been written to.
    */
   async seedIfFirstRun(): Promise<boolean> {
     if (this.preferences.read(SEEDED_KEY) !== null) return false;
 
     try {
       if ((await this.spaces.loadAll()).length > 0) {
-        // An installation that predates the samples: nothing to offer, and
-        // nothing to come back and check on every launch either.
+        // An installation that predates the samples: nothing to offer, and nothing
+        // to come back and check on every launch.
         this.preferences.write(SEEDED_KEY, 'skipped');
         return false;
       }
 
       return await this.seed();
     } catch {
-      // No bridge (jsdom), or a database that will not open: the canvas reports
-      // its own failure, and a second banner would only add noise.
+      // No bridge (jsdom), or a database that will not open: the canvas reports it.
       return false;
     }
   }
@@ -112,8 +99,8 @@ export class SampleNotesService {
     const text = await this.texts();
 
     const space = await this.spaces.create({ name: text.spaceName });
-    // Written before the notes: a failure halfway through leaves an incomplete
-    // set, which is still better than a second full set on the next launch.
+    // Written before the notes: a failure halfway through leaves an incomplete set
+    // rather than a second full one on the next launch.
     this.preferences.write(SEEDED_KEY, 'true');
 
     const drafts: NoteDraft[] = [
@@ -124,8 +111,7 @@ export class SampleNotesService {
         content: text.welcomeContent,
         source: text.welcomeSource,
         tags: [text.devboxTag],
-        // Pinned so the "pinned" section is not an empty heading on the first
-        // screen.
+        // Pinned so the "pinned" section is not an empty heading on the first screen.
         pinned: true,
         lifecycle: { kind: 'permanent' },
         kind: 'snippet',
@@ -169,16 +155,15 @@ export class SampleNotesService {
         source: text.codeSource,
         tags: [text.angularTag, text.exampleTag],
         pinned: false,
-        // The one sample with a deadline: it is what puts a note in the untriaged
-        // lights the ⏳ badge and gives the quick filter something to find.
+        // The one sample with a deadline: it lights the ⏳ badge and gives the quick
+        // filter something to find.
         lifecycle: { kind: 'expires', at: this.deadline() },
         kind: 'snippet',
         items: [],
       },
     ];
 
-    // Sequential on purpose: `created_at` orders the canvas, and parallel
-    // writes would land in whatever order the bridge answered in.
+    // Sequential on purpose: `created_at` orders the canvas.
     for (const draft of drafts) {
       await this.notes.create(draft);
     }
@@ -187,8 +172,8 @@ export class SampleNotesService {
   }
 
   /**
-   * End of the local day, like the editor's date field: midnight would make a
-   * note dated today expired on the spot.
+   * End of the local day, like the editor's date field: midnight would make a note
+   * dated today expired on the spot.
    */
   private deadline(): Date {
     const at = new Date(this.clock.now());

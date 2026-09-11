@@ -1,15 +1,12 @@
 import { Directive, ElementRef, inject, output, signal } from '@angular/core';
 
 /**
- * A dropdown's open/closed state, and the two ways out of it without clicking
- * an entry: a click outside and Escape.
+ * A dropdown's open/closed state, and the two ways out of it without clicking an entry: a
+ * click outside and Escape. The trigger is named by `[appMenuAnchor]` — focus returns to
+ * it on close, which it would otherwise lose to `<body>`.
  *
- * Placed on the component's root element and read through `exportAs`. The
- * trigger is named by `[appMenuAnchor]` — focus returns to it on close, which
- * it would otherwise lose to `<body>` along with the destroyed element.
- *
- * Escape is emitted rather than handled here: a multi-level menu must be able
- * to fold its panel before closing (see `SpaceSwitcher`).
+ * Escape is emitted rather than handled here: a multi-level menu must be able to fold its
+ * panel before closing (see `SpaceSwitcher`).
  */
 @Directive({
   selector: '[appMenuTrigger]',
@@ -38,10 +35,7 @@ export class MenuTriggerDirective {
     this._open.set(true);
   }
 
-  /**
-   * `restoreFocus` is left `false` when closing opens something else that will
-   * take focus — the "About" card, say.
-   */
+  /** Left `false` when closing opens something else that will take focus. */
   close(restoreFocus = true): void {
     if (!this._open()) return;
 
@@ -52,7 +46,6 @@ export class MenuTriggerDirective {
     }
   }
 
-  /** Returns focus to the trigger, the only landmark still on screen. */
   focusAnchor(): void {
     this.host.nativeElement.querySelector<HTMLElement>('[appMenuAnchor]')?.focus();
   }

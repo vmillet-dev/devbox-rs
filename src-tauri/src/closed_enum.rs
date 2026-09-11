@@ -1,12 +1,6 @@
-//! A closed set of values that crosses the bridge as a TypeScript union.
-
-/// Declares such an enum together with everything one needs here: its `ALL`
-/// array, its stored spelling, `Display` and `FromStr`.
-///
-/// Written by hand, one variant means four edits — five counting the length in
-/// `ALL: [Self; 13]`, which is part of the type. The literal given per variant
-/// is the **single** spelling: serde, the database column, `Display` and
-/// `FromStr` all read it, so they cannot drift apart.
+/// One list gives the enum, its `ALL` array, its stored spelling, `Display` and
+/// `FromStr`. The literal per variant is the **single** spelling: serde, the
+/// database column, `Display` and `FromStr` all read it, so they cannot drift.
 macro_rules! closed_enum {
     (
         $(#[$meta:meta])*
@@ -54,9 +48,8 @@ macro_rules! closed_enum {
             }
         }
 
-        /// The column carries no `CHECK`: a database written by a newer version
-        /// may hold a value this one has never heard of, and the caller decides
-        /// whether to fall back.
+        /// The column carries no `CHECK`: a database written by a newer version may
+        /// hold a value this one never heard of, and the caller decides to fall back.
         impl std::str::FromStr for $name {
             type Err = ();
 

@@ -13,7 +13,6 @@ describe('checklistProgress', () => {
   });
 
   it('reads an empty list as nothing done rather than everything done', () => {
-    // Dividing by zero would show a full bar on a list holding no task at all.
     expect(checklistProgress([])).toEqual({ done: 0, total: 0, percent: 0 });
   });
 
@@ -22,16 +21,12 @@ describe('checklistProgress', () => {
   });
 });
 
-// The Markdown itself is `notes::checklist::to_markdown`'s and is tested there;
-// what is left here is the choice between the two texts a note can carry.
 describe('noteCopyText', () => {
   it('copies the body of an ordinary note', () => {
     expect(noteCopyText({ content: 'select 1', copyText: null })).toBe('select 1');
   });
 
   it('copies the rendered list of a checklist, which has no body', () => {
-    // Without this the card and the palette would put an empty string on the
-    // clipboard.
     expect(noteCopyText({ content: '', copyText: '- [ ] Relire' })).toBe('- [ ] Relire');
   });
 });

@@ -3,9 +3,8 @@ import { exit } from '@tauri-apps/plugin-process';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 /**
- * What the front asks of the native window. A token, as for the clipboard:
- * under jsdom there is no bridge, and a spec really calling `exit()` would take
- * the test runner down.
+ * A token, as for the clipboard: under jsdom there is no bridge, and a spec really calling
+ * `exit()` would take the test runner down.
  */
 export interface AppWindowAdapter {
   hide(): Promise<void>;
@@ -21,11 +20,9 @@ export const APP_WINDOW_ADAPTER = new InjectionToken<AppWindowAdapter>('APP_WIND
 });
 
 /**
- * Hiding the window and quitting the application.
- *
- * The two are distinct and stay so: the window's close button **hides**
- * (`lib.rs` intercepts `CloseRequested` while there is a tray), and `quit` is
- * the only path that actually ends the process.
+ * The two are distinct and stay so: the window's close button **hides** (`lib.rs`
+ * intercepts `CloseRequested` while there is a tray), and `quit` is the only path that
+ * actually ends the process.
  */
 @Injectable({ providedIn: 'root' })
 export class AppWindowService {

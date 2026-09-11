@@ -10,8 +10,6 @@ import { SpacesStore } from './spaces.store';
 
 export type { NoteFilter } from '../model/note.model';
 
-// Re-exported so the search delay and the store that uses it stay one import
-// away from each other.
 export { SEARCH_DEBOUNCE_MS };
 
 /** The **local** day: a new query only on a day change. */
@@ -35,9 +33,8 @@ function sameStrings(a: readonly string[], b: readonly string[]): boolean {
 }
 
 /**
- * ⚠️ `resource` compares its params by identity: without this comparator, the
- * fresh literal `queryParams` builds on every clock tick would fire a full
- * query every 30 s, hidden behind the retained view.
+ * ⚠️ `resource` compares its params by identity: without this comparator, the fresh
+ * literal `queryParams` builds on every clock tick fires a full query every 30 s.
  */
 function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
   return (
@@ -51,7 +48,6 @@ function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
   );
 }
 
-/** A fresh set, never mutated. */
 function toggled<T>(selection: ReadonlySet<T>, value: T): ReadonlySet<T> {
   const next = new Set(selection);
   if (!next.delete(value)) {
@@ -61,12 +57,9 @@ function toggled<T>(selection: ReadonlySet<T>, value: T): ReadonlySet<T> {
 }
 
 /**
- * What the canvas shows: the question asked of the back end, and the answer.
- *
- * It filters, sorts and groups nothing — `query_notes` returns a ready-to-render
- * `NotesView` and this store displays it. Everything here is about *which*
- * notes, never about their contents: writing one is [`NotesStore`]'s business,
- * and pointing at one is [`NoteSelectionStore`]'s.
+ * It filters, sorts and groups nothing: `query_notes` returns a ready-to-render
+ * `NotesView` and this store displays it. Everything here is about *which* notes —
+ * writing one is [`NotesStore`]'s business, pointing at one [`NoteSelectionStore`]'s.
  */
 @Injectable({ providedIn: 'root' })
 export class NotesQueryStore {
@@ -93,9 +86,8 @@ export class NotesQueryStore {
   );
 
   /**
-   * What triggers a query. The exact instant is not part of it: only the **day**
-   * matters for the section split. The `equal` comparator is load-bearing, see
-   * `sameQueryParams`.
+   * Only the **day** matters for the section split, not the exact instant. The
+   * `equal` comparator is load-bearing, see `sameQueryParams`.
    */
   private readonly queryParams = computed<QueryParams>(
     () => ({
@@ -113,8 +105,7 @@ export class NotesQueryStore {
   private readonly viewResource = resource({
     params: () => this.queryParams(),
     loader: ({ params }): Promise<NotesView> => {
-      // Deliberately untracked: we want the current instant without the query
-      // re-running on every tick (see `queryParams`).
+      // Untracked: the current instant, without the query re-running on every tick.
       const now = untracked(() => this.clock.now());
       const query: NotesQuery = {
         spaceId: params.spaceId,
@@ -124,8 +115,7 @@ export class NotesQueryStore {
         languages: params.languages,
         now,
         tzOffsetMinutes: now.getTimezoneOffset(),
-        // Always true on the canvas: pinning is what keeps a note within reach
-        // there, and what makes the top section.
+        // Always true on the canvas: pinning is what keeps a note within reach there.
         pinnedFirst: true,
       };
       return this.repository.query(query);
@@ -133,12 +123,10 @@ export class NotesQueryStore {
   });
 
   /**
-   * The last view obtained, kept during reloads: without it every keystroke
-   * would blank the canvas.
+   * Kept during reloads, or every keystroke would blank the canvas.
    *
-   * ⚠️ A `linkedSignal` only retains what it has **seen go past**, its value
-   * being recomputed on read. Everything this store exposes therefore reads
-   * `view()`, with no short-circuit (see `isLoading`).
+   * ⚠️ A `linkedSignal` only retains what it has **seen go past**: everything this
+   * store exposes therefore reads `view()`, with no short-circuit (see `isLoading`).
    */
   private readonly view = linkedSignal<NotesView | undefined, NotesView | null>({
     source: () => (this.viewResource.hasValue() ? this.viewResource.value() : undefined),
@@ -150,18 +138,14 @@ export class NotesQueryStore {
   readonly allLanguages = computed<readonly LanguageTag[]>(() => this.view()?.availableLanguages ?? []);
   readonly isFiltering = computed(() => this.view()?.isFiltering ?? false);
 
-  /** A search is running but found nothing: the UI has to say so. */
   readonly hasNoResults = computed(() => {
     const view = this.view();
     return view !== null && view.isFiltering && view.matched === 0;
   });
 
   /**
-   * True only while no view has ever been obtained.
-   *
-   * ⚠️ `view()` is read **before** the resource state: an `&&` the other way
-   * round would short-circuit past the read once loading finishes, and the
-   * freshly loaded view would never be retained.
+   * ⚠️ `view()` is read **before** the resource state: an `&&` the other way round
+   * would short-circuit past the read, dropping the freshly loaded view.
    */
   readonly isLoading = computed(() => {
     const hasView = this.view() !== null;
@@ -170,10 +154,8 @@ export class NotesQueryStore {
 
   readonly loadError: Signal<Error | undefined> = this.viewResource.error;
 
-  /**
-   * The displayed notes, flat and **in section order**: what keyboard
-   * navigation follows, and what a range selection spans.
-   */
+  /** Flat and **in section order**: what keyboard navigation follows, and what a
+   * range selection spans. */
   readonly visibleNotes = computed<readonly Note[]>(() =>
     this.sections().flatMap((section) => [...section.notes]),
   );
@@ -200,7 +182,6 @@ export class NotesQueryStore {
     this._selectedLanguages.update((languages) => toggled(languages, language));
   }
 
-  /** The note under that id **as the canvas currently shows it**, or `null`. */
   findVisible(id: string): Note | null {
     for (const section of this.sections()) {
       const found = section.notes.find((note) => note.id === id);

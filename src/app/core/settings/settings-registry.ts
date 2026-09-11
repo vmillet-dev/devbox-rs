@@ -2,12 +2,8 @@ import { Injectable, Type } from '@angular/core';
 import { Contribution, ContributionRegistry } from '@core/contributions/contribution.registry';
 
 /**
- * A page of the preferences panel, contributed by the feature that knows what
- * it holds.
- *
- * `component` is rendered through `NgComponentOutlet`: the panel shows a page
- * it knows nothing about, exactly as the "File" menu runs an action it knows
- * nothing about.
+ * `component` is rendered through `NgComponentOutlet`: the panel shows a page it knows
+ * nothing about, exactly as the "File" menu runs an action it knows nothing about.
  */
 export interface SettingsPage extends Contribution {
   readonly labelKey: string;

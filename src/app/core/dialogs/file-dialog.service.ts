@@ -3,9 +3,8 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import type { OpenDialogOptions, SaveDialogOptions } from '@tauri-apps/plugin-dialog';
 
 /**
- * What this service needs from the plugin. A token rather than a direct call,
- * for the same practical reason as `CLIPBOARD_ADAPTER`: the Angular builder
- * bundles the modules before Vitest sees them.
+ * A token rather than a direct call, for the same practical reason as `CLIPBOARD_ADAPTER`:
+ * the Angular builder bundles the modules before Vitest sees them.
  */
 export interface FileDialogAdapter {
   open(options: OpenDialogOptions): Promise<string | string[] | null>;
@@ -21,11 +20,9 @@ export const FILE_DIALOG_ADAPTER = new InjectionToken<FileDialogAdapter>('FILE_D
 const BUNDLE_FILTER = { name: 'DevBox', extensions: ['json'] };
 
 /**
- * The native file picker.
- *
- * `null` covers both a cancellation and the plugin being unavailable (outside
- * Tauri it throws): either way the caller has nothing to open, and an exception
- * would force it to tell two non-choices apart.
+ * `null` covers both a cancellation and the plugin being unavailable (outside Tauri it
+ * throws): either way the caller has nothing to open, and an exception would force it to
+ * tell two non-choices apart.
  */
 @Injectable({ providedIn: 'root' })
 export class FileDialogService {
@@ -43,10 +40,7 @@ export class FileDialogService {
     return this.destination({ defaultPath, filters: [BUNDLE_FILTER] });
   }
 
-  /**
-   * No filter: an attachment can be of any type, and imposing one would rename
-   * the file the user wants back as it is.
-   */
+  /** No filter: an attachment can be of any type. */
   async chooseDestination(defaultPath: string): Promise<string | null> {
     return this.destination({ defaultPath });
   }
@@ -60,8 +54,8 @@ export class FileDialogService {
   }
 
   /**
-   * `multiple: false` is asked of the plugin, but its return type stays a
-   * union: the array is ruled out here so callers handle one path only.
+   * `multiple: false` is asked of the plugin, but its return type stays a union: the
+   * array is ruled out here so callers handle one path only.
    */
   private async pick(options: OpenDialogOptions): Promise<string | null> {
     try {

@@ -3,12 +3,9 @@ import { Note } from '../model/note.model';
 import { NotesQueryStore } from './notes-query.store';
 
 /**
- * What the canvas is pointing at: the note the keyboard is on, and the ones
- * ticked for a bulk action.
- *
- * Both are **positions in the visible list**, which is why they live together
- * and next to it: a range selection spans from the focused note to the clicked
- * one, and neither survives a note leaving the view.
+ * Both are **positions in the visible list**, which is why they live together and
+ * next to it: a range selection spans from the focused note to the clicked one, and
+ * neither survives a note leaving the view.
  */
 @Injectable({ providedIn: 'root' })
 export class NoteSelectionStore {
@@ -21,8 +18,8 @@ export class NoteSelectionStore {
   readonly checkedIds = this._checkedIds.asReadonly();
 
   /**
-   * Derived from what is visible, never read raw: an id ticked then gone (note
-   * deleted, filter narrowed) must not travel into a bulk action.
+   * Derived from what is visible, never read raw: an id ticked then gone must not
+   * travel into a bulk action.
    */
   readonly checkedNotes = computed<readonly Note[]>(() => {
     const checked = this._checkedIds();
@@ -39,7 +36,6 @@ export class NoteSelectionStore {
     this._focusedNoteId.set(id);
   }
 
-  /** Index of the focused note in the visible list, or `-1`. */
   focusedIndex(): number {
     const focused = this._focusedNoteId();
     return focused === null ? -1 : this.notes.visibleNotes().findIndex((note) => note.id === focused);
@@ -51,8 +47,8 @@ export class NoteSelectionStore {
   }
 
   /**
-   * Focuses by position rather than by id: navigation reasons in indices, the
-   * only landmark that survives a renamed note.
+   * By position rather than by id: navigation reasons in indices, the only landmark
+   * that survives a renamed note.
    */
   focusIndex(index: number): void {
     const note = this.notes.visibleNotes()[index];
@@ -71,10 +67,7 @@ export class NoteSelectionStore {
     });
   }
 
-  /**
-   * Ticks everything between the focused note and `id` — a file list's
-   * Shift+click. With no anchor, this ticks the named note alone.
-   */
+  /** A file list's Shift+click. With no anchor, this ticks the named note alone. */
   checkRangeTo(id: string): void {
     const visible = this.notes.visibleNotes();
     const anchor = this.focusedIndex();

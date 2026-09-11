@@ -36,7 +36,6 @@ describe('TitlebarComponent', () => {
   });
 
   it('exposes the active locale as a pressed toggle with a spelled-out name', () => {
-    // "FR" alone is an abbreviation a screen reader spells out letter by letter.
     expect(localeOptions().map((option) => option.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
     expect(localeOptions()[0].getAttribute('aria-label')).toBe('Français');
   });

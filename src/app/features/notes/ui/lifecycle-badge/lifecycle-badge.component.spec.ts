@@ -49,8 +49,6 @@ describe('LifecycleBadgeComponent', () => {
   });
 
   it('is marked stale when the backend reports the expiry as near', async () => {
-    // The threshold itself lives in Rust (`domain::display`): a second copy here
-    // could drift from the one driving the section hint.
     fixture.componentRef.setInput('lifecycle', { kind: 'expires', at: new Date('2026-01-02T00:00:00Z') });
     fixture.componentRef.setInput('expiringSoon', true);
     await fixture.whenStable();

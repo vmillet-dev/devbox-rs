@@ -87,8 +87,6 @@ describe('NoteSectionComponent', () => {
   });
 
   it('forwards the remaining card events untouched, deciding nothing itself', async () => {
-    // The section is a pass-through: it owns the heading and the grid, and the
-    // page is what turns each of these into a store call.
     fixture.componentRef.setInput('section', createSection('today', [createNote({ id: 'a' })]));
     await fixture.whenStable();
     const emitted: unknown[] = [];

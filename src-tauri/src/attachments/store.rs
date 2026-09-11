@@ -1,6 +1,3 @@
-//! Attachment records: SQL only. The files are written by `super`, the only
-//! place that knows the application directory.
-
 use std::collections::HashMap;
 
 use diesel::prelude::*;
@@ -119,8 +116,7 @@ pub fn delete(connection: &mut SqliteConnection, id: &str) -> Result<(), Storage
     Ok(())
 }
 
-/// The files of the named notes, to be collected **before** a purge: the
-/// cascade takes the records, never what is on the disk.
+/// Collected **before** a purge: the cascade takes the records, never the files.
 pub fn stored_names_of(
     connection: &mut SqliteConnection,
     note_ids: &[String],
@@ -138,7 +134,6 @@ pub fn stored_names_of(
         .collect())
 }
 
-/// What the database knows, to compare against the directory during a sweep.
 pub fn all_stored_names(connection: &mut SqliteConnection) -> Result<Vec<String>, StorageError> {
     Ok(attachments::table
         .select((attachments::id, attachments::file_name))
@@ -148,7 +143,6 @@ pub fn all_stored_names(connection: &mut SqliteConnection) -> Result<Vec<String>
         .collect())
 }
 
-/// Attachment count per note, for the card badge.
 pub fn counts(connection: &mut SqliteConnection) -> Result<HashMap<String, u32>, StorageError> {
     let rows = attachments::table
         .group_by(attachments::note_id)
@@ -232,7 +226,6 @@ mod tests {
         let note_id = note(&mut connection);
         create(&mut connection, &sample("a-1", &note_id)).unwrap();
 
-        // The files are collected first: the cascade says nothing afterwards.
         let files = stored_names_of(&mut connection, std::slice::from_ref(&note_id)).unwrap();
         crate::notes::store::delete(&mut connection, &note_id, Utc::now()).unwrap();
         crate::notes::store::purge(&mut connection, std::slice::from_ref(&note_id)).unwrap();

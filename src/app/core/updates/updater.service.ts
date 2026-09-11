@@ -2,14 +2,12 @@ import { Injectable } from '@angular/core';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { Update, check } from '@tauri-apps/plugin-updater';
 
-/** An offered update, reduced to what the interface has to display. */
 export interface AvailableUpdate {
   readonly version: string;
   readonly currentVersion: string;
   /**
-   * Release notes as published in the manifest. Explicitly `| undefined`:
-   * the plugin may omit them, and `exactOptionalPropertyTypes` tells an absent
-   * key from a present-but-undefined one.
+   * Explicitly `| undefined`: the plugin may omit them, and `exactOptionalPropertyTypes`
+   * tells an absent key from a present-but-undefined one.
    */
   readonly notes?: string | undefined;
 }
@@ -18,15 +16,13 @@ export interface AvailableUpdate {
 export type DownloadProgress = number | null;
 
 /**
- * The only way through to the updater plugin.
+ * The only way through to the updater plugin: no component or store imports
+ * `@tauri-apps/plugin-updater` directly, which is what makes the store testable by
+ * doubling this class.
  *
- * `bindings.ts` covers the commands we write; these belong to the plugin, so
- * no component or store imports `@tauri-apps/plugin-updater` directly — which
- * is what makes the store testable by doubling this class.
- *
- * ⚠️ The `Update` the plugin returns is a **native resource**: it holds an
- * identifier on the Rust side and must be closed when it is not installed. It
- * is kept here rather than handed to the store, which would only leak it.
+ * ⚠️ The `Update` the plugin returns is a **native resource**: it holds an identifier on
+ * the Rust side and must be closed when it is not installed. It is kept here rather than
+ * handed to the store, which would only leak it.
  */
 @Injectable({ providedIn: 'root' })
 export class UpdaterService {
@@ -48,9 +44,8 @@ export class UpdaterService {
   }
 
   /**
-   * Downloads then installs the update held by the last `check()`. On Windows
-   * the installer stops the application itself, so nothing after this call is
-   * guaranteed to run.
+   * Downloads then installs the update held by the last `check()`. On Windows the
+   * installer stops the application itself, so nothing after this call is guaranteed.
    */
   async install(onProgress: (progress: DownloadProgress) => void): Promise<void> {
     const update = this.pending;
@@ -62,8 +57,7 @@ export class UpdaterService {
     await update.downloadAndInstall((event) => {
       switch (event.event) {
         case 'Started':
-          // Absent when the server does not announce it: the bar stays
-          // indeterminate rather than showing a made-up percentage.
+          // Absent when the server does not announce it: the bar stays indeterminate.
           total = event.data.contentLength ?? null;
           onProgress(null);
           break;

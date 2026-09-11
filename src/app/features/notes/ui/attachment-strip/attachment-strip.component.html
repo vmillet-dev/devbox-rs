@@ -3,8 +3,7 @@
 
   @for (attachment of attachments(); track attachment.id) {
     <span class="strip-item" [class.previewing]="previewId() === attachment.id">
-      <!-- Open with the default application: what makes a PDF or an archive
-           usable, where the preview can only show images. -->
+      <!-- Open with the default application: what makes a PDF or an archive usable. -->
       <button
         type="button"
         class="strip-name"
@@ -61,16 +60,14 @@
 @if (previewed(); as attachment) {
   <div class="strip-preview">
     @if (previewData(); as data) {
-      <!-- A <button> around the image rather than a `(click)` on it: the
-           lightbox must be reachable by keyboard as well as by mouse. -->
+      <!-- A <button> around the image: the lightbox must be reachable by keyboard. -->
       <button
         type="button"
         class="strip-preview-zoom"
         [attr.aria-label]="'attachments.zoom' | transloco: { name: attachment.fileName }"
         (click)="zoomRequested.emit()"
       >
-        <!-- A `data:` URI and not a file path: the WebView's CSP only allows
-             `img-src 'self' data:`. -->
+        <!-- A `data:` URI and not a file path: the CSP only allows `img-src 'self' data:`. -->
         <img
           class="strip-preview-image"
           [src]="data"

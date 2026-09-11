@@ -1,13 +1,6 @@
 /**
- * The vocabulary of todo-list notes.
- *
- * The functions are pure and inject nothing: they present data the front
- * already holds. The same deliberate exception as relative-time formatting — an
- * IPC round trip to count an array received with the note would be absurd.
- *
- * Both types are plain aliases of the **generated** unions, like `LanguageTag`:
- * an `import type` is erased at compile time, and the value boundary
- * (`commands`) stays in `data/`.
+ * Plain aliases of the **generated** unions, like `LanguageTag`: an `import type` is
+ * erased at compile time, and the value boundary (`commands`) stays in `data/`.
  */
 import type { ChecklistItem, NoteKind } from '@core/ipc/bindings';
 
@@ -28,12 +21,9 @@ export function checklistProgress(items: readonly ChecklistItem[]): ChecklistPro
 }
 
 /**
- * What a note puts on the clipboard.
- *
  * A todo list's Markdown is **not** rendered here: `copyText` carries what
- * `notes::checklist::to_markdown` produced, which is also what sharing and
- * exporting emit. The front end used to hold a second copy of the `- [x] `
- * syntax, and one of the two was going to drift.
+ * `notes::checklist::to_markdown` produced, which is also what sharing and exporting
+ * emit. The front end used to hold a second copy of the `- [x] ` syntax.
  */
 export function noteCopyText(note: { readonly content: string; readonly copyText: string | null }): string {
   return note.copyText ?? note.content;

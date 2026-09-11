@@ -12,7 +12,7 @@ describe('GlobalShortcutsService', () => {
   let service: GlobalShortcutsService;
   let settings: SettingsStore;
 
-  /** Combinaisons du dernier appel. */
+  /** Combinations of the last call. */
   function lastBindings() {
     return setGlobalShortcuts.mock.calls.at(-1)![0];
   }
@@ -47,8 +47,6 @@ describe('GlobalShortcutsService', () => {
   });
 
   it('says which combinations another application already holds', async () => {
-    // The native side can only fail silently: without this message, pressing the
-    // touche ne fait rien et rien ne dit pourquoi.
     setGlobalShortcuts.mockResolvedValue(['Ctrl+Alt+P']);
     service.start();
     TestBed.tick();
@@ -69,7 +67,6 @@ describe('GlobalShortcutsService', () => {
   });
 
   it('stays silent when there is no bridge to talk to', async () => {
-    // Outside Tauri (jsdom): there is no global shortcut to take.
     setGlobalShortcuts.mockRejectedValue(new Error('no bridge'));
 
     expect(() => service.start()).not.toThrow();

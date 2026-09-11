@@ -30,11 +30,11 @@
             }
           </h3>
 
-          <!-- Tracked by position: two categories of a release may legitimately carry
-               the same heading, and so may two identical entries. -->
+          <!-- Tracked by position: two categories of a release may legitimately carry the
+               same heading. -->
           @for (section of release.sections; track $index) {
-            <!-- A release may list its entries with no category of its own:
-                 the heading is then dropped rather than rendered empty. -->
+            <!-- A release may list its entries with no category: the heading is then
+                 dropped rather than rendered empty. -->
             @if (section.title) {
               <h4 class="news-section-title">{{ section.title }}</h4>
             }
@@ -50,8 +50,8 @@
   </div>
 
   <div class="news-actions">
-    <!-- A <button> and not an <a>: the `opener` plugin acts, the WebView does
-         not navigate. An href would give a dead link. -->
+    <!-- A <button> and not an <a>: the `opener` plugin acts, the WebView does not
+         navigate. -->
     <button type="button" class="news-link" (click)="openReleases()">
       {{ releasesLabel }}
       <span aria-hidden="true">↗</span>

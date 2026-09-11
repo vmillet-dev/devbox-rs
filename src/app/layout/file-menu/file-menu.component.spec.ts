@@ -50,8 +50,6 @@ describe('FileMenuComponent', () => {
   });
 
   it('always offers the preferences and quitting, even with no feature loaded', async () => {
-    // Both act on the application itself: they do not go through the registry, and
-    // an unloaded tool does not make them disappear.
     await openMenu();
 
     expect(options().map((option) => option.textContent?.trim())).toEqual(['Préférences…', 'Quitter DevBox']);
@@ -83,8 +81,6 @@ describe('FileMenuComponent', () => {
   });
 
   it('runs the entry and closes, the report showing elsewhere', async () => {
-    // A native file picker covers the menu: reopening it to read the result would
-    // be absurd, hence the banner under the titlebar.
     let ran = 0;
     registry.register([{ id: 'a', labelKey: 'file.import', order: 10, run: () => (ran += 1) }]);
     await openMenu();

@@ -27,7 +27,6 @@
   color: var(--amber);
 }
 
-// Toolbar variant, aligned on the editor's `.toolbar-btn`.
 .copy-btn.with-label {
   @include surface(var(--bg-2), 7px);
   padding: 5px 10px;

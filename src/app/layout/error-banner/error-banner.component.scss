@@ -1,8 +1,7 @@
 @use 'mixins' as *;
 
-// The same rung as the success banner, for a stronger reason still: "could not
-// save the note" happens precisely while the editor is open, and so behind its
-// blurred backdrop without this z-index.
+// The same rung as the success banner: "could not save the note" happens precisely while
+// the editor is open, and so behind its blurred backdrop without this z-index.
 :host {
   position: relative;
   z-index: 80;

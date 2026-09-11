@@ -10,18 +10,14 @@ import { ShortcutsDialogComponent } from '@layout/shortcuts-dialog/shortcuts-dia
 import { WhatsNewDialogComponent } from '@layout/whats-new-dialog/whats-new-dialog.component';
 
 /**
- * What the menu can put on screen. One signal rather than one flag per panel:
- * they share a backdrop rung and only ever appear one at a time, and four
- * booleans would allow a state where two of them are stacked.
+ * One signal rather than one flag per panel: they share a backdrop rung and only ever
+ * appear one at a time, where four booleans would allow a state with two stacked.
  */
 export type AboutPanel = 'whatsNew' | 'gettingStarted' | 'shortcuts' | 'about';
 
 /**
- * The titlebar's "À propos" menu: check for an update, the three help panels,
- * and the card itself.
- *
- * The update check reports **in place** — that is the whole point of a manual
- * check next to the silent one at startup.
+ * The update check reports **in place** — that is the whole point of a manual check next
+ * to the silent one at startup.
  */
 @Component({
   selector: 'app-about-menu',
@@ -51,9 +47,8 @@ export class AboutMenuComponent {
   protected readonly checking = computed(() => this.store.checkState() === 'checking');
 
   /**
-   * `null` when the menu has nothing to announce. Exhaustive rather than
-   * defaulted: a state added to `CheckState` must break the build here, not
-   * silently announce nothing.
+   * `null` when the menu has nothing to announce. Exhaustive rather than defaulted: a
+   * state added to `CheckState` must break the build here.
    */
   protected readonly checkStatusRef = computed<TranslationRef | null>(() => {
     switch (this.store.checkState()) {
@@ -80,9 +75,8 @@ export class AboutMenuComponent {
   }
 
   /**
-   * The modal's focus trap would hand back to the element active when it
-   * opened — the menu entry, destroyed since. Focus therefore returns to the
-   * trigger, the only landmark still on screen.
+   * The modal's focus trap would hand back to the menu entry, destroyed since: focus
+   * returns to the trigger, the only landmark still on screen.
    */
   protected closePanel(): void {
     this.panel.set(null);

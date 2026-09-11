@@ -14,7 +14,6 @@ import {
 /** What the WebView gets from the OS; absent outside a browser (jsdom has an inert one). */
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
-/** A setting read back the way it is written: `preferences.json` holds strings. */
 interface SettingCodec<T> {
   /** `null` rejects the stored value, and the setting keeps its default. */
   parse(stored: string): T | null;
@@ -39,21 +38,15 @@ function asOneOf<T extends string>(values: readonly T[]): SettingCodec<T> {
   };
 }
 
-/** A readable signal that also knows how to persist what it is given. */
 export type SettingSignal<T> = Signal<T> & { write(value: T): void };
 
 /**
- * The application's settings: the source of truth for the interface, backed by
- * `PreferencesService` — so by a real file, which survives a WebView wipe.
- *
- * **Writes apply immediately.** No "OK / Cancel": it is already the idiom here
- * (the editor saves on blur, the language picker switches on click), and a
+ * **Writes apply immediately.** No "OK / Cancel": it is already the idiom here, and a
  * theme you only see after confirming is guessed at rather than chosen.
  *
- * This store talks to nobody: the native services *read* these signals and push
- * to Rust (`GlobalShortcutsService`, `WindowBehaviorService`, `AutostartService`).
- * The other way round would put IPC in a preferences store, which has to stay
- * readable outside Tauri.
+ * This store talks to nobody: the native services *read* these signals and push to Rust.
+ * The other way round would put IPC in a preferences store, which has to stay readable
+ * outside Tauri.
  */
 @Injectable({ providedIn: 'root' })
 export class SettingsStore {
@@ -77,7 +70,6 @@ export class SettingsStore {
   /** What the OS asks for, followed live: a "system" theme must switch without a restart. */
   private readonly systemPrefersDark = signal(false);
 
-  /** The theme once `system` is resolved — this is the value the CSS reads. */
   readonly resolvedTheme: Signal<ResolvedTheme> = computed(() => {
     const choice = this.theme();
 
@@ -87,8 +79,8 @@ export class SettingsStore {
   constructor() {
     this.watchSystemTheme();
 
-    // `<html>` carries the theme and the density: the CSS variables live on
-    // `:root`, and a class set any lower would not reach them.
+    // `<html>` carries the theme and the density: the CSS variables live on `:root`,
+    // and a class set any lower would not reach them.
     effect(() => {
       const root = document.documentElement;
       root.dataset['theme'] = this.resolvedTheme();
@@ -97,9 +89,9 @@ export class SettingsStore {
   }
 
   /**
-   * Reads the stored settings back. Called from `provideAppInitializer`,
-   * **after** `PreferencesService.hydrate()`: reading before would yield the
-   * defaults, and the interface would appear in one theme then the other.
+   * Called from `provideAppInitializer`, **after** `PreferencesService.hydrate()`:
+   * reading before would yield the defaults, and the interface would appear in one theme
+   * then the other.
    */
   restore(): void {
     for (const restore of this.restorers) {
@@ -141,9 +133,8 @@ export class SettingsStore {
   }
 
   /**
-   * One setting: its signal, its restore step and its write-through, from a
-   * single declaration. Adding a setting is a line here and a field on
-   * `AppSettings` — nothing else.
+   * One setting: its signal, its restore step and its write-through, from a single
+   * declaration.
    */
   private setting<K extends keyof AppSettings>(
     key: K,

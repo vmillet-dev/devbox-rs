@@ -7,11 +7,9 @@ import { Note } from '@features/notes/model/note.model';
 const SNIPPET_LINES = 2;
 
 /**
- * The quick-paste palette: search, choose, paste elsewhere.
- *
- * The field keeps focus from start to finish and the list is walked with the
- * arrows without ever taking it — hence `aria-activedescendant` rather than a
- * moved focus, which would lose what is being typed.
+ * The field keeps focus from start to finish and the list is walked with the arrows
+ * without ever taking it — hence `aria-activedescendant` rather than a moved focus,
+ * which would lose what is being typed.
  */
 @Component({
   selector: 'app-quick-palette',
@@ -57,9 +55,7 @@ export class QuickPaletteComponent {
         this.chosen.emit();
         break;
       case 'Tab': {
-        // Open rather than copy: the palette also serves to find a note to
-        // edit. Tab has nothing else to do here, the field being alone — and
-        // nothing to open on the create row, which names no note.
+        // Open rather than copy: the palette also serves to find a note to edit.
         const note = this.results()[this.highlighted()];
         if (note) {
           event.preventDefault();

@@ -1,16 +1,11 @@
-// DevBox's global styles — the application's theme file: every colour and font
-// lives here as a CSS variable, and components only read them through var(--…).
-
-// Syntax highlighting. Global and not scoped to the code viewer: see the
-// explanation at the top of that file.
+// Global and not scoped to the code viewer: see the top of that file.
 @use 'code-theme';
 
 /*
- * ⚠️ These variables must live HERE, in a global, unscoped file, and never in a
- * *.component.scss. Angular's emulated encapsulation rewrites a `:root` selector
- * from a component stylesheet into `:root[_ngcontent-xxx]`, which never matches
- * the real <html>. Every variable would then be invalid — `color: var(--text-0)`
- * would fall back to the browser's black, on a background that stays dark.
+ * ⚠️ These variables must live HERE, in a global unscoped file, and never in a
+ * *.component.scss: Angular's emulated encapsulation rewrites a `:root` selector into
+ * `:root[_ngcontent-xxx]`, which never matches the real <html>. Every variable would then
+ * be invalid — `color: var(--text-0)` falling back to black on a dark background.
  */
 :root {
   --bg-0: #15171c;
@@ -30,8 +25,7 @@
   --red: #d1706f;
   --purple: #a98fd1;
 
-  // "RGB triplet" variants of the colours above, for rgba()/rgb() wherever a
-  // translucent tint is needed — so no hex is ever duplicated behind a
+  // "RGB triplet" variants of the colours above, so no hex is ever duplicated behind a
   // hard-coded opacity.
   --text-1-rgb: 170, 176, 192;
   --amber-rgb: 232, 163, 61;
@@ -47,26 +41,21 @@
   --dot-yellow: #e6b450;
   --dot-green: #5fbf6f;
 
-  // The code viewer's line numbers: deliberately dimmer than --text-2, readable
-  // without drawing the eye.
+  // Deliberately dimmer than --text-2: readable without drawing the eye.
   --line-no: #3f4454;
 
   --shadow-dropdown: 0 10px 30px rgba(var(--black-rgb), 0.35);
   --shadow-overlay: 0 30px 60px rgba(var(--black-rgb), 0.5);
 
-  // The four gaps density tightens: a card's padding, the canvas grid, the
-  // distance between sections, the canvas margin. Everything else stays fixed —
-  // tightening it all would make the interface unreadable without gaining a
-  // single line on screen.
+  // The four gaps density tightens. Everything else stays fixed — tightening it all
+  // would make the interface unreadable without gaining a single line on screen.
   --space-card: 14px;
   --space-grid: 12px;
   --space-section: 28px;
   --space-canvas: 24px;
 
-  // Inter and JetBrains Mono ship with the binary through the @fontsource
-  // packages, declared in angular.json's `styles` array. They used to come from
-  // Google Fonts, which on a desktop application meant degraded type offline and
-  // a CSP that could not be locked down.
+  // Shipped with the binary through the @fontsource packages: Google Fonts meant degraded
+  // type offline and a CSP that could not be locked down.
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
@@ -77,16 +66,12 @@
 }
 
 /*
- * The light theme. `SettingsStore` stamps `data-theme` on <html>; the `:root`
- * block above stays the dark base, which avoids a white flash at launch: the
- * preference lives in a file, which nothing can read before Angular starts.
+ * The light theme. `SettingsStore` stamps `data-theme` on <html>; the `:root` block above
+ * stays the dark base, which avoids a white flash at launch: the preference lives in a
+ * file, which nothing can read before Angular starts.
  *
- * Only the colours are redefined: fonts, shadows and spacing are the same in
- * both themes.
- *
- * ⚠️ The dark theme's amber (#e8a33d) falls to 2:1 on white. The light accent is
- * therefore a hue of its own, and `--amber-ink` flips with it — that is the text
- * sitting on solid amber (the "new note" button).
+ * ⚠️ The dark theme's amber (#e8a33d) falls to 2:1 on white. The light accent is therefore
+ * a hue of its own, and `--amber-ink` flips with it.
  */
 :root[data-theme='light'] {
   --bg-0: #eceef2;
@@ -120,18 +105,15 @@
   --shadow-dropdown: 0 10px 26px rgba(var(--black-rgb), 0.14);
   --shadow-overlay: 0 24px 52px rgba(var(--black-rgb), 0.2);
 
-  // Like `color-scheme: dark` above, the other way round: this is what repaints
-  // the native <select>s, scrollbars and autocomplete.
+  // Like `color-scheme: dark` above, the other way round: this is what repaints the
+  // native <select>s, scrollbars and autocomplete.
   color-scheme: light;
 }
 
 /*
- * Compact density tightens the **spacing**, never the type — shrinking the text
- * would be a zoom out, not a density.
- *
- * Four variables rather than one global factor: these four gaps are what decide
- * how many cards fit, and setting them one by one avoids squeezing margins that
- * would gain nothing by it.
+ * Compact density tightens the **spacing**, never the type — shrinking the text would be a
+ * zoom out, not a density. Four variables rather than one global factor: these four gaps
+ * are what decide how many cards fit.
  */
 :root[data-density='compact'] {
   --space-card: 10px;
@@ -175,10 +157,8 @@ body {
   background: transparent;
 }
 
-// For assistive technology only: taken out of the visual flow without leaving
-// the accessibility tree, which `display: none` and `visibility: hidden` both
-// do. It is how information the design carries graphically — a card's pinned
-// state, say — is still said.
+// For assistive technology only: taken out of the visual flow without leaving the
+// accessibility tree, which `display: none` and `visibility: hidden` both do.
 .visually-hidden {
   position: absolute;
   width: 1px;

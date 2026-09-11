@@ -3,11 +3,8 @@ import { FALLBACK_LANGUAGE, LanguageTag } from '@core/language/language.model';
 import { highlightLines } from './highlighter';
 
 /**
- * A read-only preview, coloured by language through highlight.js (see
- * `highlighter.ts`).
- *
- * Lives in `shared/ui` because it knows nothing of the notes: a future
- * formatting tool will use it as it is.
+ * A read-only preview, coloured by language through highlight.js. In `shared/ui` because
+ * it knows nothing of the notes.
  */
 @Component({
   selector: 'app-code-viewer',
@@ -23,10 +20,7 @@ export class CodeViewerComponent {
   /** Numbering a three-line excerpt on a card teaches nothing. */
   readonly showLineNumbers = input(true);
 
-  /**
-   * The embedded variant: no margin, no scrolling, no font size of its own —
-   * the viewer adopts its host's typography.
-   */
+  /** The embedded variant: no margin, no scrolling, no font size of its own. */
   readonly compact = input(false);
 
   protected readonly lines = computed<readonly string[]>(() =>

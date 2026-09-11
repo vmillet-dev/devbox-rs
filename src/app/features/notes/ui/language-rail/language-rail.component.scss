@@ -17,9 +17,8 @@
   flex-shrink: 0;
 }
 
-// A clickable wrapper around the badge: the colour stays the language's, and
-// the ring is what says "selected". Tinting the badge amber when active would
-// erase the very clue it is recognised by.
+// Tinting the badge amber when active would erase the very clue it is recognised by,
+// so the ring is what says "selected".
 .language-chip {
   @include unstyled-control;
   display: flex;

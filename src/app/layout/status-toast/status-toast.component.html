@@ -1,6 +1,5 @@
 @if (notifier.status(); as status) {
-  <!-- role="status" and not "alert": a success does not justify interrupting a
-       screen reader. -->
+  <!-- role="status" and not "alert": a success does not justify interrupting a reader. -->
   <div class="status-toast" role="status">
     <span class="status-text">{{ status.key | transloco: status.params }}</span>
     <button

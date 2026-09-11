@@ -1,16 +1,12 @@
--- Trash and attachments.
---
--- `deleted_at` rather than a boolean: the 30-day purge needs the date, and the
--- trash panel shows the deadline. NULL means a living note, which lets the
--- partial index cover only the deleted rows.
+-- `deleted_at` rather than a boolean: the 30-day purge needs the date, and NULL for
+-- a living note is what lets the partial index cover only the deleted rows.
 
 ALTER TABLE notes ADD COLUMN deleted_at TEXT;
 
 CREATE INDEX notes_deleted_at ON notes (deleted_at) WHERE deleted_at IS NOT NULL;
 
--- The bytes are not here: they live in `app_data_dir()/attachments/` under a
--- name derived from the id. A database growing by 10 MB per screenshot would
--- make every note read slower.
+-- The bytes are not here: they live in `app_data_dir()/attachments/` under a name
+-- derived from the id.
 CREATE TABLE attachments (
     id         TEXT PRIMARY KEY,
     note_id    TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,

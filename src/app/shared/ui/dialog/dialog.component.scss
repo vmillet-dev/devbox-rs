@@ -1,7 +1,6 @@
 @use 'mixins' as *;
 
-// `contents` and not a block: the host would otherwise leave an inline box in
-// the page flow, which a fixed backdrop has no use for.
+// `contents` and not a block: the host would otherwise leave an inline box in the flow.
 :host {
   display: contents;
 }
@@ -13,8 +12,6 @@
   backdrop-filter: blur(2px);
   display: flex;
   justify-content: center;
-  // A dialog that opens near the top of the window rather than centred (the
-  // palette) sets these two; everything else stays centred.
   align-items: var(--dialog-align, center);
   padding-top: var(--dialog-offset, 0);
 }
@@ -38,9 +35,7 @@
   max-height: 88vh;
 }
 
-// The middle scrolls, so the panel itself must not: its sections carry their
-// own padding and sit flush against each other, which is why there is neither
-// padding nor gap here.
+// The middle scrolls, so the panel itself must not: its sections carry their own padding.
 .dialog-panel.framed {
   overflow: hidden;
   gap: var(--dialog-gap, 0);

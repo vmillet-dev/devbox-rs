@@ -14,11 +14,8 @@ function checkedValue(event: Event): boolean {
 }
 
 /**
- * The application's settings: appearance, window behaviour, quick paste,
- * acknowledgements.
- *
- * Every control writes straight into [`SettingsStore`] — there is no draft to
- * confirm, and the `core/` services carry each change down to the native side.
+ * Every control writes straight into [`SettingsStore`] — there is no draft to confirm, and
+ * the `core/` services carry each change down to the native side.
  */
 @Component({
   selector: 'app-settings-page',
@@ -63,12 +60,11 @@ export class SettingsPageComponent {
   }
 
   /**
-   * The field accepts no text: it **listens for a keystroke**. Typing
-   * `Ctrl+Alt+P` by hand would let through combinations the native side cannot
-   * read back, with nothing to say so.
+   * The field accepts no text: it **listens for a keystroke**. Typing `Ctrl+Alt+P` by hand
+   * would let through combinations the native side cannot read back.
    *
-   * A keystroke with no modifier is not a combination and goes back to the
-   * dialog: that is what leaves Tab and Escape working inside the field.
+   * A keystroke with no modifier is not a combination and goes back to the dialog: that is
+   * what leaves Tab and Escape working inside the field.
    */
   protected onShortcutKeydown(event: KeyboardEvent): void {
     const accelerator = acceleratorFromEvent(event);

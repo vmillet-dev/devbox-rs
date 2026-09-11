@@ -50,12 +50,9 @@ describe('AboutDialogComponent', () => {
     fixture.debugElement.query(By.css('.about-repo')).triggerEventHandler('click');
 
     expect(appInfo.openedRepository).toBe(1);
-    // A real link would have moved the locked-down WebView off the app.
     expect(fixture.nativeElement.querySelector('.about-repo').tagName).toBe('BUTTON');
   });
 
-  // Escape and the backdrop click belong to the dialog shell, and are covered
-  // in `dialog.component.spec.ts` rather than once per dialog.
   it('emits on the close button', async () => {
     const closed = vi.fn();
     fixture.componentInstance.closed.subscribe(closed);

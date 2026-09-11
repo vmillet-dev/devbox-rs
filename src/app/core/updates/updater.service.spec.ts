@@ -2,14 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DownloadProgress, UpdaterService } from './updater.service';
 
 /**
- * `check()` and `relaunch()` are one-line calls into the plugin and are left to
- * the application to exercise: `vi.mock` on a Tauri package is unreliable here
- * (the Angular builder bundles modules before Vitest sees them, so the mock
- * holds or not depending on which spec files share the run).
- *
- * What is worth pinning is what the service actually decides — the arithmetic
- * turning download events into a progress bar, and the lifetime of the native
- * handle — and none of it goes near the bridge.
+ * `check()` and `relaunch()` are one-line calls into the plugin and are left to the
+ * application to exercise: `vi.mock` on a Tauri package is unreliable here. What is worth
+ * pinning is what the service decides — the download arithmetic and the lifetime of the
+ * native handle — and none of it goes near the bridge.
  */
 
 /** Download event as the plugin emits it, reduced to the fields that are read. */
@@ -19,8 +15,8 @@ type DownloadEvent =
   | { event: 'Finished' };
 
 /**
- * Stand-in for the plugin's `Update`, which is a **native resource**: it carries
- * an id on the Rust side and has to be closed when it is not installed.
+ * Stand-in for the plugin's `Update`, a **native resource**: it carries an id on the Rust
+ * side and has to be closed when it is not installed.
  */
 function fakeUpdate(events: DownloadEvent[] = []) {
   return {
@@ -67,8 +63,6 @@ describe('UpdaterService', () => {
   });
 
   it('leaves the progress undetermined when the server announces no size', async () => {
-    // `contentLength` is absent when the server does not send it, and a made-up
-    // percentage would be worse than an indeterminate bar.
     retain(
       fakeUpdate([
         { event: 'Started', data: {} },
@@ -92,7 +86,6 @@ describe('UpdaterService', () => {
   });
 
   it('lets go of the update once it is installed', async () => {
-    // The native resource was consumed: a second install has nothing left.
     retain(fakeUpdate([{ event: 'Finished' }]));
     await service.install(() => undefined);
 

@@ -126,9 +126,8 @@ describe('ChecklistEditorComponent', () => {
   });
 
   describe('reordering by pointer', () => {
-    // ⚠️ HTML5 drag & drop does not work in this WebView (Tauri’s
-    // `dragDropEnabled`), hence the pointer events — that is the path to cover,
-    // not a `dragstart` that would never arrive.
+    // ⚠️ HTML5 drag & drop does not work in this WebView: the pointer events are the
+    // path to cover, not a `dragstart` that would never arrive.
     function grip(index: number): HTMLElement {
       return fixture.nativeElement.querySelectorAll('.row-grip')[index];
     }
@@ -207,8 +206,6 @@ describe('ChecklistEditorComponent', () => {
       pointer(grip(1), 'pointercancel');
       await fixture.whenStable();
 
-      // `pointercancel` takes the same path as `pointerup`: the row lands where it
-      // was drawn rather than staying in limbo.
       expect(last().map((item) => item.text)).toEqual(['Déployer', 'Relire']);
     });
   });
@@ -226,12 +223,10 @@ describe('ChecklistEditorComponent', () => {
     type(rows()[0], 'En cours de frappe');
     await fixture.whenStable();
 
-    // Same note, refreshed after a save: the in-flight edit must survive.
     fixture.componentRef.setInput('items', [...ITEMS]);
     await fixture.whenStable();
     expect(rows()[0].value).toBe('En cours de frappe');
 
-    // Another note: the draft follows.
     fixture.componentRef.setInput('noteId', 'note-2');
     fixture.componentRef.setInput('items', [{ text: 'Autre', done: false }]);
     await fixture.whenStable();

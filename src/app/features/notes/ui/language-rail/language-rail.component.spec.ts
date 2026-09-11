@@ -46,8 +46,6 @@ describe('LanguageRailComponent', () => {
     fixture.componentRef.setInput('activeLanguages', new Set<LanguageTag>(['yml']));
     await fixture.whenStable();
 
-    // Selection is shown by a ring rather than by recolouring the badge, so the
-    // pressed state has to exist for assistive technology on its own.
     expect(chips().map((chip) => chip.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
   });
 

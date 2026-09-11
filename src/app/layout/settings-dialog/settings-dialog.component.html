@@ -10,8 +10,8 @@
   </div>
 
   <div class="settings-body">
-    <!-- A navigation rail, not a list of options: each entry changes what the
-         right-hand panel shows, hence `aria-current="page"`. -->
+    <!-- A navigation rail, not a list of options: each entry changes what the right-hand
+         panel shows, hence `aria-current="page"`. -->
     <nav class="settings-rail" [attr.aria-label]="'settings.pagesLabel' | transloco">
       @for (page of pages(); track page.id) {
         <button

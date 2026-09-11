@@ -4,9 +4,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { DialogComponent } from './dialog.component';
 
 /**
- * Two dialogs on two rungs, the way the palette opens the fields form: what
- * tells the shell apart from a per-dialog copy is that only one of them answers
- * Escape.
+ * Two dialogs on two rungs, the way the palette opens the fields form: only one of them
+ * answers Escape, which is what tells the shell apart from a per-dialog copy.
  */
 @Component({
   selector: 'app-dialog-host',

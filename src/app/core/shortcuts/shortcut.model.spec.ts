@@ -22,13 +22,10 @@ describe('acceleratorFromEvent', () => {
   });
 
   it('says nothing while only a modifier is held', () => {
-    // The combination is unfinished: recording it would give `Ctrl+Ctrl`.
     expect(acceleratorFromEvent(keydown({ code: 'ControlLeft', ctrlKey: true }))).toBeNull();
   });
 
   it('refuses a key pressed without any modifier', () => {
-    // A **global** shortcut with no modifier would swallow that key in every
-    // application on the machine, typing included.
     expect(acceleratorFromEvent(keydown({ code: 'KeyP' }))).toBeNull();
   });
 
@@ -37,8 +34,6 @@ describe('acceleratorFromEvent', () => {
   });
 
   it('reads the key by position, not by the character it produces', () => {
-    // `code` is the physical key: a shortcut set on AZERTY stays in the same place
-    // on QWERTY, which `key` would not guarantee.
     expect(acceleratorFromEvent(keydown({ code: 'KeyA', key: 'q', ctrlKey: true }))).toBe('Ctrl+A');
   });
 });
@@ -64,7 +59,6 @@ describe('acceleratorKeys', () => {
   });
 
   it('drops what a stray separator leaves behind', () => {
-    // The sheet must never render an empty cap.
     expect(acceleratorKeys('Ctrl++P')).toEqual(['Ctrl', 'P']);
   });
 });

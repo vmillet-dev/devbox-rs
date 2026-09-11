@@ -1,9 +1,6 @@
--- Folds tag case **across** notes, where `normalize_tags` only folded it within
--- one: `Urgent` and `urgent` produced two facets in the rail, of which
--- `tag IN (…)` found only one.
---
--- A column's collation cannot be altered, hence the recreated table;
--- `INSERT OR IGNORE` absorbs the duplicates the new primary key merges.
+-- Folds tag case **across** notes, where `normalize_tags` only folded it within one.
+-- A column's collation cannot be altered, hence the recreated table; `INSERT OR
+-- IGNORE` absorbs the duplicates the new primary key merges.
 
 CREATE TABLE note_tags_v2 (
     note_id TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,

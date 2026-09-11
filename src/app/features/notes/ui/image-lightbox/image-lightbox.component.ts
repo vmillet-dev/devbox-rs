@@ -3,14 +3,10 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
 /**
- * An attached image at full size, above everything else.
- *
- * The strip bounds its preview to 220 px so as not to push the editor off
- * screen, where a code screenshot is unreadable. This view bounds only on the
- * window.
- *
- * It re-reads nothing: the bytes are the ones the preview already loaded, and a
- * multi-megabyte `data:` URI has no business crossing the bridge twice.
+ * The strip bounds its preview to 220 px so as not to push the editor off screen; this
+ * view bounds only on the window. It re-reads nothing: the bytes are the ones the
+ * preview already loaded, and a multi-megabyte `data:` URI has no business crossing the
+ * bridge twice.
  */
 @Component({
   selector: 'app-image-lightbox',

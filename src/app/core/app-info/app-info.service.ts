@@ -15,21 +15,16 @@ export const AUTHOR_HANDLE = '@vmillet-dev';
 export const APP_NAME = 'DevBox';
 
 /**
- * The seam to the Tauri APIs that describe the application. Same reason to
- * exist as `UpdaterService`: these are core and plugin commands, absent from
- * `bindings.ts`, and a component importing them would become untestable —
- * jsdom has no Tauri bridge.
- *
- * No description here: that is visible text, and so a translation key.
+ * The seam to the Tauri APIs that describe the application: core and plugin commands,
+ * absent from `bindings.ts`, which a component importing them would make untestable.
  */
 @Injectable({ providedIn: 'root' })
 export class AppInfoService {
   private readonly versionResource = resource({ loader: () => getVersion() });
 
   /**
-   * The version from `tauri.conf.json`, which the `check-version` CI job keeps
-   * aligned with the tag. `null` outside the Tauri runtime (`ng serve` alone):
-   * the card then shows a dash rather than lying.
+   * `null` outside the Tauri runtime (`ng serve` alone): the card then shows a dash rather
+   * than lying.
    */
   readonly version: Signal<string | null> = computed(() =>
     this.versionResource.hasValue() ? this.versionResource.value() : null,

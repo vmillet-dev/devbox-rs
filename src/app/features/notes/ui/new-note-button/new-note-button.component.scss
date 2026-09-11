@@ -5,8 +5,6 @@
   display: flex;
 }
 
-// The two halves make one amber pill: only the outer corners are rounded, and
-// what separates them is a border, not a gap.
 .new-note-btn,
 .new-note-caret {
   @include unstyled-control;
@@ -41,8 +39,7 @@
   outline-offset: 2px;
 }
 
-// Right-aligned, unlike the space switcher: this button sits at the end of the
-// bar, and a left-aligned panel would overflow the window.
+// Right-aligned: at the end of the bar, a left-aligned panel would overflow the window.
 .new-note-menu {
   position: absolute;
   top: calc(100% + 6px);

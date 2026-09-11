@@ -73,12 +73,10 @@ describe('AttachmentsStore', () => {
 
     await harness.store.openFor('note-1');
 
-    // The open preview survives: the editor re-renders on every keystroke.
     expect(harness.store.previewId()).toBe('attachment-1');
   });
 
   it('drops the preview when the note changes', async () => {
-    // Showing the previous note's screenshot would be worse than nothing.
     await harness.store.openFor('note-1');
     await harness.store.togglePreview('attachment-1');
 
@@ -99,8 +97,6 @@ describe('AttachmentsStore', () => {
   });
 
   it('names the attachment being previewed, for the enlarged view', async () => {
-    // The lightbox lives in the page, above the editor: it cannot see what the
-    // strip computed for itself.
     await harness.store.openFor('note-1');
     expect(harness.store.previewed()).toBeNull();
 
@@ -171,7 +167,6 @@ describe('AttachmentsStore', () => {
   });
   describe('getting a file back out', () => {
     it('opens it with the system application', async () => {
-      // An attachment you can only read the name of is no use.
       await harness.store.openFor('note-1');
 
       await harness.store.open('attachment-1');
@@ -237,7 +232,6 @@ describe('AttachmentsStore', () => {
     });
 
     it('says what was attached, and shows an image straight away', async () => {
-      // Without a report, attaching a screenshot is only visible by looking for it.
       await harness.store.openFor('note-1');
 
       await harness.store.attachPath('C:/shots/error.png');
@@ -250,7 +244,6 @@ describe('AttachmentsStore', () => {
     });
 
     it('refuses every route while a note is only a draft', async () => {
-      // Attaching targets a database row: with no note there is nothing to target.
       expect(await harness.store.attachPath('C:/shots/error.png')).toBe(false);
       expect(await harness.store.attachClipboardImage(new Date())).toBe(false);
     });

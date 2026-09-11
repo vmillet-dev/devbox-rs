@@ -21,7 +21,6 @@ describe('StatusNotifier', () => {
   });
 
   it('holds the reference it was handed, untranslated', () => {
-    // The caller does not know the active language: it sends a key.
     notifier.notify({ key: 'file.exported', params: { notes: '3' } });
 
     expect(notifier.status()).toEqual({ key: 'file.exported', params: { notes: '3' } });
@@ -42,7 +41,6 @@ describe('StatusNotifier', () => {
     notifier.notify({ key: 'file.copied' });
     await vi.advanceTimersByTimeAsync(STATUS_TTL_MS - 1);
 
-    // The second message must be readable for as long as the first was.
     expect(notifier.status()?.key).toBe('file.copied');
   });
 

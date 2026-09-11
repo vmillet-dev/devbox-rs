@@ -1,9 +1,7 @@
-//! An attachment: what the database keeps, and the rules that decide the rest.
-//!
-//! ⚠️ The bytes are not here. The database holds only a record; the file lives
-//! in `app_data_dir()/attachments/` under a name **derived from the id** — two
-//! captures called `image.png` must not overwrite each other, and a name from
-//! outside has no business deciding a write path.
+//! ⚠️ The bytes are not here: the database holds a record, and the file lives in
+//! `app_data_dir()/attachments/` under a name **derived from the id** — two captures
+//! called `image.png` must not overwrite each other, and a name from outside has no
+//! business deciding a write path.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -23,14 +21,12 @@ pub struct Attachment {
     /// The original name, the one displayed. Never used as a path.
     pub file_name: String,
     pub mime_type: String,
-    /// `u32` and not `u64`: Specta refuses what JSON cannot carry without loss,
-    /// and [`MAX_BYTES`] fits comfortably.
+    /// `u32` and not `u64`: Specta refuses what JSON cannot carry without loss.
     pub byte_size: u32,
     pub created_at: DateTime<Utc>,
 }
 
 impl Attachment {
-    /// The file's name on disk.
     pub fn stored_name(&self) -> String {
         stored_name(&self.id, &self.file_name)
     }
@@ -61,8 +57,7 @@ pub fn stored_name(id: &str, file_name: &str) -> String {
     }
 }
 
-/// Deliberately short: what we can display, plus a fallback. An unknown type
-/// stays attachable, it is simply not previewed.
+/// Deliberately short: an unknown type stays attachable, it is simply not previewed.
 pub fn mime_of(file_name: &str) -> String {
     let mime = match extension_of(file_name).as_deref() {
         Some("png") => "image/png",
@@ -99,9 +94,8 @@ pub fn display_name(path: &str) -> Result<String, ValidationError> {
     Ok(trimmed)
 }
 
-/// The name given to a pasted image: the caller supplies a readable timestamp,
-/// this guarantees the extension. Without it `mime_of` would answer
-/// `application/octet-stream` and the capture would not be previewed.
+/// The caller supplies a readable timestamp, this guarantees the extension: without
+/// it `mime_of` would answer `application/octet-stream` and skip the preview.
 pub fn png_name(base: &str) -> String {
     let trimmed = base.trim();
     let stem = if trimmed.is_empty() {
@@ -117,10 +111,8 @@ pub fn png_name(base: &str) -> String {
     }
 }
 
-/// Encodes raw RGBA — what the system clipboard hands over — into PNG.
-///
-/// The clipboard gives no file: without this encoding we would store bytes no
-/// viewer could open.
+/// Encodes raw RGBA — what the system clipboard hands over — into PNG: without it
+/// we would store bytes no viewer could open.
 pub fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, StorageError> {
     let expected = (width as usize)
         .saturating_mul(height as usize)
@@ -156,7 +148,6 @@ pub fn validate_size(byte_size: u64) -> Result<u32, ValidationError> {
         ));
     }
 
-    // The bound above guarantees the conversion.
     Ok(saturating_u32(byte_size))
 }
 
@@ -166,7 +157,6 @@ mod tests {
 
     #[test]
     fn the_stored_name_comes_from_the_identifier_not_from_the_user() {
-        // Two "capture.png" pasted onto two notes must not overwrite each other.
         assert_eq!(stored_name("a-1", "capture.png"), "a-1.png");
         assert_eq!(stored_name("a-2", "capture.png"), "a-2.png");
     }
@@ -207,8 +197,6 @@ mod tests {
 
     #[test]
     fn a_pasted_image_always_ends_up_with_its_extension() {
-        // Without it, `mime_of` would answer `application/octet-stream` and the
-        // capture would never be previewed.
         assert_eq!(png_name("capture-2026"), "capture-2026.png");
         assert_eq!(png_name("capture.PNG"), "capture.PNG");
         assert_eq!(png_name("   "), "capture.png");
@@ -220,16 +208,12 @@ mod tests {
 
         let png = encode_png(2, 2, &rgba).unwrap();
 
-        // The PNG signature: what the file must carry for any viewer, ours
-        // included, to agree to open it.
         assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
         assert_eq!(mime_of(&png_name("capture")), "image/png");
     }
 
     #[test]
     fn a_truncated_clipboard_image_is_refused_rather_than_written() {
-        // The clipboard can hand back an empty or inconsistent image; writing an
-        // unreadable file would be worse than attaching nothing.
         assert!(encode_png(2, 2, &[0u8; 4]).is_err());
         assert!(encode_png(0, 0, &[]).is_err());
     }

@@ -13,13 +13,9 @@ import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 
 /**
- * A card's action menu: move to another space, delete.
- *
  * Separate from `NoteCardComponent` because it brings what the card has not: an
- * open/closed state and focus handling. The card stays derived from its note.
- *
- * It **never emits the note id** — it does not know it. The card adds it when
- * relaying.
+ * open/closed state and focus handling. It **never emits the note id** — it does not
+ * know it, and the card adds it when relaying.
  */
 @Component({
   selector: 'app-note-card-menu',
@@ -35,7 +31,6 @@ export class NoteCardMenuComponent {
   readonly spaces = input.required<readonly Space[]>();
   readonly currentSpaceId = input.required<string>();
 
-  /** Identifiant de l'espace de destination. */
   readonly moveRequested = output<string>();
   readonly deleteRequested = output<void>();
 
@@ -46,9 +41,8 @@ export class NoteCardMenuComponent {
   }
 
   /**
-   * Deletion in two steps: the WebView blocks everything during a native
-   * `confirm()`. Reset on every opening and closing — a confirmation in
-   * progress must not outlive leaving the menu.
+   * Deletion in two steps: the WebView blocks everything during a native `confirm()`.
+   * Reset on every opening and closing.
    */
   protected readonly confirmingDelete = linkedSignal({
     source: this.menu.open,
@@ -61,8 +55,8 @@ export class NoteCardMenuComponent {
   );
 
   protected toggle(event: MouseEvent): void {
-    // The whole card is an opening button: without this, a click on the ⋯ would
-    // bubble up to it and open the editor along with the menu.
+    // The whole card is an opening button: without this, a click on the ⋯ would bubble
+    // up and open the editor along with the menu.
     event.stopPropagation();
     this.menu.toggle();
   }

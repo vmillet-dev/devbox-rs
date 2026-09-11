@@ -9,16 +9,12 @@ import { Attachment } from '../model/note.model';
 import { NotesStore } from './notes.store';
 
 /**
- * The open note's attachments: the list, the preview, and the three ways of
- * adding one — the picker, a paste, a file dropped on the window.
+ * It follows the open note itself rather than being told to: the page used to chain
+ * "save the draft, then re-point the store, then attach", and forgetting the middle
+ * step attached nothing without saying so.
  *
- * It follows the open note itself rather than being told to: the page used to
- * chain "save the draft, then re-point the store, then attach", and forgetting
- * the middle step attached nothing without saying so.
- *
- * ⚠️ The bytes are never loaded in bulk: `preview` asks for **one** at a time,
- * and a `data:` URI weighs a third more than the file — preloading the list
- * would pull several megabytes into the WebView for one thumbnail.
+ * ⚠️ The bytes are never loaded in bulk: `preview` asks for **one** at a time, and a
+ * `data:` URI weighs a third more than the file.
  */
 @Injectable({ providedIn: 'root' })
 export class AttachmentsStore {
@@ -36,16 +32,13 @@ export class AttachmentsStore {
   private readonly _previewData = signal<string | null>(null);
   private readonly _zoomed = signal(false);
 
-  /** The preview shown full size, above the editor. */
   readonly zoomed = this._zoomed.asReadonly();
 
   constructor() {
-    // Attachments follow the **persisted** note: a draft has no row yet, and
-    // nothing can be attached to it.
+    // Attachments follow the **persisted** note: a draft has no row to carry them.
     effect(() => void this.openFor(this.notes.persistedNoteId()));
 
-    // A drop is a window event, not a DOM one: it targets something only while
-    // a note is open to receive it.
+    // A drop is a window event, not a DOM one.
     const drops = inject(FileDropService);
     inject(DestroyRef).onDestroy(drops.on((paths) => void this.addDroppedFiles(paths)));
   }
@@ -58,14 +51,12 @@ export class AttachmentsStore {
     this._zoomed.set(false);
   }
 
-  /** Adds the file the picker returns, saving the draft on the way. */
   async addFromPicker(): Promise<void> {
     if (await this.targetNote()) {
       await this.attach();
     }
   }
 
-  /** `Ctrl+V` in the editor with an image on the clipboard. */
   async addPastedImage(): Promise<void> {
     if (!(await this.targetNote())) return;
 
@@ -74,7 +65,6 @@ export class AttachmentsStore {
     }
   }
 
-  /** Saves an attachment somewhere the user picks, and says where it went. */
   async saveToDisk(id: string): Promise<void> {
     const path = await this.saveAs(id);
     if (path) {
@@ -92,13 +82,9 @@ export class AttachmentsStore {
   }
 
   /**
-   * Attaching demands a note **in the database**, so the draft is saved on the
-   * way — a note you attach a file to is no longer empty.
-   *
    * ⚠️ The store is re-pointed **here** rather than waiting for the effect on
-   * `persistedNoteId`, which only runs on the next detection cycle — after the
-   * write that follows, which would attach nothing and not say so. `openFor` is
-   * idempotent, so this is a no-op when the note already existed.
+   * `persistedNoteId`, which only runs on the next detection cycle — after the write
+   * that follows, which would attach nothing and not say so. `openFor` is idempotent.
    */
   private async targetNote(): Promise<string | null> {
     const noteId = await this.notes.materialiseDraft();
@@ -116,19 +102,16 @@ export class AttachmentsStore {
   readonly count = computed(() => this._attachments().length);
 
   /**
-   * The attachment whose preview is open. Resolved here and not in the strip:
-   * the lightbox lives in the page, above the editor, and cannot see what the
-   * strip computed for itself.
+   * Resolved here and not in the strip: the lightbox lives in the page, above the
+   * editor, and cannot see what the strip computed for itself.
    */
   readonly previewed = computed<Attachment | null>(() => {
     const id = this._previewId();
     return this._attachments().find((attachment) => attachment.id === id) ?? null;
   });
 
-  /**
-   * Called whenever the open note changes. A different note clears the preview:
-   * showing the previous one's screenshot would be worse than nothing.
-   */
+  /** A different note clears the preview: showing the previous one's screenshot
+   * would be worse than nothing. */
   async openFor(noteId: string | null): Promise<void> {
     if (this._noteId() === noteId) return;
 
@@ -148,11 +131,8 @@ export class AttachmentsStore {
     return this.attachPath(path);
   }
 
-  /**
-   * The shape shared by the three ways of adding an attachment. The file name
-   * is announced: without it, attaching a screenshot is only visible by looking
-   * for it in the strip.
-   */
+  /** The file name is announced: without it, attaching a screenshot is only visible
+   * by looking for it in the strip. */
   private async write(action: (noteId: string) => Promise<Attachment>): Promise<boolean> {
     const noteId = this._noteId();
     if (noteId === null || this._isBusy()) return false;
@@ -171,7 +151,6 @@ export class AttachmentsStore {
 
     await this.load(noteId);
     this.status.notify({ key: 'attachments.added', params: { name: added.fileName } });
-    // An attached image shows straight away: it is what one wants to see.
     if (added.mimeType.startsWith('image/')) {
       await this.togglePreview(added.id);
     }
@@ -179,23 +158,16 @@ export class AttachmentsStore {
     return true;
   }
 
-  /**
-   * Attaches an **already named** file — the one just dropped on the editor.
-   * The file picker is not reopened.
-   */
+  /** An **already named** file — the one just dropped: the picker is not reopened. */
   async attachPath(path: string): Promise<boolean> {
     return this.write((noteId) => this.repository.attach(noteId, path));
   }
 
-  /**
-   * Attaches the clipboard image. `Ctrl+V` in the editor comes through here
-   * when the clipboard holds no text.
-   */
+  /** `Ctrl+V` in the editor comes through here when the clipboard holds no text. */
   async attachClipboardImage(now: Date): Promise<boolean> {
     return this.write((noteId) => this.repository.attachClipboardImage(noteId, screenshotName(now)));
   }
 
-  /** Opens the attachment with the system's default application. */
   async open(id: string): Promise<void> {
     await this.notifier.attempt('errors.attachmentOpenFailed', () => this.repository.open(id));
   }
@@ -231,11 +203,7 @@ export class AttachmentsStore {
     return true;
   }
 
-  /**
-   * A toggle: asking again for the open preview closes it, with no round trip.
-   * The lightbox goes with it — it shows the bytes the preview loaded, and
-   * keeping them on screen without it makes no sense.
-   */
+  /** A toggle: asking again for the open preview closes it, with no round trip. */
   async togglePreview(id: string): Promise<void> {
     this._zoomed.set(false);
     if (this._previewId() === id) {
@@ -269,10 +237,8 @@ export class AttachmentsStore {
   }
 }
 
-/**
- * The name of a pasted image: dated to the second, so two captures in a row do
- * not look alike in the list. The extension is added on the Rust side.
- */
+/** Dated to the second, so two captures in a row do not look alike in the list. The
+ * extension is added on the Rust side. */
 function screenshotName(now: Date): string {
   const stamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '-');
   return `capture-${stamp}`;

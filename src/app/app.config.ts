@@ -40,9 +40,9 @@ export const appConfig: ApplicationConfig = {
       loader: AppTranslocoLoader,
     }),
 
-    // One initialiser for both steps rather than two chained: Angular starts
-    // them together and only awaits their promises as a block, so `restore()`
-    // would read a still-empty cache.
+    // One initialiser for both steps rather than two chained: Angular starts them
+    // together and awaits their promises as a block, so `restore()` would read a
+    // still-empty cache.
     provideAppInitializer(async () => {
       // ⚠️ Everything is injected **before** the first `await`: an `inject()`
       // after one leaves the injection context and fails the bootstrap
@@ -60,25 +60,22 @@ export const appConfig: ApplicationConfig = {
       // Before the first render: reading later would show the interface in one
       // theme then the other.
       settings.restore();
-      // After `restore()`: the front creates the tray by giving it its labels,
-      // and creating it earlier would have shown the default language for a
-      // round trip.
+      // After `restore()`: the front creates the tray by giving it its labels, and
+      // creating it earlier would have shown the default language for a round trip.
       tray.start();
 
-      // After `settings.restore()` too: these three follow a preference, and
-      // starting from the default would push a setting the user had changed to
-      // the native side — for the length of a visible flip.
+      // After `settings.restore()` too: starting from the default would push a setting
+      // the user had changed to the native side, for the length of a visible flip.
       shortcuts.start();
       windowBehavior.start();
-      // Not awaited: the real state belongs to the system, and asking it must
-      // not delay the first render.
+      // Not awaited: the real state belongs to the system, and asking must not delay
+      // the first render.
       void autostart.start();
     }),
 
-    // Update check at launch. ⚠️ The promise is deliberately not returned:
-    // Angular awaits an initialiser's, and the application would sit on a blank
-    // screen for the length of a network call — indefinitely if the endpoint
-    // never answers. The prompt appears when the answer arrives.
+    // Update check at launch. ⚠️ The promise is deliberately not returned: Angular awaits
+    // an initialiser's, and the application would sit on a blank screen for the length of
+    // a network call — indefinitely if the endpoint never answers.
     provideAppInitializer(() => {
       void inject(UpdateStore).check();
     }),

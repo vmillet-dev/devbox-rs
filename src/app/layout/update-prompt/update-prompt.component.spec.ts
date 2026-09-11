@@ -56,7 +56,6 @@ describe('UpdatePromptComponent', () => {
     await offerUpdate();
     expect(fixture.debugElement.query(By.css('.update-notes'))).toBeNull();
 
-    // Back to idle first: a check is ignored while an offer is already standing.
     await store.dismiss();
     await offerUpdate('Corrige le rail de tags');
     expect(fixture.nativeElement.querySelector('.update-notes-body').textContent).toContain(
@@ -78,7 +77,6 @@ describe('UpdatePromptComponent', () => {
     await fixture.whenStable();
 
     expect(updater.installCalls).toBe(1);
-    // Nothing left to cancel: the installer is already replacing files.
     expect(fixture.debugElement.query(By.css('.update-actions'))).toBeNull();
     expect(fixture.nativeElement.querySelector('.update-status')).not.toBeNull();
 
@@ -130,8 +128,6 @@ describe('UpdatePromptComponent', () => {
     expect(fixture.debugElement.query(By.css('.dialog-panel'))).toBeNull();
   });
 
-  // The prompt stops being dismissible while it installs: interrupting halfway
-  // would leave a half-replaced binary.
   it('ignores Escape once the install is under way', async () => {
     updater.deferInstall = true;
     await offerUpdate();

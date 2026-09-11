@@ -1,11 +1,6 @@
-//! The crate's three errors, and the translation of the first two into the
-//! third.
-//!
-//! [`ValidationError`] refuses an incoming value, [`StorageError`] reports a
-//! persistence failure, [`AppError`] is what crosses the bridge: a stable
-//! **code** the front maps onto a translation key, its interpolation parameters,
-//! and a technical detail. No user-facing text leaves this module — a `String`
-//! would put French in the English UI, and force callers to parse prose.
+//! No user-facing text leaves this module: a `String` would put French in the
+//! English UI and force callers to parse prose. The front end maps `code` onto a
+//! translation key and interpolates `params`.
 
 use std::collections::BTreeMap;
 
@@ -13,14 +8,11 @@ use serde::Serialize;
 use specta::Type;
 use thiserror::Error;
 
-/// Travels like the others: a code and a `field` parameter, never a written
-/// sentence.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[error("Invalid field \"{field}\": {detail}")]
 pub struct ValidationError {
     /// The offending field, spelled the way the front names it.
     pub field: &'static str,
-    /// Technical detail, shown in the background.
     pub detail: String,
 }
 
@@ -33,41 +25,30 @@ impl ValidationError {
     }
 }
 
-/// Each variant becomes a **code** the front translates, and `Display` is now
-/// only the technical detail — which is why it may stay in French if it comes
-/// from a system or external error.
+/// Each variant becomes a **code** the front end translates; `Display` is only the
+/// technical detail, which may stay in French when it comes from an external error.
 #[derive(Debug, Error)]
 pub enum StorageError {
     /// Never a silent `Ok`: the front would believe the write went through.
     #[error("Note not found: {0}")]
     NoteNotFound(String),
-    /// The target space does not exist: the note would have nowhere to be filed.
     #[error("Space not found: {0}")]
     SpaceNotFound(String),
-    /// Name already taken (case-insensitive comparison).
     #[error("A space named \"{0}\" already exists")]
     DuplicateSpaceName(String),
     #[error("Attachment not found: {0}")]
     AttachmentNotFound(String),
-    /// Reading, copying or writing a file outside the database failed —
-    /// attachments, export and import all land here.
     #[error("File error: {0}")]
     File(String),
-    /// A file offered as an export bundle that is not one.
     #[error("Unreadable export file: {0}")]
     ImportFormat(String),
-    /// A column no write from this code could have produced.
     #[error("Note \"{id}\" unreadable: field \"{field}\" is out of format")]
     CorruptRow { id: String, field: &'static str },
-    /// A database carrying a migration this binary does not know: it was
-    /// written by a newer version of the application.
     #[error("Database carrying migration \"{0}\", unknown to this version of DevBox")]
     SchemaTooRecent(String),
-    /// Opening or migrating failed — a breakdown before the first `SELECT`.
     #[error("Migration failed: {0}")]
     Migration(String),
-    /// `#[from]`: required by `Connection::transaction`, which needs to know how
-    /// to absorb Diesel's error into the caller's. `#[source]` comes along for
+    /// `#[from]`: required by `Connection::transaction`. `#[source]` comes along for
     /// free, where an overridden `impl Display` used to lose the cause chain.
     #[error("Storage error: {0}")]
     Sqlite(#[from] diesel::result::Error),
@@ -85,9 +66,7 @@ pub enum ErrorCode {
     SpaceNotFound,
     DuplicateSpaceName,
     AttachmentNotFound,
-    /// Reading or writing a file outside the database failed.
     FileAccess,
-    /// The chosen file is not an export bundle this version can read.
     ImportFormat,
     /// The `field` parameter names the offending field.
     InvalidInput,
@@ -102,7 +81,6 @@ pub struct AppError {
     pub code: ErrorCode,
     /// Values to interpolate into the translated message, e.g. `{ "name": "Perso" }`.
     pub params: BTreeMap<String, String>,
-    /// Shown in the background of the banner. Not translated, but readable.
     pub detail: String,
 }
 
@@ -151,7 +129,6 @@ impl From<StorageError> for AppError {
             StorageError::SpaceNotFound(id) => {
                 Self::with(ErrorCode::SpaceNotFound, detail, "id", &id)
             }
-            // The name travels as a parameter: that is what the front interpolates.
             StorageError::DuplicateSpaceName(name) => {
                 Self::with(ErrorCode::DuplicateSpaceName, detail, "name", &name)
             }
@@ -160,8 +137,8 @@ impl From<StorageError> for AppError {
             }
             StorageError::File(_) => Self::new(ErrorCode::FileAccess, detail),
             StorageError::ImportFormat(_) => Self::new(ErrorCode::ImportFormat, detail),
-            // None of these causes gives the front anything to do beyond
-            // reporting the failure; `detail` carries the rest in plain text.
+            // Nothing here gives the front end anything to do beyond reporting the
+            // failure; `detail` carries the rest in plain text.
             StorageError::SchemaTooRecent(_)
             | StorageError::Migration(_)
             | StorageError::CorruptRow { .. }

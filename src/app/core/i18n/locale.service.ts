@@ -26,16 +26,14 @@ export class LocaleService {
   });
 
   constructor() {
-    // `<html lang>` must follow the displayed language: it drives screen-reader
-    // pronunciation and the rendering engine's typographic rules.
+    // `<html lang>` drives screen-reader pronunciation and typographic rules.
     effect(() => {
       document.documentElement.lang = this.activeLocale();
     });
   }
 
   /**
-   * Restores the language chosen in an earlier session. Called from a
-   * `provideAppInitializer`, so before the first render: otherwise the
+   * Called from a `provideAppInitializer`, so before the first render: otherwise the
    * interface would briefly appear in the default language.
    */
   restore(): void {

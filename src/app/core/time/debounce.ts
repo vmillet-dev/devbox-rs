@@ -3,7 +3,6 @@ import { DestroyRef, inject } from '@angular/core';
 /** Filtering crosses the IPC bridge: one call per keystroke would be wasted. */
 export const SEARCH_DEBOUNCE_MS = 150;
 
-/** A deferred call, and the means to give up on it. */
 export interface Debounced<T> {
   (value: T): void;
   /** Drops a call still waiting. The next one starts a fresh delay. */
@@ -11,11 +10,8 @@ export interface Debounced<T> {
 }
 
 /**
- * Runs `action` once the calls stop for `delayMs`.
- *
- * Must be built in an injection context: the pending timer is cleared on
- * destruction, which is what a hand-rolled `setTimeout` in a store has to
- * remember to do.
+ * Runs `action` once the calls stop for `delayMs`. Must be built in an injection context:
+ * the pending timer is cleared on destruction.
  */
 export function debounced<T>(action: (value: T) => void, delayMs: number): Debounced<T> {
   const destroyRef = inject(DestroyRef);

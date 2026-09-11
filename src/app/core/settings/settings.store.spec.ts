@@ -42,8 +42,6 @@ describe('SettingsStore', () => {
 
     expect(store.theme()).toBe('system');
     expect(store.density()).toBe('comfortable');
-    // What DevBox has always done: flipping this default would quit the
-    // application on someone who only meant to tidy it away.
     expect(store.closeToTray()).toBe(true);
     expect(store.minimizeToTray()).toBe(false);
     expect(store.paletteShortcut()).toBe('Ctrl+Alt+P');
@@ -72,8 +70,6 @@ describe('SettingsStore', () => {
   });
 
   it('keeps the default of a flag nothing has stored, rather than reading it as false', () => {
-    // `closeToTray` defaults to `true`: reading its absence as `false` would quit
-    // the application on the very first close.
     expect(createStore().closeToTray()).toBe(true);
   });
 
@@ -113,8 +109,6 @@ describe('SettingsStore', () => {
   });
 
   it('stamps the resolved theme and the density on the document', () => {
-    // The CSS variables live on `:root`: a class set any lower would not
-    // atteindrait pas.
     const store = createStore();
     store.setTheme('light');
     store.setDensity('compact');

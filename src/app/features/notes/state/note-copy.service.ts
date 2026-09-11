@@ -3,11 +3,9 @@ import { ClipboardService } from '@core/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 
 /**
- * Putting a note's text on the clipboard, and saying so when that failed.
- *
- * A service rather than a method on whoever needs it: copying happens from the
- * canvas, from the editor and from the fields form, and an acknowledgement that
- * is only earned in one of the three would be a lie in the other two.
+ * A service rather than a method on whoever needs it: copying happens from the canvas,
+ * from the editor and from the fields form, and an acknowledgement earned in only one
+ * of the three would be a lie in the other two.
  */
 @Injectable({ providedIn: 'root' })
 export class NoteCopyService {

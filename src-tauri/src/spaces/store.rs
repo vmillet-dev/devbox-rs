@@ -1,8 +1,3 @@
-//! Reading and writing spaces.
-//!
-//! No row structure here, unlike notes: `Space` has two fields
-//! and crosses as-is.
-
 use diesel::dsl::sql;
 use diesel::prelude::*;
 use diesel::sql_types::{Bool, Text};
@@ -12,13 +7,12 @@ use crate::db::schema::{notes, spaces};
 use crate::error::StorageError;
 use uuid::Uuid;
 
-/// An empty list is valid: it's the state of the first launch. No "All" space
-/// is manufactured here.
+/// An empty list is valid: it is the state of the first launch.
 pub fn list(connection: &mut SqliteConnection) -> Result<Vec<Space>, StorageError> {
     let rows = spaces::table
         .select((spaces::id, spaces::name))
-        // Raw fragment: Diesel does not model collations, and sorting as
-        // BINARY would place "perso" after "Zebra".
+        // Raw fragment: Diesel does not model collations, and sorting as BINARY
+        // would place "perso" after "Zebra".
         .order(sql::<Text>("name COLLATE NOCASE"))
         .load::<(String, String)>(connection)?;
 
@@ -40,19 +34,16 @@ pub fn exists(connection: &mut SqliteConnection, id: &str) -> Result<bool, Stora
     Ok(found.is_some())
 }
 
-/// Detected here rather than left to the unique index, to return a code to the
-/// front end that it knows how to translate.
-///
-/// `except_id` excludes the renamed space: without it, correcting the case of a name
-/// would be refused as a duplicate of itself, the comparison being `NOCASE`.
+/// Detected here rather than left to the unique index, to return a code the front
+/// end knows how to translate. `except_id` excludes the renamed space: without it,
+/// correcting the case of a name would be refused as a duplicate of itself.
 fn ensure_unique_name(
     connection: &mut SqliteConnection,
     name: &str,
     except_id: Option<&str>,
 ) -> Result<(), StorageError> {
-    // ⚠️ `spaces.name` is not declared `NOCASE` — only the unique index is —
-    // so the collation must be set on the comparison, otherwise "PERSO"
-    // would miss "Perso".
+    // ⚠️ `spaces.name` is not declared `NOCASE` — only the unique index is — so the
+    // collation must be set on the comparison, or "PERSO" would miss "Perso".
     let mut query = spaces::table
         .filter(
             sql::<Bool>("name = ")
@@ -88,7 +79,6 @@ pub fn create(connection: &mut SqliteConnection, name: &str) -> Result<Space, St
     Ok(space)
 }
 
-/// `name` is expected **already validated**.
 pub fn rename(
     connection: &mut SqliteConnection,
     id: &str,
@@ -110,14 +100,12 @@ pub fn rename(
     })
 }
 
-/// Deletes a space after moving its notes to `target_id`.
+/// ⚠️ Same transaction and **this order**: `notes.space_id` has an `ON DELETE
+/// CASCADE`, so deleting first — or failing between the two — would sweep away the
+/// notes instead of moving them.
 ///
-/// ⚠️ Same transaction and **this order**: `notes.space_id` has an
-/// `ON DELETE CASCADE`, so deleting first — or failing between the two —
-/// would sweep away the notes instead of moving them.
-///
-/// `updated_at` is not refreshed: touching it would float the whole absorbed
-/// space to the top of the canvas, which sorts on it.
+/// `updated_at` is not refreshed: touching it would float the whole absorbed space
+/// to the top of the canvas, which sorts on it.
 pub fn delete(
     connection: &mut SqliteConnection,
     id: &str,

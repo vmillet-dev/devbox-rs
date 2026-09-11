@@ -39,7 +39,6 @@ describe('ShortcutsDialogComponent', () => {
   });
 
   it('lists the global shortcuts even when no feature has contributed', async () => {
-    // They are the application's own, and they work with the window closed.
     expect(groupTitles()).toEqual(['Globaux (même fenêtre fermée)']);
     expect(keysFor('palette de collage rapide')).toEqual(['Ctrl', 'Alt', 'P']);
     expect(keysFor('Capturer le presse-papier')).toEqual(['Ctrl', 'Alt', 'V']);
@@ -74,7 +73,6 @@ describe('ShortcutsDialogComponent', () => {
   });
 
   it('draws the separator between two caps rather than writing it', async () => {
-    // A "+" inside a cap reads as a key to look for on the keyboard.
     const row = fixture.nativeElement.querySelector('.shortcut-keys') as HTMLElement;
 
     expect(row.querySelectorAll('kbd')).toHaveLength(3);

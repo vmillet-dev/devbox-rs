@@ -24,7 +24,6 @@ import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.componen
 /** The footer label is either plain text (a source name) or a translation reference (a time). */
 type FooterLabel = { kind: 'text'; value: string } | { kind: 'ref'; ref: TranslationRef };
 
-/** A move requested from a card's menu. */
 export interface NoteMove {
   readonly noteId: string;
   readonly spaceId: string;
@@ -42,7 +41,6 @@ const MAX_VISIBLE_TAGS = 2;
 /** What fits between the progress bar and the footer on a 150 px card. */
 const MAX_VISIBLE_ITEMS = 2;
 
-/** A box ticked on a card: the note, and the list as it becomes. */
 export interface ItemToggle {
   readonly noteId: string;
   readonly items: readonly ChecklistItem[];
@@ -65,7 +63,6 @@ export class NoteCardComponent {
   private readonly clock = inject(ClockService);
 
   readonly note = input.required<Note>();
-  /** The note open in the editor. */
   readonly selected = input(false);
   /** The note keyboard navigation points at — distinct from the selection. */
   readonly focused = input(false);
@@ -77,16 +74,14 @@ export class NoteCardComponent {
   readonly checkToggled = output<string>();
   readonly moveRequested = output<NoteMove>();
   readonly deleteRequested = output<string>();
-  /** The note carries `{{fields}}`: the page opens the input form. */
   readonly fillRequested = output<string>();
-  /** A box ticked from the canvas, without going through the editor. */
   readonly itemToggled = output<ItemToggle>();
 
   private readonly cardButton = viewChild.required<ElementRef<HTMLButtonElement>>('cardButton');
 
   constructor() {
-    // Real focus follows the state, otherwise arrow navigation would move an
-    // outline without taking the keyboard with it.
+    // Real focus follows the state, or arrow navigation would move an outline without
+    // taking the keyboard with it.
     effect(() => {
       if (this.focused() && document.activeElement !== this.cardButton().nativeElement) {
         this.cardButton().nativeElement.focus({ preventScroll: false });
@@ -113,9 +108,8 @@ export class NoteCardComponent {
   protected readonly hasPlaceholders = computed(() => this.note().placeholders.length > 0);
 
   /**
-   * The back end has already decided **what** to show; only the rendering is
-   * left. The two dated variants are formatted here so the label ages on screen
-   * without a new query.
+   * The back end has already decided **what** to show. The two dated variants are
+   * formatted here so the label ages on screen without a new query.
    */
   protected readonly footerLabel = computed<FooterLabel>(() => {
     const footer = this.note().footer;
@@ -129,8 +123,8 @@ export class NoteCardComponent {
   });
 
   /**
-   * Ctrl ticks, Shift extends the range, a bare click opens — the convention of
-   * a file list, which is what the canvas became once it gained a selection.
+   * Ctrl ticks, Shift extends the range, a bare click opens — the convention of a file
+   * list, which is what the canvas became once it gained a selection.
    */
   protected onOpen(event: MouseEvent): void {
     this.opened.emit({
@@ -147,10 +141,8 @@ export class NoteCardComponent {
   }
 
   /**
-   * Ticking from the card without opening the note — the real gesture of a todo
-   * list, crossed off as one goes.
-   *
-   * The card emits the **whole** list as it becomes: it persists nothing itself.
+   * Ticking from the card without opening the note. The card emits the **whole** list as
+   * it becomes: it persists nothing itself.
    */
   protected onItemToggle(event: MouseEvent, index: number): void {
     event.stopPropagation();

@@ -18,9 +18,8 @@ export class LifecycleBadgeComponent {
   readonly lifecycle = input.required<NoteLifecycle>();
 
   /**
-   * A near deadline, as the back end decided it. Recomputing the threshold here
-   * would make a second owner, free to drift from the one that decides the
-   * sections' "due soon" hint.
+   * A near deadline, as the back end decided it: recomputing the threshold here would
+   * make a second owner, free to drift from the one deciding the sections' hint.
    */
   readonly expiringSoon = input(false);
 

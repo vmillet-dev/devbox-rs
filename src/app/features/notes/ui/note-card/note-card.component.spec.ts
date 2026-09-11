@@ -45,8 +45,6 @@ describe('NoteCardComponent', () => {
   });
 
   it('falls back to a translated placeholder for an untitled note', async () => {
-    // A freshly created note has no title; storing "Nouvelle note" in the data
-    // would freeze French into the database.
     fixture.componentRef.setInput('note', createNote({ title: '' }));
     await fixture.whenStable();
 
@@ -57,8 +55,6 @@ describe('NoteCardComponent', () => {
     fixture.componentRef.setInput('note', createNote({ content: 'one\ntwo\nthree\nfour' }));
     await fixture.whenStable();
 
-    // The snippet goes through the code viewer, which renders one element per
-    // line rather than a single text node.
     const lines = fixture.debugElement.queryAll(By.css('.card-snippet .line-content'));
     expect(lines.map((line) => line.nativeElement.textContent)).toEqual(['one', 'two', 'three']);
   });
@@ -74,7 +70,6 @@ describe('NoteCardComponent', () => {
     fixture.componentRef.setInput('note', createNote({ content: 'one\ntwo' }));
     await fixture.whenStable();
 
-    // A gutter on a three-line excerpt is noise, and it would eat into the width.
     expect(fixture.debugElement.queryAll(By.css('.card-snippet .line-no'))).toHaveLength(0);
   });
 
@@ -87,10 +82,9 @@ describe('NoteCardComponent', () => {
   });
 
   /**
-   * Which footer a note gets is decided in Rust (`domain::display`) and tested
-   * there. What is left here is rendering the variant that arrives — including
-   * formatting the dated ones locally, so the label keeps ageing on screen
-   * without another round trip.
+   * Which footer a note gets is decided in Rust and tested there. What is left here is
+   * rendering the variant that arrives, dated ones formatted locally so the label keeps
+   * ageing on screen.
    */
   describe('footer', () => {
     it('renders an expiry footer as a countdown', async () => {
@@ -146,8 +140,6 @@ describe('NoteCardComponent', () => {
   });
 
   it('keeps the card button free of flow content, which a <button> may not contain', () => {
-    // Nested <div> inside a <button> is invalid HTML with undefined
-    // accessibility behaviour across browsers.
     expect(fixture.nativeElement.querySelectorAll('button div')).toHaveLength(0);
   });
 
@@ -157,16 +149,12 @@ describe('NoteCardComponent', () => {
     let emitted: string | undefined;
     fixture.componentInstance.opened.subscribe(({ noteId }) => (emitted = noteId));
 
-    // An explicit `MouseEvent`: the card reads its modifiers to choose between
-    // opening, ticking and extending the selection.
     fixture.debugElement.query(By.css('.card')).triggerEventHandler('click', new MouseEvent('click'));
 
     expect(emitted).toBe('note-42');
   });
 
   it('reports the click modifiers instead of deciding what they mean', async () => {
-    // Ctrl checks, Shift extends the range, a bare click opens — the file-list
-    // convention. Which store call that becomes is the page's business.
     fixture.componentRef.setInput('note', createNote({ id: 'note-42' }));
     await fixture.whenStable();
     const activations: NoteActivation[] = [];
@@ -183,7 +171,6 @@ describe('NoteCardComponent', () => {
   });
 
   it('checks the note without opening it', async () => {
-    // The checkbox is a control of its own, sitting on a card that is a button.
     fixture.componentRef.setInput('note', createNote({ id: 'note-42' }));
     await fixture.whenStable();
     let checked: string | undefined;
@@ -239,7 +226,6 @@ describe('NoteCardComponent', () => {
     });
 
     it('gives the menu the placeholder title the card itself shows', async () => {
-      // Resolving it once here keeps the untitled rule in a single place.
       fixture.componentRef.setInput('note', createNote({ title: '' }));
       await fixture.whenStable();
 
@@ -337,8 +323,6 @@ describe('NoteCardComponent', () => {
 
       fixture.nativeElement.querySelector('.card-item').click();
 
-      // Les items vivent hors du bouton de carte, mais un clic remonterait
-      // reach it without the `stopPropagation`.
       expect(opened).toEqual([]);
     });
 

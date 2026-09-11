@@ -5,12 +5,8 @@ import { UpdateStore } from '@core/updates/update.store';
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
 /**
- * The prompt offering an update, shown as soon as a newer version is published.
- *
- * The component decides nothing: it renders `UpdateStore`'s state and hands
- * back the user's choice. Once installing starts both buttons disappear, and
- * the dialog stops being dismissible, because there is nothing left to cancel:
- * the installer is replacing the files.
+ * Once installing starts both buttons disappear and the dialog stops being dismissible:
+ * there is nothing left to cancel, the installer is replacing the files.
  */
 @Component({
   selector: 'app-update-prompt',

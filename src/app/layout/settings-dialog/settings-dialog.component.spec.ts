@@ -114,7 +114,6 @@ describe('SettingsDialogComponent', () => {
     optionLabelled('Variables').click();
     await fixture.whenStable();
 
-    // The feature unloads: its page goes with it.
     registry.unregister(['notes.variables']);
     await fixture.whenStable();
 

@@ -31,8 +31,7 @@
   font-size: 9px;
 }
 
-// Anchored right: the menu sits at the end of the bar, and opening leftwards is
-// what keeps it inside the window.
+// Anchored right: opening leftwards is what keeps the menu inside the window.
 .about-dropdown {
   position: absolute;
   top: calc(100% + 6px);
@@ -74,8 +73,7 @@
   color: var(--text-2);
 }
 
-// Empty while there is nothing to announce, but never `display: none`: an
-// `aria-live` region has to be in the DOM before the update to be read out.
+// Never `display: none`: an `aria-live` region has to be in the DOM before the update.
 .about-option-status {
   font-size: 11px;
   color: var(--text-2);
@@ -86,7 +84,6 @@
   }
 }
 
-// Separates the update check from the help panels, and those from the card.
 .about-separator {
   height: 1px;
   margin: 4px 6px;

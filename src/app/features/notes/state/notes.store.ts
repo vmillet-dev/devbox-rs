@@ -12,28 +12,21 @@ import { SpacesStore } from './spaces.store';
 
 export type { NoteFilter, NoteKind } from '../model/note.model';
 
-/** How long undo stays offered. The note is not lost after that: it is in the trash for 30 days. */
+/** The note is not lost after that: it stays in the trash for 30 days. */
 export const UNDO_WINDOW_MS = 8000;
 
-/** What an undo needs to take back. */
 export interface Deletion {
   readonly ids: readonly string[];
   readonly count: number;
 }
 
 /**
- * The note being created, **never persisted**.
- *
- * Opening creation writes nothing: one empty note per opening would turn the
- * canvas into a pile of things to tidy up.
+ * The note being created, **never persisted**: one empty note per opening would turn
+ * the canvas into a pile of things to tidy up.
  */
 export const DRAFT_ID = '__draft__';
 
-/**
- * What tells a note worth keeping from one to abandon. A tag or a deadline is
- * enough — and so is an item, since a todo list has no body and would otherwise
- * stay local and vanish on close.
- */
+/** A tag, a deadline or an item is enough — a todo list has no body. */
 function isWorthSaving(note: Note): boolean {
   return (
     note.title.trim() !== '' ||
@@ -47,9 +40,8 @@ function isWorthSaving(note: Note): boolean {
 }
 
 /**
- * Empty title and source: the UI renders translated placeholders, and storing
- * "New note" would freeze one language into the data. `txt` means "nothing
- * chosen", which `create_note` replaces with a detection on the content.
+ * Empty title and source: the UI renders translated placeholders, and storing "New
+ * note" would freeze one language into the data. `txt` means "nothing chosen".
  */
 function emptyDraft(spaceId: string, kind: NoteKind): NoteDraft {
   return {
@@ -66,11 +58,7 @@ function emptyDraft(spaceId: string, kind: NoteKind): NoteDraft {
   };
 }
 
-/**
- * The draft seen as a `Note`, so the editor need not know two shapes. The
- * derived fields carry neutral values: they come from the back end, which has
- * not seen this note yet.
- */
+/** The draft seen as a `Note`, so the editor need not know two shapes. */
 function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
   return {
     ...emptyDraft(spaceId, kind),
@@ -81,12 +69,10 @@ function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
     expiringSoon: false,
     placeholders: [],
     attachmentCount: 0,
-    // A draft todo list has no stored items yet, so nothing to render.
     copyText: null,
   };
 }
 
-/** What goes to `create_note`: the draft without its derived fields. */
 function toDraftPayload(note: Note): NoteDraft {
   return {
     spaceId: note.spaceId,
@@ -123,13 +109,9 @@ function sameLifecycle(a: NoteLifecycle, b: NoteLifecycle): boolean {
 }
 
 /**
- * How each field decides it has not moved.
- *
  * ⚠️ Exhaustive by construction: a field added to `NoteDraft` stops this table
- * compiling until it says how to compare itself. `Date` and arrays compare by
- * identity, and a patch replaying a value already stored would otherwise make a
- * write — which refreshes `updatedAt` and floats the note to the top of the
- * canvas for nothing.
+ * compiling until it says how to compare itself. A patch replaying a value already
+ * stored would otherwise write, refreshing `updatedAt` and floating the note up.
  */
 const UNCHANGED: {
   readonly [K in keyof Required<NotePatch>]: (current: Note[K], next: Required<NotePatch>[K]) => boolean;
@@ -146,7 +128,6 @@ const UNCHANGED: {
   lifecycle: sameLifecycle,
 };
 
-/** The fields of `patch` that actually move the note. */
 function changedFields(note: Note, patch: NotePatch): NotePatch {
   const changed: Record<string, unknown> = {};
 
@@ -165,14 +146,8 @@ function changedFields(note: Note, patch: NotePatch): NotePatch {
 }
 
 /**
- * The open note: creating it, writing to it, throwing it away.
- *
- * Which notes the canvas shows belongs to [`NotesQueryStore`], and which one it
- * points at to [`NoteSelectionStore`]; what is left here is the note itself.
- *
- * Two rules: writable signals stay private (every mutation goes through a
- * method), and **the back end decides** — persist then reload, so there is
- * nothing to roll back on failure.
+ * Writable signals stay private — every mutation goes through a method — and **the
+ * back end decides**: persist then reload, so there is nothing to roll back.
  */
 @Injectable({ providedIn: 'root' })
 export class NotesStore {
@@ -193,24 +168,18 @@ export class NotesStore {
   readonly selectedNote = computed<Note | null>(() => this._draftNote() ?? this._selectedNote());
   readonly selectedNoteId = computed<string | null>(() => this.selectedNote()?.id ?? null);
 
-  /**
-   * The id actually in the database, or `null` while the open note is only a
-   * draft. What anything needing a real row must read — attachments, say.
-   */
+  /** The id actually in the database, or `null` while the open note is only a draft. */
   readonly persistedNoteId = computed<string | null>(() => this._selectedNote()?.id ?? null);
   readonly lastDeletion = this._lastDeletion.asReadonly();
 
-  /** What the banner shows: the same deletion, while it is still offered. */
   readonly undoBanner = computed<Deletion | null>(() => (this._undoVisible() ? this._lastDeletion() : null));
 
   private readonly hideUndoBanner = debounced(() => this._undoVisible.set(false), UNDO_WINDOW_MS);
 
   /**
-   * The real id the draft took once saved.
-   *
-   * ⚠️ Load-bearing: closing the editor commits the title **then** the content
-   * with no change detection in between, so the second call still carries
-   * `DRAFT_ID` while the note already exists.
+   * ⚠️ Load-bearing: closing the editor commits the title **then** the content with
+   * no change detection in between, so the second call still carries `DRAFT_ID` while
+   * the note already exists.
    */
   private draftMaterialisedAs: string | null = null;
 
@@ -226,19 +195,11 @@ export class NotesStore {
     this._selectedNote.set(null);
   }
 
-  // --- Writing to a note -----------------------------------------------------
-
   /**
-   * The single write for a note's own fields: title, body, source, language,
-   * tags, pin, deadline, space, items.
-   *
-   * The editor sends what it changed and this drops what has not moved, so
-   * closing on an untouched note makes no round trip. There is deliberately no
-   * setter per field: nine of them made a new field a four-file change, and the
-   * "has it moved?" rule was written out nine times.
-   *
-   * No normalisation either — trim, leading `#` and duplicate tags are decided
-   * by `notes::model::normalize_tags`, the only place that rule lives.
+   * The single write for a note's own fields. The editor sends what it changed and
+   * this drops what has not moved, so closing on an untouched note makes no round
+   * trip: nine setters made a new field a four-file change, and wrote the "has it
+   * moved?" rule out nine times.
    */
   applyPatch(id: string, patch: NotePatch): Promise<void> {
     return this.edit(id, (note) => {
@@ -251,32 +212,20 @@ export class NotesStore {
     return this.edit(id, (note) => ({ pinned: !note.pinned }));
   }
 
-  /**
-   * `spaceId` is the only field the front pushes without the user typing it,
-   * and the only one storage refuses when the space is gone.
-   */
+  /** The only field storage refuses, when the space is gone. */
   moveNote(id: string, spaceId: string): Promise<void> {
     return this.applyPatch(id, { spaceId });
   }
 
-  /**
-   * Replaces the **whole** list — ticking, renaming, adding, removing and
-   * reordering all go through here, because no item has an identity of its own:
-   * its position is all that designates it.
-   */
+  /** Replaces the **whole** list: an item has no identity beyond its position. */
   setChecklist(id: string, items: readonly ChecklistItem[]): Promise<void> {
     return this.applyPatch(id, { items });
   }
 
-  // --- Creating --------------------------------------------------------------
-
   /**
-   * Opens the editor on a **local draft**: nothing is written until the note is
-   * worth keeping.
-   *
-   * In "all spaces" mode the note goes to the first one — one has to be picked.
-   * With no space at all it is refused outright: a note without a space would
-   * be invisible the moment a space filter is set.
+   * Opens the editor on a **local draft**: nothing is written until the note is worth
+   * keeping. In "all spaces" mode it goes to the first space; with no space at all it
+   * is refused, a note without one being invisible under any space filter.
    */
   createNote(kind: NoteKind = 'snippet'): void {
     const spaceId = this.spaceForNewNote();
@@ -292,10 +241,7 @@ export class NotesStore {
     await this.createWithContent(await this.clipboard.paste());
   }
 
-  /**
-   * A note created in one gesture because it already has its content. No draft
-   * here — there is nothing to wait for, and the editor opens on a saved note.
-   */
+  /** Already carries its content, so no draft: the editor opens on a saved note. */
   async createWithContent(content: string): Promise<void> {
     if (!content.trim()) return;
 
@@ -305,12 +251,7 @@ export class NotesStore {
     await this.persistNew({ ...emptyDraft(spaceId, 'snippet'), content });
   }
 
-  /**
-   * Forces the draft to be saved and returns its real id.
-   *
-   * Used by whatever needs an **existing** note — attaching a file targets a
-   * database row. Answers `null` when there is nothing to save.
-   */
+  /** Forces the draft to be saved and returns its real id, `null` if there is none. */
   async materialiseDraft(): Promise<string | null> {
     const persisted = this.persistedNoteId();
     if (persisted) return persisted;
@@ -320,8 +261,6 @@ export class NotesStore {
 
     return this.saveDraft(draft);
   }
-
-  // --- Deleting, and taking it back ------------------------------------------
 
   /** Moves to the trash and offers the undo. The note stays there for 30 days. */
   async deleteNote(id: string): Promise<void> {
@@ -347,10 +286,7 @@ export class NotesStore {
     this.notes.reload();
   }
 
-  /**
-   * The bulk actions follow the same rule as the single writes: the back end
-   * decides, we reload, nothing is applied locally.
-   */
+  /** Same rule as the single writes: the back end decides, we reload. */
   async moveSelection(spaceId: string): Promise<void> {
     await this.runOnSelection((ids) => this.repository.moveMany(ids, spaceId));
   }
@@ -386,24 +322,16 @@ export class NotesStore {
     if (restored !== null) this.notes.reload();
   }
 
-  /**
-   * Hiding the banner **gives up** the undo: an explicit gesture, unlike the
-   * timer expiring, which only tidies the display away.
-   */
+  /** Hiding the banner **gives up** the undo, unlike the timer running out. */
   dismissUndo(): void {
     this.hideUndoBanner.cancel();
     this._undoVisible.set(false);
     this._lastDeletion.set(null);
   }
 
-  // --- `{{fields}}` ----------------------------------------------------------
-
   /**
-   * Stores what was typed into a note's `{{fields}}`.
-   *
-   * ⚠️ Outside `edit()` and `NotePatch`: filling a field is not editing the
-   * note. The back end leaves `updatedAt` where it is, so the note does not
-   * float to the top of the canvas for a value typed in the panel.
+   * ⚠️ Outside `edit()` and `NotePatch`: filling a field is not editing the note, so
+   * `updatedAt` stays put and the note does not float to the top of the canvas.
    */
   async setPlaceholderValues(id: string, values: Record<string, string>): Promise<void> {
     const resolved = this.resolve(id);
@@ -418,20 +346,13 @@ export class NotesStore {
     if (this.persistedNoteId() === target) {
       this._selectedNote.set(saved);
     }
-    // The cards carry the same values: the filled copy from the canvas starts
-    // from them.
     this.notes.reload();
   }
 
-  /**
-   * Fills a piece of content's `{{fields}}`. The back end is the only judge of
-   * what is a field and what is Angular template code.
-   */
+  /** The back end is the only judge of what is a field and what is template code. */
   fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
     return this.repository.fillPlaceholders(content, values);
   }
-
-  // --- Internals -------------------------------------------------------------
 
   private spaceForNewNote(): string | null {
     const spaceId = this.spaces.activeSpaceId() ?? this.spaces.spaces()[0]?.id;
@@ -443,7 +364,7 @@ export class NotesStore {
     return spaceId;
   }
 
-  /** Writes the draft and adopts the returned note. The one place `DRAFT_ID` stops existing. */
+  /** Writes the draft and adopts the returned note: `DRAFT_ID` stops existing here. */
   private async saveDraft(draft: Note): Promise<string | null> {
     const created = await this.persistNew(toDraftPayload(draft));
     if (!created) return null;
@@ -480,9 +401,8 @@ export class NotesStore {
   }
 
   /**
-   * ⚠️ The banner fades, **the deletion stays undoable**. The two states are
-   * distinct so `Ctrl+Z` still works after the banner is gone: hiding a
-   * suggestion is not withdrawing it.
+   * ⚠️ The banner fades, **the deletion stays undoable**: `Ctrl+Z` still works once it
+   * is gone, hiding a suggestion not being withdrawing it.
    */
   private openUndoWindow(deletion: Deletion): void {
     this._lastDeletion.set(deletion);
@@ -490,11 +410,7 @@ export class NotesStore {
     this.hideUndoBanner(undefined);
   }
 
-  /**
-   * The shape shared by every write: find the note, decide the patch, persist.
-   * `changes` answers `null` when nothing moved — a missing note and a no-op
-   * edit both produce no round trip.
-   */
+  /** `changes` answers `null` when nothing moved: a no-op edit makes no round trip. */
   private async edit(id: string, changes: (note: Note) => NotePatch | null): Promise<void> {
     const resolved = this.resolve(id);
     const target = this.find(resolved);
@@ -510,8 +426,8 @@ export class NotesStore {
   }
 
   /**
-   * A write on a draft stays **local** while the note is not worth keeping:
-   * changing an empty note's language must not make it appear on the canvas.
+   * A write on a draft stays **local** while the note is not worth keeping: changing
+   * an empty note's language must not make it appear on the canvas.
    */
   private async editDraft(draft: Note, patch: NotePatch): Promise<void> {
     const updated: Note = { ...draft, ...patch };
@@ -525,20 +441,16 @@ export class NotesStore {
   }
 
   /**
-   * `DRAFT_ID` names the draft **or** the note it became: the editor chains
-   * several commits with no change detection in between, and so keeps sending
-   * the old id.
+   * `DRAFT_ID` names the draft **or** the note it became: the editor chains several
+   * commits with no change detection in between, and keeps sending the old id.
    */
   private resolve(id: string): string {
     return id === DRAFT_ID && this.draftMaterialisedAs ? this.draftMaterialisedAs : id;
   }
 
   /**
-   * Persists then reloads. The returned note decides: it carries what the back
-   * end actually wrote (`updatedAt`, normalised tags, card footer).
-   *
-   * `NotePatch` and not `Partial<Note>`: the latter would let `id`, `createdAt`
-   * or `footer` through to the repository boundary.
+   * The returned note decides: it carries what the back end actually wrote. `NotePatch`
+   * and not `Partial<Note>`, which would let `id` or `createdAt` reach the repository.
    */
   private async persist(id: string, patch: NotePatch): Promise<void> {
     const saved = await this.notifier.attempt('errors.noteSaveFailed', () =>
@@ -553,8 +465,8 @@ export class NotesStore {
   }
 
   /**
-   * The open note is consulted first: it may have left the filtered view since
-   * it was opened without ceasing to be editable.
+   * The open note is consulted first: it may have left the filtered view since it was
+   * opened without ceasing to be editable.
    */
   private find(id: string): Note | null {
     const draft = this._draftNote();

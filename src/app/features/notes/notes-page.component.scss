@@ -60,8 +60,6 @@
   }
 }
 
-// Quiet on purpose: it speaks to whoever is looking for it, not to whoever
-// is reading their notes.
 .canvas-keyboard-hint {
   margin: 6px 0 0;
   font-size: 10.5px;
@@ -69,8 +67,7 @@
   text-align: center;
 }
 
-// Next to the filters and not in the "File" menu: the trash is a view on the
-// notes, not a file operation.
+// Next to the filters and not in the "File" menu: the trash is a view on the notes.
 .trash-btn {
   all: unset;
   box-sizing: border-box;

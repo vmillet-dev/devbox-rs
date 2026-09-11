@@ -1,13 +1,11 @@
 /**
- * The rungs a modal may sit on, from the one furthest back to the one in front.
+ * The **order is the value**: a rung's position in this list decides both the `z-index`
+ * and which dialog Escape reaches, so adding one is a single entry here. No stylesheet
+ * carries a modal `z-index`.
  *
- * The **order is the value**: the position in this list decides both the
- * `z-index` and which dialog Escape reaches, so adding a rung is one entry here
- * and nothing else. No stylesheet carries a modal `z-index` any more.
- *
- * ⚠️ The banners of `layout/` sit at 80 and must stay above every modal: they
- * are triggered from inside one, and a blurred backdrop over them would hide
- * the acknowledgement. Hence the base well below it.
+ * ⚠️ The banners of `layout/` sit at 80 and must stay above every modal: they are
+ * triggered from inside one, and a blurred backdrop over them would hide the
+ * acknowledgement. Hence the base well below it.
  */
 const LAYERS = ['editor', 'app', 'settings', 'update', 'palette', 'fields', 'zoom'] as const;
 
@@ -20,11 +18,9 @@ export function dialogRung(layer: DialogLayer): number {
 }
 
 /**
- * How the panel is framed.
- *
  * - `fitted` — height follows the content, the panel is padded.
- * - `framed` — fixed height with a scrolling middle, so changing page does not
- *   make the panel jump under the cursor. Its sections carry their own padding.
+ * - `framed` — fixed height with a scrolling middle, so changing page does not make the
+ *   panel jump under the cursor. Its sections carry their own padding.
  * - `bare` — no surface at all: what is shown *is* the content (an image).
  */
 export type DialogVariant = 'fitted' | 'framed' | 'bare';

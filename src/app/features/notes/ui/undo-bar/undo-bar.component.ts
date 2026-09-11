@@ -2,10 +2,8 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
- * The banner offering to take a deletion back.
- *
- * `role="status"` and not `alert`: a deletion the user asked for is not an
- * alert, and a screen reader must not interrupt to announce it.
+ * `role="status"` and not `alert`: a deletion the user asked for is not an alert, and a
+ * screen reader must not interrupt to announce it.
  */
 @Component({
   selector: 'app-undo-bar',

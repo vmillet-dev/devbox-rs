@@ -1,6 +1,3 @@
-//! Spaces read and written against a real database — deletion included, which
-//! moves the notes out before dropping, on pain of a cascade.
-
 use diesel::SqliteConnection;
 use diesel::prelude::*;
 
@@ -11,8 +8,8 @@ use devbox_lib::spaces::store::{create, delete, exists, list, rename};
 
 const T0: &str = "2026-07-25T09:00:00.000Z";
 
-/// A note written straight into the database: these tests are about spaces, and
-/// going through `notes::create` would drag its own rules in.
+/// A note written straight into the database: going through `notes::create` would
+/// drag its own rules in.
 fn note_in(connection: &mut SqliteConnection, space_id: &str) {
     diesel::insert_into(notes::table)
         .values((
@@ -69,7 +66,6 @@ fn spaces_are_listed_in_name_order() {
     create(&mut connection, "Boulot").unwrap();
     create(&mut connection, "perso").unwrap();
 
-    // Case-insensitive: a BINARY sort would file "perso" after "Veille".
     assert_eq!(names(&mut connection), ["Boulot", "perso", "Veille"]);
 }
 
@@ -100,7 +96,6 @@ fn a_renamed_space_keeps_its_identifier() {
 
     let renamed = rename(&mut connection, &space.id, "Personnel").unwrap();
 
-    // The id is what the notes point at: changing it would orphan them.
     assert_eq!(renamed.id, space.id);
     assert_eq!(renamed.name, "Personnel");
     assert_eq!(list(&mut connection).unwrap()[0].name, "Personnel");
@@ -111,8 +106,6 @@ fn a_space_can_be_renamed_to_a_different_case_of_its_own_name() {
     let mut connection = open_in_memory().unwrap();
     let space = create(&mut connection, "perso").unwrap();
 
-    // The uniqueness check is COLLATE NOCASE: without excluding the row
-    // being renamed, it would see the space as a duplicate of itself.
     let renamed = rename(&mut connection, &space.id, "Perso").unwrap();
 
     assert_eq!(renamed.name, "Perso");
@@ -148,8 +141,6 @@ fn deleting_a_space_moves_its_notes_to_the_target() {
 
     delete(&mut connection, &doomed.id, &refuge.id).unwrap();
 
-    // The schema cascades on space deletion; the move must happen first or
-    // the note disappears with its space.
     let space_id = notes::table
         .find("n-1")
         .select(notes::space_id)
@@ -168,8 +159,6 @@ fn moving_notes_out_of_a_deleted_space_does_not_touch_their_timestamps() {
 
     delete(&mut connection, &doomed.id, &refuge.id).unwrap();
 
-    // The canvas orders on updated_at: refreshing it would float the whole
-    // absorbed space to the top as if every note had just been edited.
     let updated_at = notes::table
         .find("n-1")
         .select(notes::updated_at)
@@ -207,8 +196,6 @@ fn deleting_into_an_unknown_space_changes_nothing() {
 
     let error = delete(&mut connection, &doomed.id, "inconnu").unwrap_err();
 
-    // Rolling back matters here: a half-applied delete would have taken the
-    // notes with it.
     assert!(matches!(error, StorageError::SpaceNotFound(_)));
     assert_eq!(list(&mut connection).unwrap().len(), 1);
     assert_eq!(

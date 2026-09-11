@@ -1,9 +1,7 @@
 @use 'mixins' as *;
 
-// Above **every** modal: an acknowledgement triggered from inside one — "copy
-// filled", say — would otherwise land behind its blurred backdrop, which is to
-// say nowhere. The banner stays in the flow and still pushes the content down;
-// it merely stops being covered.
+// Above **every** modal: an acknowledgement triggered from inside one — "copy filled",
+// say — would otherwise land behind its blurred backdrop, which is to say nowhere.
 :host {
   position: relative;
   z-index: 80;

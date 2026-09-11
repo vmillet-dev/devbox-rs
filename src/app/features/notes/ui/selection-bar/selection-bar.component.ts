@@ -3,10 +3,8 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Space } from '@features/notes/model/space.model';
 
 /**
- * The multi-selection action bar: move, tag, share, trash.
- *
- * Only appears when there is a selection — a permanently empty bar would eat
- * canvas height to offer nothing.
+ * Only appears when there is a selection: a permanently empty bar would eat canvas
+ * height to offer nothing.
  */
 @Component({
   selector: 'app-selection-bar',
@@ -28,10 +26,7 @@ export class SelectionBarComponent {
 
   protected readonly tagDraft = signal('');
 
-  /**
-   * Deletion in two steps, as elsewhere: the WebView blocks on a native
-   * `confirm()`, and a bulk action deserves more than one click.
-   */
+  /** Deletion in two steps, as elsewhere: the WebView blocks on a native `confirm()`. */
   protected readonly confirmingDelete = signal(false);
 
   protected onMove(spaceId: string): void {

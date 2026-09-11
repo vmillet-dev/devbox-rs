@@ -1,28 +1,25 @@
 import type { AppError, ErrorCode } from './bindings';
 
 /**
- * Failure causes the back end can name. A plain alias of the union **generated**
- * from `ErrorCode`, so a variant added in Rust appears here on regeneration and
- * breaks the build everywhere it is not handled.
+ * A plain alias of the union **generated** from `ErrorCode`, so a variant added in Rust
+ * appears here on regeneration and breaks the build everywhere it is not handled.
  *
- * These are **codes**, never text: that is what allows reacting to a precise
- * cause and showing a translated message, where a sentence written in Rust
- * would impose its language on the whole interface.
+ * These are **codes**, never text: a sentence written in Rust would impose its language
+ * on the whole interface.
  */
 export type IpcErrorCode = ErrorCode;
 
 /**
- * A Rust `Result` seen from TypeScript. Redeclared rather than imported: the
- * generator writes it inline in every signature without ever naming it.
+ * Redeclared rather than imported: the generator writes it inline in every signature
+ * without ever naming it.
  */
 export type IpcResult<T> = { status: 'ok'; data: T } | { status: 'error'; error: AppError };
 
 /**
- * Exhaustive by construction: adding a variant to `ErrorCode` in Rust makes
- * this object incomplete and fails the build here.
+ * Exhaustive by construction: a variant added to `ErrorCode` fails the build here.
  *
- * ⚠️ Needed despite the typing, because `bindings.ts` **declares** an `AppError`
- * where Tauri may have rejected with something else (see [`IpcError`]).
+ * ⚠️ Needed despite the typing, because `bindings.ts` **declares** an `AppError` where
+ * Tauri may have rejected with something else (see [`IpcError`]).
  */
 const IPC_ERROR_CODES: Record<IpcErrorCode, true> = {
   noteNotFound: true,
@@ -53,12 +50,10 @@ function describeCause(cause: unknown): string {
 }
 
 /**
- * A command failure.
- *
- * ⚠️ `code` is `null` when the rejection does not come from our commands: Tauri
- * rejects with a plain **string** for an unknown command or an argument that
- * fails to deserialise, and `bindings.ts` files that in the `error` branch
- * typed as an `AppError` it is not. Hence the fallback to `describeCause`.
+ * ⚠️ `code` is `null` when the rejection does not come from our commands: Tauri rejects
+ * with a plain **string** for an unknown command or an argument that fails to
+ * deserialise, and `bindings.ts` files that in the `error` branch typed as an `AppError`
+ * it is not. Hence the fallback to `describeCause`.
  */
 export class IpcError extends Error {
   readonly code: IpcErrorCode | null;
@@ -78,11 +73,8 @@ export class IpcError extends Error {
 }
 
 /**
- * Turns the bindings' discriminated `Result` into a value or an exception.
- *
- * The repositories throw rather than propagate the `status`: stores and
- * components already react to a `catch`, and carrying the discriminant up to
- * them would make every caller hold a branch `ErrorNotifier` handles once.
+ * The repositories throw rather than propagate the `status`: carrying the discriminant
+ * up would make every caller hold a branch `ErrorNotifier` handles once.
  */
 export function unwrap<T>(command: string, result: IpcResult<T>): T {
   if (result.status === 'error') {

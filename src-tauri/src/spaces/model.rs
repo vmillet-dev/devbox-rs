@@ -1,7 +1,5 @@
-//! Spaces: the folders where notes are stored.
-//!
-//! No "All spaces" entry on the data side: it's a display mode,
-//! and creating one would cause notes to be filed into it.
+//! No "All spaces" entry on the data side: it is a display mode, and creating one
+//! would have notes filed into it.
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -16,7 +14,6 @@ pub struct Space {
     pub name: String,
 }
 
-/// No identifier: persistence assigns it.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceDraft {
@@ -39,9 +36,9 @@ impl SpaceDraft {
     }
 }
 
-/// A space cannot be its own refuge: the `ON DELETE CASCADE`
-/// would sweep away the notes right after the transfer. Persistence cannot
-/// decide — from both sides, the space exists.
+/// A space cannot be its own refuge: the `ON DELETE CASCADE` would sweep away the
+/// notes right after the transfer. Persistence cannot decide — from both sides, the
+/// space exists.
 pub fn validate_move_target(id: &str, target_id: &str) -> Result<(), ValidationError> {
     if id == target_id {
         return Err(ValidationError::new(
@@ -65,8 +62,6 @@ mod tests {
 
     #[test]
     fn a_name_is_trimmed_before_being_stored() {
-        // NOCASE folds case but not whitespace: without this, "Perso " would
-        // slip past the uniqueness check and sit next to "Perso", identical on screen.
         assert_eq!(draft("  Perso  ").validated_name().unwrap(), "Perso");
     }
 
@@ -80,8 +75,6 @@ mod tests {
 
     #[test]
     fn a_space_cannot_be_its_own_move_target() {
-        // The cascade would take the notes back out a statement later, so this
-        // has to be refused before any SQL runs.
         let error = validate_move_target("s-1", "s-1").unwrap_err();
 
         assert_eq!(error.field, "targetSpaceId");

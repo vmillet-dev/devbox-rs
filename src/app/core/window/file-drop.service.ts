@@ -22,12 +22,9 @@ export const FILE_DROP_SUBSCRIBER = new InjectionToken<FileDropSubscriber>('FILE
 });
 
 /**
- * Files dropped on the window.
- *
- * Same shape as `AppEventsService`: the unsubscribe is handed back at once
- * where the subscription only lands on the next turn, otherwise a component
- * destroyed in between would stay subscribed for the session. Outside Tauri the
- * call fails and the subscription is simply inert.
+ * Same shape as `AppEventsService`: the unsubscribe is handed back at once where the
+ * subscription only lands on the next turn, otherwise a component destroyed in between
+ * would stay subscribed for the session. Outside Tauri the subscription is simply inert.
  */
 @Injectable({ providedIn: 'root' })
 export class FileDropService {

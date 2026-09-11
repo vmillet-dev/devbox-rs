@@ -5,14 +5,9 @@ import { Attachment } from '@features/notes/model/note.model';
 const BYTES_PER_KB = 1024;
 
 /**
- * A note's attachment strip: add, open, save elsewhere, preview, remove.
- *
- * An attached file one can only read the name of is no use: "open" (the
- * system's default application) and "save as" are what make it recoverable.
- *
- * The preview is fetched **on demand** and one at a time: a `data:` URI weighs
- * a third more than the file, and preloading the list would pull several
- * megabytes into the WebView for one thumbnail.
+ * The preview is fetched **on demand** and one at a time: a `data:` URI weighs a third
+ * more than the file, and preloading the list would pull several megabytes into the
+ * WebView for one thumbnail.
  */
 @Component({
   selector: 'app-attachment-strip',
@@ -33,7 +28,6 @@ export class AttachmentStripComponent {
   readonly saveRequested = output<string>();
   readonly removeRequested = output<string>();
   readonly previewToggled = output<string>();
-  /** The preview is height-bounded: the lightbox shows the whole image. */
   readonly zoomRequested = output<void>();
 
   protected readonly confirmingRemove = signal<string | null>(null);

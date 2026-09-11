@@ -103,8 +103,7 @@
   font-size: 13px;
 }
 
-// Struck through **and** dimmed: colour alone does not tell a finished task
-// apart for someone who cannot see it.
+// Struck through **and** dimmed: colour alone does not tell a finished task apart.
 .row-text.done {
   color: var(--text-2);
   text-decoration: line-through;
@@ -114,8 +113,7 @@
   color: var(--text-2);
 }
 
-// Quiet at rest rather than hidden: `display: none` would take it out of the
-// tab order, like a card’s copy button.
+// Quiet at rest rather than hidden: `display: none` would take it out of the tab order.
 .row-remove {
   @include unstyled-control;
   padding: 3px 5px;

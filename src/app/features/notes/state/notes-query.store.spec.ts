@@ -19,12 +19,6 @@ import { NotesQueryStore, SEARCH_DEBOUNCE_MS } from './notes-query.store';
 import { NotesStore } from './notes.store';
 import { SpacesStore } from './spaces.store';
 
-/**
- * Filtering, grouping and tag normalisation are the back end's job and are
- * tested in `src-tauri/src/notes/`. What is left here is what the front still
- * owns: assembling the query, pacing it, adopting what comes back, and
- * surviving a failure.
- */
 describe('NotesQueryStore', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -44,7 +38,6 @@ describe('NotesQueryStore', () => {
     it('sends no space while all spaces are shown', async () => {
       const { repository } = await createNotesHarness([createNote()]);
 
-      // null is a deliberate choice ("every space"), not a missing value.
       expect(repository.lastQuery?.spaceId).toBeNull();
     });
 
@@ -86,8 +79,6 @@ describe('NotesQueryStore', () => {
       await awaitQuery(repository, beforeAdd);
       expect(repository.lastQuery?.tags).toEqual(['urgent']);
 
-      // Each toggle is awaited: selecting then deselecting inside a single tick
-      // leaves the criteria untouched, and the store rightly asks nothing.
       const beforeRemove = repository.queryCount;
       canvas.toggleTag('urgent');
       await awaitQuery(repository, beforeRemove);
@@ -99,8 +90,8 @@ describe('NotesQueryStore', () => {
       const { canvas, repository } = await createNotesHarness([createNote()]);
       const before = repository.queryCount;
 
-      // This is the test that catches a `sameQueryParams` missing its languages
-      // clause: the resource would compare the params equal and never refetch.
+      // Catches a `sameQueryParams` missing its languages clause: the resource would
+      // compare the params equal and never refetch.
       canvas.toggleLanguage('json');
       await awaitQuery(repository, before);
 
@@ -134,16 +125,14 @@ describe('NotesQueryStore', () => {
 
       await store.applyPatch('a', { tags: ['  #urgent '] });
 
-      // Trimming here would mean two places deciding what a tag looks like.
       expect(update).toHaveBeenCalledWith('a', { tags: ['  #urgent '] });
     });
   });
 
   /**
-   * `queryParams` builds a fresh object literal and reads `clock.now()`, while
-   * `resource` compares its parameters by identity. Only the `equal` comparator
-   * keeps a clock tick from firing a full IPC round trip — and the retained view
-   * would hide it, so nothing else would notice.
+   * `queryParams` builds a fresh object literal and reads `clock.now()`, while `resource`
+   * compares its parameters by identity: only the `equal` comparator keeps a clock tick
+   * from firing a full IPC round trip, and the retained view would hide it.
    */
   describe('clock sensitivity', () => {
     async function createStoreWithClock(now: WritableSignal<Date>): Promise<NotesHarness> {
@@ -227,7 +216,6 @@ describe('NotesQueryStore', () => {
       vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
       await vi.waitFor(() => expect(repository.queryCount).toBe(before + 1));
 
-      // One round trip per character is exactly what the debounce exists to avoid.
       expect(repository.lastQuery?.search).toBe('dep');
     });
 
@@ -276,8 +264,6 @@ describe('NotesQueryStore', () => {
     });
 
     it('keeps the previous results on screen while a new query runs', async () => {
-      // Blanking the canvas on every debounced keystroke would make the list
-      // flicker between "Loading…" and the results.
       const { canvas, spaces } = await createNotesHarness([createNote({ id: 'a' })]);
 
       spaces.selectSpace('space-2');
@@ -302,7 +288,6 @@ describe('NotesQueryStore', () => {
     it('does not report "no results" for an empty space', async () => {
       const { canvas } = await createNotesHarness([]);
 
-      // An empty space and a fruitless search read very differently to a user.
       expect(canvas.isFiltering()).toBe(false);
       expect(canvas.hasNoResults()).toBe(false);
     });
@@ -343,7 +328,6 @@ describe('NotesQueryStore', () => {
       canvas.setFilter('pinned');
       await awaitQuery(repository, before);
 
-      // The store must not re-sort, re-group or drop empty sections.
       expect(canvas.sections().map((section) => section.key)).toEqual(['pinned', 'today', 'week']);
     });
   });

@@ -41,7 +41,6 @@
   gap: 8px;
 }
 
-// Monospace: a combination is read key by key.
 .setting-shortcut-input {
   @include setting-field(130px);
   font-family: var(--font-mono), serif;

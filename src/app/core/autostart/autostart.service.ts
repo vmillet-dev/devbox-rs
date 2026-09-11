@@ -2,10 +2,7 @@ import { InjectionToken, Injectable, Injector, effect, inject } from '@angular/c
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { SettingsStore } from '@core/settings/settings.store';
 
-/**
- * All this service needs from the plugin. A token rather than a direct call,
- * for the same practical reason as `PREFERENCES_STORE_LOADER`.
- */
+/** A token rather than a direct call, for the same reason as `PREFERENCES_STORE_LOADER`. */
 export interface AutostartAdapter {
   enable(): Promise<void>;
   disable(): Promise<void>;
@@ -18,13 +15,10 @@ export const AUTOSTART_ADAPTER = new InjectionToken<AutostartAdapter>('AUTOSTART
 });
 
 /**
- * "Start with the system": an entry the OS holds for us — the registry's `Run`
- * key on Windows, a launch agent on macOS.
- *
- * ⚠️ The real state therefore belongs to the system and not to the preferences
- * file: at startup we read the system and align the preference to it. Without
- * that read-back, disabling autostart from the task manager would leave the box
- * ticked — and DevBox would re-enable it on the next setting change.
+ * ⚠️ The real state belongs to the system and not to the preferences file: at startup we
+ * read the system and align the preference to it. Without that read-back, disabling
+ * autostart from the task manager would leave the box ticked — and DevBox would re-enable
+ * it on the next setting change.
  */
 @Injectable({ providedIn: 'root' })
 export class AutostartService {
@@ -33,9 +27,8 @@ export class AutostartService {
   private readonly injector = inject(Injector);
 
   /**
-   * Aligns the preference with what the system declares, then follows every
-   * change. Never rejects: an autostart that cannot be set must not stop the
-   * application from opening.
+   * Aligns the preference with what the system declares, then follows every change. Never
+   * rejects: an autostart that cannot be set must not stop the application from opening.
    */
   async start(): Promise<void> {
     try {

@@ -47,8 +47,6 @@ button.strip-name {
   color: var(--text-2);
 }
 
-// Big enough to aim at: these three are most of what one does with an
-// attachment, and at 10px they read as decoration.
 .strip-icon {
   @include unstyled-control;
   display: inline-flex;
@@ -116,8 +114,7 @@ button.strip-name {
   opacity: 0.85;
 }
 
-// Height-bounded: a full-size screenshot would push the editor off screen,
-// which is exactly what the lightbox is for.
+// Height-bounded: a full-size screenshot would push the editor off screen.
 .strip-preview-image {
   display: block;
   max-width: 100%;

@@ -1,11 +1,9 @@
 <div class="new-note-wrapper">
-  <!-- The default action opens nothing: the menu is a detour, not a toll gate. -->
   <button type="button" class="new-note-btn" (click)="create('snippet')">
     {{ 'notes.newNote' | transloco }}
   </button>
 
-  <!-- The chevron carries `appMenuAnchor`: it opened the menu, so focus must
-       return to it. -->
+  <!-- The chevron carries `appMenuAnchor`: it opened the menu, so focus returns to it. -->
   <button
     appMenuAnchor
     type="button"

@@ -39,8 +39,8 @@ app-dialog {
   outline-offset: 2px;
 }
 
-// The notes come from the manifest and can be long: bounded and scrolling, so
-// the buttons stay visible without scrolling the modal.
+// The notes come from the manifest and can be long: bounded and scrolling, so the buttons
+// stay visible.
 .update-notes-body {
   margin: 8px 0 0;
   max-height: 160px;
@@ -62,9 +62,8 @@ app-dialog {
   font-family: var(--font-mono), serif;
 }
 
-// `appearance: none` strips the native rendering; the track and the bar are then
-// coloured through pseudo-elements, which Chromium and WebKit both expose under
-// the -webkit- prefix.
+// `appearance: none` strips the native rendering; the track and the bar are then coloured
+// through the -webkit- pseudo-elements.
 .update-progress {
   appearance: none;
   width: 100%;

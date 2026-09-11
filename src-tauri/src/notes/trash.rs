@@ -1,27 +1,19 @@
-//! The trash: a deleted note carries a date instead of disappearing.
-//!
-//! Retention is a product rule, so it lives here and not in the SQL — `store`
-//! only writes and reads `deleted_at`.
-
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::Serialize;
 use specta::Type;
 
 use super::model::Note;
 
-/// Past this the note goes for good. Single threshold: the panel shows the
-/// deadline the purge applies.
+/// Single threshold: the panel shows the deadline the purge applies.
 pub const RETENTION: TimeDelta = TimeDelta::days(30);
 
-/// `flatten`: the front reads a note, with two extra dates.
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TrashedNote {
     #[serde(flatten)]
     pub note: Note,
     pub deleted_at: DateTime<Utc>,
-    /// Derived, never stored: retention can change between versions, and a
-    /// deadline frozen in the database would not follow.
+    /// Derived, never stored: retention can change between versions.
     pub purge_at: DateTime<Utc>,
 }
 

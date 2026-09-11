@@ -8,19 +8,11 @@ import {
 } from '../placeholder-fields/placeholder-fields.component';
 
 /**
- * Typing a snippet's `{{fields}}` before copying, from a card or the palette —
- * where there is no open editor to carry the panel.
+ * Seeded with the values **already stored** on the note: there is one set per note, and
+ * what comes out is copied *and* kept. The values leave raw — `notes::placeholder::fill`
+ * decides what an empty field is worth and what is not a field at all.
  *
- * Seeded with the values **already stored** on the note: there is one set per
- * note, and the form offers them rather than asking again. What comes out is
- * copied *and* kept.
- *
- * The values leave raw: `notes::placeholder::fill` decides what an empty field
- * is worth and what is not a field at all. Making that choice here would be
- * making it twice.
- *
- * "Copy as is" exists for the note that contains template code without being
- * one — the back end is careful, not infallible.
+ * "Copy as is" exists for the note that contains template code without being a snippet.
  */
 @Component({
   selector: 'app-placeholder-form',
@@ -37,9 +29,8 @@ export class PlaceholderFormComponent {
   readonly cancelled = output<void>();
 
   /**
-   * What is being typed. `null` until something is: the note then supplies its
-   * own values, and copying them here would freeze them the day the form opens
-   * on a note whose values changed in between.
+   * `null` until something is typed: the note then supplies its own values, and copying
+   * them here would freeze them.
    */
   private readonly typed = signal<Record<string, string> | null>(null);
 

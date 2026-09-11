@@ -1,14 +1,3 @@
-//! What the user asks to see ([`NotesQuery`]) and what the canvas
-//! displays in return ([`NotesView`]): text filtering, grouping into sections,
-//! facets.
-//!
-//! No intermediate "note list" type is exposed to the front end: it
-//! would invite re-filtering on the interface side.
-//!
-//! ⚠️ **Exhaustiveness of sections is a guarantee.** Outside of pinned ones, each
-//! note falls into exactly one section: a note without a section would be
-//! unreachable in the interface, including search.
-
 use std::collections::{BTreeMap, HashMap};
 
 use chrono::{DateTime, Datelike, FixedOffset, TimeDelta, Utc};
@@ -19,30 +8,22 @@ use super::language::Language;
 use super::model::{self, DisplayNote, Note};
 use crate::count::saturating_u32;
 
-/// Neither clock nor time zone read here: everything is explicit, thus reproducible in tests.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotesQuery {
-    /// `None` = "all spaces" — a choice, not an absence of choice: there
-    /// is no "All" space on the data side.
+    /// `None` = every space: a choice, not an absence of one.
     pub space_id: Option<String>,
-    /// Empty = no search.
     pub search: String,
     pub filter: NoteFilter,
     /// A note passes if it carries **at least one** of these tags.
     pub tags: Vec<String>,
-    /// Same union semantics. Empty = all.
     pub languages: Vec<Language>,
     pub now: DateTime<Utc>,
-    /// ⚠️ `Date#getTimezoneOffset()`, whose value is the **opposite** of the offset
-    /// (UTC+2 gives −120). Sections reason in local days: at 11 PM in
-    /// Paris, `now` in UTC is already tomorrow.
+    /// ⚠️ `Date#getTimezoneOffset()`, whose sign is the **opposite** of the offset
+    /// (−120 for UTC+2). Sections reason in local days.
     pub tz_offset_minutes: i32,
-    /// Hoists pinned notes: their own section when the view is chronological,
-    /// the head of the list when it is flat.
-    ///
-    /// The canvas always says `true` — pinning is precisely what keeps a note
-    /// within reach there. The quick-paste palette follows the preference.
+    /// Hoists pinned notes: their own section when the view is chronological, the
+    /// head of the list when it is flat. The canvas always says `true`.
     pub pinned_first: bool,
 }
 
@@ -55,7 +36,6 @@ pub enum NoteFilter {
     Untriaged,
 }
 
-/// What the rails have to offer. Does not cross the bridge.
 #[derive(Debug, Clone, Default)]
 pub struct Facets {
     pub tags: Vec<String>,
@@ -66,14 +46,13 @@ pub struct Facets {
 #[serde(rename_all = "camelCase")]
 pub struct NotesView {
     pub sections: Vec<NoteSection>,
-    /// Attached to the **space**, not the current filter: only offering facets
-    /// from already filtered notes would empty the rail upon the 1st selection.
+    /// Attached to the **space**, not the current filter: facets drawn from
+    /// already filtered notes would empty the rail on the first selection.
     pub available_tags: Vec<String>,
     pub available_languages: Vec<Language>,
     /// Distinguishes "no result" from "empty space".
     pub is_filtering: bool,
-    /// `u32` and not `usize`: Specta refuses to export a type the size of a
-    /// `BigInt`, which JSON does not render without loss of precision.
+    /// `u32` and not `usize`: Specta refuses a type JSON cannot render losslessly.
     pub matched: u32,
 }
 
@@ -98,11 +77,8 @@ pub enum NoteSectionKey {
     Results,
 }
 
-/// Lays the attachment count on the notes of an already built view.
-///
-/// Separate from [`build`], which reads no database: the counter comes from a
-/// second query, and pushing it down there would force a hash map into every
-/// section-splitting test.
+/// Separate from [`build`], which reads no database: pushing the counter down
+/// there would force a hash map into every section-splitting test.
 pub fn apply_attachment_counts<S: std::hash::BuildHasher>(
     view: &mut NotesView,
     counts: &HashMap<String, u32, S>,
@@ -114,8 +90,7 @@ pub fn apply_attachment_counts<S: std::hash::BuildHasher>(
     }
 }
 
-/// Lays the global variables on every note of a view — separate from [`build`]
-/// for the same reason as [`apply_attachment_counts`].
+/// Separate from [`build`] for the same reason as [`apply_attachment_counts`].
 pub fn apply_global_defaults(view: &mut NotesView, globals: &BTreeMap<String, String>) {
     if globals.is_empty() {
         return;
@@ -136,17 +111,14 @@ pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesVie
         notes.retain(|note| matches_search(note, &needle));
     }
 
-    // A quick filter restricts a view that remains chronological; a search
-    // or a facet, on the other hand, switches to a flat list.
-    // Asked rather than built: `store::fetch` has already normalised the same
-    // list for its `WHERE`, and this only needs to know whether one was picked.
+    // A quick filter restricts a view that stays chronological; a search or a
+    // facet switches to a flat list.
     let is_filtering = !needle.is_empty()
         || request
             .tags
             .iter()
             .any(|tag| model::normalize_tag(tag).is_some())
         || !request.languages.is_empty();
-    // Saturating is better than panicking: this counter is only used for a label.
     let matched = saturating_u32(notes.len());
 
     let offset = offset_from_minutes(request.tz_offset_minutes);
@@ -168,13 +140,9 @@ pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesVie
 
 /// `needle` is expected **already folded to lowercase and trimmed**.
 ///
-/// ⚠️ The folding is in Rust and not in SQL: without ICU, SQLite's `LOWER()`
-/// only handles ASCII, so `Étape` would not match `étape`. Hence a search that
-/// does not descend into the `WHERE`, unlike the coarse filters, which stay
-/// indexed there.
-///
-/// The items count as much as the content: a todo list has no body, and would
-/// otherwise be findable only by its title.
+/// ⚠️ Folded in Rust and not in SQL: without ICU, SQLite's `LOWER()` only handles
+/// ASCII, so `Étape` would not match `étape`. The items count as much as the
+/// content — a todo list has no body to be found by.
 fn matches_search(note: &Note, needle: &str) -> bool {
     contains_folded(&note.title, needle)
         || note.tags.iter().any(|tag| contains_folded(tag, needle))
@@ -185,27 +153,21 @@ fn matches_search(note: &Note, needle: &str) -> bool {
             .any(|item| contains_folded(&item.text, needle))
 }
 
-/// Case-insensitive `contains`.
-///
-/// ⚠️ Do **not** "optimise" this into a hand-rolled fold-as-you-compare scan to
-/// save the copy: measured on 800 notes of 13 kB, a needle matching nothing
-/// took 11.0 ms that way against 6.3 ms here. `str::contains` runs Two-Way,
-/// which is O(n+m); a window scan is O(n·m), and searching is precisely the
-/// case where most notes do not match.
+/// ⚠️ Do **not** hand-roll a fold-as-you-compare scan to save the copy: measured
+/// on 800 notes of 13 kB, a needle matching nothing took 11.0 ms that way against
+/// 6.3 ms here. `str::contains` runs Two-Way (O(n+m)); a window scan is O(n·m),
+/// and searching is precisely the case where most notes do not match.
 fn contains_folded(haystack: &str, needle: &str) -> bool {
     haystack.to_lowercase().contains(needle)
 }
 
 const A_WEEK: TimeDelta = TimeDelta::days(7);
 
-/// The span of real time zones: UTC−12 to UTC+14.
 const MAX_TZ_OFFSET_MINUTES: u32 = 14 * 60;
 
 /// ⚠️ The sign flips: JavaScript counts the minutes to **add** to local time to
-/// get UTC (−120 for UTC+2), where chrono expects the offset east.
-///
-/// The bound is checked **before** the multiplication: the value crosses the
-/// bridge unvalidated, and both `-i32::MIN` and `i32::MAX * 60` would overflow.
+/// get UTC (−120 for UTC+2), where chrono expects the offset east. The bound is
+/// checked **before** the multiplication, which would otherwise overflow.
 fn offset_from_minutes(tz_offset_minutes: i32) -> FixedOffset {
     let utc = FixedOffset::east_opt(0).expect("UTC is a valid offset");
 
@@ -244,12 +206,8 @@ fn section(
     }
 }
 
-/// Spread over dates, results dilute and read as absent when everything lands
-/// at the bottom of the page.
-///
-/// Pinning hoists here too, otherwise the setting would only ever show before
-/// the first keystroke. The partition is **stable**: at equal pinning, the
-/// order received from SQL still decides.
+/// Pinning hoists here too, otherwise the setting would only ever show before the
+/// first keystroke. The partition is **stable**: at equal pinning, SQL decides.
 fn results(notes: Vec<Note>, pinned_first: bool, now: DateTime<Utc>) -> Vec<NoteSection> {
     let mut notes = notes;
     if pinned_first {
@@ -259,8 +217,6 @@ fn results(notes: Vec<Note>, pinned_first: bool, now: DateTime<Utc>) -> Vec<Note
     vec![section(NoteSectionKey::Results, notes, false, now)]
 }
 
-/// `is_filtering` switches to a flat list. The order received is kept within
-/// each section: it is the SQL sort, and it decides.
 fn build_sections(
     notes: Vec<Note>,
     is_filtering: bool,
@@ -279,8 +235,7 @@ fn build_sections(
     let mut older = Vec::new();
 
     for note in notes {
-        // Without the hoist a pinned note follows its date like any other, and
-        // the "pinned" section disappears rather than merely being empty.
+        // Without the hoist the "pinned" section disappears rather than being empty.
         if pinned_first && note.pinned {
             pinned.push(note);
             continue;
@@ -373,8 +328,6 @@ mod tests {
             },
         );
 
-        // Trimmed and case-folded before matching, then flattened: a search
-        // result reads as a list, not as date buckets.
         assert_eq!(view.matched, 1);
         assert!(view.is_filtering);
         assert_eq!(keys(&view), [NoteSectionKey::Results]);
@@ -397,8 +350,6 @@ mod tests {
 
     #[test]
     fn a_tag_that_normalises_to_nothing_does_not_count_as_filtering() {
-        // " # " is not a selection; treating it as one would flatten the canvas
-        // and tell the user a search is running when none is.
         let view = build(
             vec![note("a", "Un")],
             Facets::default(),
@@ -413,7 +364,6 @@ mod tests {
 
     #[test]
     fn a_fruitless_search_reports_filtering_with_zero_matches() {
-        // The front tells "no result" from "empty space" on exactly this pair.
         let view = build(
             vec![note("a", "Un")],
             Facets::default(),
@@ -429,8 +379,6 @@ mod tests {
 
     #[test]
     fn the_rail_facets_are_passed_through_untouched() {
-        // They are scoped to the space by the query, not to the current search:
-        // narrowing them would empty the rails on the first selection.
         let view = build(
             vec![note("a", "Un")],
             Facets {
@@ -449,8 +397,6 @@ mod tests {
 
     #[test]
     fn a_selected_language_counts_as_filtering_like_a_selected_tag() {
-        // Both rails are facet rails: selecting in either one turns the canvas
-        // into a flat result list. Only the quick filters keep the date buckets.
         let view = build(
             vec![note("a", "Un")],
             Facets::default(),
@@ -489,15 +435,11 @@ mod tests {
                 ..sample()
             };
 
-            // SQLite's LOWER() leaves É alone without ICU, so this match is exactly
-            // what moving the comparison into Rust buys.
             assert!(matches_search(&note, "étape"));
         }
 
         #[test]
         fn a_checklist_is_found_by_the_text_of_its_items() {
-            // It has no content of its own: without this, a todo list would only
-            // ever be findable by its title.
             let note = Note {
                 title: "Sprint".to_string(),
                 content: String::new(),
@@ -556,7 +498,6 @@ mod tests {
 
         #[test]
         fn a_real_offset_keeps_its_sign_inverted() {
-            // JavaScript reports -120 for UTC+2 and 300 for UTC-5.
             assert_eq!(offset_from_minutes(-120).local_minus_utc(), 2 * 3600);
             assert_eq!(offset_from_minutes(300).local_minus_utc(), -5 * 3600);
             assert_eq!(offset_from_minutes(0).local_minus_utc(), 0);
@@ -564,9 +505,8 @@ mod tests {
 
         #[test]
         fn an_absurd_offset_falls_back_to_utc_without_overflowing() {
-            // The value crosses the IPC bridge unvalidated. Negating i32::MIN or
-            // multiplying i32::MAX by 60 overflows, which panics in debug while the
-            // connection mutex is held — poisoning it for the rest of the process.
+            // Negating i32::MIN or multiplying i32::MAX by 60 panics in debug while
+            // the connection mutex is held — poisoning it for the rest of the process.
             for absurd in [i32::MIN, i32::MAX, -100_000, 100_000, 841, -841] {
                 assert_eq!(offset_from_minutes(absurd).local_minus_utc(), 0);
             }
@@ -583,7 +523,6 @@ mod tests {
 
             let sections = build_sections(notes, false, true, now_at(offset), offset);
 
-            // A note in no section would be unreachable in the UI, search included.
             let placed: Vec<String> = sections
                 .iter()
                 .flat_map(|section| section.notes.iter().map(|note| note.id.clone()))
@@ -600,7 +539,6 @@ mod tests {
 
             let sections = build_sections(Vec::new(), false, true, now_at(offset), offset);
 
-            // It hosts the "paste or create" ghost card, so it cannot be dropped.
             assert_eq!(keys(&sections), [NoteSectionKey::Week]);
             assert!(sections[0].show_create_ghost);
         }
@@ -637,8 +575,6 @@ mod tests {
 
         #[test]
         fn without_the_hoist_a_pinned_note_follows_its_date_like_any_other() {
-            // The "pinned" section then disappears rather than being empty: an
-            // empty section is never emitted.
             let offset = utc();
             let mut pinned = note("pinned", "2026-07-25T08:00:00.000Z");
             pinned.pinned = true;
@@ -651,8 +587,6 @@ mod tests {
 
         #[test]
         fn the_hoist_reaches_the_flat_list_too() {
-            // Without this the palette setting would only show before the first
-            // keystroke — and searching is exactly when it is used.
             let offset = utc();
             let mut pinned = note("pinned", "2019-05-05T08:00:00.000Z");
             pinned.pinned = true;
@@ -665,7 +599,6 @@ mod tests {
                 ids_in(&hoisted, NoteSectionKey::Results),
                 ["pinned", "recent"]
             );
-            // The order received from SQL decides: the partition is stable.
             assert_eq!(
                 ids_in(&untouched, NoteSectionKey::Results),
                 ["recent", "pinned"]
@@ -699,7 +632,6 @@ mod tests {
 
             let sections = build_sections(notes, true, true, now_at(offset), offset);
 
-            // Chronological grouping would bury an old match in a trailing section.
             assert_eq!(keys(&sections), [NoteSectionKey::Results]);
             assert_eq!(sections[0].notes.len(), 2);
             assert!(!sections[0].show_create_ghost);
@@ -743,8 +675,6 @@ mod tests {
 
             let sections = build_sections(vec![expiring], false, true, now_at(offset), offset);
 
-            // The hint reads "to triage soon"; firing it six months ahead would make
-            // it permanent background noise.
             let today = sections
                 .iter()
                 .find(|s| s.key == NoteSectionKey::Today)
@@ -754,8 +684,6 @@ mod tests {
 
         #[test]
         fn the_day_boundary_follows_the_local_timezone_not_utc() {
-            // 23:30 in Paris on 25 July is already 21:30 UTC the same day, but a note
-            // created at 22:10 UTC is 00:10 local on the 26th — tomorrow, not today.
             let paris = offset_from_minutes(-120);
             let now = at("2026-07-25T21:30:00.000Z");
 
@@ -772,8 +700,6 @@ mod tests {
 
         #[test]
         fn a_note_created_just_after_local_midnight_is_not_yesterday() {
-            // Same instant read in UTC would fall on the previous day and land in
-            // "this week" instead of "today".
             let paris = offset_from_minutes(-120);
             let now = at("2026-07-26T08:00:00.000Z");
 
@@ -800,8 +726,6 @@ mod tests {
                 offset,
             );
 
-            // is_within rejects negative elapsed time, so it must still surface
-            // somewhere rather than vanish between the branches.
             assert_eq!(ids_in(&sections, NoteSectionKey::Older), ["future"]);
         }
 
@@ -815,7 +739,6 @@ mod tests {
 
             let sections = build_sections(notes, false, true, now_at(offset), offset);
 
-            // The SQL ORDER BY decides; this module must not re-sort.
             assert_eq!(
                 ids_in(&sections, NoteSectionKey::Today),
                 ["first", "second"]

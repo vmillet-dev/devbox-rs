@@ -1,10 +1,3 @@
-//! A library making the round trip between two databases: what the export puts
-//! together, the import has to find again.
-//!
-//! The commands themselves are not testable here (they want a Tauri `State<Db>`);
-//! `collect` and `merge` carry the whole rule and take a connection, which is
-//! enough.
-
 use chrono::{DateTime, Utc};
 use diesel::SqliteConnection;
 
@@ -75,8 +68,6 @@ fn a_library_moves_whole_to_another_machine() {
     assert_eq!(titles, ["Première", "Seconde"]);
     assert_eq!(arrived[0].content, "select 1");
     assert_eq!(arrived[0].tags, ["auth"]);
-    // Ids and dates cross over: an imported note is not a fresh copy, it is the
-    // same note on another machine.
     assert_eq!(arrived[0].created_at, t0());
     assert_eq!(spaces::list(&mut target).unwrap().len(), 2);
 }
@@ -89,7 +80,6 @@ fn only_the_spaces_actually_cited_travel() {
 
     let bundle = collect(&mut source, single).unwrap();
 
-    // Exporting one space must not recreate the whole tree on the other side.
     assert_eq!(bundle.spaces.len(), 1);
     assert_eq!(bundle.notes.len(), 1);
 }
@@ -111,9 +101,6 @@ fn importing_the_same_file_twice_adds_nothing_the_second_time() {
 
 #[test]
 fn reimporting_into_the_base_it_came_from_changes_nothing() {
-    // The gesture everybody makes on discovering the feature: export, then import
-    // it straight back. Everything is already there, so everything is skipped — and
-    // it is the report, not silence, that has to say so.
     let mut library = library();
     let bundle = round_tripped(&exported(&mut library));
 
@@ -130,8 +117,6 @@ fn a_space_of_the_same_name_is_reused_rather_than_duplicated() {
     let bundle = round_tripped(&exported(&mut source));
 
     let mut target = open_in_memory().unwrap();
-    // A different case: the comparison folds case, like the uniqueness of space
-    // names.
     spaces::create(&mut target, "PERSO").unwrap();
 
     let report = merge(&mut target, bundle).unwrap();
@@ -149,7 +134,6 @@ fn a_note_whose_space_is_missing_from_the_file_is_skipped_not_misfiled() {
     let mut target = open_in_memory().unwrap();
     let report = merge(&mut target, bundle).unwrap();
 
-    // Inventing one would file the note where nobody will look for it.
     assert_eq!(report.notes_imported, 0);
     assert_eq!(report.notes_skipped, 2);
 }

@@ -13,27 +13,21 @@ import {
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ChecklistItem, checklistProgress } from '@features/notes/model/checklist.model';
 
-/** The row being dragged, and where it started. */
 interface Drag {
   readonly from: number;
   readonly to: number;
 }
 
 /**
- * The todo list under edit: add, rename, tick, remove, reorder.
+ * ⚠️ **HTML5 drag and drop does not work here.** Tauri's `dragDropEnabled` is `true` —
+ * which is what delivers files dropped on the window to `FileDropService` — so the
+ * WebView never sees `dragstart` or `drop`. Reordering is written in pointer events
+ * instead; turning the flag off would break attachments. `Alt+↑/↓` does the same from
+ * the keyboard, which the linter requires anyway.
  *
- * ⚠️ **HTML5 drag and drop does not work here.** Tauri's `dragDropEnabled` is
- * `true` — which is what delivers files dropped on the window to
- * `FileDropService` — and the WebView therefore never sees `dragstart` or
- * `drop`. Reordering is written in pointer events instead; turning the flag off
- * would break attachments, so it is not an option.
- *
- * `Alt+↑/↓` does the same from the keyboard, and it is not a bonus: the linter
- * refuses an interaction only the mouse can trigger.
- *
- * Like the title and the body, the list is a **local draft** keyed on the note
- * id and not on its object. Ticking, adding, removing and moving commit at
- * once — they are discrete gestures; only typing waits for the `blur`.
+ * Like the title and the body, the list is a **local draft** keyed on the note id and
+ * not on its object. Ticking, adding, removing and moving commit at once — they are
+ * discrete gestures; only typing waits for the `blur`.
  */
 @Component({
   selector: 'app-checklist-editor',
@@ -44,7 +38,6 @@ interface Drag {
 })
 export class ChecklistEditorComponent {
   readonly items = input.required<readonly ChecklistItem[]>();
-  /** What the draft re-keys on: the id, never the note object. */
   readonly noteId = input.required<string>();
 
   readonly itemsChanged = output<readonly ChecklistItem[]>();
@@ -58,7 +51,6 @@ export class ChecklistEditorComponent {
 
   protected readonly progress = computed(() => checklistProgress(this.draft()));
 
-  /** The row being dragged, `null` at rest. */
   protected readonly dragging = signal<Drag | null>(null);
 
   /** The row to focus on the next render, set by add and remove. */
@@ -71,14 +63,13 @@ export class ChecklistEditorComponent {
     this.commit();
   }
 
-  /** Typing: purely local, the `blur` decides to write. */
   protected setText(index: number, text: string): void {
     this.draft.update((items) => items.map((item, at) => (at === index ? { ...item, text } : item)));
   }
 
   /**
-   * Inserts after the current row and focuses it: typing a list must be
-   * possible without ever leaving the keyboard.
+   * Inserts after the current row and focuses it: typing a list must be possible
+   * without ever leaving the keyboard.
    */
   protected insertAfter(index: number): void {
     this.draft.update((items) => [
@@ -104,10 +95,8 @@ export class ChecklistEditorComponent {
   }
 
   /**
-   * Backspace on an empty row removes it instead of doing nothing.
-   *
-   * `Event` and not `KeyboardEvent`: a modifier key binding (`keydown.backspace`)
-   * is typed `Event` by the template compiler.
+   * Backspace on an empty row removes it instead of doing nothing. `Event` and not
+   * `KeyboardEvent`: a modifier key binding is typed `Event` by the template compiler.
    */
   protected onBackspace(event: Event, index: number): void {
     const input = event.target as HTMLInputElement;
@@ -133,12 +122,9 @@ export class ChecklistEditorComponent {
   }
 
   /**
-   * The start of a mouse drag. `setPointerCapture` is what keeps the events on
-   * the handle even when the cursor leaves the row — without it a slightly
-   * quick gesture is lost as soon as it passes one row's height.
-   *
-   * The call is optional: capture makes the gesture comfortable, it does not
-   * condition it, and an environment without it (jsdom) must not fail the drag.
+   * `setPointerCapture` keeps the events on the handle even when the cursor leaves the
+   * row — without it a slightly quick gesture is lost. The call is optional: capture
+   * makes the gesture comfortable, and jsdom, which lacks it, must not fail the drag.
    */
   protected onPointerDown(event: PointerEvent, index: number): void {
     if (event.button !== 0) return;
@@ -167,10 +153,7 @@ export class ChecklistEditorComponent {
     this.move(drag.from, drag.to);
   }
 
-  /**
-   * A row's preview position during a drag: it follows the grabbed row, and the
-   * others shift by one.
-   */
+  /** During a drag: the grabbed row follows the cursor, the others shift by one. */
   protected displayIndex(index: number): number {
     const drag = this.dragging();
     if (!drag) return index;
@@ -183,16 +166,14 @@ export class ChecklistEditorComponent {
   }
 
   /**
-   * Commits what is being typed. Called on a field's `blur`, and by the editor
-   * before it closes: Escape, the backdrop and the close button produce no
-   * `blur`, so the last line typed would otherwise be lost.
+   * Called on a field's `blur`, and by the editor before it closes: Escape, the backdrop
+   * and the close button produce no `blur`, so the last line typed would be lost.
    */
   commit(): void {
     this.itemsChanged.emit(this.draft().map((item) => ({ ...item })));
     this.applyPendingFocus();
   }
 
-  /** The row under the cursor, deduced from each row's midpoint. */
   private rowIndexAt(clientY: number): number | null {
     const rows = this.rows();
     for (const [index, row] of rows.entries()) {
@@ -208,8 +189,7 @@ export class ChecklistEditorComponent {
     this.pendingFocus = null;
     if (index === null) return;
 
-    // After the created or moved row renders: the signal has just triggered it,
-    // but it is not in the DOM yet.
+    // After the created or moved row renders: the signal has just triggered it.
     queueMicrotask(() => this.rows()[index]?.nativeElement.focus());
   }
 }

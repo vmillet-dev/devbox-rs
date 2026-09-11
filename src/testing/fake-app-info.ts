@@ -1,9 +1,8 @@
 import { Signal, signal } from '@angular/core';
 
 /**
- * Stand-in for `AppInfoService`. The real one calls `getVersion()` eagerly from
- * a `resource`, which needs the Tauri bridge jsdom does not have — every spec
- * mounting the titlebar would otherwise log a failed resource.
+ * The real one calls `getVersion()` eagerly from a `resource`, which needs the Tauri
+ * bridge jsdom does not have.
  */
 export class FakeAppInfo {
   /** Writable here so a spec can flip it to `null` and assert the fallback. */

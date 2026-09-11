@@ -24,16 +24,11 @@ import {
 } from '../model/note.model';
 
 /**
- * The shape carried over the Tauri bridge, **generated** from the Rust structs
- * by tauri-specta. The rest of the application never reads `bindings.ts`: it
- * goes through these aliases, which keep the boundary vocabulary next to its
- * conversion.
- *
- * What generation cannot cover, and what this file exists for: **JSON has no
- * date type**, so every `Date` arrives and leaves as an ISO 8601 string. Every
- * other field already has the right type, which is why the conversions below
- * spread the wire object and override only the dates — a scalar added on the
- * Rust side then costs nothing here.
+ * The shape carried over the Tauri bridge, **generated** from the Rust structs by
+ * tauri-specta. What generation cannot cover, and what this file exists for: **JSON
+ * has no date type**, so every `Date` arrives and leaves as an ISO 8601 string. The
+ * conversions below spread the wire object and override only the dates, so a scalar
+ * added on the Rust side costs nothing here.
  */
 export type NoteDto = DisplayNote;
 
@@ -52,8 +47,7 @@ export class ContractError extends Error {
 
 function parseIsoDate(value: string, field: string): Date {
   const date = new Date(value);
-  // Fail loudly rather than let an `Invalid Date` surface as `NaN` in the
-  // relative-time labels.
+  // Fail loudly rather than let an `Invalid Date` surface as `NaN` in the labels.
   if (Number.isNaN(date.getTime())) {
     throw new ContractError(field, value);
   }
@@ -61,8 +55,8 @@ function parseIsoDate(value: string, field: string): Date {
 }
 
 /**
- * Same requirement the other way: `toISOString()` throws a bare `RangeError` on
- * an `Invalid Date`, without saying which field is at fault.
+ * `toISOString()` throws a bare `RangeError` on an `Invalid Date`, without saying which
+ * field is at fault.
  */
 export function toIsoString(date: Date, field: string): string {
   if (Number.isNaN(date.getTime())) {
@@ -106,23 +100,19 @@ function toFooter(dto: WireNoteFooter): NoteFooter {
     case 'age':
       return { kind: 'age', at: parseIsoDate(dto.at, 'footer.at') };
     default:
-      // A variant added on the Rust side and not reflected here. The switch is
-      // exhaustive at compile time, so this only fires when an older front
-      // meets a newer back end — and saying so beats a blank footer.
+      // Only fires when an older front end meets a newer back end — the switch is
+      // exhaustive at compile time — and saying so beats a blank footer.
       throw new ContractError('footer.kind', (dto satisfies never as { kind: string }).kind);
   }
 }
 
 /**
- * ⚠️ `placeholderValues` is dropped on purpose: the front reads what was typed
- * through `placeholders[].value`, where the back end has already paired it with
- * the field the text actually carries. A second, unpaired copy would invite
- * reading a value whose token has left the content.
+ * ⚠️ `placeholderValues` is dropped on purpose: the front end reads what was typed
+ * through `placeholders[].value`, already paired with the field the text carries. A
+ * second, unpaired copy would invite reading a value whose token has left the content.
  *
- * The arrays are aliased rather than copied. This runs for every note of every
- * view on every keystroke, the payload is a fresh `JSON.parse` nothing else
- * retains, and the model types are `readonly` — the copies bought nothing and
- * cost thousands of allocations per search.
+ * The arrays are aliased rather than copied: this runs for every note of every view on
+ * every keystroke, and the model types are `readonly`.
  */
 export function toNote({ placeholderValues: _stored, ...dto }: NoteDto): Note {
   return {
@@ -131,16 +121,15 @@ export function toNote({ placeholderValues: _stored, ...dto }: NoteDto): Note {
     updatedAt: parseIsoDate(dto.updatedAt, 'updatedAt'),
     lifecycle: toLifecycle(dto.lifecycle),
     footer: toFooter(dto.footer),
-    // Declared optional by `#[serde(default)]`, which keeps export files written
-    // before todo lists readable. Rust always serialises them.
+    // Declared optional by `#[serde(default)]`, which keeps older export files readable.
     kind: dto.kind ?? 'snippet',
     items: dto.items ?? [],
   };
 }
 
 /**
- * Deliberately narrower than a `Note`: a trashed note is restored or purged,
- * never opened, so nothing decorated travels this far.
+ * Narrower than a `Note` on purpose: a trashed note is restored or purged, never
+ * opened, so nothing decorated travels this far.
  */
 export function toTrashedNote(dto: WireTrashedNote): TrashedNote {
   return {
@@ -149,8 +138,7 @@ export function toTrashedNote(dto: WireTrashedNote): TrashedNote {
     title: dto.title,
     language: dto.language,
     content: dto.content,
-    // Copied here, unlike `toNote`: the trash panel opens on demand over a
-    // handful of rows, so the allocation is free and the isolation is worth it.
+    // Copied here, unlike `toNote`: the panel opens on demand over a handful of rows.
     tags: [...dto.tags],
     deletedAt: parseIsoDate(dto.deletedAt, 'deletedAt'),
     purgeAt: parseIsoDate(dto.purgeAt, 'purgeAt'),
@@ -173,10 +161,8 @@ export function toNoteDraftDto(draft: NoteDraft): NoteDraftDto {
 }
 
 /**
- * A key left out is a field the patch does not touch; a key sent as `null`
- * would overwrite it. Hence the filtering rather than a plain spread — and
- * hence `#[specta(optional)]` on the Rust fields, which is what makes the keys
- * omissible at all.
+ * A key left out is a field the patch does not touch; a key sent as `null` would
+ * overwrite it — hence the filtering, and hence `#[specta(optional)]` on the Rust side.
  */
 export function toNotePatchDto(patch: NotePatch): NotePatchDto {
   const { lifecycle, tags, items, ...scalars } = patch;
@@ -184,8 +170,7 @@ export function toNotePatchDto(patch: NotePatch): NotePatchDto {
 
   if (lifecycle !== undefined) dto.lifecycle = toLifecycleDto(lifecycle);
   if (tags !== undefined) dto.tags = [...tags];
-  // Copied item by item, not just the array: a patch is the last thing to hold
-  // these objects, and nothing downstream should be able to reach back.
+  // Copied item by item: a patch is the last thing to hold these objects.
   if (items !== undefined) dto.items = items.map((item) => ({ ...item }));
 
   return dto;

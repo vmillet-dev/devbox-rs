@@ -1,7 +1,6 @@
 @use 'mixins' as *;
 
-// Above the canvas but below the modals: an undoable deletion must not come in
-// front of the editor that was just opened.
+// Above the canvas but below the modals: it must not come in front of the editor.
 .undo-bar {
   position: fixed;
   left: 50%;

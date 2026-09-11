@@ -1,14 +1,9 @@
-<!-- The placeholder label is already the one the card shows: resolving it here
-     saves the menu from knowing the rule a second time. -->
 @let menuTitle = note().title || ('notes.untitled' | transloco);
 
-<!-- A wrapper and not a root `<button>`: the action menu is itself a button,
-     and a <button>'s content model forbids nesting one. It also anchors the
-     menu (`position: relative`). -->
+<!-- A wrapper and not a root `<button>`: the action menu is itself a button, and a
+     button's content model forbids nesting one. It also anchors the menu. -->
 <div class="card-shell" [class.checked]="checked()" [class.checklist]="isChecklist()">
-  <!-- Content in <span> and not <div>: a <button>'s content model admits only
-       phrasing content. A nested <div> produces invalid HTML, whose
-       accessibility behaviour is undefined across browsers. -->
+  <!-- Content in <span> and not <div>: a <button> admits only phrasing content. -->
   <button
     #cardButton
     type="button"
@@ -18,13 +13,13 @@
     (click)="onOpen($event)"
   >
     @if (note().pinned) {
-      <!-- Pinning is signalled only by a decorative dot: without this text
-           twin, the information does not exist for a screen reader. -->
+      <!-- Pinning is signalled by a decorative dot: without this text twin, the
+           information does not exist for a screen reader. -->
       <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
     }
     <span class="card-top">
-      <!-- No format for a todo list: it has no body to colour, and a "TXT"
-           badge would announce a language nothing shows. -->
+      <!-- No format for a todo list: a "TXT" badge would announce a language nothing
+           shows. -->
       @if (!isChecklist()) {
         <app-language-badge [language]="note().language" />
       }
@@ -52,8 +47,7 @@
       }
     </span>
     @if (isChecklist()) {
-      <!-- A decorative bar: the count beside it carries the same information as
-           text, without which it would exist only graphically. -->
+      <!-- Decorative: the count beside it carries the same information as text. -->
       <span class="card-progress">
         <span class="progress-track" aria-hidden="true">
           <span class="progress-fill" [style.width.%]="progress().percent"></span>
@@ -62,8 +56,8 @@
           {{ 'notes.checklistProgress' | transloco: { done: progress().done, total: progress().total } }}
         </span>
       </span>
-      <!-- Space reserved for the items, which are laid over the top: they carry
-           buttons, and a <button> cannot contain another. -->
+      <!-- Space reserved for the items laid over the top: they carry buttons, and a
+           <button> cannot contain another. -->
       <span class="card-items-space"></span>
     } @else {
       <app-code-viewer
@@ -75,7 +69,7 @@
       />
     }
     <span class="card-footer">
-      <!-- Deliberately compact: a line break between the interpolations would leave a stray space in the rendered text (Angular does not fully collapse it). Hence the prettier-ignore, which would put those breaks back. -->
+      <!-- Compact on purpose: a line break between the interpolations would leave a stray space in the rendered text, which the prettier-ignore below keeps out. -->
       <!-- prettier-ignore -->
       <span [class.stale]="note().expiringSoon"
         >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
@@ -88,9 +82,8 @@
     </span>
   </button>
 
-  <!-- The multi-selection checkbox. A real button with `aria-pressed` rather
-       than an `<input type=checkbox>`: the parent card is a button, and a
-       native control would inherit its styles. -->
+  <!-- A button with `aria-pressed` rather than an `<input type=checkbox>`: the parent
+       card is a button, and a native control would inherit its styles. -->
   <button
     type="button"
     class="card-check"
@@ -102,10 +95,9 @@
     <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
   </button>
 
-  <!-- A todo list's items: siblings of the card button and not its children,
-       because they are buttons. The layer is transparent to clicks and only the
-       boxes take them — everything else falls through to the card, which opens
-       the note. Same trick as the viewer under the editor's textarea. -->
+  <!-- Siblings of the card button and not its children, because they are buttons. The
+       layer is transparent to clicks and only the boxes take them, so everything else
+       falls through to the card. -->
   @if (isChecklist() && note().items.length > 0) {
     <ul class="card-items">
       @for (item of visibleItems(); track $index) {
@@ -132,8 +124,7 @@
     </ul>
   }
 
-  <!-- A snippet with fields does not copy as is: the button opens the form
-       instead of putting `psql -h {{ '{{host}}' }}` on the clipboard. -->
+  <!-- A snippet with fields does not copy as is: the button opens the form. -->
   @if (hasPlaceholders()) {
     <button
       type="button"

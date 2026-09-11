@@ -10,13 +10,9 @@ const FOCUSABLE_SELECTOR = [
 ].join(',');
 
 /**
- * Confines keyboard focus inside the element, and restores it on destruction.
- *
- * Without this a dialog is not keyboard-usable: focus stays on the element that
- * opened it, `Tab` walks the user through the content hidden behind the modal,
- * and closing loses focus into nothing.
- *
- * Written by hand rather than pulling in `@angular/cdk` for one directive.
+ * Without this a dialog is not keyboard-usable: focus stays on the element that opened
+ * it, `Tab` walks the user through the content hidden behind the modal, and closing loses
+ * focus into nothing. Written by hand rather than pulling in `@angular/cdk`.
  */
 @Directive({
   selector: '[appFocusTrap]',
@@ -38,9 +34,8 @@ export class FocusTrapDirective implements AfterViewInit, OnDestroy {
     this.previouslyFocused?.focus();
   }
 
-  // `Event` and not `KeyboardEvent`: modifier pseudo-events (`keydown.tab`) are
-  // absent from the host-binding type table, so `typeCheckHostBindings` hands
-  // over a generic `Event`. Only `preventDefault()` is used here.
+  // `Event` and not `KeyboardEvent`: modifier pseudo-events (`keydown.tab`) are absent
+  // from the host-binding type table, so `typeCheckHostBindings` hands over an `Event`.
   protected onTab(event: Event, backwards: boolean): void {
     const elements = this.focusableElements();
     if (elements.length === 0) return;
@@ -51,8 +46,7 @@ export class FocusTrapDirective implements AfterViewInit, OnDestroy {
 
     const active = document.activeElement;
 
-    // Only the two edges of the trap need intervention: in between, native
-    // navigation already does the right thing.
+    // Only the two edges of the trap need intervention: native navigation does the rest.
     if (backwards && active === first) {
       event.preventDefault();
       last.focus();

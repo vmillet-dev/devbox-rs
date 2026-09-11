@@ -1,9 +1,6 @@
-//! What leaves DevBox and what comes back in: the exchange format, and the
-//! Markdown rendering used for sharing.
-//!
-//! The format reuses the domain types rather than duplicating them — a field
-//! added to `Note` is exported without anyone thinking about it, and an older
-//! file stays readable as long as serde can fill the gap.
+//! The format reuses the domain types rather than duplicating them: a field added
+//! to `Note` is exported without anyone thinking about it, and an older file stays
+//! readable as long as serde can fill the gap.
 
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -38,7 +35,7 @@ pub struct ExportReport {
 }
 
 /// `skipped`: notes already present (same id) or whose space is missing from the
-/// file. An import has to be replayable without duplicating.
+/// file — an import has to be replayable without duplicating.
 #[derive(Debug, Clone, Copy, Default, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportReport {
@@ -61,7 +58,6 @@ pub fn read_bundle(json: &str) -> Result<Bundle, StorageError> {
     Ok(bundle)
 }
 
-/// The path is chosen by the user in a file picker; this only checks it is one.
 pub fn validate_path(path: &str) -> Result<(), ValidationError> {
     if path.trim().is_empty() {
         return Err(ValidationError::new("path", "no file chosen"));
@@ -78,12 +74,8 @@ fn fence_for(content: &str) -> String {
     "`".repeat(longest.max(2) + 1)
 }
 
-/// Rendering meant to be pasted elsewhere (a review, a ticket, a message):
-/// title, context, tags, then the content in a block annotated with its
-/// language.
-///
-/// A todo list comes out as a Markdown task list rather than a fenced block: it
-/// has no content, and an empty block pastes nowhere.
+/// A todo list comes out as a Markdown task list rather than a fenced block: it has
+/// no content, and an empty block pastes nowhere.
 pub fn to_markdown(notes: &[Note], space_names: &BTreeMap<String, String>) -> String {
     let mut out = String::new();
 
@@ -165,14 +157,12 @@ mod tests {
 
         let markdown = to_markdown(&[note], &spaces());
 
-        // The outer fence has to be longer than the one in the content.
         assert!(markdown.contains("````txt"));
         assert!(markdown.ends_with("````\n"));
     }
 
     #[test]
     fn a_todo_list_is_shared_as_a_markdown_task_list() {
-        // It has no content: an empty fenced block pastes nowhere.
         let mut note = sample();
         note.kind = NoteKind::Checklist;
         note.content = String::new();

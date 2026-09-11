@@ -4,10 +4,6 @@ import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { createNote } from '@testing/note.fixture';
 import { NotesHarness, awaitQuery, createNotesHarness, visibleIds } from '@testing/notes-harness';
 
-/**
- * Both halves point **into the visible list**: what is tested here is that they
- * keep doing so when it moves under them.
- */
 describe('NoteSelectionStore', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -40,8 +36,6 @@ describe('NoteSelectionStore', () => {
     });
 
     it('never hands out a note that is no longer displayed', async () => {
-      // An id ticked and then gone must not travel into a bulk action: the
-      // selection derives from what is visible.
       const { canvas, selection, repository } = await withThreeNotes();
       selection.toggleChecked('a');
       const before = repository.queryCount;
@@ -81,8 +75,6 @@ describe('NoteSelectionStore', () => {
     });
 
     it('sends the typed tag through untouched', async () => {
-      // Trim, a leading "#" and duplicates are the back end’s call, the only place
-      // that rule lives.
       const { store, selection, repository } = await withThreeNotes();
       selection.toggleChecked('a');
 

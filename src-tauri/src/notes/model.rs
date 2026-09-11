@@ -1,11 +1,5 @@
-//! The note: what is persisted ([`Note`]) and what is displayed ([`DisplayNote`]).
-//!
-//! [`normalize_tags`] lives here and **only here**: both writing and querying
-//! pass through it, otherwise a typed `#urgent` would not find the stored `urgent`.
-//!
-//! ⚠️ `rename_all` and `tag = "kind"` are load-bearing — without them serde emits
+//! ⚠️ `rename_all` and `tag = "kind"` are load-bearing: without them serde emits
 //! `space_id` and `{"Expires":{…}}`, which the front end cannot read back.
-//! `tests/ipc_contract.rs` freezes them.
 
 use std::collections::BTreeMap;
 
@@ -22,7 +16,6 @@ use super::placeholder::{self, Placeholder};
 pub struct Note {
     pub id: String,
     pub space_id: String,
-    /// Can be empty: the interface then displays a translated label.
     pub title: String,
     pub language: Language,
     pub content: String,
@@ -33,19 +26,15 @@ pub struct Note {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub lifecycle: NoteLifecycle,
-    /// ⚠️ `default` is not decoration: `transfer::Bundle` deserialises `Note`
-    /// itself, and a required key here would make every export file written
-    /// before todo-lists existed unreadable.
+    /// ⚠️ `default`: `transfer::Bundle` deserialises `Note` itself, and a required
+    /// key would make every export file written before todo-lists unreadable.
     #[serde(default)]
     pub kind: NoteKind,
     /// Empty for a snippet. A checklist has these **instead of** `content`.
     #[serde(default)]
     pub items: Vec<ChecklistItem>,
-    /// What was typed into the content's `{{fields}}`, by field name.
-    ///
-    /// Written by `set_placeholder_values` and by nothing else: filling a field
-    /// is not editing the note, so it leaves `updated_at` alone. `default` for
-    /// the reason that already applies to `kind`.
+    /// Written by `set_placeholder_values` and by nothing else: filling a field is
+    /// not editing the note, so it leaves `updated_at` alone.
     #[serde(default)]
     pub placeholder_values: BTreeMap<String, String>,
 }
@@ -60,7 +49,6 @@ pub enum NoteLifecycle {
     },
 }
 
-/// Neither identifier nor timestamps: persistence assigns them.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteDraft {
@@ -78,11 +66,9 @@ pub struct NoteDraft {
     pub items: Vec<ChecklistItem>,
 }
 
-/// A field set to `None` remains **unchanged** in the database.
-///
-/// `#[specta(optional)]` makes keys omissible on the TypeScript side. Without it, the
-/// front end would have to send `null` for fields it doesn't touch — thus
-/// overwriting what it wanted to leave intact.
+/// A field set to `None` stays **unchanged**. `#[specta(optional)]` makes the key
+/// omissible on the TypeScript side; without it the front would send `null` for
+/// what it does not touch, overwriting it.
 #[derive(Debug, Clone, Default, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotePatch {
@@ -104,18 +90,14 @@ pub struct NotePatch {
     pub lifecycle: Option<NoteLifecycle>,
     #[specta(optional)]
     pub kind: Option<NoteKind>,
-    /// Replaces the **whole** list, like `tags`: nothing addresses a single
-    /// item, since a position is all the identity an item has.
+    /// Replaces the **whole** list, like `tags`: a position is all the identity an
+    /// item has.
     #[specta(optional)]
     pub items: Option<Vec<ChecklistItem>>,
 }
 
 impl NoteDraft {
-    /// Language guessed if the front end didn't choose one, normalized tags and
-    /// items: these rules live here, not in the SQL.
-    ///
-    /// A checklist is exempt from detection — it has no body to read, and
-    /// guessing a language for a note that will never show one is noise.
+    /// A checklist is exempt from language detection — it has no body to read.
     pub fn into_note(self, id: String, now: DateTime<Utc>) -> Note {
         let language = if self.kind == NoteKind::Checklist {
             Language::default()
@@ -139,25 +121,16 @@ impl NoteDraft {
             lifecycle: self.lifecycle,
             kind: self.kind,
             items,
-            // A note just born has nothing to remember: the values are typed in
-            // the editor, once the fields exist.
             placeholder_values: BTreeMap::new(),
         }
     }
 }
 
 impl NotePatch {
-    /// Applies the provided fields and refreshes `updated_at`; a `None`
-    /// leaves the note intact.
-    ///
-    /// Language detection is decided on the **pre-patch** state: it is
-    /// it who says if the note receives there its first content.
-    ///
-    /// ⚠️ Does not check that `space_id` exists — only persistence can
-    /// see it, and it does so before calling.
+    /// ⚠️ Does not check that `space_id` exists — only persistence can, and it does
+    /// so before calling.
     pub fn apply(&self, note: &mut Note, now: DateTime<Utc>) {
-        // Read on the pre-patch note, and skipped once the note is — or becomes —
-        // a checklist: such a note has no body for a heuristic to read.
+        // Skipped once the note is — or becomes — a checklist: no body to read.
         let becomes_checklist = self.kind.unwrap_or(note.kind) == NoteKind::Checklist;
         let detected = if becomes_checklist {
             None
@@ -203,12 +176,10 @@ impl NotePatch {
     }
 }
 
-/// **Single** "untriaged soon" threshold: the front end had a second one.
 const EXPIRING_SOON: TimeDelta = TimeDelta::days(3);
 
-/// Card footer: the **decision**, not the rendering. The dated variants
-/// carry a date and not a label — "4 min ago" must age by itself
-/// on the screen, so formatting remains on the front end.
+/// The **decision**, not the rendering: the dated variants carry a date and not a
+/// label — "4 min ago" has to age on screen without a round trip.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum NoteFooter {
@@ -217,8 +188,7 @@ pub enum NoteFooter {
     Age { at: DateTime<Utc> },
 }
 
-/// `flatten` flattens the note into the same JSON object: the front end only has a single
-/// note type.
+/// `flatten`: the front end has a single note type.
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayNote {
@@ -226,22 +196,16 @@ pub struct DisplayNote {
     pub note: Note,
     pub footer: NoteFooter,
     pub expiring_soon: bool,
-    /// The content's `{{…}}` fields, carrying what has already been typed for
-    /// them. The **list** is derived from the text; the values are persisted.
+    /// The **list** is derived from the text; the values are persisted.
     pub placeholders: Vec<Placeholder>,
-    /// Filled in afterwards by whoever holds a connection — `decorate` reads no
-    /// database. Zero until someone sets it.
+    /// Filled in afterwards by whoever holds a connection: `decorate` reads no database.
     pub attachment_count: u32,
-    /// What copying this note puts on the clipboard, when that is **not** its
-    /// content: a todo list has no body, so it travels as the Markdown of its
-    /// items. `None` for a snippet, whose content is already on the wire.
-    ///
-    /// Decided here so that `checklist::to_markdown` stays the only place the
-    /// `- [x] ` syntax is written — the front end used to carry a second copy.
+    /// What copying puts on the clipboard when that is **not** the content: a todo
+    /// list travels as the Markdown of its items, a snippet as `None`. Decided here
+    /// so `checklist::to_markdown` stays the only place the `- [x] ` syntax exists.
     pub copy_text: Option<String>,
 }
 
-/// To read `note.id` instead of `note.note.id`.
 impl std::ops::Deref for DisplayNote {
     type Target = Note;
 
@@ -264,19 +228,13 @@ pub fn decorate(note: Note, now: DateTime<Utc>) -> DisplayNote {
     }
 }
 
-/// Unlike a query, creation and update do not receive a reference
-/// instant from the front end.
 pub fn decorate_now(note: Note) -> DisplayNote {
     decorate(note, Utc::now())
 }
 
-/// Lays the **global variables** on an already decorated note's fields, as
-/// proposed values.
-///
-/// ⚠️ They override the default written in the text but **do not touch** what
-/// was typed on the note, which is why the panel shows them in grey. Copying
-/// one into `value` would freeze the variable the day it changes, and
-/// `set_placeholder_values` would then write that copy to the database.
+/// ⚠️ They override the default written in the text but **do not touch** what was
+/// typed on the note: copying one into `value` would freeze the variable the day
+/// it changes.
 pub fn apply_global_defaults(note: &mut DisplayNote, globals: &BTreeMap<String, String>) {
     for placeholder in &mut note.placeholders {
         if let Some(value) = globals.get(&placeholder.name) {
@@ -290,7 +248,6 @@ fn footer_of(note: &Note) -> NoteFooter {
         return NoteFooter::Expiry { at };
     }
 
-    // The first segment locates the note without overflowing the card.
     if note.pinned
         && let Some(root) = note
             .source
@@ -313,12 +270,11 @@ fn expires_soon(note: &Note, now: DateTime<Utc>) -> bool {
         return false;
     };
 
-    // A duration, not a number of whole days: at 3 days and 1 hour,
-    // rounding down would switch the note to alert one day too early.
+    // A duration, not a number of whole days: at 3 days and 1 hour, rounding down
+    // would switch the note to alert a day early.
     at.signed_duration_since(now) <= EXPIRING_SOON
 }
 
-/// A tag of the corpus and the number of living notes carrying it.
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TagUsage {
@@ -326,8 +282,7 @@ pub struct TagUsage {
     pub note_count: u32,
 }
 
-/// A tag typed to be **written across the whole corpus** (rename, merge) goes
-/// through the same normalisation as any other, but its failure is an error:
+/// Written across the whole corpus (rename, merge), so its failure is an error:
 /// staying silent would rename onto nothing.
 pub fn validated_tag(raw: &str) -> Result<String, crate::error::ValidationError> {
     normalize_tags(std::slice::from_ref(&raw.to_string()))
@@ -336,24 +291,17 @@ pub fn validated_tag(raw: &str) -> Result<String, crate::error::ValidationError>
         .ok_or_else(|| crate::error::ValidationError::new("tag", "a tag must have a readable name"))
 }
 
-/// The cleaned spelling of **one** tag, or `None` when nothing readable is
-/// left.
-///
-/// Split out of [`normalize_tags`] so a caller that only needs to know whether
-/// a tag was selected can ask without building the list — and without carrying
-/// a second copy of the rule.
+/// Split out of [`normalize_tags`] so a caller that only needs to know whether a
+/// tag was selected can ask without building the list.
 pub fn normalize_tag(tag: &str) -> Option<&str> {
     let cleaned = tag.trim().trim_start_matches('#').trim();
 
     (!cleaned.is_empty()).then_some(cleaned)
 }
 
-/// Trim, leading `#`, blanks, and duplicates.
-///
-/// Single rule: the front end sends what the user typed, both writing
-/// and querying go through here — otherwise a typed `#urgent` would not find the
-/// stored `urgent`. De-duplication is case-insensitive and keeps the
-/// first spelling; `COLLATE NOCASE` (migration 2) extends the rule to the corpus.
+/// Trim, leading `#`, blanks, duplicates. Both writing and querying go through
+/// here, or a typed `#urgent` would not find the stored `urgent`. De-duplication
+/// is case-insensitive and keeps the first spelling, like `COLLATE NOCASE`.
 pub fn normalize_tags(tags: &[String]) -> Vec<String> {
     let mut seen: Vec<String> = Vec::new();
     let mut normalized: Vec<String> = Vec::new();
@@ -410,14 +358,11 @@ mod tests {
 
     #[test]
     fn a_tag_reduced_to_nothing_is_dropped_rather_than_stored_empty() {
-        // " # " trims to "#", then to "" — storing that would put a blank facet
-        // in the rail that selects every note carrying it.
         assert!(normalized(&[" # ", "#"]).is_empty());
     }
 
     #[test]
     fn tag_case_folding_reaches_beyond_ascii() {
-        // SQLite's NOCASE would not collapse these; `to_lowercase` is Unicode.
         assert_eq!(normalized(&["Étape", "étape"]), ["Étape"]);
     }
 
@@ -458,8 +403,6 @@ mod tests {
 
     #[test]
     fn turning_a_draft_into_a_note_detects_the_language_and_normalises_the_tags() {
-        // Both rules used to run in `storage`, where they needed an open database
-        // to be exercised at all.
         let note = draft(Language::Txt, "{\"a\": 1}").into_note("n-7".to_string(), now());
 
         assert_eq!(note.language, Language::Json);
@@ -470,7 +413,6 @@ mod tests {
     fn turning_a_draft_into_a_note_leaves_everything_else_alone() {
         let note = draft(Language::Md, "SELECT 1").into_note("n-7".to_string(), now());
 
-        // A chosen language is a decision; only the rest travels verbatim.
         assert_eq!(note.language, Language::Md);
         assert_eq!(note.content, "SELECT 1");
         assert_eq!(note.space_id, "s-1");
@@ -492,7 +434,6 @@ mod tests {
         assert_eq!(note.content, "Content");
         assert_eq!(note.tags, ["auth"]);
         assert_eq!(note.updated_at, at("2026-07-25T10:00:00.000Z"));
-        // `created_at` is the one stamp nothing may move.
         assert_eq!(note.created_at, now());
     }
 
@@ -515,8 +456,6 @@ mod tests {
 
     #[test]
     fn a_patch_filling_an_empty_note_detects_its_language() {
-        // Decided on the state *before* the patch: that is what says whether the
-        // note is receiving its first content.
         let mut note = Note {
             language: Language::Txt,
             content: String::new(),
@@ -541,8 +480,6 @@ mod tests {
 
     #[test]
     fn a_checklist_is_not_given_a_guessed_language() {
-        // No body to read: a language on a note that will never show one is noise,
-        // and `Txt` doubles as "nothing chosen".
         let draft = NoteDraft {
             kind: NoteKind::Checklist,
             content: "{ \"a\": 1 }".to_string(),
@@ -661,7 +598,6 @@ mod tests {
             ..expiring("2026-08-01T00:00:00.000Z")
         };
 
-        // The deadline is the more urgent thing to know; the context can wait.
         assert!(matches!(footer_of(&note), NoteFooter::Expiry { .. }));
     }
 
@@ -672,8 +608,6 @@ mod tests {
 
     #[test]
     fn the_threshold_is_measured_in_fractions_of_a_day() {
-        // Three days and one hour is not "soon"; rounding to whole days would
-        // raise the alert a day early.
         assert!(!expires_soon(&expiring("2026-07-28T10:00:00.000Z"), now()));
         assert!(expires_soon(&expiring("2026-07-28T08:00:00.000Z"), now()));
     }

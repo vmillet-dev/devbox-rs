@@ -22,8 +22,8 @@
         (click)="checkUpdates()"
       >
         {{ 'about.checkUpdates' | transloco }}
-        <!-- aria-live: the result arrives after the click and must be announced
-             without moving focus, which stayed on this entry. -->
+        <!-- aria-live: the result arrives after the click and must be announced without
+             moving focus. -->
         <span class="about-option-status" aria-live="polite">
           @if (checkStatusRef(); as ref) {
             {{ ref.key | transloco }}

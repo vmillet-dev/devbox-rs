@@ -39,7 +39,6 @@ describe('WindowBehaviorService', () => {
   });
 
   it('stays silent when there is no bridge to talk to', async () => {
-    // Outside Tauri (jsdom): a browser window tidies itself away nowhere.
     setWindowBehavior.mockRejectedValue(new Error('no bridge'));
 
     expect(() => service.start()).not.toThrow();

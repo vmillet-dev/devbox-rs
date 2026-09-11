@@ -7,10 +7,6 @@ import { createNote } from '@testing/note.fixture';
 import { HARNESS_SPACES, awaitQuery, createNotesHarness, visibleIds } from '@testing/notes-harness';
 import { DRAFT_ID, UNDO_WINDOW_MS } from './notes.store';
 
-/**
- * The open note and what is written to it. Which notes the canvas shows is
- * `notes-query.store.spec.ts`, and what it points at `note-selection.store.spec.ts`.
- */
 describe('NotesStore', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -41,7 +37,6 @@ describe('NotesStore', () => {
     });
 
     it('keeps the open note editable after it drops out of the filtered view', async () => {
-      // Removing a note's last matching tag must not yank the editor shut.
       const { store, canvas, repository } = await createNotesHarness([
         createNote({ id: 'a', tags: ['urgent'] }),
       ]);
@@ -76,14 +71,10 @@ describe('NotesStore', () => {
       await store.applyPatch('a', { title: 'New' });
       await awaitQuery(repository, before);
 
-      // The view is the backend's to compute: a write can move a note between
-      // sections, so it has to be recomputed rather than patched locally.
       expect(repository.queryCount).toBeGreaterThan(before);
     });
 
     it('skips persistence when the value has not changed', async () => {
-      // The overlay emits on every keystroke; an unchanged value must not
-      // produce a write per character.
       const { store, repository } = await createNotesHarness([createNote({ id: 'a', title: 'Same' })]);
       const update = vi.spyOn(repository, 'update');
 
@@ -103,8 +94,6 @@ describe('NotesStore', () => {
 
       await store.applyPatch('a', { title: 'Attempted' });
 
-      // Nothing was applied locally in the first place, so there is nothing to
-      // roll back — the displayed note is still the stored one.
       expect(visibleIds(canvas)).toEqual(['a']);
       expect(canvas.sections()[0].notes[0].title).toBe('Original');
       expect(notifier.notice()?.ref.key).toBe('errors.noteSaveFailed');
@@ -150,8 +139,6 @@ describe('NotesStore', () => {
 
       await store.applyPatch('a', { title: 'Same', content: 'new' });
 
-      // One round trip carrying one field: a patch is not "what the editor
-      // holds", it is "what moved".
       expect(update).toHaveBeenCalledWith('a', { content: 'new' });
     });
   });
@@ -186,8 +173,6 @@ describe('NotesStore', () => {
 
       await store.moveNote('a', 'space-2');
 
-      // Naming the cause beats "could not save": the space was deleted in
-      // another window while this menu was open.
       expect(notifier.notice()?.ref.key).toBe('errors.spaceGone');
     });
   });
@@ -215,8 +200,6 @@ describe('NotesStore', () => {
       ]);
       const update = vi.spyOn(repository, 'update');
 
-      // An equivalent list, rebuilt: comparing by identity would float the note
-      // to the top of the canvas every time the editor closes.
       await store.setChecklist(
         'a',
         items.map((item) => ({ ...item })),
@@ -245,8 +228,6 @@ describe('NotesStore', () => {
 
       await store.applyPatch('a', { lifecycle: { kind: 'expires', at } });
 
-      // This write is the only thing that feeds the "À trier" filter: without
-      // it the chip and the lifecycle badge have nothing to show.
       expect(update).toHaveBeenCalledWith('a', { lifecycle: { kind: 'expires', at } });
     });
 
@@ -268,8 +249,6 @@ describe('NotesStore', () => {
       ]);
       const update = vi.spyOn(repository, 'update');
 
-      // A fresh `Date` carrying the same instant: comparing by identity would
-      // write on every visit to the date field.
       await store.applyPatch('a', { lifecycle: { kind: 'expires', at: new Date(at.getTime()) } });
 
       expect(update).not.toHaveBeenCalled();
@@ -296,8 +275,6 @@ describe('NotesStore', () => {
     });
 
     it('does not write an unchanged context', async () => {
-      // The editor commits on blur and on every closing path, so it re-submits
-      // the same value routinely.
       const { store, repository } = await createNotesHarness([createNote({ id: 'a', source: 'API' })]);
       const update = vi.spyOn(repository, 'update');
 
@@ -326,13 +303,10 @@ describe('NotesStore', () => {
 
       await store.captureFromClipboard();
 
-      // `txt` is the "nothing chosen" signal `create_note` replaces by running
-      // `domain::detect` on the content; deciding here would duplicate the rule.
       expect(create).toHaveBeenCalledWith(expect.objectContaining({ language: 'txt' }));
     });
 
     it('creates nothing from an empty or blank clipboard', async () => {
-      // An empty note would be one more thing to file away, not a capture.
       const { store, repository } = await createNotesHarness([], HARNESS_SPACES, new FakeClipboard('  \n '));
       const create = vi.spyOn(repository, 'create');
 
@@ -364,7 +338,6 @@ describe('NotesStore', () => {
 
   describe('createNote', () => {
     it('writes nothing until the note is worth keeping', async () => {
-      // One empty note per opening would turn the canvas into a pile to tidy up.
       const { store, repository } = await createNotesHarness([]);
       const create = vi.spyOn(repository, 'create');
 
@@ -376,8 +349,6 @@ describe('NotesStore', () => {
     });
 
     it('opens a blank draft', async () => {
-      // Empty title and source: the UI renders translated placeholders rather than
-      // one language frozen into the data.
       const { store } = await createNotesHarness([]);
 
       store.createNote();
@@ -401,8 +372,6 @@ describe('NotesStore', () => {
     });
 
     it('creates an ordinary note when nothing says otherwise', async () => {
-      // The default covers the ghost card, the shortcut and the palette: the
-      // button's menu is the only place the other value comes from.
       const { store } = await createNotesHarness([]);
 
       store.createNote();
@@ -444,8 +413,6 @@ describe('NotesStore', () => {
     });
 
     it('files the draft in the first space while showing all spaces', async () => {
-      // It has to land somewhere, and the first space is the one the switcher
-      // shows at the top.
       const { store } = await createNotesHarness([]);
 
       store.createNote();
@@ -454,7 +421,6 @@ describe('NotesStore', () => {
     });
 
     it('refuses to create a note when no space exists at all', async () => {
-      // A note without a space would vanish as soon as a space filter is applied.
       const { store, repository } = await createNotesHarness([], []);
       const notifier = TestBed.inject(ErrorNotifier);
       const create = vi.spyOn(repository, 'create');
@@ -481,7 +447,6 @@ describe('NotesStore', () => {
       const create = vi.spyOn(repository, 'create');
       store.createNote();
 
-      // Changing an empty note's language must not make it appear on the canvas.
       await store.applyPatch(DRAFT_ID, { language: 'json' });
 
       expect(create).not.toHaveBeenCalled();
@@ -489,7 +454,6 @@ describe('NotesStore', () => {
     });
 
     it('saves a note that carries only a tag', async () => {
-      // It is no longer empty, even with no text in it.
       const { store } = await createNotesHarness([]);
       store.createNote();
 
@@ -499,8 +463,6 @@ describe('NotesStore', () => {
     });
 
     it('routes a second commit still carrying the draft id to the real note', async () => {
-      // Closing commits the title then the content with no change detection in
-      // between, so the second call still carries `DRAFT_ID`.
       const { store, repository } = await createNotesHarness([]);
       const update = vi.spyOn(repository, 'update');
       store.createNote();
@@ -535,7 +497,6 @@ describe('NotesStore', () => {
     });
 
     it('throws nothing away and offers no undo when a draft is deleted', async () => {
-      // A draft exists nowhere: there is nothing to move to the trash.
       const { store, repository } = await createNotesHarness([]);
       const remove = vi.spyOn(repository, 'delete');
       store.createNote();
@@ -548,7 +509,6 @@ describe('NotesStore', () => {
     });
 
     it('materialises the draft on demand, for what needs a real note', async () => {
-      // Attaching a file targets a database row.
       const { store } = await createNotesHarness([]);
       store.createNote();
 
@@ -643,8 +603,6 @@ describe('NotesStore', () => {
     });
 
     it('hides the banner after its window but stays undoable', async () => {
-      // Hiding a suggestion is not withdrawing it: `Ctrl+Z` still has to work once
-      // the banner is gone.
       const { store } = await createNotesHarness([createNote({ id: 'a' })]);
       // The timers are faked **after** the store is built: `waitFor` depends on
       // them to await the first view.
@@ -663,7 +621,6 @@ describe('NotesStore', () => {
     });
 
     it('drops the offer when dismissed', async () => {
-      // Hiding the banner by hand, on the other hand, gives up for good.
       const { store } = await createNotesHarness([createNote({ id: 'a' })]);
       await store.deleteNote('a');
 
@@ -676,7 +633,6 @@ describe('NotesStore', () => {
 
   describe('{{fields}}', () => {
     it('delegates the substitution to the backend', async () => {
-      // What is a field and what is Angular template code is decided there.
       const { store } = await createNotesHarness();
 
       const filled = await store.fillPlaceholders('psql -h {{host}}', { host: 'db' });
@@ -699,8 +655,6 @@ describe('NotesStore', () => {
     });
 
     it('gives the draft a real row before writing its values', async () => {
-      // A note carrying fields carries content: it is worth saving, and a value
-      // cannot be written onto a row that does not exist.
       const { store, repository } = await createNotesHarness();
       store.createNote();
       await store.applyPatch(DRAFT_ID, { content: 'psql -h {{host}}' });
@@ -725,8 +679,6 @@ describe('NotesStore', () => {
 
       await store.setPlaceholderValues('snippet', { host: 'db.internal' });
 
-      // The cause the back end names wins over "could not save": a note that is
-      // gone does not come back by retrying.
       expect(TestBed.inject(ErrorNotifier).notice()?.ref.key).toBe('errors.noteGone');
     });
   });

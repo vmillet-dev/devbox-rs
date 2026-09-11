@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CardBox, nextFocusIndex } from './grid-navigation.util';
 
-/**
- * Hand-written positions: that is the whole point of having taken the rule out of
- * the component — the column count exists nowhere, it is deduced.
- */
 function grid(columns: number, count: number): CardBox[] {
   return Array.from({ length: count }, (_, index) => ({
     top: Math.floor(index / columns) * 160,
@@ -21,8 +17,6 @@ describe('nextFocusIndex', () => {
   });
 
   it('stops at the edges instead of wrapping around', () => {
-    // Wrapping would lose track of where you are in a grid with no visible start
-    // ni fin visibles.
     const boxes = grid(3, 6);
 
     expect(nextFocusIndex(boxes, 0, 'prev')).toBe(0);
@@ -39,16 +33,14 @@ describe('nextFocusIndex', () => {
   });
 
   it('lands on the nearest card when the target row is shorter', () => {
-    // An incomplete last row: moving down from the 3rd column must not leave the
-    // grid.
     const boxes = grid(3, 5);
 
     expect(nextFocusIndex(boxes, 2, 'down')).toBe(4);
   });
 
   it('tolerates a few pixels of difference within a row', () => {
-    // Two cards on one row do not always share a pixel-exact `top`: with no
-    // tolerance, each would form a row of its own.
+    // Two cards on one row do not always share a pixel-exact `top`: with no tolerance,
+    // each would form a row of its own.
     const boxes: CardBox[] = [
       { top: 0, left: 0 },
       { top: 2, left: 200 },

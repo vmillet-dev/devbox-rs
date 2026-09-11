@@ -1,19 +1,10 @@
-//! A note's language: the recognized list, and detection from pasted content.
-//!
-//! Detection heuristics are deliberately cheap and fallible: the result is
-//! only an **initial value**, which the editor allows to be changed.
-//! An error costs one click. They only play when a note receives its
-//! first content — [`for_draft`] at creation, [`after_patch`] upon the first
-//! paste. After this point, nothing is guessed anymore.
-
 use crate::closed_enum::closed_enum;
 
 use super::model::{Note, NoteDraft, NotePatch};
 
 closed_enum! {
-    /// **Closed** list, which is the whole point: the front end receives it as a
-    /// generated TypeScript union, so an unknown value no longer compiles there
-    /// instead of being refused at runtime.
+    /// **Closed**: the front end receives it as a generated TypeScript union, so
+    /// an unknown value stops compiling there instead of being refused at runtime.
     pub enum Language {
         Json = "json",
         Js = "js",
@@ -27,15 +18,13 @@ closed_enum! {
         Css = "css",
         Sh = "sh",
         Md = "md",
-        /// Default, and a **signal that the front end hasn't chosen anything**:
-        /// creation replaces it with a detection.
+        /// Default, and the signal that the front end chose nothing.
         #[default]
         Txt = "txt",
     }
 }
 
-/// The front end's choice if it made one, otherwise a detection — `txt` acting
-/// as "nothing chosen".
+/// The front end's choice if it made one, `txt` meaning it made none.
 pub fn for_draft(draft: &NoteDraft) -> Language {
     if draft.language == Language::default() {
         from_content(&draft.content)
@@ -44,12 +33,9 @@ pub fn for_draft(draft: &NoteDraft) -> Language {
     }
 }
 
-/// The usual gesture: "+ New note" creates an empty note, then we paste.
-/// Since creation sees no content, without this the note would remain in `txt`.
-///
-/// The three refusals are what prevent detection from becoming a permanent
-/// correction: a language set via the selector, a language already other than `txt`,
-/// or a note that already had content.
+/// "+ New note" creates an empty note, then we paste: creation sees no content,
+/// so without this the note would stay in `txt`. The three refusals are what keep
+/// detection from becoming a permanent correction.
 pub fn after_patch(before: &Note, patch: &NotePatch) -> Option<Language> {
     if patch.language.is_some()
         || before.language != Language::default()
@@ -168,8 +154,7 @@ fn is_sql(lower: &str) -> bool {
     starts_with_any(lower, &STATEMENTS)
 }
 
-/// A section **and** an assignment: `[…]` alone would be indistinguishable from
-/// an array on its own line in any language.
+/// A section **and** an assignment: `[…]` alone could be an array on its own line.
 fn is_toml(content: &str) -> bool {
     any_line(content, is_toml_section) && any_line(content, is_assignment)
 }
@@ -239,7 +224,6 @@ fn is_css(content: &str) -> bool {
         return false;
     }
 
-    // Anywhere in the line: a compact rule fits on one.
     let has_declaration = any_line(content, |line| {
         line.find(':')
             .zip(line.find(';'))
@@ -256,8 +240,7 @@ fn is_css(content: &str) -> bool {
 }
 
 fn is_yaml(content: &str) -> bool {
-    // These belong to languages already ruled out above: seeing them here means
-    // we are on the wrong track.
+    // These belong to languages already ruled out above.
     if content.contains(';') || content.contains('{') {
         return false;
     }
@@ -310,8 +293,6 @@ mod tests {
 
     #[test]
     fn an_unknown_value_is_refused_rather_than_guessed() {
-        // A database written by a newer binary can hold one; the caller decides
-        // whether to fall back, and it does so in one place.
         assert_eq!("rust".parse::<Language>(), Err(()));
         assert_eq!("JSON".parse::<Language>(), Err(()));
     }
@@ -323,8 +304,6 @@ mod tests {
 
     #[test]
     fn the_serialised_form_matches_the_stored_one() {
-        // The bindings export this spelling as a TS union; the column holds the
-        // same string. One vocabulary, two consumers.
         for language in Language::ALL {
             let json = serde_json::to_value(language).unwrap();
             assert_eq!(json, serde_json::json!(language.as_str()));
@@ -353,8 +332,6 @@ mod tests {
 
     #[test]
     fn a_chosen_language_is_never_overwritten() {
-        // The editor's select is a decision; re-detecting on every write would
-        // undo it the moment the content stops looking like that language.
         assert_eq!(for_draft(&draft(Language::Md, "SELECT 1")), Language::Md);
     }
 
@@ -380,9 +357,6 @@ mod tests {
 
     #[test]
     fn an_empty_note_receiving_its_first_content_gets_a_language() {
-        // The ordinary gesture: "+ New note" creates an empty note, and the
-        // paste lands through `update_note`. Without this the note would stay
-        // `txt` whatever is put in it.
         let detected = after_patch(&blank_note(), &content_patch("interface A { id: string }"));
 
         assert_eq!(detected, Some(Language::Ts));
@@ -390,8 +364,6 @@ mod tests {
 
     #[test]
     fn a_note_that_already_had_content_keeps_its_language() {
-        // It has an identity; re-detecting on every keystroke would take the
-        // select back from the user.
         let note = Note {
             content: "du texte".to_string(),
             ..blank_note()
@@ -412,7 +384,6 @@ mod tests {
 
     #[test]
     fn a_patch_setting_the_language_itself_is_left_alone() {
-        // The user just picked from the select, in the same write.
         let patch = NotePatch {
             language: Some(Language::Md),
             ..content_patch("SELECT 1")
@@ -438,8 +409,6 @@ mod tests {
 
     #[test]
     fn every_detected_language_is_one_the_editor_accepts() {
-        // A value outside this list would be refused by `language::validate`, so
-        // detection would turn a paste into a failed creation.
         let samples = [
             "",
             "#!/bin/bash\necho hi",
@@ -474,7 +443,6 @@ mod tests {
 
     #[test]
     fn prose_stays_plain_text() {
-        // The common case of a scratch note: it must not be dressed up as code.
         assert_eq!(
             from_content("Penser à relancer Marc au sujet du certificat"),
             Language::Txt
@@ -523,7 +491,6 @@ mod tests {
     #[test]
     fn toml_needs_both_a_section_and_an_assignment() {
         assert_eq!(from_content("[package]\nname = \"devbox\""), Language::Toml);
-        // A bare list on its own line is not a section header.
         assert_ne!(from_content("[1, 2]\nx = 3"), Language::Toml);
     }
 
@@ -532,7 +499,6 @@ mod tests {
         assert_eq!(from_content("def run():\n    return 1"), Language::Py);
         assert_eq!(from_content("class Note:\n    pass"), Language::Py);
         assert_eq!(from_content("from os import path"), Language::Py);
-        // Same keyword, brace instead of colon.
         assert_eq!(from_content("class Note { }"), Language::Js);
     }
 
@@ -541,7 +507,6 @@ mod tests {
         assert_eq!(from_content("interface Note { id: string }"), Language::Ts);
         assert_eq!(from_content("export type Id = string"), Language::Ts);
         assert_eq!(from_content("const a: number = 1"), Language::Ts);
-        // Nothing type-specific: plain JavaScript.
         assert_eq!(from_content("const add = (a, b) => a + b"), Language::Js);
         assert_eq!(from_content("console.log('hi')"), Language::Js);
     }
@@ -563,8 +528,6 @@ mod tests {
 
     #[test]
     fn a_bare_url_is_not_read_as_a_yaml_mapping() {
-        // "https://example.com" splits on ':' with a value that has no space;
-        // without that rule every pasted link would come back as YAML.
         assert_ne!(from_content("https://example.com/a/b"), Language::Yml);
     }
 

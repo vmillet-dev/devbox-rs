@@ -3,10 +3,9 @@ import { load } from '@tauri-apps/plugin-store';
 import type { Store, StoreOptions } from '@tauri-apps/plugin-store';
 
 /**
- * All this service needs from the plugin: opening a file. A token rather than a
- * direct call to `load`, also out of practical necessity — the Angular builder
- * bundles the modules before Vitest sees them, and `vi.mock` on an external
- * package then intercepts only half the time.
+ * A token rather than a direct call to `load`: the Angular builder bundles the modules
+ * before Vitest sees them, and `vi.mock` on an external package then intercepts only
+ * half the time.
  */
 type PreferencesStoreLoader = (path: string, options: StoreOptions) => Promise<Store>;
 
@@ -22,15 +21,12 @@ const STORE_FILE = 'preferences.json';
 const AUTO_SAVE_MS = 300;
 
 /**
- * Local preferences, backed by `tauri-plugin-store`: a real file, immune to a
- * WebView wipe unlike the `localStorage` it replaces.
+ * Backed by `tauri-plugin-store`: a real file, immune to a WebView wipe unlike the
+ * `localStorage` it replaces.
  *
- * ⚠️ The API stays **synchronous** where the plugin's is not: a preference is
- * read when a component is constructed, and an async `read` would show the
- * interface in one state then the other. The file is loaded once by
- * [`hydrate`], and writes leave without being awaited.
- *
- * Outside Tauri (jsdom), `load` fails and the service degrades to a memory cache.
+ * ⚠️ The API stays **synchronous** where the plugin's is not: a preference is read when a
+ * component is constructed, and an async `read` would show the interface in one state
+ * then the other. Outside Tauri (jsdom), it degrades to a memory cache.
  */
 @Injectable({ providedIn: 'root' })
 export class PreferencesService {
@@ -39,11 +35,9 @@ export class PreferencesService {
   private store: Store | null = null;
 
   /**
-   * Loads the file and fills the cache. Call **before** the first read, which
-   * would otherwise answer `null`.
-   *
-   * Values from an earlier version still in `localStorage` are adopted: without
-   * this, an upgrade would reset the interface language.
+   * Call **before** the first read, which would otherwise answer `null`. Values from an
+   * earlier version still in `localStorage` are adopted: without this, an upgrade would
+   * reset the interface language.
    */
   async hydrate(): Promise<void> {
     try {
@@ -76,8 +70,7 @@ export class PreferencesService {
     try {
       for (let index = 0; index < localStorage.length; index++) {
         const key = localStorage.key(index);
-        // Our keys only: the WebView may carry others, and dumping everything
-        // would pollute the preferences file for good.
+        // Our keys only: dumping everything would pollute the preferences file for good.
         if (!key?.startsWith('devbox.') || this.cache.has(key)) continue;
 
         const value = localStorage.getItem(key);
@@ -92,9 +85,8 @@ export class PreferencesService {
       return;
     }
 
-    // Only what was adopted: the old location is no longer read, and leaving a
-    // value there would resurrect it if this ever replayed. A `clear()` would
-    // also take the keys this loop deliberately refused to read.
+    // Only what was adopted: a `clear()` would also take the keys this loop refused to
+    // read.
     for (const key of adopted) {
       try {
         localStorage.removeItem(key);

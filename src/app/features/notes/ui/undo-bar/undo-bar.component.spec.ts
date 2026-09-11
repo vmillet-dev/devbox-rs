@@ -23,7 +23,6 @@ describe('UndoBarComponent', () => {
   });
 
   it('announces itself as a status, not an alert', () => {
-    // A deletion the user asked for does not justify interrupting a screen reader.
     expect(fixture.nativeElement.querySelector('.undo-bar').getAttribute('role')).toBe('status');
   });
 

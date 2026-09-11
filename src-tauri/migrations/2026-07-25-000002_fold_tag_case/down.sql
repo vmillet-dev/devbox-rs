@@ -1,6 +1,5 @@
--- A collation can no more be undone than applied: the table is recreated the
--- other way round. Tags merged by the up migration do not split again — the
--- information was lost there, not here.
+-- Tags merged by the up migration do not split again: that information was lost
+-- there, not here.
 
 CREATE TABLE note_tags_v1 (
     note_id TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,

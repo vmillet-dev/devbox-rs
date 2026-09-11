@@ -55,12 +55,8 @@ describe('TagRailComponent', () => {
     expect(emitted).toBe('alpha');
   });
   it('offers to manage exactly the tags it displays', async () => {
-    // Global management acts on this rail: putting it in a "File" menu would
-    // separate it from its subject.
     let emitted = 0;
     fixture.componentInstance.manageRequested.subscribe(() => (emitted += 1));
-    // Le rail entier ne s'affiche qu'avec au moins un tag — sans tag, il n'y a
-    // nothing to manage either.
     fixture.componentRef.setInput('tags', ['alpha']);
     await fixture.whenStable();
 

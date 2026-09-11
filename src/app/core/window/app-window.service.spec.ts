@@ -30,7 +30,6 @@ describe('AppWindowService', () => {
   });
 
   it('swallows a failure rather than surfacing one nothing can act on', async () => {
-    // Outside Tauri both throw, and neither leaves anything inconsistent behind.
     adapter.throwOnHide = new Error('no bridge');
     adapter.throwOnExit = new Error('no bridge');
 

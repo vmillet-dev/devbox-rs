@@ -8,13 +8,8 @@ import { NotesStore } from './notes.store';
 import { PaletteStore } from './palette.store';
 
 /**
- * Filling a snippet's `{{fields}}` before copying it, from wherever it is
- * asked: a card, the palette, or the editor's preview.
- *
- * The filling itself is `notes::placeholder::fill`'s — what is here is the
- * order of operations, which is the same in all three cases: fill, copy, and
- * **keep** the values. There is one set per note, so filling twice in a row at
- * the same place must not ask the same thing twice.
+ * The filling itself belongs to `notes::placeholder::fill`; what is here is the order
+ * of operations, the same in all three cases: fill, copy, and **keep** the values.
  */
 @Injectable({ providedIn: 'root' })
 export class PlaceholderFillStore {
@@ -27,7 +22,6 @@ export class PlaceholderFillStore {
   private readonly _target = signal<Note | null>(null);
   private readonly _preview = signal<string | null>(null);
 
-  /** The note whose fields are being typed outside the palette, or `null`. */
   readonly target = this._target.asReadonly();
 
   /** The filled body the editor preview shows; `null` before the first request. */
@@ -35,15 +29,11 @@ export class PlaceholderFillStore {
 
   readonly placeholders = computed(() => this._target()?.placeholders ?? []);
 
-  /**
-   * The last preview request sent. Filling crosses the bridge, and two answers
-   * can come back out of order: only the current request may render.
-   */
+  /** Two answers can come back out of order: only the current request may render. */
   private latestRequest: FillRequest | null = null;
 
   constructor() {
-    // A preview belongs to the note that asked for it: keeping it while opening
-    // the next would show the previous note's filled body for a round trip.
+    // A preview belongs to the note that asked for it.
     effect(() => {
       this.notes.selectedNoteId();
       this.latestRequest = null;
@@ -51,7 +41,6 @@ export class PlaceholderFillStore {
     });
   }
 
-  /** Opens the form on a card's note. */
   openFor(noteId: string): void {
     this._target.set(this.canvas.visibleNotes().find((note) => note.id === noteId) ?? null);
   }
@@ -78,7 +67,6 @@ export class PlaceholderFillStore {
     }
   }
 
-  /** The editor preview: this fills, the editor displays. */
   async refreshPreview(request: FillRequest): Promise<void> {
     this.latestRequest = request;
     const filled = await this.notes.fillPlaceholders(request.content, request.values);
@@ -89,9 +77,8 @@ export class PlaceholderFillStore {
   }
 
   /**
-   * Copy from the editor. The acknowledgement goes through the status banner
-   * rather than the button's tick: the text only exists once the bridge has
-   * been crossed, and ticking early would announce a copy that did not happen.
+   * The acknowledgement goes through the status banner rather than the button's tick:
+   * the text only exists once the bridge has been crossed.
    */
   async copyFilled(request: FillRequest): Promise<void> {
     const filled = await this.notes.fillPlaceholders(request.content, request.values);
@@ -101,13 +88,11 @@ export class PlaceholderFillStore {
     }
   }
 
-  /** The palette's own form, which sits in front of it while it stays open. */
   async submitForPalette(values: Record<string, string>): Promise<void> {
     const note = this.palette.pendingFill();
     if (!note) return;
 
     await this.palette.copyAndDismiss(await this.notes.fillPlaceholders(note.content, values));
-    // Kept as elsewhere: the palette fills the same note as the editor.
     await this.notes.setPlaceholderValues(note.id, values);
   }
 }

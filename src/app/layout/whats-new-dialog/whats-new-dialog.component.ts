@@ -4,19 +4,14 @@ import { AppInfoService } from '@core/app-info/app-info.service';
 import { ChangelogRelease, ChangelogService, RELEASES_URL } from '@core/app-info/changelog.service';
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
-/** Display of the repository: the URL without its scheme, more readable and enough. */
 const RELEASES_LABEL = RELEASES_URL.replace(/^https:\/\//, '');
 
 /**
- * The release-notes panel: the `CHANGELOG.md` shipped with the binary, release
- * by release.
+ * Read through the bridge and **not** rendered from Markdown: the Rust side returns
+ * releases, categories and entries already separated, so there is no Markdown renderer to
+ * pull in and no `innerHTML` for the CSP to worry about.
  *
- * Read through the bridge and **not** rendered from Markdown: the Rust side
- * returns releases, categories and entries already separated, so there is no
- * Markdown renderer to pull in and no `innerHTML` for the CSP to worry about.
- *
- * Deliberately untranslated, like the release notes the updater hands over —
- * one changelog, written once, rather than two that drift apart.
+ * Deliberately untranslated, like the release notes the updater hands over.
  */
 @Component({
   selector: 'app-whats-new-dialog',
@@ -46,9 +41,8 @@ export class WhatsNewDialogComponent {
   protected readonly isLoading = this.releasesResource.isLoading;
 
   /**
-   * Outside the Tauri runtime there is no bridge to ask, and the panel says so
-   * rather than showing an empty changelog — which would read as "nothing ever
-   * changed".
+   * Outside the Tauri runtime there is no bridge to ask, and an empty changelog would
+   * read as "nothing ever changed".
    */
   protected readonly hasFailed = computed(() => this.releasesResource.error() !== undefined);
 

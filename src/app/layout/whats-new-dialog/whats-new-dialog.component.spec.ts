@@ -63,13 +63,10 @@ describe('WhatsNewDialogComponent', () => {
   it('drops the heading of a release that lists its entries without a category', async () => {
     await mount();
 
-    // An empty `<h4>` would draw a rule under nothing.
     expect(fixture.nativeElement.querySelectorAll('.news-section-title')).toHaveLength(1);
   });
 
   it('says the changelog is unavailable rather than showing an empty one', async () => {
-    // Outside the Tauri runtime there is no bridge to ask, and a blank panel
-    // would read as "nothing ever changed".
     changelog.loadError = new Error('no bridge');
     await mount();
 

@@ -14,8 +14,6 @@
   min-width: 0;
 }
 
-// A fixed width: the fields of one snippet line up, and that alignment is what
-// makes the list read as a form rather than a pile of rows.
 .field-name {
   width: 116px;
   flex-shrink: 0;
@@ -25,8 +23,6 @@
   overflow-wrap: anywhere;
 }
 
-// The token as the text writes it, dimmer than its name: the braces are what
-// say where the row comes from.
 .field-name::before,
 .field-name::after {
   color: var(--text-2);
@@ -60,8 +56,7 @@
   outline-offset: -1px;
 }
 
-// A suggestion has to read as one, not as a value already typed: that is the
-// whole difference between "it will be 5432" and "I typed 5432".
+// A suggestion has to read as one, not as a value already typed.
 .field-input::placeholder {
   color: var(--text-2);
   font-style: italic;

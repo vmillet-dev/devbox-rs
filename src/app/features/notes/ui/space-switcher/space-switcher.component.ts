@@ -15,7 +15,6 @@ import { Space } from '@features/notes/model/space.model';
 import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 
-/** Deleting a space: what has to be known so no note is lost. */
 export interface SpaceDeletion {
   readonly id: string;
   /** The space that takes in the deleted one's notes. */
@@ -41,7 +40,6 @@ export class SpaceSwitcherComponent {
   /** `null` = "all spaces", a choice in its own right and not a waiting state. */
   readonly activeSpace = input.required<Space | null>();
 
-  /** `null` for "all spaces". */
   readonly spaceChanged = output<string | null>();
   /** The raw name typed: normalisation and persistence belong to the store. */
   readonly spaceCreated = output<string>();
@@ -53,9 +51,8 @@ export class SpaceSwitcherComponent {
   protected readonly creating = signal(false);
 
   /**
-   * The space being edited. The panel **replaces** the menu rather than adding
-   * to it, like the create form: input fields inside a `role="menu"` are
-   * neither valid ARIA nor navigable as options.
+   * The panel **replaces** the menu rather than adding to it, like the create form:
+   * input fields inside a `role="menu"` are neither valid ARIA nor navigable as options.
    */
   protected readonly editing = signal<Space | null>(null);
 
@@ -66,10 +63,9 @@ export class SpaceSwitcherComponent {
   private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
 
   /**
-   * Possible refuges for the edited space's notes. A space cannot be its own:
-   * the cascade would take the notes right after the transfer. An empty list
-   * means deletion is impossible, and the panel says so rather than offering a
-   * button that would fail.
+   * A space cannot be its own refuge: the cascade would take the notes right after the
+   * transfer. An empty list means deletion is impossible, and the panel says so rather
+   * than offering a button that would fail.
    */
   protected readonly moveTargets = computed<readonly Space[]>(() => {
     const edited = this.editing();
@@ -80,8 +76,7 @@ export class SpaceSwitcherComponent {
     this.menu.escaped.subscribe(() => this.onEscape());
     this.menu.closed.subscribe(() => this.resetPanels());
 
-    // The panels replace the menu, whose focus `MenuPanelDirective` handles:
-    // only their input fields are left to place here.
+    // The panels replace the menu, whose focus `MenuPanelDirective` handles.
     effect(() => {
       if (!this.menu.open()) return;
       if (this.editing()) {
@@ -111,10 +106,7 @@ export class SpaceSwitcherComponent {
     this.confirmingDelete.set(false);
   }
 
-  /**
-   * `submit` and not `click`: the form then also answers Enter, the natural way
-   * to confirm a text field.
-   */
+  /** `submit` and not `click`: the form then also answers Enter. */
   protected submitNewSpace(event: Event, name: string): void {
     event.preventDefault();
     if (!name.trim()) return;

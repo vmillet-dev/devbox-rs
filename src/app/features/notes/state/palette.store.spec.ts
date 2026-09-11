@@ -39,8 +39,8 @@ describe('PaletteStore', () => {
   let harness: Harness;
 
   beforeEach(async () => {
-    // Only the debounce timers: a faked `requestAnimationFrame`
-    // bloquerait l'ordonnanceur zoneless d'Angular.
+    // Only the debounce timers: a faked `requestAnimationFrame` would hang Angular's
+    // zoneless scheduler.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     harness = createStore();
     await harness.store.open();
@@ -51,7 +51,6 @@ describe('PaletteStore', () => {
   });
 
   it('searches every space, ignoring the canvas filters', async () => {
-    // Nobody remembers which space a snippet was filed in.
     expect(harness.repository.lastQuery?.spaceId).toBeNull();
     expect(harness.repository.lastQuery?.filter).toBe('all');
     expect(harness.repository.lastQuery?.tags).toEqual([]);
@@ -86,7 +85,6 @@ describe('PaletteStore', () => {
 
     expect(harness.clipboard.content).toBe('plain body');
     expect(harness.store.isOpen()).toBe(false);
-    // The window steps aside: the user goes back to paste where they were.
     expect(harness.window.hidden).toBe(1);
   });
 
@@ -119,15 +117,11 @@ describe('PaletteStore', () => {
   });
   describe('creating from what was typed', () => {
     it('offers nothing to create on an empty query', () => {
-      // Reopening the palette without typing should show the recent notes, not
-      // offer to create an empty one.
       expect(harness.store.canCreate()).toBe(false);
       expect(harness.store.optionCount()).toBe(2);
     });
 
     it('appends the create row after the results', async () => {
-      // Finding a snippet stays the most frequent gesture, and so keeps first
-      // place.
       harness.store.setQuery('psql');
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
 
@@ -157,7 +151,6 @@ describe('PaletteStore', () => {
     });
 
     it('hands the typed text over and closes', async () => {
-      // The store creates nothing itself: it does not know `NotesStore`.
       harness.repository.setView({ sections: [] });
       harness.store.setQuery('  penser à migrer la base  ');
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);

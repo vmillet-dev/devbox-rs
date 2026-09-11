@@ -1,7 +1,6 @@
 @use 'mixins' as *;
 
-// The host card (`.card-shell`) carries the `position: relative` and places
-// this component; it anchors only its own dropdown.
+// The host card carries the `position: relative`; this anchors only its own dropdown.
 :host {
   position: absolute;
   top: 8px;
@@ -18,13 +17,11 @@
   line-height: 1.2;
   color: var(--text-2);
   cursor: pointer;
-  // Quiet at rest rather than hidden: `display: none` would take the button out
-  // of the tab order, and the menu out of reach of the keyboard.
+  // Quiet at rest rather than hidden: `display: none` would take it out of the tab order.
   opacity: 0;
 }
 
-// `:focus-within` on the card: hover alone would leave the button invisible
-// while navigating by keyboard.
+// `:focus-within`: hover alone would leave the button invisible to the keyboard.
 :host-context(.card-shell:hover) .card-menu-trigger,
 .card-menu-trigger:focus-visible,
 .card-menu-trigger[aria-expanded='true'] {

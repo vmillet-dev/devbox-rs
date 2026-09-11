@@ -2,12 +2,9 @@ import { Injectable, Signal } from '@angular/core';
 import { Contribution, ContributionRegistry } from '@core/contributions/contribution.registry';
 
 /**
- * An entry of the "File" menu, contributed by the feature that knows how to run
- * it.
- *
- * `disabled` is a signal and not a boolean: "Export selection" depends on what
- * is ticked right now, and a value frozen at registration would stop matching
- * the screen a second later.
+ * `disabled` is a signal and not a boolean: "Export selection" depends on what is ticked
+ * right now, and a value frozen at registration would stop matching the screen a second
+ * later.
  */
 export interface AppMenuEntry extends Contribution {
   readonly labelKey: string;

@@ -3,10 +3,7 @@ import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { StatusNotifier } from '@core/notifications/status.service';
 import { SettingsStore } from '@core/settings/settings.store';
 
-/**
- * All this service needs from the plugin. A token rather than a direct call,
- * for the same practical reason as `PREFERENCES_STORE_LOADER`.
- */
+/** A token rather than a direct call, for the same reason as `PREFERENCES_STORE_LOADER`. */
 export interface ClipboardAdapter {
   readText(): Promise<string | null>;
   writeText(value: string): Promise<void>;
@@ -18,15 +15,12 @@ export const CLIPBOARD_ADAPTER = new InjectionToken<ClipboardAdapter>('CLIPBOARD
 });
 
 /**
- * The system clipboard. The CSP locks the WebView to `'self'` and
- * `navigator.clipboard` is unusable there: everything goes through the plugin.
+ * The CSP locks the WebView to `'self'` and `navigator.clipboard` is unusable there:
+ * everything goes through the plugin, which throws outside Tauri — hence the success
+ * boolean rather than an exception.
  *
- * Outside Tauri (jsdom) the plugin throws. A failed copy must neither bring the
- * application down nor surface an unhandled error, hence the success boolean
- * rather than an exception.
- *
- * ⚠️ The copy acknowledgement is placed **here** and not in the callers: there
- * are five of them, and a single point is what makes it settable by one boolean.
+ * ⚠️ The copy acknowledgement is placed **here** and not in the five callers, which is
+ * what makes it settable by one boolean.
  */
 @Injectable({ providedIn: 'root' })
 export class ClipboardService {
@@ -41,8 +35,7 @@ export class ClipboardService {
       return false;
     }
 
-    // Callers with something better to say — "3 notes copied as Markdown" —
-    // speak afterwards: the banner keeps only the last message.
+    // Callers with something better to say speak afterwards: the banner keeps the last.
     if (this.settings.copyConfirmation()) {
       this.notifier.notify({ key: 'settings.copied' });
     }
@@ -50,7 +43,7 @@ export class ClipboardService {
     return true;
   }
 
-  /** An empty string for an empty clipboard as for an impossible read: either way there is nothing to capture. */
+  /** An empty string for an empty clipboard as for an impossible read. */
   async paste(): Promise<string> {
     try {
       return (await this.adapter.readText()) ?? '';

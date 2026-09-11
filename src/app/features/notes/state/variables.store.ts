@@ -4,12 +4,8 @@ import { NotesRepository } from '../data/notes.repository';
 import { Variable, duplicateNames, toVariableRecord } from '../model/variable.model';
 
 /**
- * The global variables, as the preferences panel edits them.
- *
- * ⚠️ The local state is a **list**, not the map the back end returns: a row
- * just added has neither name nor value yet, and a map would lose it on the
- * next keystroke. The conversion only happens on save.
- *
+ * ⚠️ The local state is a **list**, not the map the back end returns: a row just added
+ * has neither name nor value yet, and a map would lose it on the next keystroke.
  * Writes on field exit, as everywhere else here: there is no "Save" button.
  */
 @Injectable({ providedIn: 'root' })
@@ -59,9 +55,8 @@ export class VariablesStore {
   }
 
   /**
-   * Sends the **whole** set. What the back end keeps is not adopted back here:
-   * it drops half-filled rows, which have to stay on screen long enough to be
-   * finished.
+   * Sends the **whole** set. What the back end keeps is not adopted back here: it
+   * drops half-filled rows, which have to stay on screen long enough to be finished.
    */
   async commit(): Promise<void> {
     await this.notifier.attempt('errors.variablesSaveFailed', () =>

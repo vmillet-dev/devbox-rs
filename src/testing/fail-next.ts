@@ -1,8 +1,6 @@
 /**
- * Shared failure gate for the in-memory repositories.
- *
- * Each double exposes `failNext`; a spec sets it to make the next call reject
- * once, which is how error paths are exercised without a real backend.
+ * Shared failure gate for the in-memory repositories: a spec sets `failNext` to make the
+ * next call reject once, which is how error paths are exercised without a real back end.
  */
 export interface FailsNext {
   failNext: Error | null;

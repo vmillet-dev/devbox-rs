@@ -60,8 +60,6 @@ describe('CopyButtonComponent', () => {
   });
 
   it('stays silent when the clipboard refuses', async () => {
-    // Outside Tauri the plugin rejects; claiming a copy that never happened
-    // would be worse than saying nothing.
     await build(vi.fn(async () => Promise.reject(new Error('no plugin'))));
 
     button().click();
@@ -77,13 +75,10 @@ describe('CopyButtonComponent', () => {
     button().dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await fixture.whenStable();
 
-    // The card is itself a button that opens the editor: copying must not open it.
     expect(onParentClick).not.toHaveBeenCalled();
   });
 
   it('renders the icon alone unless a label is asked for', async () => {
-    // Counting the decorative spans rather than matching a translated string:
-    // the icon is one, the label a second.
     expect(button().querySelectorAll('[aria-hidden="true"]')).toHaveLength(1);
 
     fixture.componentRef.setInput('showLabel', true);

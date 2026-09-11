@@ -116,8 +116,7 @@
   outline-offset: 2px;
 }
 
-// The option takes all the remaining width: the ⋯ must not eat into the click
-// area that selects the space.
+// The option takes all the remaining width: the ⋯ must not eat into the click area.
 .space-row {
   display: flex;
   align-items: center;
@@ -137,8 +136,7 @@
   line-height: 1;
   color: var(--text-2);
   cursor: pointer;
-  // Quiet at rest but never hidden: `visibility: hidden` would take it out of
-  // the tab order and out of reach of the keyboard.
+  // Quiet at rest but never hidden: `visibility: hidden` would take it out of the tab order.
   opacity: 0.45;
 }
 

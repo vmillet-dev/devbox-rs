@@ -71,7 +71,6 @@ describe('AboutMenuComponent', () => {
     expect(trigger().getAttribute('aria-expanded')).toBe('true');
     expect(fixture.nativeElement.querySelector('.about-dropdown').getAttribute('role')).toBe('menu');
     expect(options()).toHaveLength(5);
-    // A menu opened without focus is unreachable from the keyboard.
     expect(document.activeElement).toBe(options()[0]);
   });
 
@@ -82,14 +81,12 @@ describe('AboutMenuComponent', () => {
     panel.triggerEventHandler('keydown', new KeyboardEvent('keydown', { key: 'ArrowDown' }));
     expect(document.activeElement).toBe(options()[1]);
 
-    // Up from the second entry, then up again wraps onto the last one.
     panel.triggerEventHandler('keydown', new KeyboardEvent('keydown', { key: 'ArrowUp' }));
     panel.triggerEventHandler('keydown', new KeyboardEvent('keydown', { key: 'ArrowUp' }));
     expect(document.activeElement).toBe(options().at(-1));
   });
 
   it('steps the arrow keys over the separators', async () => {
-    // They are not `appMenuItem`, so they never take the focus.
     await openMenu();
 
     expect(fixture.nativeElement.querySelectorAll('[role="separator"]')).toHaveLength(2);
@@ -99,8 +96,6 @@ describe('AboutMenuComponent', () => {
   it('closes on Escape and hands focus back to the trigger', async () => {
     await openMenu();
 
-    // Dispatched for real so it bubbles from the focused entry up to the host,
-    // which is where the `(keydown.escape)` binding lives.
     options()[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await fixture.whenStable();
 
@@ -187,8 +182,6 @@ describe('AboutMenuComponent', () => {
   });
 
   it('never stacks two panels', async () => {
-    // One signal rather than one flag each: two of them at once would share a
-    // backdrop rung and trap the focus in whichever rendered last.
     await openPanel('Raccourcis clavier');
 
     expect(fixture.debugElement.query(By.directive(ShortcutsDialogComponent))).not.toBeNull();

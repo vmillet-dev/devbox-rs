@@ -5,10 +5,8 @@ import { Attachment } from '../model/note.model';
 import { toAttachment } from './note.dto';
 
 /**
- * The way in to the attachments. The bytes are only read on demand: `read`
- * answers a `data:` URI, the one form an `<img>` accepts under the WebView's
- * CSP, and it weighs a third more than the file — a thumbnail is asked for when
- * a note opens, never for a whole list.
+ * The bytes are only read on demand: `read` answers a `data:` URI, the one form an
+ * `<img>` accepts under the WebView's CSP, and it weighs a third more than the file.
  */
 @Injectable({ providedIn: 'root' })
 export class AttachmentsRepository {
@@ -25,19 +23,17 @@ export class AttachmentsRepository {
     return unwrap('read_attachment', await commands.readAttachment(id));
   }
 
-  /** Opens the file with the system's default application. */
   async open(id: string): Promise<void> {
     unwrap('open_attachment', await commands.openAttachment(id));
   }
 
-  /** Copies the file where the user asked. */
   async saveAs(id: string, path: string): Promise<void> {
     unwrap('save_attachment', await commands.saveAttachment(id, path));
   }
 
   /**
-   * Attaches the clipboard image. The bytes do not travel up here: the native
-   * side reads the clipboard, encodes to PNG and writes the file itself.
+   * The bytes do not travel up here: the native side reads the clipboard, encodes to
+   * PNG and writes the file itself.
    */
   async attachClipboardImage(noteId: string, fileName: string): Promise<Attachment> {
     return toAttachment(

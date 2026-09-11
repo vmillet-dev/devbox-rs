@@ -5,10 +5,7 @@ import { SettingsPage, SettingsRegistry } from '@core/settings/settings-registry
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { SettingsPageComponent } from './settings-page/settings-page.component';
 
-/**
- * The application's own settings, always present: unlike the registry's pages
- * they depend on no loaded tool.
- */
+/** Always present, unlike the registry's pages, which depend on a loaded tool. */
 const GENERAL_PAGE: SettingsPage = {
   id: 'general',
   labelKey: 'settings.pages.general',
@@ -17,16 +14,12 @@ const GENERAL_PAGE: SettingsPage = {
 };
 
 /**
- * The preferences panel: a rail of pages on the left, the chosen page on the
- * right.
+ * It knows one page, its own. The others come from [`SettingsRegistry`], where the
+ * features register them — importing one here would break the rule that deleting a
+ * feature's folder deletes the feature.
  *
- * It knows one page, its own. The others come from [`SettingsRegistry`], where
- * the features register them — importing one here would break the rule that
- * deleting a feature's folder deletes the feature.
- *
- * **No "OK / Cancel / Apply".** Everything applies as it is typed: it is
- * already the application's idiom, and a theme you only see after confirming is
- * guessed at rather than chosen.
+ * **No "OK / Cancel / Apply"**: everything applies as it is typed, which is already the
+ * application's idiom.
  */
 @Component({
   selector: 'app-settings-dialog',
@@ -47,8 +40,8 @@ export class SettingsDialogComponent {
   private readonly requestedPageId = signal<string | null>(null);
 
   /**
-   * The page shown. Falls back to the first when nothing was chosen — or when
-   * the feature carrying the chosen page has just been unloaded.
+   * Falls back to the first when nothing was chosen — or when the feature carrying the
+   * chosen page has just been unloaded.
    */
   protected readonly activePage = computed<SettingsPage>(() => {
     const pages = this.pages();

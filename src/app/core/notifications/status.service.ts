@@ -5,14 +5,11 @@ import { TranslationRef } from '../i18n/translation-ref.model';
 export const STATUS_TTL_MS = 6000;
 
 /**
- * Acknowledgements for actions that **succeed**.
+ * Separate from `ErrorNotifier`, which carries a breakdown that stays until it is
+ * dismissed: mixing the two in one banner would make a success read as a problem.
  *
- * Separate from `ErrorNotifier`, which carries a breakdown that stays until it
- * is dismissed: mixing the two in one banner would make a success read as a
- * problem.
- *
- * The message is a **translation reference**, never a sentence: the caller does
- * not know the active language.
+ * The message is a **translation reference**, never a sentence: the caller does not know
+ * the active language.
  */
 @Injectable({ providedIn: 'root' })
 export class StatusNotifier {

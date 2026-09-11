@@ -1,15 +1,4 @@
-//! "Notes taking" commands.
-//!
-//! Three guarantees the front-end depends on: [`create_note`] and [`update_note`]
-//! return the note **as persisted** (which the editor then adopts);
-//! an unknown identifier returns an `Err`, never a silent `Ok`; and in a
-//! `NotePatch`, an absent field means "do not touch".
-//!
-//! Nothing left to validate here: the language is an enum, so an unknown value
-//! no longer passes deserialization — and no longer compiles on the front-end side.
-
-// A command receives its arguments deserialized from the IPC payload:
-// they arrive owned, whether it consumes them or not.
+// Commands receive their arguments owned, deserialized from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod checklist;
@@ -20,8 +9,8 @@ pub mod store;
 pub mod trash;
 pub mod view;
 
-/// Reference note shared by the feature tests: a field added to
-/// [`model::Note`] is declared here rather than in every module that builds one.
+/// Reference note for the feature tests: a field added to [`model::Note`] is
+/// declared here rather than in every module that builds one.
 #[cfg(test)]
 pub(crate) mod fixtures {
     use std::collections::BTreeMap;
@@ -73,8 +62,7 @@ use model::{DisplayNote, NoteDraft, NotePatch, TagUsage};
 use trash::TrashedNote;
 use view::{NotesQuery, NotesView};
 
-/// Filtered **and** grouped notes, ready to display. No command returns
-/// the raw list: it would invite re-filtering on the front-end side.
+/// No command returns the raw list: it would invite re-filtering on the front end.
 #[tauri::command]
 #[specta::specta]
 pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, AppError> {
@@ -114,7 +102,7 @@ pub fn update_note(
 }
 
 /// **Moves to the trash**: the note comes back through [`restore_notes`] for
-/// [`trash::RETENTION`]. Nothing deletes for good without going through there.
+/// [`trash::RETENTION`].
 #[tauri::command]
 #[specta::specta]
 pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
@@ -123,7 +111,6 @@ pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
     Ok(store::delete(&mut connection, &id, Utc::now())?)
 }
 
-/// The number of notes actually trashed: that is what undo offers to take back.
 #[tauri::command]
 #[specta::specta]
 pub fn delete_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -189,8 +176,8 @@ pub fn move_notes(ids: Vec<String>, space_id: String, db: State<'_, Db>) -> Resu
     )?))
 }
 
-/// Normalised here as everywhere else, otherwise an `#urgent` typed in the
-/// action bar would not join the `urgent` already stored.
+/// Normalised here as everywhere else, or an `#urgent` typed in the action bar
+/// would not join the `urgent` already stored.
 #[tauri::command]
 #[specta::specta]
 pub fn tag_notes(ids: Vec<String>, tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -220,8 +207,7 @@ pub fn list_tags(db: State<'_, Db>) -> Result<Vec<TagUsage>, AppError> {
         .collect())
 }
 
-/// Renaming onto an existing tag **is** a merge: a note cannot carry the same
-/// tag twice.
+/// Renaming onto an existing tag **is** a merge: a note cannot carry one twice.
 #[tauri::command]
 #[specta::specta]
 pub fn rename_tag(tag: String, into: String, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -242,11 +228,8 @@ pub fn merge_tags(tags: Vec<String>, into: String, db: State<'_, Db>) -> Result<
     Ok(count(store::retag(&mut connection, &tags, &target)?))
 }
 
-/// Removes labels from the corpus; the notes themselves stay.
-///
-/// A list rather than one tag at a time, like [`merge_tags`]: the panel deletes
-/// a whole selection, and one round trip per tag was one lock and one
-/// transaction per tag.
+/// A list rather than one tag at a time: the panel deletes a whole selection, and
+/// one round trip per tag was one lock and one transaction per tag.
 #[tauri::command]
 #[specta::specta]
 pub fn delete_tags(tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -255,11 +238,8 @@ pub fn delete_tags(tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError
     Ok(count(store::drop_tags(&mut connection, &tags)?))
 }
 
-/// Stores what was typed into a note's `{{fields}}`.
-///
-/// ⚠️ A command of its own rather than a `NotePatch` field: filling a field is
-/// not editing the note, so `updated_at` stays put — the canvas sorts on it and
-/// would otherwise float the note to the top on every value typed.
+/// ⚠️ A command of its own rather than a `NotePatch` field: filling a field is not
+/// editing the note, so `updated_at` stays put — the canvas sorts on it.
 #[tauri::command]
 #[specta::specta]
 pub fn set_placeholder_values(
@@ -275,11 +255,8 @@ pub fn set_placeholder_values(
     Ok(display(&mut connection, note)?)
 }
 
-/// Fills the `{{fields}}` of a piece of content.
-///
-/// No note identifier: the palette fills an unsaved draft as readily as the
-/// note it just opened. The database is read only for the **global variables**,
-/// which depend on no note.
+/// No note identifier: the palette fills an unsaved draft as readily as the note
+/// it just opened. The database is read only for the **global variables**.
 #[tauri::command]
 #[specta::specta]
 pub fn fill_placeholders(
@@ -296,7 +273,6 @@ pub fn fill_placeholders(
     ))
 }
 
-/// The global variables, as the preferences panel shows them.
 #[tauri::command]
 #[specta::specta]
 pub fn list_global_placeholders(db: State<'_, Db>) -> Result<BTreeMap<String, String>, AppError> {
@@ -305,10 +281,8 @@ pub fn list_global_placeholders(db: State<'_, Db>) -> Result<BTreeMap<String, St
     Ok(store::global_placeholder_values(&mut connection)?)
 }
 
-/// Stores the **whole** set: what is not sent is what the user removed.
-///
-/// No note is touched, not even its `updated_at`: setting a variable is not
-/// editing a note, and the canvas sorts on that column.
+/// Stores the **whole** set: what is not sent is what the user removed. No note is
+/// touched, not even its `updated_at`.
 #[tauri::command]
 #[specta::specta]
 pub fn set_global_placeholders(
@@ -323,9 +297,7 @@ pub fn set_global_placeholders(
     Ok(retained)
 }
 
-/// Deletes for good, **attached files included**.
-///
-/// ⚠️ The names are collected before the `DELETE`: afterwards the cascade has
+/// ⚠️ The file names are collected before the `DELETE`: afterwards the cascade has
 /// taken the records that carried them.
 fn purge(app: &AppHandle, db: &Db, ids: Vec<String>) -> Result<usize, AppError> {
     if ids.is_empty() {
@@ -355,19 +327,17 @@ fn purge_expired(app: &AppHandle, db: &Db) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Startup sweep: retention applies even if nobody opens the trash. A failure
-/// is logged, never fatal — the application has to start.
+/// Retention applies even if nobody opens the trash. A failure is logged, never
+/// fatal — the application has to start.
 pub fn sweep_trash_at_startup(app: &AppHandle, db: &Db) {
     if let Err(error) = purge_expired(app, db) {
         log::warn!("Expired trash not purged: {}", error.detail);
     }
 }
 
-/// Decorates a note with what only the database knows: its attachment count,
-/// and the global variables laid on its fields as proposed values.
-///
-/// Both are queries of their own, which is why neither lives in
-/// [`model::decorate`].
+/// What only the database knows: the attachment count, and the global variables
+/// laid on the fields as proposed values. Both are queries of their own, which is
+/// why neither lives in [`model::decorate`].
 fn display(
     connection: &mut SqliteConnection,
     note: model::Note,

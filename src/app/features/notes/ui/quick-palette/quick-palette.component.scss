@@ -1,7 +1,7 @@
 @use 'mixins' as *;
 
-// Near the top of the window rather than centred: the list grows downwards
-// and a centred panel would slide under the cursor as it fills.
+// Near the top of the window rather than centred: the list grows downwards, and a
+// centred panel would slide under the cursor as it fills.
 app-dialog {
   --dialog-align: flex-start;
   --dialog-offset: 12vh;
@@ -91,7 +91,6 @@ app-dialog {
   padding-bottom: 0;
 }
 
-// Detached from the results: it is an action, not a snippet that was found.
 .palette-create {
   border-top: 1px solid var(--line-soft);
   margin-top: 2px;

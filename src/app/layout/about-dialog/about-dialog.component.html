@@ -1,8 +1,7 @@
 <app-dialog [layer]="'app'" [width]="420" labelledBy="about-dialog-title" (closed)="closed.emit()">
   <div class="about-header">
     <h2 id="about-dialog-title" class="about-name">{{ 'about.title' | transloco }}</h2>
-    <!-- The version is absent outside the Tauri runtime: a dash rather than a
-         made-up number, and a text twin for screen readers. -->
+    <!-- Absent outside the Tauri runtime: a dash rather than a made-up number. -->
     <span class="about-version" aria-hidden="true">
       {{ version() ? 'v' + version() : '—' }}
     </span>
@@ -19,8 +18,8 @@
 
     <dt>{{ 'about.repository' | transloco }}</dt>
     <dd>
-      <!-- A <button> and not an <a>: the `opener` plugin acts, the WebView
-           does not navigate. An href would give a dead link. -->
+      <!-- A <button> and not an <a>: the `opener` plugin acts, the WebView does not
+           navigate, and an href would give a dead link. -->
       <button type="button" class="about-repo" (click)="openRepository()">
         {{ repositoryLabel }}
         <span aria-hidden="true">↗</span>

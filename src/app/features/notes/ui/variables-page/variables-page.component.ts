@@ -8,16 +8,11 @@ function typedValue(event: Event): string {
 }
 
 /**
- * The preferences panel's "Variables" page: the `{{field}}` values valid across
- * the whole corpus.
+ * In `features/notes/` and not in `layout/`: a `{{field}}` is notes vocabulary. The
+ * panel shows the page without knowing it, through [`SettingsRegistry`].
  *
- * It lives in `features/notes/` and not in `layout/`: a `{{field}}` is notes
- * vocabulary. The panel shows it without knowing it, through
- * [`SettingsRegistry`], where `NotesPageComponent` registers it.
- *
- * These values are only a **suggestion**: what was typed on a note wins, and a
- * field left empty in the editor shows the variable in grey rather than copying
- * it.
+ * These values are only a **suggestion**: what was typed on a note wins, and a field
+ * left empty in the editor shows the variable in grey rather than copying it.
  */
 @Component({
   selector: 'app-variables-page',

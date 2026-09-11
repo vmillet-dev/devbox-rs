@@ -1,8 +1,8 @@
 import { ChangelogRelease } from '@core/app-info/changelog.service';
 
 /**
- * Stand-in for `ChangelogService`. The real one goes through the Tauri bridge
- * and the `opener` plugin, neither of which jsdom has.
+ * The real one goes through the Tauri bridge and the `opener` plugin, neither of which
+ * jsdom has.
  */
 export class FakeChangelog {
   releases: readonly ChangelogRelease[] = [

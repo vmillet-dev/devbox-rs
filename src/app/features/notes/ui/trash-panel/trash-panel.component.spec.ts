@@ -33,8 +33,8 @@ describe('TrashPanelComponent', () => {
   }
 
   beforeEach(async () => {
-    // Only `Date` is faked: a faked `requestAnimationFrame` would block
-    // l'ordonnanceur zoneless d'Angular et `whenStable` ne rendrait jamais.
+    // Only `Date` is faked: a faked `requestAnimationFrame` would block Angular's
+    // zoneless scheduler and `whenStable` would never resolve.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(NOW);
 
@@ -65,7 +65,6 @@ describe('TrashPanelComponent', () => {
   });
 
   it('counts the last day as still the user’s', async () => {
-    // Rounded up: "erased in 1 d" while there is any time left.
     fixture.componentRef.setInput('notes', [trashed({ purgeAt: new Date('2026-08-27T23:00:00Z') })]);
     await fixture.whenStable();
 
@@ -91,7 +90,6 @@ describe('TrashPanelComponent', () => {
     await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelector('.trash-state').textContent).toContain('vide');
-    // Emptying an already empty trash has nothing to offer.
     expect(fixture.nativeElement.querySelector('.trash-footer')).toBeNull();
   });
 
@@ -146,7 +144,6 @@ describe('TrashPanelComponent', () => {
       emptyButton().click();
       await fixture.whenStable();
       expect(emitted).toBe(1);
-      // The confirmation is spent: the next click starts the two steps over.
       expect(emptyButton().textContent).toContain('Vider la corbeille');
     });
 

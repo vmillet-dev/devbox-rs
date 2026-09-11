@@ -10,8 +10,7 @@
   @if (showLabel()) {
     <span aria-hidden="true">{{ (copied() ? 'notes.copied' : label()) | transloco }}</span>
   }
-  <!-- The acknowledgement exists only as an icon otherwise: without this
-       announced twin, a screen reader would not know the copy happened. -->
+  <!-- Without this announced twin, a screen reader would not know the copy happened. -->
   <span class="visually-hidden" role="status">
     @if (copied()) {
       {{ 'notes.copied' | transloco }}

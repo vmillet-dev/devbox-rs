@@ -36,8 +36,6 @@ describe('SearchBoxComponent', () => {
   });
 
   it('emits the new value when the user types', () => {
-    // `model()` exposes its change output through the signal itself; there is
-    // no separate `queryChange` property on the instance.
     let emitted: string | undefined;
     fixture.componentInstance.query.subscribe((value: string) => (emitted = value));
 
@@ -48,8 +46,6 @@ describe('SearchBoxComponent', () => {
   });
 
   it('gives the input an accessible name of its own', () => {
-    // The wrapping <label> also holds the magnifier and the shortcut hint;
-    // without an explicit label the field would be announced as "🔍 Ctrl+K".
     expect(input().getAttribute('aria-label')).toBe('Rechercher dans les notes');
   });
 
@@ -73,7 +69,6 @@ describe('SearchBoxComponent', () => {
   });
 
   it('ignores the shortcut while it is disabled', async () => {
-    // Guards against stealing focus to a field hidden behind an open modal.
     fixture.componentRef.setInput('shortcutEnabled', false);
     await fixture.whenStable();
 

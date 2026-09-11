@@ -85,9 +85,8 @@ describe('NotesPageComponent', () => {
   }
 
   /**
-   * Builds the page over fresh doubles. Both native seams are substituted rather
-   * than left to fail the way they do under jsdom: a global shortcut and a file
-   * drop are only observable by firing them.
+   * Both native seams are substituted rather than left to fail under jsdom: a global
+   * shortcut and a file drop are only observable by firing them.
    */
   async function setUp(notes: readonly Note[] = [createNote({ id: 'note-42' })]): Promise<void> {
     TestBed.resetTestingModule();
@@ -135,7 +134,6 @@ describe('NotesPageComponent', () => {
     menu = TestBed.inject(AppMenuRegistry);
     fixture.autoDetectChanges();
     await vi.waitFor(() => expect(spaces.spaces()).toHaveLength(SPACES.length));
-    // The subscription lands a microtask after the constructor asked for it.
     await vi.waitFor(() => expect(actionHandler).not.toBeNull());
   }
 
@@ -187,7 +185,6 @@ describe('NotesPageComponent', () => {
   });
 
   it('renames a space without touching the canvas', async () => {
-    // A note carries the space id, never its name: there is nothing to reload.
     const queries = repository.queryCount;
 
     child(SpaceSwitcherComponent).spaceRenamed.emit({ id: 'work', name: 'Client work' });
@@ -197,8 +194,6 @@ describe('NotesPageComponent', () => {
   });
 
   it('reloads the canvas once a deleted space has handed its notes over', async () => {
-    // The absorbed notes changed `spaceId` in the database, and nothing would
-    // report it when the current query does not depend on the space that went.
     const queries = repository.queryCount;
 
     child(SpaceSwitcherComponent).spaceDeleted.emit({ id: 'work', targetSpaceId: 'space-1' });
@@ -222,7 +217,6 @@ describe('NotesPageComponent', () => {
     const setFilter = vi.spyOn(canvas, 'setFilter');
     const createNoteSpy = vi.spyOn(store, 'createNote').mockResolvedValue();
 
-    // `query` is a model signal: writing it is what emits `queryChange`.
     child(SearchBoxComponent).query.set('term');
     child(FilterChipsComponent).filterChanged.emit('untriaged');
     fixture.debugElement.query(By.css('.new-note-btn')).triggerEventHandler('click');
@@ -233,7 +227,6 @@ describe('NotesPageComponent', () => {
   });
 
   it('disables the search shortcut while the editor overlay is open', async () => {
-    // Otherwise Ctrl+K focuses a field sitting behind the modal.
     expect(child(SearchBoxComponent).shortcutEnabled()).toBe(true);
 
     store.openNote('note-42');
@@ -254,8 +247,6 @@ describe('NotesPageComponent', () => {
     beforeEach(async () => {
       repository.setView({
         sections: [
-          // The note must sit in a section: the store resolves an opened note by
-          // looking it up in the view it currently shows.
           createSection('pinned', [createNote({ id: 'note-42' })]),
           createSection('week', [], { showCreateGhost: true }),
         ],
@@ -284,8 +275,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('checks a note instead of opening it when the card reports a modified click', () => {
-      // Ctrl+click is the file-list convention the canvas took on with multiple
-      // selection: it must not open the editor as well.
       const openNote = vi.spyOn(store, 'openNote');
 
       sections()[0].noteOpened.emit({ noteId: 'note-42', toggleChecked: true, extendRange: false });
@@ -301,7 +290,6 @@ describe('NotesPageComponent', () => {
 
       sections()[0].noteOpened.emit({ noteId: 'note-42', toggleChecked: true, extendRange: true });
 
-      // A range wins over the toggle: both modifiers can be held at once.
       expect(checkRangeTo).toHaveBeenCalledWith('note-42');
       expect(toggleChecked).not.toHaveBeenCalled();
     });
@@ -322,8 +310,6 @@ describe('NotesPageComponent', () => {
 
   describe('canvas states', () => {
     it('shows a loading message instead of the sections while loading', async () => {
-      // The store reports loading only until its first view lands, so this
-      // needs its own fixture whose very first query stays in flight.
       TestBed.resetTestingModule();
       const held = new FakeNotesRepository([createNote({ id: 'note-42' })]);
       held.hold();
@@ -342,8 +328,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('shows an empty-search message instead of an empty results section', async () => {
-      // "No results" is the backend's verdict, not something the page recomputes:
-      // it reports a filtered view that matched nothing.
       repository.setView({ sections: [], isFiltering: true, matched: 0 });
 
       canvas.setFilter('pinned');
@@ -355,8 +339,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('shows the load failure with its detail and offers a retry', async () => {
-      // A failed load empties the whole screen, so it gets its own recovery
-      // path rather than relying on the global banner alone.
       repository.failNext = new Error('database is locked');
       canvas.reload();
       await vi.waitFor(() =>
@@ -366,8 +348,6 @@ describe('NotesPageComponent', () => {
       expect(fixture.nativeElement.textContent).toContain('database is locked');
       expect(fixture.nativeElement.querySelector('.canvas-state').getAttribute('role')).toBe('alert');
       expect(sections()).toHaveLength(0);
-      // The error branch comes first in the template: a failed load must not
-      // also read as "still loading".
       expect(fixture.nativeElement.textContent).not.toContain('Chargement des notes');
     });
 
@@ -385,9 +365,6 @@ describe('NotesPageComponent', () => {
 
   describe('editor overlay', () => {
     it('is not rendered until a note is selected', () => {
-      // The overlay never reports which note it holds — the store owns that — so
-      // it simply does not exist while nothing is open, and no stray event can
-      // be applied to whatever note happens to be around.
       expect(maybeChild(NoteEditorOverlayComponent)).toBeNull();
     });
 
@@ -401,10 +378,7 @@ describe('NotesPageComponent', () => {
       expect(closeOverlay).toHaveBeenCalled();
     });
 
-    /**
-     * The page names no field: the editor says what changed, the page says on
-     * which note. That is what makes a new field a one-file change.
-     */
+    /** The page names no field: the editor says what changed, the page on which note. */
     it('hands every editor change to the store as a patch on the open note', async () => {
       store.openNote('note-42');
       await fixture.whenStable();
@@ -436,8 +410,6 @@ describe('NotesPageComponent', () => {
 
   describe('native shortcuts', () => {
     it('captures the clipboard into a saved note when the capture event fires', async () => {
-      // The global shortcut is registered in Rust, which only shows the window
-      // and says so: the note is still created through the ordinary command.
       clipboard.content = 'psql -h localhost';
 
       fireAction('capture');
@@ -450,7 +422,6 @@ describe('NotesPageComponent', () => {
       await fixture.whenStable();
 
       expect(store.selectedNote()?.content).toBe('');
-      // Nothing is written until the note is worth keeping.
       expect(store.persistedNoteId()).toBeNull();
     });
 
@@ -480,7 +451,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('takes its entries back when the page goes away', () => {
-      // A tool that is not loaded has no business in the menu.
       fixture.destroy();
 
       expect(menu.entries()).toEqual([]);
@@ -497,7 +467,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('keeps the selection entries unavailable until notes are checked', async () => {
-      // `disabled` is a signal precisely so it follows what is checked right now.
       const ids = ['notes.exportSelection', 'notes.copyMarkdown'];
       const entries = menu.entries().filter((entry) => ids.includes(entry.id));
       expect(entries.map((entry) => entry.disabled!())).toEqual([true, true]);
@@ -519,8 +488,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('leaves the canvas alone when the import added nothing', async () => {
-      // Exporting then re-importing at once imports zero notes, and that is
-      // correct: every id is already there.
       fileDialog.openPath = 'C:\\bundles\\same-again.json';
       transferRepository.importReport = { spacesCreated: 0, notesImported: 0, notesSkipped: 4 };
       const queries = repository.queryCount;
@@ -600,13 +567,10 @@ describe('NotesPageComponent', () => {
 
       press('ArrowLeft');
       press('ArrowLeft');
-      // Stopping beats wrapping around, which loses track of where one was.
       expect(selection.focusedNoteId()).toBe('n1');
     });
 
     it('measures the cards to move between rows', () => {
-      // The column count depends on the window width, so the page reads the
-      // positions off the screen rather than assuming a grid.
       const shells = fixture.nativeElement.querySelectorAll('.card-shell') as NodeListOf<HTMLElement>;
       shells.forEach((shell, index) => {
         const rect = new DOMRect(index % 2 === 0 ? 0 : 300, index < 2 ? 0 : 200, 240, 160);
@@ -676,8 +640,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('takes back the last deletion on Ctrl+Z', async () => {
-      // The gesture one makes without looking at the screen, which is why it
-      // reads `lastDeletion` and not the banner.
       selection.focusNote('n1');
       press('Backspace');
       await vi.waitFor(() => expect(store.lastDeletion()).not.toBeNull());
@@ -706,8 +668,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('ignores the canvas keys while typing in a field', () => {
-      // The letters are bare on purpose; they must not swallow a keystroke aimed
-      // at the search box.
       selection.focusNote('n1');
       const input = document.createElement('input');
       document.body.appendChild(input);
@@ -766,7 +726,6 @@ describe('NotesPageComponent', () => {
 
       child(NoteEditorOverlayComponent).attachmentAddRequested.emit();
 
-      // A note one attaches a file to is no longer empty.
       await vi.waitFor(() => expect(store.persistedNoteId()).not.toBeNull());
       await vi.waitFor(() =>
         expect(
@@ -778,7 +737,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('attaches every file dropped on the window', async () => {
-      // The WebView never sees the file: only the native side announces the paths.
       dropFiles(['C:\\a.png', 'C:\\b.png']);
 
       await vi.waitFor(() =>
@@ -814,8 +772,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('says so when the pasted clipboard carried no image after all', async () => {
-      // Only the type is read in the editor; the bytes are re-read natively, and
-      // by then the clipboard may hold nothing usable.
       attachmentsRepository.failNext = new Error('no image in clipboard');
 
       child(NoteEditorOverlayComponent).imagePasted.emit();
@@ -859,15 +815,12 @@ describe('NotesPageComponent', () => {
     it('closes the zoomed view along with the preview it shows', async () => {
       fileDialog.openPath = 'C:\\shots\\capture.png';
       child(NoteEditorOverlayComponent).attachmentAddRequested.emit();
-      // An attached image opens its own preview: it is what one wants to see.
       await vi.waitFor(() => expect(TestBed.inject(AttachmentsStore).previewData()).not.toBeNull());
       const id = TestBed.inject(AttachmentsStore).previewId()!;
 
       child(NoteEditorOverlayComponent).imageZoomRequested.emit();
       await vi.waitFor(() => expect(maybeChild(ImageLightboxComponent)).not.toBeNull());
 
-      // The enlarged view shows the bytes the preview loaded: without it there
-      // is nothing left to show.
       child(NoteEditorOverlayComponent).attachmentPreviewToggled.emit(id);
       await vi.waitFor(() => expect(maybeChild(ImageLightboxComponent)).toBeNull());
     });
@@ -913,8 +866,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('keeps what was typed, so the next copy does not ask again', async () => {
-      // There is one set of values per note: the card's, the palette's and the
-      // editor panel's are the same one.
       sections()[0].fillRequested.emit('snippet');
       await fixture.whenStable();
 
@@ -959,8 +910,6 @@ describe('NotesPageComponent', () => {
       });
 
       await vi.waitFor(() => expect(clipboard.content).toBe('psql -h db.internal'));
-      // The acknowledgement goes through the banner: the text only exists once the
-      // bridge has been crossed, and the button’s tick would lie in the meantime.
       expect(TestBed.inject(StatusNotifier).status()?.key).toBe('placeholders.copiedFilled');
     });
 
@@ -1013,8 +962,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('turns what was typed on the create row into a saved note', async () => {
-      // The palette captures as much as it retrieves: the shortest path between
-      // an idea and a stored note.
       palette.setQuery('kubectl get pods -A');
       palette.highlight(palette.results().length);
       await fixture.whenStable();
@@ -1029,7 +976,6 @@ describe('NotesPageComponent', () => {
       child(QuickPaletteComponent).chosen.emit();
 
       await vi.waitFor(() => expect(clipboard.content).toBe('line one\nline two'));
-      // The window hides itself: the user goes back to paste where they were.
       await vi.waitFor(() => expect(appWindow.hidden).toBe(1));
       expect(palette.isOpen()).toBe(false);
     });
@@ -1080,8 +1026,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('closes the trash panel without re-querying, since nothing changed', async () => {
-      // Restoring and purging bump `NotesRevision` where they happen, so
-      // closing no longer has to stand in for "something may have changed".
       await TestBed.inject(TrashStore).open();
       await fixture.whenStable();
       const queries = repository.queryCount;
@@ -1122,7 +1066,6 @@ describe('NotesPageComponent', () => {
       await vi.waitFor(() => expect(maybeChild(TagManagerComponent)).not.toBeNull());
       const queries = repository.queryCount;
 
-      // Nothing selected: there is no tag to rename.
       child(TagManagerComponent).renameRequested.emit('authentication');
       await fixture.whenStable();
 

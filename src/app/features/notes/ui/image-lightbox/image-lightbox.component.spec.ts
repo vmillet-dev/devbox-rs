@@ -5,8 +5,6 @@ import { ImageLightboxComponent } from './image-lightbox.component';
 
 const SOURCE = 'data:image/png;base64,AAA';
 
-// Backdrop, focus trap and Escape belong to the dialog shell and are covered by
-// `dialog.component.spec.ts`; what is tested here is what the lightbox adds.
 describe('ImageLightboxComponent', () => {
   let fixture: ComponentFixture<ImageLightboxComponent>;
 
@@ -28,7 +26,6 @@ describe('ImageLightboxComponent', () => {
   });
 
   it('shows the bytes it was handed rather than fetching them again', () => {
-    // A multi-megabyte `data:` URI has no business crossing the bridge twice.
     expect(image().getAttribute('src')).toBe(SOURCE);
   });
 

@@ -13,16 +13,9 @@ import { Note } from '../model/note.model';
 const MAX_RESULTS = 8;
 
 /**
- * The quick-paste palette, opened from any application by a global shortcut.
- *
- * It **captures as much as it retrieves**: what is typed without matching a
- * snippet can become a note, which makes it the shortest path between an idea
- * and a saved note.
- *
- * It queries **every space** and ignores the canvas filters: when recalling a
- * snippet one does not remember which space it was filed in. It does not reuse
- * `NotesStore` for the same reason — its search would change what the canvas
- * shows behind it.
+ * It queries **every space** and ignores the canvas filters: recalling a snippet, one
+ * does not remember which space it was filed in. It does not reuse `NotesStore` for
+ * the same reason — its search would change what the canvas shows behind it.
  */
 @Injectable({ providedIn: 'root' })
 export class PaletteStore {
@@ -45,13 +38,11 @@ export class PaletteStore {
   readonly pendingFill = this._pendingFill.asReadonly();
 
   /**
-   * What was typed can become a note. The create row is offered as soon as
-   * there is something to write, and it comes **after** the results — finding a
-   * snippet stays the most frequent gesture and keeps first place.
+   * The create row comes **after** the results: finding a snippet stays the most
+   * frequent gesture and keeps first place.
    */
   readonly canCreate = computed(() => this._query().trim().length > 0);
 
-  /** The results plus, possibly, the create row. */
   readonly optionCount = computed(() => this._results().length + (this.canCreate() ? 1 : 0));
 
   /** Bounded: a shrinking list must not leave the index outside it. */
@@ -97,11 +88,8 @@ export class PaletteStore {
   }
 
   /**
-   * The content of the note to create when the create row is the one picked,
-   * otherwise `null` — and the palette closes on the way.
-   *
-   * The store does not create anything itself: it does not know `NotesStore`,
-   * and the other way round would be a cycle. The page chains it.
+   * The store creates nothing itself: it does not know `NotesStore`, and the other
+   * way round would be a cycle. The page chains it.
    */
   takeNewNoteContent(): string | null {
     if (!this.isCreateHighlighted()) return null;
@@ -113,8 +101,8 @@ export class PaletteStore {
   }
 
   /**
-   * Copies and disappears. A snippet with fields goes through the form first:
-   * copying `psql -h {{host}}` as is would give an unusable command.
+   * A snippet with fields goes through the form first: copying `psql -h {{host}}`
+   * as is would give an unusable command.
    */
   async chooseHighlighted(): Promise<void> {
     const note = this.highlightedNote();
@@ -125,12 +113,10 @@ export class PaletteStore {
       return;
     }
 
-    // A todo list has no content: without this rendering the palette would put
-    // an empty string on the clipboard.
+    // A todo list has no content: without this the palette would copy an empty string.
     await this.copyAndDismiss(noteCopyText(note));
   }
 
-  /** Out of the fields form, or an explicit choice to copy the raw text. */
   async copyAndDismiss(content: string): Promise<void> {
     if (!(await this.clipboard.copy(content))) {
       this.notifier.notify({ ref: { key: 'errors.copyFailed' } });
@@ -151,7 +137,6 @@ export class PaletteStore {
 
     try {
       const view = await this.repository.query({
-        // Every space, no filter: the palette searches everywhere.
         spaceId: null,
         search: query.trim(),
         filter: 'all',
@@ -159,8 +144,8 @@ export class PaletteStore {
         languages: [],
         now,
         tzOffsetMinutes: now.getTimezoneOffset(),
-        // The one place the pinned hoist is a setting: on the canvas it makes
-        // the top section, here it only decides what comes to hand first.
+        // The one place the pinned hoist is a setting: here it only decides what
+        // comes to hand first.
         pinnedFirst: this.settings.showPinnedFirst(),
       });
 

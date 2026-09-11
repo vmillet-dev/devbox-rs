@@ -2,14 +2,12 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject, input, signal }
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ClipboardService } from '@core/clipboard/clipboard.service';
 
-/** How long the copy acknowledgement lasts: long enough to be seen, short enough not to follow the mouse to the next card. */
+/** Long enough to be seen, short enough not to follow the mouse to the next card. */
 const FEEDBACK_MS = 2000;
 
 /**
- * Copies a value to the clipboard and says so.
- *
- * In `features/` and not in `shared/`: it injects, and a `shared/` component
- * injects nothing.
+ * In `features/` and not in `shared/`: it injects, and a `shared/` component injects
+ * nothing.
  */
 @Component({
   selector: 'app-copy-button',
@@ -26,9 +24,8 @@ export class CopyButtonComponent {
   readonly showLabel = input(false);
 
   /**
-   * The label's translation key. Settable because the same button says "Copy"
-   * in a toolbar and "Copy as is" next to a fields panel, where **as is** is
-   * what carries the information.
+   * Settable because the same button says "Copy" in a toolbar and "Copy as is" next to
+   * a fields panel, where **as is** is what carries the information.
    */
   readonly label = input('notes.copyContent');
 
@@ -40,10 +37,7 @@ export class CopyButtonComponent {
     inject(DestroyRef).onDestroy(() => this.clearTimeout());
   }
 
-  /**
-   * `stopPropagation` because the host card is itself an opening button:
-   * without it, copying would open the editor at the same time.
-   */
+  /** `stopPropagation` because the host card is itself an opening button. */
   protected async onCopy(event: MouseEvent): Promise<void> {
     event.stopPropagation();
 

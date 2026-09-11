@@ -1,6 +1,5 @@
 @use 'mixins' as *;
 
-// The panel is a form, so the shell cannot be it: the layout lives here.
 .fields-form {
   display: flex;
   flex-direction: column;
@@ -20,8 +19,6 @@
   color: var(--text-2);
 }
 
-// The rows come from `app-placeholder-fields`, shared with the editor's panel:
-// only the scrolling is a modal's business.
 .fields-list {
   overflow-y: auto;
 }

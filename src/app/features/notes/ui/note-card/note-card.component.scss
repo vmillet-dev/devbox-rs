@@ -1,7 +1,6 @@
 @use 'mixins' as *;
 
-// Anchors the action menu, which is positioned over the card. It is also what
-// the menu watches (`:host-context(.card-shell:hover)`) to appear only on hover.
+// Anchors the action menu, and is what it watches to appear only on hover.
 .card-shell {
   position: relative;
 }
@@ -25,8 +24,7 @@
   background: var(--bg-2);
 }
 
-// Next to the ⋯ menu, which already holds the corner. Quiet at rest rather
-// than hidden: `display: none` would take it out of the tab order.
+// Quiet at rest rather than hidden: `display: none` would take it out of the tab order.
 app-copy-button {
   position: absolute;
   top: 8px;
@@ -50,8 +48,8 @@ app-copy-button:focus-within {
   box-shadow: 0 0 0 1px var(--amber-dim);
 }
 
-// The children are <span>s — the parent <button> allows nothing else — so they
-// need their block behaviour handed back explicitly.
+// The children are <span>s — the parent <button> allows nothing else — so they need
+// their block behaviour handed back explicitly.
 .card-top {
   display: flex;
   align-items: center;
@@ -75,8 +73,7 @@ app-copy-button:focus-within {
   line-height: 1.3;
 }
 
-// `app-code-viewer` in compact mode: it brings the colouring only, the
-// snippet’s typography stays decided here.
+// `app-code-viewer` brings the colouring only; the typography stays decided here.
 .card-snippet {
   font-size: 11px;
   color: var(--text-2);
@@ -109,8 +106,6 @@ app-copy-button:focus-within {
   color: var(--text-2);
 }
 
-// --- Todo list ---------------------------------------------------------------
-
 .card-progress {
   display: flex;
   align-items: center;
@@ -140,20 +135,18 @@ app-copy-button:focus-within {
   white-space: nowrap;
 }
 
-// Reserves, inside the button, the band the list covers. Without it the card
-// footer would slide up under the items.
+// Reserves, inside the button, the band the list covers, or the footer would slide up
+// under the items.
 .card-items-space {
   display: block;
   flex: 1;
 }
 
-// A sibling layer of the card button: it carries buttons, which cannot live
-// inside another one. Transparent to clicks — only the checkboxes take them —
-// so that clicking beside one still opens the note.
+// A sibling layer of the card button: it carries buttons, which cannot live inside
+// another one. Transparent to clicks — only the checkboxes take them.
 //
-// Anchored to the **bottom** rather than offset from the top: what precedes it
-// has no fixed height (the pin and the paperclip come and go), and a hard `top`
-// would have drifted every time.
+// Anchored to the **bottom** rather than offset from the top: what precedes it has no
+// fixed height, and a hard `top` would have drifted every time.
 .card-items {
   position: absolute;
   inset: 0;
@@ -221,10 +214,6 @@ app-copy-button:focus-within {
   color: var(--text-2);
 }
 
-// --- Multiple selection and badges ------------------------------------------
-
-// Top-left corner, opposite the ⋯ menu. Like the copy button: quiet at rest
-// rather than hidden, since `display: none` would take it out of the tab order.
 .card-check {
   @include unstyled-control;
   position: absolute;

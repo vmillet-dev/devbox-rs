@@ -1,15 +1,4 @@
-//! Import, export and share: getting notes off the machine, and back onto it.
-//!
-//! The file is written and read **here**, not on the front: the serialisation is
-//! the domain's, and sending it over the bridge to be reassembled in TypeScript
-//! would add a second format to keep.
-//!
-//! The commands only pick *what* to transfer and touch the disk; assembling
-//! ([`collect`]) and merging ([`merge`]) are functions over a connection, so
-//! they test against an in-memory database without launching Tauri.
-
-// A command receives its arguments deserialised from the IPC payload: they
-// arrive owned, whether it consumes them or not.
+// Commands receive their arguments owned, deserialised from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod model;
@@ -38,9 +27,7 @@ fn space_names(
         .collect())
 }
 
-/// Assembles the file around the notes given.
-///
-/// Only the spaces **actually cited** travel with them: exporting one space
+/// Only the spaces **actually cited** travel with the notes: exporting one space
 /// must not recreate the whole tree for whoever imports it.
 pub fn collect(
     connection: &mut SqliteConnection,
@@ -59,19 +46,15 @@ pub fn collect(
     })
 }
 
-/// Brings a file into the database: **merge, never replace**.
-///
-/// Spaces are matched by name (case-insensitively), and a note whose id is
-/// already taken is counted then set aside. Importing the same file twice
-/// therefore duplicates nothing — and re-importing a file exported from *this*
-/// database adds nothing at all, which the report says.
+/// **Merge, never replace**: spaces are matched by name (case-insensitively), and a
+/// note whose id is already taken is counted then set aside. Importing the same file
+/// twice therefore duplicates nothing, which the report says.
 pub fn merge(
     connection: &mut SqliteConnection,
     bundle: Bundle,
 ) -> Result<ImportReport, StorageError> {
     let mut report = ImportReport::default();
 
-    // Identifiant d'espace du fichier → identifiant local.
     let mut mapping: BTreeMap<String, String> = BTreeMap::new();
     let existing = spaces::list(connection)?;
 
@@ -91,8 +74,8 @@ pub fn merge(
 
     for mut note in bundle.notes {
         let Some(space_id) = mapping.get(&note.space_id) else {
-            // A file truncated by hand: the note has no space to go to, and
-            // inventing one would file it where nobody will look.
+            // A file truncated by hand: inventing a space would file the note where
+            // nobody will look.
             report.notes_skipped += 1;
             continue;
         };
@@ -121,8 +104,8 @@ fn write(path: &str, bundle: &Bundle) -> Result<ExportReport, AppError> {
     Ok(report)
 }
 
-/// The whole corpus, or the active space alone. The spaces travel with the
-/// notes: without them an import would hold an id with nowhere to file it.
+/// The spaces travel with the notes: without them an import would hold an id with
+/// nowhere to file it.
 #[tauri::command]
 #[specta::specta]
 pub fn export_notes(
@@ -141,8 +124,6 @@ pub fn export_notes(
     write(&path, &bundle)
 }
 
-/// Same file, same rules, restricted to the named notes: what one sends to
-/// someone rather than a whole library.
 #[tauri::command]
 #[specta::specta]
 pub fn export_selection(
@@ -175,7 +156,6 @@ pub fn import_notes(path: String, db: State<'_, Db>) -> Result<ImportReport, App
     Ok(merge(&mut connection, bundle)?)
 }
 
-/// Markdown rendering of a selection, which the front puts on the clipboard.
 /// Nothing is sent anywhere: "share" stops at the clipboard.
 #[tauri::command]
 #[specta::specta]

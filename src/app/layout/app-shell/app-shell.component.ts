@@ -6,9 +6,8 @@ import { UpdatePromptComponent } from '@layout/update-prompt/update-prompt.compo
 import { TitlebarComponent } from '../titlebar/titlebar.component';
 
 /**
- * The application's persistent frame: titlebar, global error banner, update
- * prompt, and a content area driven by the router. The features plug in through
- * the outlet, not through a direct import.
+ * The application's persistent frame: the features plug in through the outlet, not through
+ * a direct import.
  */
 @Component({
   selector: 'app-shell',

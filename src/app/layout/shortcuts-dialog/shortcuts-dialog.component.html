@@ -20,8 +20,8 @@
             <dt class="shortcut-label">{{ shortcut.labelKey | transloco }}</dt>
             <dd class="shortcut-keys">
               @for (key of shortcut.keys; track $index) {
-                <!-- The separators are drawn, not written: a "+" between two
-                     caps would be read out as a key of its own. -->
+                <!-- The separators are drawn, not written: a "+" between two caps would
+                     be read out as a key of its own. -->
                 @if (!$first) {
                   <span class="shortcut-plus" aria-hidden="true">+</span>
                 }

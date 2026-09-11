@@ -5,12 +5,9 @@ import { Space } from '../model/space.model';
 import { NotesRevision } from './notes-revision';
 
 /**
- * The available spaces and the active one. The active space is a **filter**:
- * `NotesStore` reads it to narrow the view, and `createNote` files there.
- *
- * `null` is not a waiting state but a choice — "all spaces". No "All" entry
- * exists on the data side: it would be a phantom space notes could be filed
- * into by mistake.
+ * The active space is a **filter**, and `null` is not a waiting state but a choice —
+ * "all spaces". No "All" entry exists on the data side: it would be a phantom space
+ * notes could be filed into by mistake.
  */
 @Injectable({ providedIn: 'root' })
 export class SpacesStore {
@@ -32,10 +29,8 @@ export class SpacesStore {
 
   private readonly _activeSpaceId = signal<string | null>(null);
 
-  /**
-   * `null` means "all spaces". An unknown id falls back to it rather than
-   * hiding every note.
-   */
+  /** `null` means "all spaces". An unknown id falls back to it rather than hiding
+   * every note. */
   readonly activeSpaceId = computed<string | null>(() => this.activeSpace()?.id ?? null);
 
   readonly activeSpace = computed<Space | null>(() => {
@@ -44,8 +39,7 @@ export class SpacesStore {
   });
 
   constructor() {
-    // Unlike the notes, a failure here empties no screen: the picker shows "all
-    // spaces". Without a banner the breakdown would go unnoticed.
+    // A failure here empties no screen, so without a banner it would go unnoticed.
     effect(() => {
       const error = this.loadError();
       if (error) {
@@ -58,24 +52,19 @@ export class SpacesStore {
     this.spacesResource.reload();
   }
 
-  /** `null` selects "all spaces". */
   selectSpace(id: string | null): void {
     this._activeSpaceId.set(id);
   }
 
   /**
-   * Creates a space and makes it active; the id comes from persistence.
-   *
-   * An empty name is ignored silently. Uniqueness is **not** checked here: only
-   * storage sees the real state of the database, and its refusal comes back as
-   * a translated code.
+   * Uniqueness is **not** checked here: only storage sees the real state of the
+   * database, and its refusal comes back as a translated code.
    */
   async createSpace(name: string): Promise<Space | null> {
     const trimmed = name.trim();
     if (!trimmed) return null;
 
-    // The typed name is the interpolation fallback when the back end supplies
-    // none: "A space named {{name}} already exists" has to stay readable.
+    // The typed name is the interpolation fallback when the back end supplies none.
     const created = await this.notifier.attempt(
       'errors.spaceCreateFailed',
       () => this.repository.create({ name: trimmed }),
@@ -88,11 +77,7 @@ export class SpacesStore {
     return created;
   }
 
-  /**
-   * The write is not optimistic: the list adopts only what persistence
-   * returned. Uniqueness there excludes the renamed space — correcting a name's
-   * case is legitimate.
-   */
+  /** Not optimistic: the list adopts only what persistence returned. */
   async renameSpace(id: string, name: string): Promise<boolean> {
     const trimmed = name.trim();
     const current = this.spaces().find((space) => space.id === id);
@@ -110,14 +95,12 @@ export class SpacesStore {
   }
 
   /**
-   * Deletes a space, moving its notes to `targetSpaceId`, which becomes active:
-   * the notes have just landed there, and falling back to "all spaces" would
-   * lose sight of where they went.
+   * `targetSpaceId` becomes active: the notes have just landed there, and falling
+   * back to "all spaces" would lose sight of where they went.
    */
   async deleteSpace(id: string, targetSpaceId: string): Promise<boolean> {
-    // A space cannot be its own refuge: the cascade would take the notes right
-    // after the transfer. The back end refuses too; this guard only saves a
-    // round trip.
+    // A space cannot be its own refuge. The back end refuses it too; this guard only
+    // saves a round trip.
     if (id === targetSpaceId || !this.spaces().some((space) => space.id === targetSpaceId)) {
       return false;
     }
@@ -129,8 +112,7 @@ export class SpacesStore {
 
     this.spacesResource.set(this.spaces().filter((space) => space.id !== id));
     this.selectSpace(targetSpaceId);
-    // The absorbed notes changed `spaceId` in the database, which a query on an
-    // unrelated space would not otherwise notice.
+    // The absorbed notes changed `spaceId`, which a query on another space would miss.
     this.revision.bump();
     return true;
   }

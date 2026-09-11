@@ -9,8 +9,8 @@
     (closed)="onDismiss()"
   >
     <div class="overlay-toolbar">
-      <!-- The title commits on blur and on close, not on every keystroke: a
-           note saved per character is one IPC round trip per character. -->
+      <!-- The title commits on blur and on close: a note saved per character is one IPC
+           round trip per character. -->
       <input
         #titleInput
         id="overlay-title-input"
@@ -22,8 +22,7 @@
         (blur)="commitTitle()"
       />
 
-      <!-- No format for a todo list: it has no body to colour, and a picker
-           with no effect is worth less than no picker. -->
+      <!-- No format for a todo list: a picker with no effect is worth less than none. -->
       @if (!isChecklist()) {
         <select
           #languageSelect
@@ -50,9 +49,7 @@
         <span aria-hidden="true">📌</span>
         {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
       </button>
-      <!-- A note with fields copies filled: the only form anything is done
-           with. The text is composed at click time, by the back end, and
-           "Copy as is" stays within reach in the panel. -->
+      <!-- A note with fields copies filled; "Copy as is" stays within reach in the panel. -->
       @if (hasPlaceholders()) {
         <button type="button" class="toolbar-btn" (click)="requestFilledCopy()">
           <span aria-hidden="true">⚡</span>
@@ -90,8 +87,7 @@
     </div>
 
     <div class="overlay-meta-row">
-      <!-- A free-form breadcrumb ("API Gateway / Auth"). It is what a pinned
-           card's footer shows instead of its age. -->
+      <!-- A free-form breadcrumb, which a pinned card's footer shows instead of its age. -->
       <input
         #sourceInput
         class="overlay-source-input"
@@ -128,8 +124,7 @@
           />
         </form>
       </div>
-      <!-- The badge says the state, the field changes it. Clearing the field
-           makes the note permanent; setting a date puts it in "untriaged". -->
+      <!-- Clearing the field makes the note permanent; a date puts it in "untriaged". -->
       <span class="overlay-expiry">
         <app-lifecycle-badge [lifecycle]="note.lifecycle" [expiringSoon]="note.expiringSoon" />
         <input
@@ -156,8 +151,8 @@
       (zoomRequested)="imageZoomRequested.emit()"
     />
 
-    <!-- Nothing for a note with no token: a header always present and always
-         empty would be a feature nobody ever uses. -->
+    <!-- Nothing for a note with no token: a header always present and always empty
+         would be a feature nobody uses. -->
     @if (hasPlaceholders()) {
       <app-placeholder-panel
         [placeholders]="placeholders()"
@@ -172,15 +167,14 @@
       />
     }
 
-    <!-- Two stacked layers rather than a preview/edit toggle: the viewer
-         colours the draft underneath, and the <textarea> takes the typing on
-         top with transparent text and a visible caret. The textarea carries
-         the accessible text; the viewer is hidden from screen readers, which
-         would otherwise read the content twice. -->
+    <!-- Two stacked layers rather than a preview/edit toggle: the viewer colours the
+         draft underneath, the <textarea> takes the typing on top with transparent text.
+         The textarea carries the accessible text; the viewer is hidden from screen
+         readers, which would otherwise read the content twice. -->
     <div class="overlay-body" [class.previewing]="showingPreview()">
       @if (showingPreview()) {
-        <!-- The filled body, read-only: the input is absent rather than
-             hidden, or typing would go into text nobody keeps. -->
+        <!-- The filled body, read-only: the input is absent rather than hidden, or
+             typing would go into text nobody keeps. -->
         <app-code-viewer [content]="filledContent() ?? ''" [language]="note.language" />
       } @else if (isChecklist()) {
         <app-checklist-editor

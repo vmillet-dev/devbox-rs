@@ -1,7 +1,5 @@
 @use 'mixins' as *;
 
-// A darker scrim than elsewhere: what is shown is an image, and the page
-// behind it has nothing to add.
 app-dialog {
   --dialog-scrim: 0.85;
   --dialog-gap: 10px;
@@ -46,8 +44,7 @@ app-dialog {
   outline-offset: 2px;
 }
 
-// `contain` rather than a fixed size: a wide capture and a tall one both have
-// to fit without being distorted.
+// `contain`: a wide capture and a tall one must both fit without being distorted.
 .lightbox-image {
   min-height: 0;
   max-width: 100%;

@@ -43,8 +43,8 @@ import { VariablesPageComponent } from './ui/variables-page/variables-page.compo
 import { UndoBarComponent } from './ui/undo-bar/undo-bar.component';
 
 /**
- * "Variables" edits `{{field}}` values — notes vocabulary, which is why it is
- * contributed from here rather than known by `layout/`.
+ * Notes vocabulary, which is why it is contributed from here rather than known by
+ * `layout/`.
  */
 const SETTINGS_PAGES: readonly SettingsPage[] = [
   {
@@ -56,13 +56,9 @@ const SETTINGS_PAGES: readonly SettingsPage[] = [
 ];
 
 /**
- * What the shortcuts sheet lists for this feature. The canvas group comes from
- * [`CanvasKeyboardDirective`], where the same table also binds the keys; the two
- * below are documentation, their keys being handled by the editor and by the
- * palette themselves.
- *
- * Key names are left untranslated: they are already the vocabulary of the
- * accelerators shown in the preferences.
+ * The canvas group comes from [`CanvasKeyboardDirective`], where the same table also
+ * binds the keys; the two below are documentation, their keys being handled by the
+ * editor and by the palette themselves. Key names stay untranslated.
  */
 const NOTES_SHORTCUTS: readonly ShortcutGroup[] = [
   CANVAS_SHORTCUT_GROUP,
@@ -91,13 +87,10 @@ const NOTES_SHORTCUTS: readonly ShortcutGroup[] = [
 ];
 
 /**
- * The feature's only page: it wires the stores onto the display components,
- * whose children stay purely derived from their inputs.
- *
- * It is also what **contributes the "File" menu entries**, the preferences page
- * and the shortcut groups — the titlebar knows no feature, and `contribute()`
- * withdraws them when this page is destroyed, which is why they are registered
- * from here and not from a root store that would outlive it.
+ * It is what **contributes the "File" menu entries**, the preferences page and the
+ * shortcut groups: the titlebar knows no feature, and `contribute()` withdraws them
+ * when this page is destroyed — hence here and not in a root store that would outlive
+ * it.
  */
 @Component({
   selector: 'app-notes-page',
@@ -145,10 +138,9 @@ export class NotesPageComponent {
   private readonly dialogs = inject(DialogStack);
 
   /**
-   * An open modal takes the keyboard, so the search shortcut must not act
-   * behind it. Asked of [`DialogStack`] rather than of each store in turn: the
-   * page used to name its five modals here and would have missed the sixth —
-   * and it now also steps aside for the ones `layout/` opens.
+   * An open modal takes the keyboard. Asked of [`DialogStack`] rather than of each
+   * store in turn: the page used to name its five modals here and would have missed
+   * the sixth.
    */
   protected readonly searchShortcutEnabled = computed(() => !this.dialogs.hasOpenDialog());
 
@@ -162,18 +154,16 @@ export class NotesPageComponent {
     contribute(this.settingsPages, SETTINGS_PAGES);
     contribute(this.shortcutGroups, NOTES_SHORTCUTS);
 
-    // A fresh installation has no space, so not even a creatable note: the
-    // samples are what replaces an empty, silent canvas.
+    // A fresh installation has no space, so not even a creatable note.
     void this.seedSamples();
   }
 
   /**
-   * What a global shortcut or a tray entry asked for. The native side shows the
-   * window and says what was wanted; creating the note stays here, so it goes
-   * through the same `create_note` as any other.
+   * The native side shows the window and says what was wanted; creating the note stays
+   * here, so it goes through the same `create_note` as any other.
    *
-   * No `default`: the switch is exhaustive over a **generated** union, so a
-   * variant added in Rust stops this compiling until it is handled here.
+   * No `default`: the switch is exhaustive over a **generated** union, so a variant
+   * added in Rust stops this compiling until it is handled here.
    */
   private runGlobalAction(action: GlobalAction): void {
     switch (action) {
@@ -189,12 +179,7 @@ export class NotesPageComponent {
     }
   }
 
-  // --- The "File" menu -------------------------------------------------------
-
-  /**
-   * The titlebar shows what the features register. `disabled` is a signal:
-   * "Export selection" follows what is ticked right now.
-   */
+  /** `disabled` is a signal: "Export selection" follows what is ticked right now. */
   private menuEntries(): readonly AppMenuEntry[] {
     const nothingChecked = computed(() => !this.selection.hasSelection());
     const checked = (): readonly string[] => this.selection.checkedNoteIds();
@@ -231,10 +216,7 @@ export class NotesPageComponent {
     ];
   }
 
-  /**
-   * First launch: the sample notes are filed before the user sees an empty
-   * canvas. The spaces reload afterwards — they already read an empty database.
-   */
+  /** The spaces reload afterwards — they had already read an empty database. */
   private async seedSamples(): Promise<void> {
     if (!(await this.samples.seedIfFirstRun())) return;
 
@@ -243,26 +225,20 @@ export class NotesPageComponent {
   }
 
   private async onImport(): Promise<void> {
-    // Only the spaces are reloaded here: the canvas follows `NotesRevision`,
-    // which the library bumps itself.
+    // Only the spaces: the canvas follows `NotesRevision`, which the library bumps.
     if (await this.library.import()) {
       this.spaces.reload();
     }
   }
-
-  // --- Spaces ----------------------------------------------------------------
 
   protected onSpaceRenamed({ id, name }: SpaceRenaming): void {
     // Nothing to reload: a note carries only the `spaceId`, never the name.
     void this.spaces.renameSpace(id, name);
   }
 
-  /** The store bumps `NotesRevision` itself; nothing to chain here. */
   protected onSpaceDeleted({ id, targetSpaceId }: SpaceDeletion): void {
     void this.spaces.deleteSpace(id, targetSpaceId);
   }
-
-  // --- Opening and selection -------------------------------------------------
 
   protected onNoteActivated({ noteId, toggleChecked, extendRange }: NoteActivation): void {
     if (extendRange) {
@@ -281,8 +257,6 @@ export class NotesPageComponent {
     void this.library.copyAsMarkdown(this.selection.checkedNoteIds());
   }
 
-  // --- Trash and tags --------------------------------------------------------
-
   protected onRestore(id: string): void {
     void this.trash.restore(id);
   }
@@ -295,19 +269,14 @@ export class NotesPageComponent {
     void this.tags.deleteSelected();
   }
 
-  // --- Palette ---------------------------------------------------------------
-
   protected onPaletteOpen(noteId: string): void {
     this.palette.close();
     this.store.openNote(noteId);
   }
 
   /**
-   * The palette captures as much as it retrieves: on its create row, what was
-   * typed becomes a note's content, saved and opened.
-   *
-   * `PaletteStore` does not create anything itself — it does not know
-   * `NotesStore`, and the other way round would be a cycle.
+   * `PaletteStore` creates nothing itself — it does not know `NotesStore`, and the
+   * other way round would be a cycle.
    */
   protected async onPaletteChosen(): Promise<void> {
     const content = this.palette.takeNewNoteContent();

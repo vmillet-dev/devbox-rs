@@ -1,11 +1,8 @@
 <section class="panel" [class.open]="open()">
   <div class="panel-head">
-    <!-- The whole strip is the button, right up to the actions: a row that
-         lights up on hover reads as a control, where a bare label reads as a
-         section heading — which is what it used to be. -->
+    <!-- The whole strip is the button: a row that lights up on hover reads as a
+         control, where a bare label reads as a section heading. -->
     <button type="button" class="panel-toggle" [attr.aria-expanded]="open()" (click)="toggled.emit()">
-      <!-- One glyph that rotates, never two: the movement alone says there is
-           something to open. -->
       <span class="panel-caret" aria-hidden="true">▸</span>
       <span class="panel-title">{{ 'placeholders.panelTitle' | transloco }}</span>
       <span class="panel-count" [class.complete]="filled() === total()" aria-hidden="true">
@@ -55,8 +52,7 @@
   </div>
 
   @if (open()) {
-    <!-- `focusout` and not `blur`: it bubbles, so one listener covers every
-         row, including those a keystroke has just added. -->
+    <!-- `focusout` and not `blur`: it bubbles, so one listener covers every row. -->
     <div class="panel-body" (focusout)="commit()">
       <app-placeholder-fields
         [placeholders]="placeholders()"

@@ -45,10 +45,8 @@ describe('PlaceholderPanelComponent', () => {
     await fixture.whenStable();
   }
 
-  /**
-   * The draft is seeded at construction, on the note id: a panel opened on other
-   * values is a panel rebuilt, not one handed a new input.
-   */
+  /** The draft is seeded at construction, on the note id: a panel opened on other values
+   * is a panel rebuilt. */
   async function open(placeholders: readonly Placeholder[] = FIELDS): Promise<void> {
     fixture = TestBed.createComponent(PlaceholderPanelComponent);
     fixture.componentRef.setInput('placeholders', placeholders);
@@ -94,8 +92,6 @@ describe('PlaceholderPanelComponent', () => {
   });
 
   it('says what the click does while it is collapsed', async () => {
-    // With no verb the bar reads as a section heading: that is what it was, and
-    // nobody thought to click it.
     fixture.componentRef.setInput('open', false);
     await fixture.whenStable();
 
@@ -110,8 +106,6 @@ describe('PlaceholderPanelComponent', () => {
     fixture.componentRef.setInput('open', false);
     await fixture.whenStable();
 
-    // A summary reads as something to open, and answers without a click
-    // « avec quoi je vais copier ? ».
     expect(summary()).toBe('host = db.internal');
   });
 
@@ -125,8 +119,6 @@ describe('PlaceholderPanelComponent', () => {
     fixture.componentRef.setInput('open', false);
     await fixture.whenStable();
 
-    // Past two, the bar would overflow instead of informing. The separators are
-    // drawn in CSS, hence reading it one row at a time.
     expect(
       [...fixture.nativeElement.querySelectorAll('.panel-pair')].map((pair) =>
         (pair as HTMLElement).textContent?.replace(/\s+/g, ' ').trim(),
@@ -137,7 +129,6 @@ describe('PlaceholderPanelComponent', () => {
   it('summarises nothing while the panel is open', async () => {
     await open([{ name: 'host', defaultValue: '', value: 'db.internal' }]);
 
-    // The fields themselves are on screen: the summary would say it twice.
     expect(fixture.nativeElement.querySelector('.panel-summary')).toBeNull();
     expect(fixture.nativeElement.querySelector('.panel-verb')).toBeNull();
   });
@@ -157,8 +148,6 @@ describe('PlaceholderPanelComponent', () => {
     toggle().click();
     await fixture.whenStable();
 
-    // The preference belongs to the editor: it survives moving from one note to
-    // the next, which state held inside the panel would not.
     expect(emitted).toBe(1);
   });
 
@@ -171,7 +160,6 @@ describe('PlaceholderPanelComponent', () => {
     await type(0, 'db');
     await type(0, 'db.internal');
 
-    // The preview follows the typing; the database waits for the field to be left.
     expect(emitted).toEqual([
       { host: 'db', port: '' },
       { host: 'db.internal', port: '' },
@@ -195,7 +183,6 @@ describe('PlaceholderPanelComponent', () => {
 
     await leaveField();
 
-    // Moving from one field to the next must not rewrite what is already stored.
     expect(emitted).toBe(0);
   });
 
@@ -258,8 +245,6 @@ describe('PlaceholderPanelComponent', () => {
     fixture.componentRef.setInput('noteId', 'note-2');
     await fixture.whenStable();
 
-    // The draft is keyed on the id, never on the note: every save produces a new
-    // object, which would overwrite what is being typed.
     expect(inputs()[0].value).toBe('');
   });
 });

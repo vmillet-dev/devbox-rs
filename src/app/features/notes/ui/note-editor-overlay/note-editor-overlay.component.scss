@@ -39,8 +39,6 @@
   border-color: var(--amber-dim);
 }
 
-// A button reduced to its glyph, with no surface or border — the close cross
-// and the fullscreen toggle, as opposed to the labelled `.toolbar-btn`.
 .icon-btn {
   @include unstyled-control;
   color: var(--text-2);
@@ -86,8 +84,7 @@
   flex-wrap: wrap;
 }
 
-// The badge and its field are one block: the pair is pushed right, not the
-// badge alone, or the field would stay stuck against the tags.
+// The pair is pushed right, not the badge alone, or the field would stick to the tags.
 .overlay-expiry {
   margin-left: auto;
   display: flex;
@@ -111,8 +108,8 @@
   outline-offset: 2px;
 }
 
-// The native date picker is white on a dark ground: without this filter its
-// icon vanishes entirely against the product's theme.
+// The native date picker icon is white on a dark ground: without this filter it
+// vanishes entirely against the theme.
 .overlay-expiry-input::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
   cursor: pointer;
@@ -167,25 +164,22 @@
   font-family: var(--font-mono), serif;
 }
 
-// The only thing that scrolls, so both layers move together and there is no
-// `scrollTop` to keep in sync.
+// The only thing that scrolls, so both layers move together with no `scrollTop` to sync.
 .overlay-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
 
-// The border is what says the screen is showing the **result** and not the text
-// being edited. Without it, a body with no token left reads as a note whose
-// fields have disappeared.
+// The border is what says the screen is showing the **result** and not the text being
+// edited.
 .overlay-body.previewing {
   border-left: 2px solid var(--amber-dim);
   background: rgba(var(--amber-rgb), 0.02);
 }
 
-// The viewer, in the flow, gives the stack its height; the <textarea> sits over
-// it absolutely. `min-height: 100%` so a click in the empty area below the text
-// still reaches the field.
+// The viewer, in the flow, gives the stack its height; the <textarea> sits over it
+// absolutely. `min-height: 100%` so a click below the text still reaches the field.
 .editor-stack {
   position: relative;
   min-height: 100%;
@@ -197,12 +191,9 @@
 }
 
 // ⚠️ Metrics copied exactly from the viewer's, or the caret drifts away from the
-// coloured text: same font, same line height, same wrapping, and a left inset
-// that adds the line-number gutter to the padding. That gutter is 32px in total,
-// not 32 + 16 — the global `box-sizing: border-box` keeps `.line-no`'s
-// `padding-right` inside its `width`. Getting this wrong shifts typing by two
-// characters while nothing moves on screen: the caret lands beside the glyph it
-// claims to be on.
+// coloured text: same font, same line height, same wrapping, and a left inset that adds
+// the line-number gutter to the padding — 32px in total, not 32 + 16, the global
+// `box-sizing: border-box` keeping `.line-no`'s `padding-right` inside its `width`.
 .overlay-body-editor {
   @include unstyled-control;
   position: absolute;
@@ -221,8 +212,8 @@
   caret-color: var(--text-0);
 }
 
-// Transparent text: the selection shows through its background alone, and the
-// placeholder has to be given an explicit colour back.
+// Transparent text: the selection shows through its background alone, so the
+// placeholder needs an explicit colour back.
 .overlay-body-editor::selection {
   background: rgba(var(--amber-rgb), 0.3);
 }

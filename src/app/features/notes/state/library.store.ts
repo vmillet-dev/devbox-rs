@@ -11,18 +11,14 @@ function defaultFileName(now: Date): string {
   return `devbox-${now.toISOString().slice(0, 10)}.json`;
 }
 
-/** The full path is long and uninteresting in a banner; the file name is enough. */
 function fileNameOf(path: string): string {
   return path.split(/[/\\]/).pop() ?? path;
 }
 
 /**
- * Import, export and share — what the "File" menu triggers.
- *
- * **Every operation reports**, including when it changed nothing: an import
- * that adds nothing because everything is already there and an import that
- * fails look too alike on screen to stay silent. Reports go through
- * `StatusNotifier`, under the titlebar — the menu itself closes on the click.
+ * **Every operation reports**, including when it changed nothing: an import that adds
+ * nothing because everything is already there and one that fails look too alike on
+ * screen to stay silent. Reports go under the titlebar — the menu closes on the click.
  */
 @Injectable({ providedIn: 'root' })
 export class LibraryStore {
@@ -50,8 +46,8 @@ export class LibraryStore {
         path: fileNameOf(path),
       };
 
-      // The most common gesture — export then re-import at once — adds nothing
-      // at all. Saying so explicitly stops it looking like a breakdown.
+      // The most common gesture — export then re-import at once — adds nothing at
+      // all. Saying so explicitly stops it looking like a breakdown.
       this.status.notify({
         key: report.notesImported === 0 ? 'file.importedNothing' : 'file.imported',
         params,
@@ -76,8 +72,8 @@ export class LibraryStore {
   }
 
   /**
-   * Sharing stops at the clipboard: nothing is sent anywhere, which is also why
-   * there is nothing to confirm. The menu label announces the format.
+   * Sharing stops at the clipboard: nothing is sent anywhere, which is also why there
+   * is nothing to confirm.
    */
   async copyAsMarkdown(ids: readonly string[]): Promise<void> {
     if (!this.requireSelection(ids)) return;
@@ -113,8 +109,8 @@ export class LibraryStore {
         return false;
       }
 
-      // The file name is part of the report: a successful export whose landing
-      // place is unknown is no use.
+      // The file name is part of the report: a successful export whose landing place
+      // is unknown is no use.
       this.status.notify({
         key: 'file.exported',
         params: { notes: String(report.notes), path: fileNameOf(path) },

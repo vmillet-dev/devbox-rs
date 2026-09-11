@@ -54,16 +54,12 @@ describe('PlaceholderFormComponent', () => {
   });
 
   it('offers the values the note already holds', async () => {
-    // There is one set of values per note: the form offers them rather than
-    // asking again on every copy.
     await open([{ name: 'host', defaultValue: '', value: 'db.internal' }]);
 
     expect(inputs().map((input) => input.value)).toEqual(['db.internal']);
   });
 
   it('leaves a default as a suggestion rather than a typed value', () => {
-    // Copying it across would freeze `5432` the day the snippet offers another:
-    // empty means "I keep what the text offers".
     expect(inputs().map((input) => input.value)).toEqual(['', '']);
     expect(inputs()[1].placeholder).toBe('5432');
   });
@@ -75,8 +71,6 @@ describe('PlaceholderFormComponent', () => {
 
     await submit();
 
-    // The back end decides what an empty field is worth: the form passes it on,
-    // it does not interpret.
     expect(emitted).toEqual({ host: 'db.internal', port: '' });
   });
 

@@ -25,8 +25,6 @@ describe('StatusToastComponent', () => {
   });
 
   it('renders the report with its parameters interpolated', async () => {
-    // The caller hands over a translation reference, never a sentence: it does
-    // not know which language is active.
     notifier.notify({ key: 'file.exported', params: { notes: '3', path: 'devbox.json' } });
     await fixture.whenStable();
 
@@ -43,7 +41,6 @@ describe('StatusToastComponent', () => {
   });
 
   it('announces itself as a status, not an alert', async () => {
-    // A success does not justify cutting a screen reader off mid-sentence.
     notifier.notify({ key: 'file.exported', params: { notes: '1', path: 'devbox.json' } });
     await fixture.whenStable();
 

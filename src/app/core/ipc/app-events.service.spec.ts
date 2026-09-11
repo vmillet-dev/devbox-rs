@@ -40,7 +40,6 @@ describe('AppEventsService', () => {
     await Promise.resolve();
     fire('new-note');
 
-    // The payload is what says which action: there is one topic, not three.
     expect(handler).toHaveBeenCalledExactlyOnceWith('new-note');
   });
 
@@ -57,8 +56,6 @@ describe('AppEventsService', () => {
   });
 
   it('still unsubscribes when destroyed before the subscription lands', async () => {
-    // `listen` resolves a tick later; without the cancelled flag a component
-    // torn down in between would stay subscribed for the whole session.
     const { state, settle, subscriber } = deferred();
     setUp(subscriber);
 
@@ -71,7 +68,6 @@ describe('AppEventsService', () => {
   });
 
   it('degrades to an inert subscription when the bridge is unavailable', async () => {
-    // This is the case outside Tauri, and the one every other spec runs under.
     setUp(() => Promise.reject(new Error('no bridge')));
 
     const unlisten = service.on(() => undefined);

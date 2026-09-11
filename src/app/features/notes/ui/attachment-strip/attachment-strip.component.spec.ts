@@ -55,15 +55,12 @@ describe('AttachmentStripComponent', () => {
   });
 
   it('never reports a non-empty file as weighing nothing', async () => {
-    // Rounded up to the kB: "0 kB" would be wrong.
     await setAttachments(attachment({ byteSize: 12 }));
 
     expect(items()[0].textContent).toContain('1 Ko');
   });
 
   it('lets any attachment be opened with the system application', async () => {
-    // An attachment you can only read the name of is no use — and that holds for
-    // an archive as much as for an image.
     await setAttachments(
       attachment(),
       attachment({ id: 'attachment-2', fileName: 'dump.zip', mimeType: 'application/zip' }),
@@ -89,7 +86,6 @@ describe('AttachmentStripComponent', () => {
   });
 
   it('offers an inline preview only for an image', async () => {
-    // Offering to "show" an archive would open an empty panel.
     await setAttachments(
       attachment(),
       attachment({ id: 'attachment-2', fileName: 'dump.zip', mimeType: 'application/zip' }),
@@ -112,7 +108,6 @@ describe('AttachmentStripComponent', () => {
   it('renders the preview as a data URI once the bytes arrive', async () => {
     fixture.componentRef.setInput('previewId', 'attachment-1');
     await fixture.whenStable();
-    // Nothing until the read lands: no broken thumbnail.
     expect(fixture.nativeElement.querySelector('.strip-preview-image')).toBeNull();
 
     fixture.componentRef.setInput('previewData', 'data:image/png;base64,AAA');
@@ -124,8 +119,6 @@ describe('AttachmentStripComponent', () => {
   });
 
   it('asks for the enlarged view when the preview is clicked', async () => {
-    // The preview is capped at 220px so it cannot push the editor off screen,
-    // where a screenshot of code is unreadable.
     fixture.componentRef.setInput('previewId', 'attachment-1');
     fixture.componentRef.setInput('previewData', 'data:image/png;base64,AAA');
     await fixture.whenStable();
@@ -152,7 +145,6 @@ describe('AttachmentStripComponent', () => {
   });
 
   it('explains the two other ways to attach when the strip is empty', async () => {
-    // The button does not say a drop or a paste work too.
     await setAttachments();
 
     expect(fixture.nativeElement.querySelector('.strip-empty').textContent).toContain('Déposez');

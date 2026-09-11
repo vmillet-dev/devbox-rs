@@ -1,11 +1,8 @@
-//! Attachments: the commands, and the only place that touches the disk.
-//!
-//! The bytes cross the bridge only on read, as a `data:` URI — the `WebView`'s
-//! CSP forbids loading a local file, and opening the `asset:` protocol to show
-//! a screenshot would be a wide door for a narrow need.
+//! The bytes cross the bridge only on read, as a `data:` URI: the `WebView`'s CSP
+//! forbids loading a local file, and opening the `asset:` protocol to show a
+//! screenshot would be a wide door for a narrow need.
 
-// A command receives its arguments deserialised from the IPC payload: they
-// arrive owned, whether it consumes them or not.
+// Commands receive their arguments owned, deserialised from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod model;
@@ -29,8 +26,7 @@ fn file_error(context: &str, error: &std::io::Error) -> StorageError {
     StorageError::File(format!("{context}: {error}"))
 }
 
-/// Created on demand: an installation that never attached anything has no empty
-/// directory to carry around.
+/// Created on demand, so an installation that never attached anything has none.
 pub(crate) fn directory(app: &AppHandle) -> Result<PathBuf, StorageError> {
     let path = app
         .path()
@@ -95,8 +91,8 @@ pub fn attach_file(
     Ok(attachment)
 }
 
-/// The path on disk, after checking the record exists: opening or copying a
-/// file nothing refers to would be a leak out of the directory.
+/// Checks the record exists first: opening or copying a file nothing refers to
+/// would be a leak out of the directory.
 fn locate(id: &str, app: &AppHandle, db: &Db) -> Result<PathBuf, AppError> {
     let stored_name = {
         let mut connection = lock(db)?;
@@ -108,8 +104,6 @@ fn locate(id: &str, app: &AppHandle, db: &Db) -> Result<PathBuf, AppError> {
     Ok(directory(app)?.join(stored_name))
 }
 
-/// The path shared by [`attach_file`] and [`attach_clipboard_image`]: the bytes
-/// are already here, and are laid down then declared, in that order.
 fn write_attachment(
     note_id: String,
     file_name: String,
@@ -150,7 +144,6 @@ pub fn list_attachments(note_id: String, db: State<'_, Db>) -> Result<Vec<Attach
     Ok(store::list(&mut connection, &note_id)?)
 }
 
-/// `data:<mime>;base64,…`, ready for an `<img>` or a front-side download.
 #[tauri::command]
 #[specta::specta]
 pub fn read_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<String, AppError> {
@@ -170,11 +163,8 @@ pub fn read_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<
     ))
 }
 
-/// Opens the attachment with the system's default application.
-///
-/// The call starts from **Rust**, not the `WebView`: capabilities control the API
-/// the `WebView` invokes, and opening a path from the front would have meant
-/// allowing `opener:allow-open-path` over a whole directory.
+/// The call starts from **Rust**, not the `WebView`: opening a path from the front
+/// end would have meant allowing `opener:allow-open-path` over a whole directory.
 #[tauri::command]
 #[specta::specta]
 pub fn open_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<(), AppError> {
@@ -187,8 +177,8 @@ pub fn open_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<
     Ok(())
 }
 
-/// Copies the attachment where the user asked. The path comes from a native
-/// picker; the write stays here, the only place that knows the directory.
+/// The path comes from a native picker; the write stays here, the only place that
+/// knows the directory.
 #[tauri::command]
 #[specta::specta]
 pub fn save_attachment(
@@ -204,11 +194,8 @@ pub fn save_attachment(
     Ok(())
 }
 
-/// Attaches the clipboard image.
-///
-/// The bytes do **not** cross the bridge: the clipboard is read natively, where
-/// the image arrives as raw RGBA, then encoded to PNG. Sending it up to the
-/// front and back would cost two conversions and several megabytes of JSON.
+/// The bytes do **not** cross the bridge: the clipboard is read natively, where the
+/// image arrives as raw RGBA, then encoded to PNG.
 #[tauri::command]
 #[specta::specta]
 pub fn attach_clipboard_image(

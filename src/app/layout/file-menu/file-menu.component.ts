@@ -7,12 +7,8 @@ import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 import { SettingsDialogComponent } from '@layout/settings-dialog/settings-dialog.component';
 
 /**
- * The titlebar's "File" menu, next to "About" — the desktop convention.
- *
- * It runs nothing itself except quitting: the entries come from
- * [`AppMenuRegistry`], where the features register them. The titlebar stays
- * ignorant of the notes, and a future tool will add its own entries without
- * touching this file.
+ * It runs nothing itself except quitting: the entries come from [`AppMenuRegistry`],
+ * where the features register them, so the titlebar stays ignorant of the notes.
  */
 @Component({
   selector: 'app-file-menu',
@@ -39,9 +35,8 @@ export class FileMenuComponent {
   }
 
   /**
-   * The menu closes on the action: the report shows under the titlebar
-   * (`StatusToastComponent`) and not in the panel — a native file picker covers
-   * it, and reopening the menu to read the result would be absurd.
+   * The report shows under the titlebar and not in the panel: the menu closes on the
+   * action, and a native file picker would cover it.
    */
   protected run(entry: AppMenuEntry): void {
     if (entry.disabled?.()) return;
@@ -51,8 +46,8 @@ export class FileMenuComponent {
   }
 
   /**
-   * The preferences do not go through the registry: they set the application
-   * itself and not a feature, so the menu always offers them, like "Quit".
+   * The preferences set the application itself and not a feature, so the menu always
+   * offers them, like "Quit".
    */
   protected openSettings(): void {
     this.settingsOpen.set(true);
@@ -61,9 +56,8 @@ export class FileMenuComponent {
   }
 
   /**
-   * The modal's focus trap would hand back to the element active when it
-   * opened — the menu entry, destroyed since. Focus therefore returns to the
-   * trigger, the only landmark still on screen.
+   * The modal's focus trap would hand back to the menu entry, destroyed since: focus
+   * returns to the trigger, the only landmark still on screen.
    */
   protected closeSettings(): void {
     this.settingsOpen.set(false);

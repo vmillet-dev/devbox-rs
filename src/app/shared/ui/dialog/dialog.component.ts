@@ -14,17 +14,12 @@ import { DialogStack } from './dialog-stack';
 import { FocusTrapDirective } from './focus-trap.directive';
 
 /**
- * The frame every modal shares: scrim, focus trap, `role="dialog"`, Escape and
- * the backdrop click.
+ * The frame every modal shares: scrim, focus trap, `role="dialog"`, Escape and the
+ * backdrop click. Each dialog used to recopy all six, which made an accessibility fix a
+ * twelve-file change and let two open dialogs answer the same Escape.
  *
- * Each dialog used to recopy all six, which made an accessibility fix a
- * twelve-file change and let two open dialogs answer the same Escape. Here they
- * are written once: a dialog projects its content and says which rung it sits
- * on, and [`DialogStack`] gives the keystroke to whichever is in front.
- *
- * Shape is set by inputs; the two measurements a panel cannot guess — the gap
- * between its blocks and its padding — are CSS custom properties a consumer
- * sets on the `app-dialog` element from its own stylesheet.
+ * The two measurements a panel cannot guess — the gap between its blocks and its padding
+ * — are CSS custom properties a consumer sets on the `app-dialog` element.
  */
 @Component({
   selector: 'app-dialog',
@@ -51,8 +46,8 @@ export class DialogComponent implements OnInit {
   readonly label = input<string>();
 
   /**
-   * Whether Escape and the backdrop click may close. `false` while an operation
-   * cannot be interrupted — installing an update replaces the files on disk.
+   * `false` while an operation cannot be interrupted — installing an update replaces the
+   * files on disk.
    */
   readonly dismissible = input(true);
 
@@ -79,11 +74,11 @@ export class DialogComponent implements OnInit {
   }
 
   /**
-   * Joining the stack is the moment the dialog opens: an `@if` in the page is
-   * what puts one on screen, so there is no separate "open" to listen for.
+   * Joining the stack is the moment the dialog opens: an `@if` in the page is what puts
+   * one on screen, so there is no separate "open" to listen for.
    *
-   * ⚠️ `ngOnInit` and not the constructor: `layer` is a required input, and a
-   * required input has no value yet while the component is being built.
+   * ⚠️ `ngOnInit` and not the constructor: `layer` is a required input, which has no value
+   * yet while the component is being built.
    */
   ngOnInit(): void {
     this.stack.push(this, this.rung());

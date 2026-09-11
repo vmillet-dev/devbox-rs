@@ -5,17 +5,10 @@ import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 
 /**
- * A split button: the default action creates an ordinary note, the chevron
- * drops down the kind picker.
- *
- * Split rather than purely a dropdown because the two gestures do not share a
- * frequency: creating a note stays the common case and keeps one click, picking
- * a kind takes two. A menu opening on every creation would have turned the most
- * frequent gesture into the slowest.
- *
- * Same mechanics as the space switcher. There is deliberately no shared
- * dropdown component: what factors out here is the behaviour, not the
- * presentation.
+ * A split button rather than a plain dropdown: the two gestures do not share a
+ * frequency — creating a note stays the common case and keeps one click, picking a kind
+ * takes two. There is deliberately no shared dropdown component: what factors out here
+ * is the behaviour, not the presentation.
  */
 @Component({
   selector: 'app-new-note-button',
@@ -31,8 +24,7 @@ export class NewNoteButtonComponent {
   protected readonly menu = inject(MenuTriggerDirective);
 
   constructor() {
-    // The directive emits Escape without handling it: there is only one level
-    // to fold here, unlike the space switcher.
+    // Only one level to fold here, unlike the space switcher.
     this.menu.escaped.subscribe(() => this.menu.close());
   }
 

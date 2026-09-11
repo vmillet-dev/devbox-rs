@@ -27,7 +27,6 @@ describe('TrayService', () => {
     service.start();
 
     expect(syncTray).toHaveBeenCalled();
-    // French is the default locale; the native side never holds a string.
     expect(lastLabels()).toEqual({
       open: 'Ouvrir DevBox',
       newNote: 'Nouvelle note',
@@ -48,8 +47,6 @@ describe('TrayService', () => {
   });
 
   it('stays silent when there is no tray to talk to', async () => {
-    // Outside Tauri the bridge is absent; the window is still usable and still
-    // closable, so there is nothing to tell the user.
     syncTray.mockRejectedValue(new Error('no bridge'));
 
     expect(() => service.start()).not.toThrow();

@@ -1,6 +1,5 @@
 <div class="checklist">
-  <!-- The bar is decorative: `aria-hidden` on the graphic, and the count beside
-       it carries the same information as text. -->
+  <!-- Decorative: the count beside it carries the same information as text. -->
   <div class="checklist-progress">
     <span class="progress-track" aria-hidden="true">
       <span class="progress-fill" [style.width.%]="progress().percent"></span>
@@ -17,8 +16,8 @@
         [class.dragging]="dragging()?.from === $index"
         [style.order]="displayIndex($index)"
       >
-        <!-- The handle: pointer events for the mouse, Alt+↑/↓ for the keyboard.
-             HTML5 dragging receives nothing in this WebView. -->
+        <!-- Pointer events for the mouse, Alt+↑/↓ for the keyboard: HTML5 dragging
+             receives nothing in this WebView. -->
         <button
           type="button"
           class="row-grip"
@@ -33,8 +32,7 @@
           <span aria-hidden="true">⠿</span>
         </button>
 
-        <!-- A `role=checkbox` button rather than an `<input type=checkbox>`:
-             the native one would inherit the panel's styles and not colour. -->
+        <!-- A `role=checkbox` button: the native one would inherit the panel's styles. -->
         <button
           type="button"
           class="row-check"

@@ -11,11 +11,8 @@ import { FakeNotesRepository } from './fake-notes-repository';
 import { provideAppTesting } from './testing.providers';
 
 /**
- * The three notes stores, wired onto one fake repository.
- *
- * They are built together and not one per spec file because they *are* one
- * object graph: the selection reads what the query holds, and a write reloads
- * it. Testing any of them in isolation would mean faking the other two.
+ * The three notes stores, wired onto one fake repository: they *are* one object graph, so
+ * testing any of them in isolation would mean faking the other two.
  */
 export interface NotesHarness {
   /** The open note: creating, writing, deleting. */
