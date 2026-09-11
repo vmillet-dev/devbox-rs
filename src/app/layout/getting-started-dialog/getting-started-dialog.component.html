@@ -1,0 +1,39 @@
+<div appDialogBackdrop class="guide-backdrop" (dismissed)="closed.emit()">
+  <div
+    appFocusTrap
+    class="guide-panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="getting-started-title"
+  >
+    <div class="guide-header">
+      <h2 id="getting-started-title" class="guide-title">{{ 'gettingStarted.title' | transloco }}</h2>
+      <p class="guide-subtitle">{{ 'gettingStarted.subtitle' | transloco }}</p>
+    </div>
+
+    <div class="guide-body">
+      @for (chapter of chapters; track chapter; let index = $index) {
+        <section class="guide-chapter">
+          <!-- The number is decoration: the heading below already orders the
+               chapters for a screen reader. -->
+          <span class="guide-step" aria-hidden="true">{{ index + 1 }}</span>
+          <div class="guide-chapter-text">
+            <h3 class="guide-chapter-title">
+              {{ 'gettingStarted.chapters.' + chapter + '.title' | transloco }}
+            </h3>
+            <p class="guide-chapter-body">
+              {{ 'gettingStarted.chapters.' + chapter + '.body' | transloco: keys() }}
+            </p>
+          </div>
+        </section>
+      }
+    </div>
+
+    <div class="guide-actions">
+      <p class="guide-hint">{{ 'gettingStarted.hint' | transloco }}</p>
+      <button type="button" class="guide-close" (click)="closed.emit()">
+        {{ 'gettingStarted.close' | transloco }}
+      </button>
+    </div>
+  </div>
+</div>

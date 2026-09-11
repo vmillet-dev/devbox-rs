@@ -40,7 +40,37 @@
     "newChecklist": "Nouvelle todolist",
     "checklistProgress": "{{done}}/{{total}}",
     "checklistToggle": "Cocher la tâche {{text}}",
-    "checklistMore": "+{{count}} autre(s)"
+    "checklistMore": "+{{count}} autre(s)",
+    "samples": {
+      "space": "Découverte",
+      "welcome": {
+        "title": "Bienvenue dans DevBox",
+        "source": "DevBox / Prise en main",
+        "content": "DevBox garde vos notes, vos snippets et vos listes à portée de raccourci.\n\n- Les cartes se rangent seules : épinglées, aujourd'hui, cette semaine, plus ancien.\n- Cliquez une carte pour l'ouvrir, ou copiez-la sans l'ouvrir.\n- Tout est local : la base vit dans votre dossier utilisateur, rien ne part sur le réseau.\n\nCes quatre notes sont des exemples. Modifiez-les, ou mettez-les à la corbeille : le menu « À propos → Prise en main » raconte la même chose et ne s'efface pas."
+      },
+      "snippet": {
+        "title": "Connexion psql",
+        "source": "PostgreSQL"
+      },
+      "checklist": {
+        "title": "À essayer",
+        "open": "Ouvrir une note en cliquant sa carte",
+        "copy": "Copier une note sans l'ouvrir, depuis le bouton de la carte",
+        "fields": "Copier « Connexion psql » et remplir ses champs",
+        "palette": "Ouvrir la palette de collage rapide avec Ctrl+Alt+P",
+        "space": "Créer un espace à soi et y déplacer une note"
+      },
+      "code": {
+        "title": "Signaux Angular",
+        "source": "Angular / Signals"
+      },
+      "tags": {
+        "devbox": "devbox",
+        "example": "exemple",
+        "database": "sql",
+        "angular": "angular"
+      }
+    }
   },
   "filters": {
     "groupLabel": "Filtrer les notes",
@@ -172,7 +202,10 @@
     "versionUnknown": "inconnue",
     "developedBy": "Développé par",
     "repository": "Dépôt",
-    "close": "Fermer"
+    "close": "Fermer",
+    "whatsNew": "Nouveautés",
+    "gettingStarted": "Prise en main",
+    "shortcuts": "Raccourcis clavier"
   },
   "trash": {
     "title": "Corbeille",
@@ -284,7 +317,47 @@
     "preferences": "Préférences…"
   },
   "shortcuts": {
-    "unavailable": "Raccourci(s) global(aux) indisponible(s) : {{list}}. Une autre application les utilise déjà."
+    "unavailable": "Raccourci(s) global(aux) indisponible(s) : {{list}}. Une autre application les utilise déjà.",
+    "title": "Raccourcis clavier",
+    "subtitle": "Les touches actives selon l'endroit où vous êtes. Les lettres nues n'agissent que sur le canevas, jamais pendant une saisie.",
+    "editHint": "Le raccourci de collage rapide se règle dans Fichier → Préférences.",
+    "close": "Fermer",
+    "groups": {
+      "global": "Globaux (même fenêtre fermée)",
+      "canvas": "Canevas",
+      "editor": "Éditeur",
+      "palette": "Collage rapide"
+    },
+    "global": {
+      "palette": "Ouvrir la palette de collage rapide",
+      "capture": "Capturer le presse-papier dans une note",
+      "newNote": "Créer une note"
+    },
+    "canvas": {
+      "search": "Aller au champ de recherche",
+      "move": "Se déplacer de carte en carte",
+      "open": "Ouvrir la carte sous le focus",
+      "copy": "Copier son contenu",
+      "pin": "Épingler ou désépingler",
+      "check": "Cocher la carte pour une action de masse",
+      "checkWithClick": "Cocher une carte au clic",
+      "extendWithClick": "Étendre la sélection au clic",
+      "trash": "Mettre à la corbeille",
+      "undo": "Annuler la dernière suppression",
+      "clearSelection": "Vider la sélection"
+    },
+    "editor": {
+      "close": "Fermer l'éditeur en enregistrant",
+      "newItem": "Ajouter un item sous celui-ci",
+      "removeItem": "Retirer un item vide",
+      "moveItem": "Déplacer l'item dans la liste"
+    },
+    "palette": {
+      "navigate": "Parcourir les résultats",
+      "paste": "Copier la note et fermer",
+      "open": "Ouvrir la note plutôt que la copier",
+      "close": "Fermer la palette"
+    }
   },
   "settings": {
     "title": "Préférences",
@@ -340,5 +413,58 @@
       "duplicate": "Nom en double : {{names}}. Seule la dernière ligne sera gardée.",
       "nameRule": "Un nom se limite aux lettres, chiffres, tirets et soulignés."
     }
+  },
+  "gettingStarted": {
+    "title": "Prise en main",
+    "subtitle": "Ce que DevBox sait faire, dans l'ordre où on le rencontre.",
+    "hint": "Les notes d'exemple du premier lancement montrent tout cela pour de vrai.",
+    "close": "Fermer",
+    "chapters": {
+      "notes": {
+        "title": "Des notes et des snippets",
+        "body": "Une note porte un titre, un corps coloré selon son langage, une source et des tags. Cliquez une carte pour l'ouvrir, ou copiez son contenu sans l'ouvrir depuis le bouton de la carte. Rien n'est enregistré tant que la note est vide : une note ouverte puis abandonnée ne laisse aucune trace."
+      },
+      "spaces": {
+        "title": "Des espaces pour ranger",
+        "body": "Chaque note vit dans un espace — « Perso », « Boulot », ce que vous voulez. Le sélecteur en haut à gauche filtre le canevas, et « Tous les espaces » les montre ensemble. Supprimer un espace demande toujours où ses notes doivent aller : elles ne disparaissent jamais avec lui."
+      },
+      "organise": {
+        "title": "Retrouver : recherche, tags, filtres",
+        "body": "La recherche traverse les titres, les corps, les sources et les items des listes, accents compris. Le rail de gauche filtre par tag et par langage, et les filtres rapides isolent les épinglées ou celles qui portent une échéance. Le tri, le regroupement par date et les sections sont calculés par le moteur, pas par l'interface."
+      },
+      "fields": {
+        "title": "Des champs à remplir",
+        "body": "Écrivez un champ entre doubles accolades dans un snippet — nom seul, ou nom et valeur par défaut — et DevBox vous le demande au moment de copier. Ce que vous saisissez est conservé avec la note, et les variables globales (Fichier → Préférences → Variables) proposent une valeur pour tout le corpus, affichée en gris tant que vous ne la remplacez pas."
+      },
+      "checklists": {
+        "title": "Des listes à cocher",
+        "body": "Une note est soit un snippet, soit une todolist : une suite d'items ordonnés, cochables depuis la carte sans l'ouvrir. Dans l'éditeur, Entrée ajoute un item, et Alt avec une flèche — ou un glisser au pointeur — le déplace dans la liste."
+      },
+      "palette": {
+        "title": "Coller sans quitter ce que vous faites",
+        "body": "{{palette}} ouvre la palette de collage rapide par-dessus n'importe quelle application : tapez, choisissez, le contenu part dans le presse-papier. {{capture}} fait l'inverse et range le presse-papier dans une note neuve, {{newNote}} en ouvre une vide. Ces trois touches marchent fenêtre fermée, DevBox restant dans la barre système."
+      },
+      "attachments": {
+        "title": "Des pièces jointes",
+        "body": "Déposez un fichier sur la fenêtre pendant qu'une note est ouverte, ou collez une image depuis le presse-papier : elle est copiée à côté de la base et rattachée à la note. La carte en affiche le compte, et un aperçu s'agrandit au clic."
+      },
+      "trash": {
+        "title": "Une corbeille, et Ctrl+Z",
+        "body": "Supprimer une note l'envoie à la corbeille, où elle reste trente jours avant de partir pour de bon. Le bandeau qui suit la suppression propose de revenir en arrière, et Ctrl+Z le fait encore après sa disparition. La corbeille s'ouvre depuis les filtres rapides."
+      },
+      "transfer": {
+        "title": "Entrer et sortir",
+        "body": "Le menu Fichier exporte tout, un espace ou la sélection dans un fichier relisible par DevBox, et réimporte sans jamais créer de doublon. « Copier en Markdown » met la sélection dans le presse-papier, prête à coller dans un ticket ou un message."
+      }
+    }
+  },
+  "whatsNew": {
+    "title": "Nouveautés",
+    "subtitle": "Le journal des versions livré avec l'application. Volontairement non traduit.",
+    "loading": "Lecture du journal…",
+    "unavailable": "Journal des versions indisponible.",
+    "empty": "Aucune version décrite pour l'instant.",
+    "installed": "installée",
+    "close": "Fermer"
   }
 }

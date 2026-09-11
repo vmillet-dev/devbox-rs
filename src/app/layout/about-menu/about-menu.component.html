@@ -31,13 +31,47 @@
         </span>
       </button>
 
-      <button appMenuItem type="button" role="menuitem" class="about-option" (click)="openDialog()">
+      <!-- Not an `appMenuItem`: the arrow keys step over it, as they should. -->
+      <div class="about-separator" role="separator"></div>
+
+      <button appMenuItem type="button" role="menuitem" class="about-option" (click)="openPanel('whatsNew')">
+        {{ 'about.whatsNew' | transloco }}
+      </button>
+
+      <button
+        appMenuItem
+        type="button"
+        role="menuitem"
+        class="about-option"
+        (click)="openPanel('gettingStarted')"
+      >
+        {{ 'about.gettingStarted' | transloco }}
+      </button>
+
+      <button appMenuItem type="button" role="menuitem" class="about-option" (click)="openPanel('shortcuts')">
+        {{ 'about.shortcuts' | transloco }}
+      </button>
+
+      <div class="about-separator" role="separator"></div>
+
+      <button appMenuItem type="button" role="menuitem" class="about-option" (click)="openPanel('about')">
         {{ 'about.openAbout' | transloco }}
       </button>
     </div>
   }
 </div>
 
-@if (dialogOpen()) {
-  <app-about-dialog (closed)="closeDialog()" />
+@switch (panel()) {
+  @case ('whatsNew') {
+    <app-whats-new-dialog (closed)="closePanel()" />
+  }
+  @case ('gettingStarted') {
+    <app-getting-started-dialog (closed)="closePanel()" />
+  }
+  @case ('shortcuts') {
+    <app-shortcuts-dialog (closed)="closePanel()" />
+  }
+  @case ('about') {
+    <app-about-dialog (closed)="closePanel()" />
+  }
 }

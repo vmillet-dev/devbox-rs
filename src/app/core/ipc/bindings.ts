@@ -125,6 +125,8 @@ export const commands = {
 	 *  Rien n'est envoyé nulle part : « partager » s'arrête au presse-papier.
 	 */
 	shareNotes: (ids: string[]) => typedError<string, AppError>(__TAURI_INVOKE("share_notes", { ids })),
+	/**  Newest release first, as the file lists them. */
+	appChangelog: () => __TAURI_INVOKE<ChangelogRelease[]>("app_changelog"),
 	/**
 	 *  Creates the icon, or replaces only its menu if it already exists — a
 	 *  language change thus re-translates it without making it flicker.
@@ -169,6 +171,28 @@ export type Attachment = {
 	 */
 	byteSize: number,
 	createdAt: string,
+};
+
+/**  One `## ` heading of the file, with everything listed under it. */
+export type ChangelogRelease = {
+	/**
+	 *  `0.1.1`, or whatever the heading names — `Unreleased` included. The
+	 *  square brackets of the Keep a Changelog style are dropped.
+	 */
+	version: string,
+	/**  `None` when the heading carries no date; never invented. */
+	date: string | null,
+	sections: ChangelogSection[],
+};
+
+/**
+ *  One `### ` heading, or the anonymous one a release gets when it lists its
+ *  entries without a category.
+ */
+export type ChangelogSection = {
+	/**  Empty for that anonymous category: the front then renders no heading. */
+	title: string,
+	items: string[],
 };
 
 /**

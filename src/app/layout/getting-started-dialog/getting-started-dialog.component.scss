@@ -1,0 +1,73 @@
+@use 'mixins' as *;
+
+.guide-backdrop {
+  @include backdrop(55);
+}
+
+.guide-panel {
+  @include help-panel(620px);
+}
+
+.guide-header {
+  @include help-header;
+}
+
+.guide-title {
+  @include help-title;
+}
+
+.guide-subtitle {
+  @include help-subtitle;
+}
+
+.guide-body {
+  @include help-body;
+  gap: 16px;
+}
+
+// The number sits in its own column so the paragraphs share one left edge,
+// whatever the width of the step badge.
+.guide-chapter {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.guide-step {
+  @include tint-badge('--amber-rgb', 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-family: var(--font-mono), serif;
+  font-size: 11px;
+}
+
+.guide-chapter-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.guide-chapter-body {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-1);
+}
+
+.guide-actions {
+  @include help-actions;
+}
+
+.guide-hint {
+  @include help-hint;
+}
+
+.guide-close {
+  @include help-close;
+}

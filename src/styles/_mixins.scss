@@ -163,3 +163,96 @@
     border: 1px solid rgba(var(#{$rgb-var}), $border-alpha);
   }
 }
+
+// --- Help dialogs ------------------------------------------------------------
+//
+// "Nouveautés", "Prise en main" and "Raccourcis clavier" are three views on the
+// same object: a fixed frame, a scrolling middle, one "Fermer" at the bottom.
+// Written here rather than in one of them because a component's SCSS is out of
+// reach of its neighbours, and three panels that do not look alike would read
+// as three unrelated windows.
+
+// A fixed height rather than one fitted to the content: the middle scrolls, and
+// a panel that resized with its chapter would jump under the cursor.
+@mixin help-panel($width) {
+  @include dialog-panel($width);
+  height: min(560px, 86vh);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+@mixin help-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+@mixin help-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+@mixin help-subtitle {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+@mixin help-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@mixin help-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--bg-0);
+}
+
+@mixin help-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+@mixin help-close {
+  @include unstyled-control;
+  @include surface($radius: 7px);
+  padding: 7px 14px;
+  font-size: 12.5px;
+  color: var(--text-1);
+  cursor: pointer;
+
+  &:hover {
+    @include accent-state(var(--text-0), var(--amber-dim));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+}
+
+// A key cap. Same look as the hint in the search field, which is the only other
+// place a key is drawn.
+@mixin key-cap {
+  font-family: var(--font-mono), serif;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  color: var(--text-1);
+}

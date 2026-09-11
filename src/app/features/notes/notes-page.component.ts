@@ -13,6 +13,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { AppEventsService } from '@core/ipc/app-events.service';
 import { AppMenuEntry, AppMenuRegistry } from '@core/menu/app-menu.registry';
 import { SettingsRegistry } from '@core/settings/settings-registry';
+import { ShortcutGroup, ShortcutsRegistry } from '@core/shortcuts/shortcuts.registry';
 import { ClipboardService } from '@core/clipboard/clipboard.service';
 import { ClockService } from '@core/time/clock.service';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
@@ -22,6 +23,7 @@ import { Note } from './model/note.model';
 import { AttachmentsStore } from './state/attachments.store';
 import { LibraryStore } from './state/library.store';
 import { NotesStore } from './state/notes.store';
+import { SampleNotesService } from './state/sample-notes.service';
 import { PaletteStore } from './state/palette.store';
 import { SpacesStore } from './state/spaces.store';
 import { TagsStore } from './state/tags.store';
@@ -119,6 +121,8 @@ export class NotesPageComponent {
   private readonly status = inject(StatusNotifier);
   private readonly menu = inject(AppMenuRegistry);
   private readonly settingsPages = inject(SettingsRegistry);
+  private readonly shortcutGroups = inject(ShortcutsRegistry);
+  private readonly samples = inject(SampleNotesService);
 
   /** Aperçu affiché en grand par-dessus l'éditeur. */
   protected readonly imageZoomed = signal(false);
@@ -173,6 +177,11 @@ export class NotesPageComponent {
 
     this.registerMenuEntries(destroyRef);
     this.registerSettingsPages(destroyRef);
+    this.registerShortcutGroups(destroyRef);
+
+    // Une installation neuve n'a pas d'espace, donc pas même de note créable :
+    // les exemples sont ce qui remplace un canevas vide et muet.
+    void this.seedSamples();
 
     // Les pièces jointes suivent la note **persistée** : un brouillon n'existe
     // pas encore en base, et rien n'y est attachable.
@@ -250,6 +259,78 @@ export class NotesPageComponent {
 
     this.settingsPages.register(pages);
     destroyRef.onDestroy(() => this.settingsPages.unregister(pages.map((page) => page.id)));
+  }
+
+  /**
+   * Les touches du canevas, de l'éditeur et de la palette appartiennent aux
+   * notes : la fiche des raccourcis les affiche sans les connaître, comme le
+   * menu « Fichier » exécute une entrée qu'il ne connaît pas. Les raccourcis
+   * **globaux** ne sont pas ici — ils sont ceux de l'application, et la fiche
+   * les lit dans les préférences.
+   *
+   * Les noms de touches ne sont pas traduits : c'est déjà le vocabulaire des
+   * accélérateurs affichés dans les préférences, et « Ctrl » n'a pas deux
+   * orthographes. Ce qui n'est pas une frappe — un clic — est dit dans le
+   * libellé plutôt que dessiné en touche.
+   */
+  private registerShortcutGroups(destroyRef: DestroyRef): void {
+    const groups: ShortcutGroup[] = [
+      {
+        id: 'notes.canvas',
+        labelKey: 'shortcuts.groups.canvas',
+        order: 10,
+        shortcuts: [
+          { keys: ['Ctrl', 'K'], labelKey: 'shortcuts.canvas.search' },
+          { keys: ['↑ ↓ ← →'], labelKey: 'shortcuts.canvas.move' },
+          { keys: ['Enter'], labelKey: 'shortcuts.canvas.open' },
+          { keys: ['C'], labelKey: 'shortcuts.canvas.copy' },
+          { keys: ['P'], labelKey: 'shortcuts.canvas.pin' },
+          { keys: ['X'], labelKey: 'shortcuts.canvas.check' },
+          { keys: ['Ctrl'], labelKey: 'shortcuts.canvas.checkWithClick' },
+          { keys: ['Shift'], labelKey: 'shortcuts.canvas.extendWithClick' },
+          { keys: ['Delete'], labelKey: 'shortcuts.canvas.trash' },
+          { keys: ['Ctrl', 'Z'], labelKey: 'shortcuts.canvas.undo' },
+          { keys: ['Escape'], labelKey: 'shortcuts.canvas.clearSelection' },
+        ],
+      },
+      {
+        id: 'notes.editor',
+        labelKey: 'shortcuts.groups.editor',
+        order: 20,
+        shortcuts: [
+          { keys: ['Escape'], labelKey: 'shortcuts.editor.close' },
+          { keys: ['Enter'], labelKey: 'shortcuts.editor.newItem' },
+          { keys: ['Backspace'], labelKey: 'shortcuts.editor.removeItem' },
+          { keys: ['Alt', '↑ ↓'], labelKey: 'shortcuts.editor.moveItem' },
+        ],
+      },
+      {
+        id: 'notes.palette',
+        labelKey: 'shortcuts.groups.palette',
+        order: 30,
+        shortcuts: [
+          { keys: ['↑ ↓'], labelKey: 'shortcuts.palette.navigate' },
+          { keys: ['Enter'], labelKey: 'shortcuts.palette.paste' },
+          { keys: ['Tab'], labelKey: 'shortcuts.palette.open' },
+          { keys: ['Escape'], labelKey: 'shortcuts.palette.close' },
+        ],
+      },
+    ];
+
+    this.shortcutGroups.register(groups);
+    destroyRef.onDestroy(() => this.shortcutGroups.unregister(groups.map((group) => group.id)));
+  }
+
+  /**
+   * Premier lancement : les notes d'exemple sont posées avant que l'utilisateur
+   * ne voie un canevas vide. Les deux stores rechargent ensuite — ils ont déjà
+   * lu une base qui ne contenait rien.
+   */
+  private async seedSamples(): Promise<void> {
+    if (!(await this.samples.seedIfFirstRun())) return;
+
+    this.spaces.reload();
+    this.store.reload();
   }
 
   private checkedIds(): readonly string[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SHORTCUTS, acceleratorFromEvent, isAccelerator } from './shortcut.model';
+import { DEFAULT_SHORTCUTS, acceleratorFromEvent, acceleratorKeys, isAccelerator } from './shortcut.model';
 
 function keydown(init: KeyboardEventInit): KeyboardEvent {
   return new KeyboardEvent('keydown', init);
@@ -55,5 +55,16 @@ describe('isAccelerator', () => {
 
   it('rejects a trailing token that is not a key', () => {
     expect(isAccelerator('Ctrl+Alt+')).toBe(false);
+  });
+});
+
+describe('acceleratorKeys', () => {
+  it('splits a combination into one key per cap', () => {
+    expect(acceleratorKeys('Ctrl+Alt+P')).toEqual(['Ctrl', 'Alt', 'P']);
+  });
+
+  it('drops what a stray separator leaves behind', () => {
+    // The sheet must never render an empty cap.
+    expect(acceleratorKeys('Ctrl++P')).toEqual(['Ctrl', 'P']);
   });
 });
