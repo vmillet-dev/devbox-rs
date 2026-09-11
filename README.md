@@ -113,8 +113,12 @@ owns its model, its SQL and the commands that expose it: `<feature>.rs` holds th
 
 ## Conventions
 
-Code comments, docstrings and UI strings are written in **French**. Test descriptions and
-test comments are in **English**, matching Vitest/Angular community conventions.
+Code comments, docstrings and test descriptions are written in **English**. UI strings are
+translation keys, resolved from `fr.json` and `en.json`.
+
+Comments record **decisions, not narration**: a load-bearing ordering, a platform trap, a
+non-obvious invariant, or why the obvious approach was rejected. Anything that restates a
+signature or narrates the next line belongs in neither.
 
 The front-end is linted with ESLint (`angular-eslint`, including its template accessibility
 rules) and formatted with Prettier — run `npm run lint` before pushing. The Rust side is

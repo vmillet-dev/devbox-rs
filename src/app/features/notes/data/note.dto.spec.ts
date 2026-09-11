@@ -26,6 +26,7 @@ const BASE_DTO: NoteDto = {
   expiringSoon: false,
   placeholders: [],
   attachmentCount: 0,
+  copyText: null,
 };
 
 describe('toNote', () => {
@@ -145,6 +146,17 @@ describe('toNoteDraftDto', () => {
 });
 
 describe('toNotePatchDto', () => {
+  it('isolates the checklist it sends from the array it was given', () => {
+    const outgoing = [{ text: 'Relire', done: true }];
+
+    const dto = toNotePatchDto({ items: outgoing });
+    outgoing[0].text = 'Changed afterwards';
+
+    // The patch is the last place these objects are held: nothing downstream
+    // should be able to reach back into the caller's array.
+    expect(dto.items).toEqual([{ text: 'Relire', done: true }]);
+  });
+
   it('includes only the fields actually present in the patch', () => {
     // An explicit `undefined` would serialise to null and overwrite the stored
     // value instead of leaving it untouched.
@@ -200,7 +212,7 @@ describe('toTrashedNote', () => {
   });
 
   it('carries only what the panel shows', () => {
-    // Rien n'y est décoré : une note au rebut n'est ni ouverte ni copiée.
+    // Nothing here is decorated: a discarded note is neither opened nor copied.
     const note = toTrashedNote(DTO);
 
     expect(note).toEqual({
@@ -212,8 +224,8 @@ describe('toTrashedNote', () => {
       tags: ['auth'],
       deletedAt: new Date('2026-08-27T08:00:00.000Z'),
       purgeAt: new Date('2026-09-26T08:00:00.000Z'),
-      // Le type suffit au panneau : une todolist au rebut affiche un libellé au
-      // lieu d'un aperçu vide. Les items, eux, ne descendent pas jusqu'ici.
+      // The kind is all the panel needs: a discarded todo list shows a label rather
+      // than an empty preview. The items do not travel this far.
       kind: 'snippet',
     });
   });

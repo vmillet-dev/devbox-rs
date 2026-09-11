@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
- * Bandeau d'annulation d'une suppression.
+ * The banner offering to take a deletion back.
  *
  * `role="status"` and not `alert`: a deletion the user asked for is not an
  * alert, and a screen reader must not interrupt to announce it.

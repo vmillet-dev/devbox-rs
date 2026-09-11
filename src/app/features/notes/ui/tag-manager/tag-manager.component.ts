@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { TagUsage } from '@features/notes/model/note.model';
 
 /**
- * Gestion globale des tags : cocher, puis renommer, fusionner ou supprimer.
+ * Corpus-wide tag management: tick, then rename, merge or delete.
  *
  * One destination field for both renaming **and** merging: in the database it
  * is the same operation, and two fields would suggest two mechanisms. The
@@ -13,13 +12,10 @@ import { TagUsage } from '@features/notes/model/note.model';
  */
 @Component({
   selector: 'app-tag-manager',
-  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
+  imports: [DialogComponent, TranslocoPipe],
   templateUrl: './tag-manager.component.html',
   styleUrl: './tag-manager.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class TagManagerComponent {
   readonly tags = input.required<readonly TagUsage[]>();

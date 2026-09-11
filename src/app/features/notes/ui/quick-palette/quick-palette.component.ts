@@ -1,30 +1,21 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  ElementRef,
-  afterNextRender,
-  input,
-  output,
-  viewChild,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
 import { Note } from '@features/notes/model/note.model';
 
 const SNIPPET_LINES = 2;
 
 /**
- * Palette de collage rapide : chercher, choisir, coller ailleurs.
+ * The quick-paste palette: search, choose, paste elsewhere.
  *
- * No focus trap here, unlike the other modals: the field keeps focus from start
- * to finish, and the list is walked with the arrows without ever taking it —
- * hence `aria-activedescendant` rather than a moved focus, which would lose
- * what is being typed.
+ * The field keeps focus from start to finish and the list is walked with the
+ * arrows without ever taking it — hence `aria-activedescendant` rather than a
+ * moved focus, which would lose what is being typed.
  */
 @Component({
   selector: 'app-quick-palette',
-  imports: [DialogBackdropDirective, LanguageBadgeComponent, TranslocoPipe],
+  imports: [DialogComponent, LanguageBadgeComponent, TranslocoPipe],
   templateUrl: './quick-palette.component.html',
   styleUrl: './quick-palette.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -42,14 +33,6 @@ export class QuickPaletteComponent {
   readonly chosen = output<void>();
   readonly openRequested = output<string>();
   readonly closed = output<void>();
-
-  private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
-
-  constructor() {
-    // A palette opened without focus would mean grabbing the field with the
-    // mouse, which removes the point of it.
-    afterNextRender(() => this.searchInput().nativeElement.focus());
-  }
 
   protected snippetOf(note: Note): string {
     return note.content.split('\n').slice(0, SNIPPET_LINES).join('\n');
@@ -84,10 +67,6 @@ export class QuickPaletteComponent {
         }
         break;
       }
-      case 'Escape':
-        event.preventDefault();
-        this.closed.emit();
-        break;
     }
   }
 }

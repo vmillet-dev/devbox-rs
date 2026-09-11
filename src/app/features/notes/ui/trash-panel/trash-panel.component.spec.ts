@@ -33,7 +33,7 @@ describe('TrashPanelComponent', () => {
   }
 
   beforeEach(async () => {
-    // Seule `Date` est truquée : `requestAnimationFrame` truqué bloquerait
+    // Only `Date` is faked: a faked `requestAnimationFrame` would block
     // l'ordonnanceur zoneless d'Angular et `whenStable` ne rendrait jamais.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(NOW);
@@ -65,7 +65,7 @@ describe('TrashPanelComponent', () => {
   });
 
   it('counts the last day as still the user’s', async () => {
-    // Arrondi au supérieur : « effacée dans 1 j » tant qu'il reste du temps.
+    // Rounded up: "erased in 1 d" while there is any time left.
     fixture.componentRef.setInput('notes', [trashed({ purgeAt: new Date('2026-08-27T23:00:00Z') })]);
     await fixture.whenStable();
 
@@ -91,7 +91,7 @@ describe('TrashPanelComponent', () => {
     await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelector('.trash-state').textContent).toContain('vide');
-    // Vider une corbeille déjà vide n'a rien à proposer.
+    // Emptying an already empty trash has nothing to offer.
     expect(fixture.nativeElement.querySelector('.trash-footer')).toBeNull();
   });
 

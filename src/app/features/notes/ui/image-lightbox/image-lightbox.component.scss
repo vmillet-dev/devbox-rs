@@ -1,18 +1,10 @@
 @use 'mixins' as *;
 
-// Au-dessus de l'éditeur (50) qui l'ouvre, et de la palette (65) : c'est la
-// dernière chose ouverte, donc la première à recevoir Échap.
-.lightbox-backdrop {
-  @include backdrop(75);
-  background: rgba(var(--backdrop-rgb), 0.85);
-}
-
-.lightbox-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 92vw;
-  max-height: 92vh;
+// A darker scrim than elsewhere: what is shown is an image, and the page
+// behind it has nothing to add.
+app-dialog {
+  --dialog-scrim: 0.85;
+  --dialog-gap: 10px;
 }
 
 .lightbox-header {
@@ -54,8 +46,8 @@
   outline-offset: 2px;
 }
 
-// `contain` et non une taille imposée : une capture large et une capture haute
-// doivent toutes deux tenir sans être déformées.
+// `contain` rather than a fixed size: a wide capture and a tall one both have
+// to fit without being distorted.
 .lightbox-image {
   min-height: 0;
   max-width: 100%;

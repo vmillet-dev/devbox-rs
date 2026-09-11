@@ -1,14 +1,7 @@
 @use 'mixins' as *;
 
-// Sous la pop-in de mise à jour (60) : si une mise à jour se propose pendant que
-// la fiche est ouverte, c'est elle qui doit passer devant.
-.about-backdrop {
-  @include backdrop(55);
-}
-
-.about-panel {
-  @include dialog-panel(420px);
-  gap: 14px;
+app-dialog {
+  --dialog-gap: 14px;
 }
 
 .about-header {
@@ -38,7 +31,6 @@
   color: var(--text-1);
 }
 
-// Deux colonnes : intitulé à gauche, valeur à droite, alignées entre elles.
 .about-facts {
   margin: 0;
   display: grid;

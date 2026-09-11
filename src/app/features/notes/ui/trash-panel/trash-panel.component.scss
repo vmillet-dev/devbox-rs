@@ -1,16 +1,5 @@
 @use 'mixins' as *;
 
-// Même étage que l'éditeur : les deux ne s'ouvrent jamais ensemble.
-.trash-backdrop {
-  @include backdrop(50);
-}
-
-.trash-panel {
-  @include dialog-panel(560px);
-  gap: 12px;
-  max-height: 80vh;
-}
-
 .trash-header {
   display: flex;
   align-items: baseline;
@@ -75,7 +64,7 @@
   color: var(--text-0);
 }
 
-// `pre` pour garder les sauts de ligne de l'extrait, tronqué à sa largeur.
+// `pre` to keep the snippet's line breaks, clipped to its width.
 .trash-row-snippet {
   margin: 0;
   max-height: 2.8em;
@@ -130,8 +119,8 @@
   outline-offset: 2px;
 }
 
-// Une todolist n'a pas de contenu : la corbeille dit ce qu'elle est plutôt que
-// de laisser un aperçu vide, qui se lirait comme une note perdue.
+// A todo list has no content: the trash says what it is rather than leaving an
+// empty preview, which would read as a lost note.
 .trash-row-kind {
   display: block;
   font-size: 11px;

@@ -1,7 +1,7 @@
-//! Forme JSON de tout ce qui traverse le pont Tauri.
+//! The JSON shape of everything that crosses the Tauri bridge.
 //!
-//! Rassemblés ici plutôt que dispersés près de chaque type : c'est **un** seul
-//! contrat, et le compilateur n'en vérifie rien.
+//! Gathered here rather than scattered beside each type: it is **one** contract,
+//! and the compiler checks none of it.
 
 use std::collections::BTreeMap;
 
@@ -250,9 +250,9 @@ fn a_null_space_is_read_as_every_space() {
 
 // --- Espace ----------------------------------------------------------------
 
-/// `rename_all` est sans effet tant que les champs tiennent en un mot : ce test
-/// échouera le jour où un `created_at` s'ajoutera sans l'attribut, au lieu de
-/// laisser le front lire `undefined`.
+/// `rename_all` has no effect while every field is one word: this test fails the
+/// day a `created_at` is added without the attribute, instead of letting the front
+/// end read `undefined`.
 #[test]
 fn a_space_serialises_with_the_keys_the_front_reads() {
     let json = serde_json::to_value(Space {
@@ -350,9 +350,9 @@ fn params_are_absent_rather_than_null_when_there_is_nothing_to_interpolate() {
 
 #[test]
 fn an_unreadable_reference_instant_is_refused_at_the_bridge() {
-    // Elle l'était par `view::build`, quand `now` était une chaîne. Le type la
-    // porte désormais : le refus arrive à la désérialisation, avant qu'aucune
-    // section ne soit découpée sur un instant inventé.
+    // It used to be `view::build`’s, back when `now` was a string. The type carries
+    // it now: the refusal happens at deserialisation, before any section is cut on
+    // an invented instant.
     let refused = serde_json::from_value::<NotesQuery>(serde_json::json!({
         "spaceId": null,
         "search": "",
@@ -368,8 +368,8 @@ fn an_unreadable_reference_instant_is_refused_at_the_bridge() {
 
 #[test]
 fn an_unknown_language_is_refused_at_the_bridge() {
-    // Le front ne peut plus l'envoyer — les bindings en font une union — mais un
-    // appel direct au pont, si. La liste fermée le refuse ici.
+    // The front end can no longer send it — the bindings make it a union — but a
+    // direct call to the bridge can. The closed list refuses it here.
     let refused = serde_json::from_value::<NoteDraft>(serde_json::json!({
         "spaceId": "s-1",
         "title": "",
@@ -386,26 +386,26 @@ fn an_unknown_language_is_refused_at_the_bridge() {
 
 #[test]
 fn an_instant_crosses_as_a_string_the_front_can_read_as_a_date() {
-    // JSON n'a pas de type date : le front fait `new Date(iso)` à la frontière.
-    // Le format exact ne l'engage pas — c'est la **colonne** qui exige ses
-    // millisecondes, parce que le canevas trie dessus (voir `domain::iso8601`).
+    // JSON has no date type: the front end does `new Date(iso)` at the boundary.
+    // The exact format does not bind it — the **column** is what demands its
+    // milliseconds, because the canvas sorts on it (see `db::iso8601`).
     let json = serde_json::to_value(sample()).unwrap();
 
     let updated_at = json["updatedAt"].as_str().unwrap();
     assert!(iso8601::parse(updated_at).is_ok());
 }
 
-// --- Corbeille, pièces jointes, échange -------------------------------------
+// --- Trash, attachments, transfer ---------------------------------------------
 
 #[test]
 fn a_trashed_note_is_a_note_with_two_dates_more() {
-    // `flatten` : le panneau de corbeille lit une note ordinaire, pas un objet
-    // imbriqué qu'il faudrait déballer.
+    // `flatten`: the trash panel reads an ordinary note, not a nested object it
+    // would have to unwrap.
     let json = serde_json::to_value(trash::trashed(sample(), at(NOW))).unwrap();
 
     assert_eq!(json["id"], "n-1");
-    // Les deux dates traversent en chaîne, comme les autres : c'est la colonne
-    // qui exige un format précis, pas le pont.
+    // Both dates cross as strings, like the others: the column is what demands a
+    // precise format, not the bridge.
     assert!(iso8601::parse(json["deletedAt"].as_str().unwrap()).is_ok());
     assert!(iso8601::parse(json["purgeAt"].as_str().unwrap()).is_ok());
 }
@@ -420,11 +420,11 @@ fn a_decorated_note_announces_its_fields_and_its_attachments() {
 
     assert_eq!(json["placeholders"][0]["name"], "host");
     assert_eq!(json["placeholders"][1]["defaultValue"], "5432");
-    // Le panneau de l'éditeur lit la valeur **sur le champ** : sans elle, il
-    // rouvrirait vide une note dont les valeurs sont pourtant en base.
+    // The editor's panel reads the value **on the field**: without it a note whose
+    // values are stored would reopen empty.
     assert_eq!(json["placeholders"][0]["value"], "db.internal");
     assert_eq!(json["placeholders"][1]["value"], "");
-    // Renseigné par ce qui tient la connexion ; zéro par défaut.
+    // Filled in by whoever holds the connection; zero by default.
     assert_eq!(json["attachmentCount"], 0);
 }
 
@@ -475,8 +475,8 @@ fn an_import_report_names_what_it_skipped() {
 
 #[test]
 fn an_export_bundle_reads_back_the_notes_it_wrote() {
-    // Le fichier est le contrat entre deux versions de DevBox, pas seulement
-    // entre le Rust et le front.
+    // The file is the contract between two versions of DevBox, not only between
+    // the Rust side and the front end.
     let bundle = Bundle {
         version: transfer::model::FORMAT_VERSION,
         exported_at: at(NOW),
@@ -506,8 +506,8 @@ fn a_note_announces_its_kind_and_its_items() {
 
     let json = serde_json::to_value(note).unwrap();
 
-    // Enum unitaire : une chaîne nue, comme `language` — et non un objet tagué,
-    // contrairement à `lifecycle`.
+    // A unit enum: a bare string, like `language` — and not a tagged object, unlike
+    // `lifecycle`.
     assert_eq!(json["kind"], serde_json::json!("checklist"));
     assert_eq!(json["items"][0]["text"], serde_json::json!("Relire"));
     assert_eq!(json["items"][0]["done"], serde_json::json!(true));
@@ -523,8 +523,8 @@ fn an_ordinary_note_still_crosses_as_a_snippet() {
 
 #[test]
 fn an_export_written_before_todo_lists_existed_still_reads() {
-    // `Bundle` désérialise `Note` lui-même : sans `#[serde(default)]` sur `kind`
-    // et `items`, tous les fichiers déjà exportés deviendraient illisibles.
+    // `Bundle` deserialises `Note` itself: without `#[serde(default)]` on `kind`
+    // and `items`, every file already exported would become unreadable.
     let json = serde_json::json!({
         "version": transfer::model::FORMAT_VERSION,
         "exportedAt": NOW,
@@ -549,8 +549,7 @@ fn an_export_written_before_todo_lists_existed_still_reads() {
 
     assert_eq!(read.notes[0].kind, NoteKind::Snippet);
     assert!(read.notes[0].items.is_empty());
-    // Même garantie, même raison : `placeholderValues` est arrivé après ces
-    // fichiers-là.
+    // Same guarantee, same reason: `placeholderValues` arrived after those files.
     assert!(read.notes[0].placeholder_values.is_empty());
 }
 
@@ -561,7 +560,7 @@ fn the_values_of_the_fields_cross_as_a_named_map() {
 
     let json = serde_json::to_value(note).unwrap();
 
-    // Un tableau de paires obligerait le front à le reconstruire pour chercher
+    // An array of pairs would make the front end rebuild it to look anything up
     // un nom ; l'export, lui, relit exactement cette forme.
     assert_eq!(
         json["placeholderValues"],
@@ -573,15 +572,15 @@ fn the_values_of_the_fields_cross_as_a_named_map() {
 fn a_patch_omitting_the_items_deserialises_to_none() {
     let patch: NotePatch = serde_json::from_value(serde_json::json!({ "title": "T" })).unwrap();
 
-    // Un `Some(vec![])` viderait la liste au lieu de la laisser intacte.
+    // A `Some(vec![])` would empty the list instead of leaving it alone.
     assert!(patch.items.is_none());
     assert!(patch.kind.is_none());
 }
 
 #[test]
 fn every_error_code_crosses_as_a_camel_case_string() {
-    // La table `CODE_KEYS` du front est indexée dessus : un `snake_case` ici
-    // n'y trouverait aucune clé de traduction.
+    // The front end's `CODE_KEYS` table is keyed on it: a `snake_case` here would
+    // find no translation key there.
     for (error, expected) in [
         (
             StorageError::AttachmentNotFound("a-1".to_string()),

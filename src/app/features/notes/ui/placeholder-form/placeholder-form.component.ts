@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { Placeholder } from '@features/notes/model/note.model';
 import {
   PlaceholderFieldsComponent,
@@ -25,13 +24,10 @@ import {
  */
 @Component({
   selector: 'app-placeholder-form',
-  imports: [DialogBackdropDirective, FocusTrapDirective, PlaceholderFieldsComponent, TranslocoPipe],
+  imports: [DialogComponent, PlaceholderFieldsComponent, TranslocoPipe],
   templateUrl: './placeholder-form.component.html',
   styleUrl: './placeholder-form.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'cancelled.emit()',
-  },
 })
 export class PlaceholderFormComponent {
   readonly placeholders = input.required<readonly Placeholder[]>();

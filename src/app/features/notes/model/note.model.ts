@@ -19,8 +19,9 @@ export type NoteFooter =
 /**
  * Immutable: every change produces a new object (see `NotesStore`).
  *
- * `footer`, `expiringSoon`, `placeholders` and `attachmentCount` are **derived
- * by the back end and never written** — they are what `DisplayNote` adds.
+ * `footer`, `expiringSoon`, `placeholders`, `attachmentCount` and `copyText`
+ * are **derived by the back end and never written** — they are what
+ * `DisplayNote` adds.
  */
 export interface Note {
   readonly id: string;
@@ -44,6 +45,11 @@ export interface Note {
   readonly kind: NoteKind;
   /** Empty for a snippet. A todo list has these **instead of** `content`. */
   readonly items: readonly ChecklistItem[];
+  /**
+   * What copying puts on the clipboard when that is not `content`: the Markdown
+   * of a todo list's items. `null` for a snippet — see `noteCopyText`.
+   */
+  readonly copyText: string | null;
 }
 
 /**
@@ -52,7 +58,14 @@ export interface Note {
  */
 export type NoteDraft = Omit<
   Note,
-  'id' | 'createdAt' | 'updatedAt' | 'footer' | 'expiringSoon' | 'placeholders' | 'attachmentCount'
+  | 'id'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'footer'
+  | 'expiringSoon'
+  | 'placeholders'
+  | 'attachmentCount'
+  | 'copyText'
 >;
 
 export type NotePatch = Partial<NoteDraft>;

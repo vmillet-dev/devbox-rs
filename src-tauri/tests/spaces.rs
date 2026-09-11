@@ -1,5 +1,5 @@
-//! Espaces lus et écrits contre une vraie base — dont la suppression, qui
-//! déplace les notes avant de supprimer, sous peine de cascade.
+//! Spaces read and written against a real database — deletion included, which
+//! moves the notes out before dropping, on pain of a cascade.
 
 use diesel::SqliteConnection;
 use diesel::prelude::*;
@@ -11,8 +11,8 @@ use devbox_lib::spaces::store::{create, delete, exists, list, rename};
 
 const T0: &str = "2026-07-25T09:00:00.000Z";
 
-/// Note posée directement en base : ces tests portent sur les espaces, et
-/// passer par `notes::create` y ferait entrer ses propres règles.
+/// A note written straight into the database: these tests are about spaces, and
+/// going through `notes::create` would drag its own rules in.
 fn note_in(connection: &mut SqliteConnection, space_id: &str) {
     diesel::insert_into(notes::table)
         .values((

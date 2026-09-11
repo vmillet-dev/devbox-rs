@@ -73,15 +73,13 @@ describe('GettingStartedDialogComponent', () => {
     expect(bodies()).not.toContain('{{');
   });
 
-  it('closes from the button, the backdrop and Escape', async () => {
+  it('closes from its button', async () => {
     let closed = 0;
     fixture.componentInstance.closed.subscribe(() => (closed += 1));
 
     (fixture.nativeElement.querySelector('.guide-close') as HTMLButtonElement).click();
-    (fixture.nativeElement.querySelector('.guide-backdrop') as HTMLElement).click();
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await fixture.whenStable();
 
-    expect(closed).toBe(3);
+    expect(closed).toBe(1);
   });
 });

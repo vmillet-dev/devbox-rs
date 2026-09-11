@@ -43,8 +43,8 @@ describe('QuickPaletteComponent', () => {
   });
 
   it('takes the focus on the search field', () => {
-    // Une palette ouverte sans focus obligerait à attraper le champ à la
-    // souris, ce qui lui retirerait tout intérêt.
+    // A palette opened without focus would mean grabbing the field with the
+    // mouse, which removes the point of it.
     expect(document.activeElement).toBe(input());
   });
 
@@ -145,7 +145,7 @@ describe('QuickPaletteComponent', () => {
     });
 
     it('replaces the empty state rather than sitting next to it', async () => {
-      // « Aucun snippet » et « créer une note » disent la même chose deux fois.
+      // "No snippet" and "create a note" say the same thing twice.
       fixture.componentRef.setInput('results', []);
       await offerCreation('migrer la base');
 

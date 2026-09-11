@@ -1,16 +1,12 @@
 @use 'mixins' as *;
 
-// Au-dessus de la palette (65) : c'est elle qui l'ouvre.
-.fields-backdrop {
-  @include backdrop(70);
-}
-
-.fields-panel {
-  @include dialog-panel(420px);
+// The panel is a form, so the shell cannot be it: the layout lives here.
+.fields-form {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  max-height: 80vh;
+  min-height: 0;
 }
-
 .fields-title {
   margin: 0;
   font-size: 15px;
@@ -24,8 +20,8 @@
   color: var(--text-2);
 }
 
-// Les lignes elles-mêmes viennent d'`app-placeholder-fields`, partagé avec le
-// panneau de l'éditeur : seul le défilement est une affaire de modale.
+// The rows come from `app-placeholder-fields`, shared with the editor's panel:
+// only the scrolling is a modal's business.
 .fields-list {
   overflow-y: auto;
 }
@@ -57,7 +53,7 @@
   color: var(--amber-ink);
 }
 
-.fields-panel :focus-visible {
+.fields-form :focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 2px;
 }

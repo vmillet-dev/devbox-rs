@@ -1,13 +1,5 @@
 @use 'mixins' as *;
 
-.guide-backdrop {
-  @include backdrop(55);
-}
-
-.guide-panel {
-  @include help-panel(620px);
-}
-
 .guide-header {
   @include help-header;
 }

@@ -2,6 +2,7 @@ import { guard } from './fail-next';
 import { NotesRepository } from '@features/notes/data/notes.repository';
 import { Note, NoteDraft, NotePatch, TagUsage, TrashedNote } from '@features/notes/model/note.model';
 import { NotesQuery, NotesView } from '@features/notes/model/note.model';
+import { checklistMarkdown } from './note.fixture';
 
 /** Mirrors `notes::trash::RETENTION`, so the double's `purgeAt` is plausible. */
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -101,6 +102,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
         expiringSoon: false,
         placeholders: [],
         attachmentCount: 0,
+        copyText: draft.kind === 'checklist' ? checklistMarkdown(draft.items) : null,
       };
       this.notes = [note, ...this.notes];
       return note;
@@ -147,6 +149,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
           expiringSoon: false,
           placeholders: [],
           attachmentCount: 0,
+          copyText: null,
           // The trash shape drops the items, so a restored checklist comes back
           // empty here. The real back-end keeps them in `note_items`; a spec
           // needing them restored pins the note with `setView`.

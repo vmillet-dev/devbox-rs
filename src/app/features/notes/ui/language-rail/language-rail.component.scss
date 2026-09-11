@@ -17,9 +17,9 @@
   flex-shrink: 0;
 }
 
-// Enveloppe cliquable autour du badge : la couleur reste celle du langage, et
-// c'est l'anneau qui dit « sélectionné ». Teinter le badge en ambre à l'état
-// actif effacerait précisément l'indice qui permet de le reconnaître.
+// A clickable wrapper around the badge: the colour stays the language's, and
+// the ring is what says "selected". Tinting the badge amber when active would
+// erase the very clue it is recognised by.
 .language-chip {
   @include unstyled-control;
   display: flex;

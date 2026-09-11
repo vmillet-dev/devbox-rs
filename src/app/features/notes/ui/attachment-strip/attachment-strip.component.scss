@@ -47,8 +47,8 @@ button.strip-name {
   color: var(--text-2);
 }
 
-// Assez grandes pour être visées : ces trois boutons sont l'essentiel de ce
-// qu'on fait d'une pièce jointe, et à 10px ils se confondaient avec le décor.
+// Big enough to aim at: these three are most of what one does with an
+// attachment, and at 10px they read as decoration.
 .strip-icon {
   @include unstyled-control;
   display: inline-flex;
@@ -116,8 +116,8 @@ button.strip-name {
   opacity: 0.85;
 }
 
-// Bornée en hauteur : une capture d'écran pleine taille pousserait l'éditeur
-// hors de l'écran. C'est précisément ce que la vue agrandie répare.
+// Height-bounded: a full-size screenshot would push the editor off screen,
+// which is exactly what the lightbox is for.
 .strip-preview-image {
   display: block;
   max-width: 100%;

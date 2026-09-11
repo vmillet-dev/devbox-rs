@@ -23,7 +23,7 @@ describe('AttachmentStripComponent', () => {
     return [...fixture.nativeElement.querySelectorAll('.strip-item')];
   }
 
-  /** Le bouton d'une ligne dont le libellé accessible commence par `label`. */
+  /** The button of a row whose accessible label starts with `label`. */
   function actionOf(index: number, label: string): HTMLButtonElement {
     const found = [...items()[index].querySelectorAll<HTMLButtonElement>('button')].find((button) =>
       button.getAttribute('aria-label')?.startsWith(label),
@@ -55,15 +55,15 @@ describe('AttachmentStripComponent', () => {
   });
 
   it('never reports a non-empty file as weighing nothing', async () => {
-    // Arrondi au Ko supérieur : « 0 Ko » serait faux.
+    // Rounded up to the kB: "0 kB" would be wrong.
     await setAttachments(attachment({ byteSize: 12 }));
 
     expect(items()[0].textContent).toContain('1 Ko');
   });
 
   it('lets any attachment be opened with the system application', async () => {
-    // Un fichier joint qu'on ne peut que lire de nom ne sert à rien — et cela
-    // vaut pour une archive comme pour une image.
+    // An attachment you can only read the name of is no use — and that holds for
+    // an archive as much as for an image.
     await setAttachments(
       attachment(),
       attachment({ id: 'attachment-2', fileName: 'dump.zip', mimeType: 'application/zip' }),
@@ -89,7 +89,7 @@ describe('AttachmentStripComponent', () => {
   });
 
   it('offers an inline preview only for an image', async () => {
-    // Proposer d'« afficher » une archive ouvrirait un panneau vide.
+    // Offering to "show" an archive would open an empty panel.
     await setAttachments(
       attachment(),
       attachment({ id: 'attachment-2', fileName: 'dump.zip', mimeType: 'application/zip' }),
@@ -112,7 +112,7 @@ describe('AttachmentStripComponent', () => {
   it('renders the preview as a data URI once the bytes arrive', async () => {
     fixture.componentRef.setInput('previewId', 'attachment-1');
     await fixture.whenStable();
-    // Rien tant que la lecture n'a pas abouti : pas de vignette cassée.
+    // Nothing until the read lands: no broken thumbnail.
     expect(fixture.nativeElement.querySelector('.strip-preview-image')).toBeNull();
 
     fixture.componentRef.setInput('previewData', 'data:image/png;base64,AAA');
@@ -124,8 +124,8 @@ describe('AttachmentStripComponent', () => {
   });
 
   it('asks for the enlarged view when the preview is clicked', async () => {
-    // L'aperçu est borné à 220 px pour ne pas pousser l'éditeur hors de
-    // l'écran ; une capture de code y est illisible.
+    // The preview is capped at 220px so it cannot push the editor off screen,
+    // where a screenshot of code is unreadable.
     fixture.componentRef.setInput('previewId', 'attachment-1');
     fixture.componentRef.setInput('previewData', 'data:image/png;base64,AAA');
     await fixture.whenStable();
@@ -152,7 +152,7 @@ describe('AttachmentStripComponent', () => {
   });
 
   it('explains the two other ways to attach when the strip is empty', async () => {
-    // Le bouton ne dit pas qu'un dépôt ou un collage fonctionnent aussi.
+    // The button does not say a drop or a paste work too.
     await setAttachments();
 
     expect(fixture.nativeElement.querySelector('.strip-empty').textContent).toContain('Déposez');

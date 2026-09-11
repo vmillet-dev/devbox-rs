@@ -1,8 +1,7 @@
 @use 'mixins' as *;
 
-// Ancre du menu d'actions, positionné en absolu par-dessus la carte. C'est
-// aussi ce conteneur que le menu observe (`:host-context(.card-shell:hover)`)
-// pour n'apparaître qu'au survol.
+// Anchors the action menu, which is positioned over the card. It is also what
+// the menu watches (`:host-context(.card-shell:hover)`) to appear only on hover.
 .card-shell {
   position: relative;
 }
@@ -26,8 +25,8 @@
   background: var(--bg-2);
 }
 
-// Voisin du menu ⋯, qui occupe déjà le coin. Discret au repos plutôt que
-// masqué : `display: none` le sortirait de l'ordre de tabulation.
+// Next to the ⋯ menu, which already holds the corner. Quiet at rest rather
+// than hidden: `display: none` would take it out of the tab order.
 app-copy-button {
   position: absolute;
   top: 8px;
@@ -51,20 +50,17 @@ app-copy-button:focus-within {
   box-shadow: 0 0 0 1px var(--amber-dim);
 }
 
-// Les enfants sont des <span> (contrainte de contenu du <button> parent) :
-// il faut donc leur rendre explicitement le comportement de bloc.
+// The children are <span>s — the parent <button> allows nothing else — so they
+// need their block behaviour handed back explicitly.
 .card-top {
   display: flex;
   align-items: center;
   gap: 7px;
   margin-bottom: 8px;
-  // Réserve la place des boutons copie et ⋯, qui flottent au-dessus du coin
-  // haut-droit.
+  // Reserves room for the copy and ⋯ buttons floating over the top-right corner.
   padding-right: 50px;
 }
 
-// La pastille d'épinglage vivait en `::after` dans ce même coin ; elle est
-// désormais un élément de la première ligne, le menu occupant le coin.
 .card-pin {
   margin-left: auto;
   font-size: 11px;
@@ -79,8 +75,8 @@ app-copy-button:focus-within {
   line-height: 1.3;
 }
 
-// `app-code-viewer` en mode compact : il n'apporte que la coloration, la
-// typographie de l'extrait reste décidée ici.
+// `app-code-viewer` in compact mode: it brings the colouring only, the
+// snippet’s typography stays decided here.
 .card-snippet {
   font-size: 11px;
   color: var(--text-2);
@@ -113,7 +109,7 @@ app-copy-button:focus-within {
   color: var(--text-2);
 }
 
-// --- Todolist ----------------------------------------------------------------
+// --- Todo list ---------------------------------------------------------------
 
 .card-progress {
   display: flex;
@@ -144,24 +140,24 @@ app-copy-button:focus-within {
   white-space: nowrap;
 }
 
-// Réserve, dans le bouton, la bande que la liste occupe par-dessus. Sans elle
-// le pied de carte remonterait sous les items.
+// Reserves, inside the button, the band the list covers. Without it the card
+// footer would slide up under the items.
 .card-items-space {
   display: block;
   flex: 1;
 }
 
-// Couche sœur du bouton de carte : elle porte des boutons, qui ne peuvent pas
-// vivre à l'intérieur d'un autre. Transparente aux clics — seules les cases en
-// reçoivent —, pour qu'un clic à côté ouvre bien la note.
+// A sibling layer of the card button: it carries buttons, which cannot live
+// inside another one. Transparent to clicks — only the checkboxes take them —
+// so that clicking beside one still opens the note.
 //
-// Calée sur le **bas** plutôt que sur un décalage depuis le haut : ce qui la
-// précède n'a pas de hauteur fixe (le badge de format a disparu, l'épingle et le
-// trombone vont et viennent), et un `top` en dur se serait décalé à chaque fois.
+// Anchored to the **bottom** rather than offset from the top: what precedes it
+// has no fixed height (the pin and the paperclip come and go), and a hard `top`
+// would have drifted every time.
 .card-items {
   position: absolute;
   inset: 0;
-  // 14px de marge de carte, plus la bande du pied en bas.
+  // 14px of card padding, plus the footer band at the bottom.
   padding: var(--space-card) var(--space-card) 34px;
   z-index: 1;
   margin: 0;
@@ -207,7 +203,7 @@ app-copy-button:focus-within {
   text-overflow: ellipsis;
 }
 
-// Barré **et** estompé : la couleur seule ne dit pas ce qui est fait.
+// Struck through **and** dimmed: colour alone does not say what is done.
 .card-item.done .item-text {
   text-decoration: line-through;
   opacity: 0.6;
@@ -225,10 +221,10 @@ app-copy-button:focus-within {
   color: var(--text-2);
 }
 
-// --- Sélection multiple et badges -------------------------------------------
+// --- Multiple selection and badges ------------------------------------------
 
-// Coin haut-gauche, à l'opposé du menu ⋯. Comme le bouton de copie : discret au
-// repos plutôt que masqué, `display: none` le sortirait de la tabulation.
+// Top-left corner, opposite the ⋯ menu. Like the copy button: quiet at rest
+// rather than hidden, since `display: none` would take it out of the tab order.
 .card-check {
   @include unstyled-control;
   position: absolute;
@@ -257,8 +253,7 @@ app-copy-button:focus-within {
   background: rgba(var(--amber-rgb), 0.06);
 }
 
-// Même emplacement que le bouton de copie, qu'il remplace : les deux ne
-// coexistent jamais.
+// The copy button’s place, which it replaces: the two never coexist.
 .card-fill {
   @include unstyled-control;
   position: absolute;

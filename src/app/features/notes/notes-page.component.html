@@ -8,11 +8,11 @@
     (spaceDeleted)="onSpaceDeleted($event)"
   />
   <app-search-box
-    [query]="store.searchQuery()"
+    [query]="canvas.searchQuery()"
     [shortcutEnabled]="searchShortcutEnabled()"
-    (queryChange)="store.setSearchQuery($event)"
+    (queryChange)="canvas.setSearchQuery($event)"
   />
-  <app-filter-chips [active]="store.activeFilter()" (filterChanged)="store.setFilter($event)" />
+  <app-filter-chips [active]="canvas.activeFilter()" (filterChanged)="canvas.setFilter($event)" />
   <!-- The trash is a **view on the notes**, not a file operation: its place is
        next to the filters, not in the "File" menu. -->
   <button type="button" class="trash-btn" (click)="trash.open()">
@@ -23,60 +23,60 @@
 </div>
 
 <app-tag-rail
-  [tags]="store.allTags()"
-  [activeTags]="store.selectedTags()"
-  (tagToggled)="store.toggleTag($event)"
+  [tags]="canvas.allTags()"
+  [activeTags]="canvas.selectedTags()"
+  (tagToggled)="canvas.toggleTag($event)"
   (manageRequested)="tags.open()"
 />
 
 <app-language-rail
-  [languages]="store.allLanguages()"
-  [activeLanguages]="store.selectedLanguages()"
-  (languageToggled)="store.toggleLanguage($event)"
+  [languages]="canvas.allLanguages()"
+  [activeLanguages]="canvas.selectedLanguages()"
+  (languageToggled)="canvas.toggleLanguage($event)"
 />
 
-@if (store.hasSelection()) {
+@if (selection.hasSelection()) {
   <app-selection-bar
-    [count]="store.checkedCount()"
+    [count]="selection.checkedCount()"
     [spaces]="spaces.spaces()"
     (moveRequested)="store.moveSelection($event)"
     (tagRequested)="store.tagSelection($event)"
     (copyRequested)="onCopySelection()"
     (deleteRequested)="store.deleteSelection()"
-    (cleared)="store.clearSelection()"
+    (cleared)="selection.clearSelection()"
   />
 }
 
-@let error = store.loadError();
+@let error = canvas.loadError();
 
-<div class="canvas" [attr.aria-busy]="store.isLoading()">
+<div class="canvas" [attr.aria-busy]="canvas.isLoading()">
   @if (error) {
     <!-- Loading is the one operation whose failure empties the whole screen: it
          deserves its own retry, not only the global banner. -->
     <div class="canvas-state" role="alert">
       <p class="canvas-state-text">{{ 'errors.notesLoadFailed' | transloco }}</p>
       <p class="canvas-state-detail">{{ error.message }}</p>
-      <button type="button" class="canvas-retry" (click)="store.reload()">
+      <button type="button" class="canvas-retry" (click)="canvas.reload()">
         {{ 'errors.retry' | transloco }}
       </button>
     </div>
-  } @else if (store.isLoading()) {
+  } @else if (canvas.isLoading()) {
     <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
-  } @else if (store.hasNoResults()) {
+  } @else if (canvas.hasNoResults()) {
     <p class="canvas-state-text">{{ 'notes.noResults' | transloco }}</p>
   } @else {
-    @for (section of store.sections(); track section.key) {
+    @for (section of canvas.sections(); track section.key) {
       <app-note-section
         [section]="section"
         [selectedNoteId]="store.selectedNoteId()"
-        [focusedNoteId]="store.focusedNoteId()"
-        [checkedIds]="store.checkedIds()"
+        [focusedNoteId]="selection.focusedNoteId()"
+        [checkedIds]="selection.checkedIds()"
         [spaces]="spaces.spaces()"
         (noteOpened)="onNoteActivated($event)"
-        (noteChecked)="store.toggleChecked($event)"
+        (noteChecked)="selection.toggleChecked($event)"
         (noteMoved)="store.moveNote($event.noteId, $event.spaceId)"
         (noteDeleted)="store.deleteNote($event)"
-        (fillRequested)="onFillRequested($event)"
+        (fillRequested)="fill.openFor($event)"
         (createRequested)="store.createNote()"
         (itemToggled)="store.setChecklist($event.noteId, $event.items)"
       />
@@ -95,37 +95,28 @@
     [attachmentsBusy]="attachments.isBusy()"
     [attachmentPreviewId]="attachments.previewId()"
     [attachmentPreviewData]="attachments.previewData()"
-    [imageZoomed]="imageZoomed()"
-    [filledContent]="filledPreview()"
+    [filledContent]="fill.preview()"
     (closed)="store.closeOverlay()"
-    (titleChanged)="store.renameNote(note.id, $event)"
-    (contentChanged)="store.updateContent(note.id, $event)"
-    (sourceChanged)="store.setSource(note.id, $event)"
-    (languageChanged)="store.setLanguage(note.id, $event)"
-    (tagAdded)="store.addTag(note.id, $event)"
-    (tagRemoved)="store.removeTag(note.id, $event)"
-    (pinToggled)="store.togglePinned(note.id)"
-    (lifecycleChanged)="store.setLifecycle(note.id, $event)"
-    (checklistChanged)="store.setChecklist(note.id, $event)"
+    (patchRequested)="store.applyPatch(note.id, $event)"
     (deleteRequested)="store.deleteNote(note.id)"
-    (attachmentAddRequested)="onAttachRequested()"
+    (attachmentAddRequested)="attachments.addFromPicker()"
     (attachmentRemoveRequested)="attachments.remove($event)"
-    (attachmentPreviewToggled)="onTogglePreview($event)"
+    (attachmentPreviewToggled)="attachments.togglePreview($event)"
     (attachmentOpenRequested)="attachments.open($event)"
-    (attachmentSaveRequested)="onSaveAttachment($event)"
-    (imagePasted)="onImagePasted()"
-    (imageZoomRequested)="imageZoomed.set(true)"
+    (attachmentSaveRequested)="attachments.saveToDisk($event)"
+    (imagePasted)="attachments.addPastedImage()"
+    (imageZoomRequested)="attachments.zoom()"
     (placeholderValuesChanged)="store.setPlaceholderValues(note.id, $event)"
-    (fillPreviewRequested)="onFillPreviewRequested($event)"
-    (filledCopyRequested)="onFilledCopyRequested($event)"
+    (fillPreviewRequested)="fill.refreshPreview($event)"
+    (filledCopyRequested)="fill.copyFilled($event)"
   />
 }
 
 <!-- Above the editor: the lightbox shows the bytes the preview already loaded,
      it re-reads nothing. -->
-@if (imageZoomed() && attachments.previewed(); as attachment) {
+@if (attachments.zoomed() && attachments.previewed(); as attachment) {
   @if (attachments.previewData(); as data) {
-    <app-image-lightbox [source]="data" [fileName]="attachment.fileName" (closed)="imageZoomed.set(false)" />
+    <app-image-lightbox [source]="data" [fileName]="attachment.fileName" (closed)="attachments.closeZoom()" />
   }
 }
 
@@ -135,7 +126,7 @@
   @if (palette.pendingFill(); as note) {
     <app-placeholder-form
       [placeholders]="note.placeholders"
-      (submitted)="onPaletteFill($event)"
+      (submitted)="fill.submitForPalette($event)"
       (rawRequested)="palette.copyAndDismiss(note.content)"
       (cancelled)="palette.cancelFill()"
     />
@@ -154,12 +145,12 @@
   />
 }
 
-@if (fillTarget(); as note) {
+@if (fill.target()) {
   <app-placeholder-form
-    [placeholders]="note.placeholders"
-    (submitted)="onFillSubmitted($event)"
-    (rawRequested)="onFillRaw()"
-    (cancelled)="fillTarget.set(null)"
+    [placeholders]="fill.placeholders()"
+    (submitted)="fill.submit($event)"
+    (rawRequested)="fill.copyRaw()"
+    (cancelled)="fill.cancel()"
   />
 }
 

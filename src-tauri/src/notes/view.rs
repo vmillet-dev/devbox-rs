@@ -207,7 +207,7 @@ const MAX_TZ_OFFSET_MINUTES: u32 = 14 * 60;
 /// The bound is checked **before** the multiplication: the value crosses the
 /// bridge unvalidated, and both `-i32::MIN` and `i32::MAX * 60` would overflow.
 fn offset_from_minutes(tz_offset_minutes: i32) -> FixedOffset {
-    let utc = FixedOffset::east_opt(0).expect("UTC est un décalage valide");
+    let utc = FixedOffset::east_opt(0).expect("UTC is a valid offset");
 
     if tz_offset_minutes.unsigned_abs() > MAX_TZ_OFFSET_MINUTES {
         return utc;

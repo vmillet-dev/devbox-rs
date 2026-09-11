@@ -232,6 +232,13 @@ pub struct DisplayNote {
     /// Filled in afterwards by whoever holds a connection — `decorate` reads no
     /// database. Zero until someone sets it.
     pub attachment_count: u32,
+    /// What copying this note puts on the clipboard, when that is **not** its
+    /// content: a todo list has no body, so it travels as the Markdown of its
+    /// items. `None` for a snippet, whose content is already on the wire.
+    ///
+    /// Decided here so that `checklist::to_markdown` stays the only place the
+    /// `- [x] ` syntax is written — the front end used to carry a second copy.
+    pub copy_text: Option<String>,
 }
 
 /// To read `note.id` instead of `note.note.id`.
@@ -249,6 +256,10 @@ pub fn decorate(note: Note, now: DateTime<Utc>) -> DisplayNote {
         expiring_soon: expires_soon(&note, now),
         placeholders: placeholder::parse(&note.content, &note.placeholder_values),
         attachment_count: 0,
+        copy_text: match note.kind {
+            NoteKind::Checklist => Some(checklist::to_markdown(&note.items)),
+            NoteKind::Snippet => None,
+        },
         note,
     }
 }

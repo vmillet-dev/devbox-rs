@@ -1,9 +1,9 @@
-//! Aller-retour d'une bibliothèque entre deux bases : ce que l'export assemble,
-//! l'import doit le retrouver.
+//! A library making the round trip between two databases: what the export puts
+//! together, the import has to find again.
 //!
-//! Les commandes elles-mêmes ne sont pas testables ici (elles réclament un
-//! `State<Db>` Tauri) ; `collect` et `merge` portent toute la règle et prennent
-//! une connexion, ce qui suffit.
+//! The commands themselves are not testable here (they want a Tauri `State<Db>`);
+//! `collect` and `merge` carry the whole rule and take a connection, which is
+//! enough.
 
 use chrono::{DateTime, Utc};
 use diesel::SqliteConnection;
@@ -36,7 +36,7 @@ fn draft(space_id: &str, title: &str) -> NoteDraft {
     }
 }
 
-/// Une base peuplée, telle qu'un utilisateur l'aurait.
+/// A populated database, the way a user would have one.
 fn library() -> SqliteConnection {
     let mut connection = open_in_memory().unwrap();
     let perso = spaces::create(&mut connection, "Perso").unwrap().id;
@@ -52,7 +52,7 @@ fn exported(connection: &mut SqliteConnection) -> Bundle {
     collect(connection, all).unwrap()
 }
 
-/// Le fichier tel qu'il est réellement écrit puis relu, sérialisation comprise.
+/// The file as it is really written and read back, serialisation included.
 fn round_tripped(bundle: &Bundle) -> Bundle {
     model::read_bundle(&serde_json::to_string(bundle).unwrap()).unwrap()
 }
@@ -75,8 +75,8 @@ fn a_library_moves_whole_to_another_machine() {
     assert_eq!(titles, ["Première", "Seconde"]);
     assert_eq!(arrived[0].content, "select 1");
     assert_eq!(arrived[0].tags, ["auth"]);
-    // Identifiants et dates traversent : une note importée n'est pas une copie
-    // neuve, c'est la même note sur une autre machine.
+    // Ids and dates cross over: an imported note is not a fresh copy, it is the
+    // same note on another machine.
     assert_eq!(arrived[0].created_at, t0());
     assert_eq!(spaces::list(&mut target).unwrap().len(), 2);
 }
@@ -89,7 +89,7 @@ fn only_the_spaces_actually_cited_travel() {
 
     let bundle = collect(&mut source, single).unwrap();
 
-    // Exporter un espace ne doit pas recréer toute l'arborescence en face.
+    // Exporting one space must not recreate the whole tree on the other side.
     assert_eq!(bundle.spaces.len(), 1);
     assert_eq!(bundle.notes.len(), 1);
 }
@@ -111,9 +111,9 @@ fn importing_the_same_file_twice_adds_nothing_the_second_time() {
 
 #[test]
 fn reimporting_into_the_base_it_came_from_changes_nothing() {
-    // Le geste que fait tout le monde en découvrant la fonction : exporter puis
-    // réimporter tout de suite. Tout est déjà là, donc tout est ignoré — et
-    // c'est le compte rendu, pas le silence, qui doit le dire.
+    // The gesture everybody makes on discovering the feature: export, then import
+    // it straight back. Everything is already there, so everything is skipped — and
+    // it is the report, not silence, that has to say so.
     let mut library = library();
     let bundle = round_tripped(&exported(&mut library));
 
@@ -130,8 +130,8 @@ fn a_space_of_the_same_name_is_reused_rather_than_duplicated() {
     let bundle = round_tripped(&exported(&mut source));
 
     let mut target = open_in_memory().unwrap();
-    // Casse différente : la comparaison est insensible à la casse, comme
-    // l'unicité des noms d'espace.
+    // A different case: the comparison folds case, like the uniqueness of space
+    // names.
     spaces::create(&mut target, "PERSO").unwrap();
 
     let report = merge(&mut target, bundle).unwrap();
@@ -149,7 +149,7 @@ fn a_note_whose_space_is_missing_from_the_file_is_skipped_not_misfiled() {
     let mut target = open_in_memory().unwrap();
     let report = merge(&mut target, bundle).unwrap();
 
-    // L'inventer rangerait la note là où personne ne la cherchera.
+    // Inventing one would file the note where nobody will look for it.
     assert_eq!(report.notes_imported, 0);
     assert_eq!(report.notes_skipped, 2);
 }

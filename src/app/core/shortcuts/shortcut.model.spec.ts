@@ -22,13 +22,13 @@ describe('acceleratorFromEvent', () => {
   });
 
   it('says nothing while only a modifier is held', () => {
-    // La combinaison n'est pas finie : l'enregistrer donnerait `Ctrl+Ctrl`.
+    // The combination is unfinished: recording it would give `Ctrl+Ctrl`.
     expect(acceleratorFromEvent(keydown({ code: 'ControlLeft', ctrlKey: true }))).toBeNull();
   });
 
   it('refuses a key pressed without any modifier', () => {
-    // Un raccourci **global** sans modificateur avalerait la touche dans toutes
-    // les applications de la machine, y compris pendant une saisie.
+    // A **global** shortcut with no modifier would swallow that key in every
+    // application on the machine, typing included.
     expect(acceleratorFromEvent(keydown({ code: 'KeyP' }))).toBeNull();
   });
 
@@ -37,8 +37,8 @@ describe('acceleratorFromEvent', () => {
   });
 
   it('reads the key by position, not by the character it produces', () => {
-    // `code` décrit la touche physique : un raccourci réglé en AZERTY reste au
-    // même endroit en QWERTY, ce que `key` ne garantirait pas.
+    // `code` is the physical key: a shortcut set on AZERTY stays in the same place
+    // on QWERTY, which `key` would not guarantee.
     expect(acceleratorFromEvent(keydown({ code: 'KeyA', key: 'q', ctrlKey: true }))).toBe('Ctrl+A');
   });
 });

@@ -30,8 +30,7 @@ describe('AppWindowService', () => {
   });
 
   it('swallows a failure rather than surfacing one nothing can act on', async () => {
-    // Hors Tauri les deux lèvent, et ni l'un ni l'autre ne laisse quoi que ce
-    // soit d'incohérent derrière lui.
+    // Outside Tauri both throw, and neither leaves anything inconsistent behind.
     adapter.throwOnHide = new Error('no bridge');
     adapter.throwOnExit = new Error('no bridge');
 

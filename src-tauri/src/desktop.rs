@@ -8,16 +8,33 @@ use std::sync::Mutex;
 
 use serde::Deserialize;
 use specta::Type;
+
+use crate::closed_enum::closed_enum;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, Wry};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-/// Mirrors of `core/ipc/app-events.service.ts`: a typo here would produce a
-/// silently inert subscription.
-const CAPTURE_EVENT: &str = "devbox:capture";
-const NEW_NOTE_EVENT: &str = "devbox:new-note";
-const PALETTE_EVENT: &str = "devbox:palette";
+closed_enum! {
+    /// What the native side can ask the front end to do.
+    ///
+    /// **One** event carrying a closed value, and not one topic per action: the
+    /// three topic strings used to be mirrored in `app-events.service.ts`, where
+    /// a typo produced a subscription that was silently inert and that nothing
+    /// reported. This crosses as a generated TypeScript union — `lib.rs` exports
+    /// it with `.typ::<GlobalAction>()` — so a variant added here stops the front
+    /// end compiling until its `switch` handles it.
+    pub enum GlobalAction {
+        /// The clipboard, as a note.
+        #[default]
+        Capture = "capture",
+        NewNote = "new-note",
+        Palette = "palette",
+    }
+}
+
+/// The one topic. Exported as a constant too, so neither side spells it twice.
+pub(crate) const ACTION_EVENT: &str = "devbox:action";
 
 /// `unminimize` first: a minimised window that is merely shown stays in the
 /// taskbar.
@@ -32,9 +49,9 @@ pub(crate) fn reveal(app: &AppHandle) {
 /// Shows the window **then** asks the front for the action: the native side
 /// never creates the note itself, which spares it from duplicating language
 /// detection.
-fn reveal_and_emit(app: &AppHandle, topic: &str) {
+fn reveal_and_emit(app: &AppHandle, action: GlobalAction) {
     reveal(app);
-    let _ = app.emit(topic, ());
+    let _ = app.emit(ACTION_EVENT, action);
 }
 
 // --- Shortcuts active outside the window ------------------------------------
@@ -70,11 +87,11 @@ impl ShortcutBindings {
         }
     }
 
-    fn entries(&self) -> [(&str, &'static str); 3] {
+    fn entries(&self) -> [(&str, GlobalAction); 3] {
         [
-            (&self.capture, CAPTURE_EVENT),
-            (&self.new_note, NEW_NOTE_EVENT),
-            (&self.palette, PALETTE_EVENT),
+            (&self.capture, GlobalAction::Capture),
+            (&self.new_note, GlobalAction::NewNote),
+            (&self.palette, GlobalAction::Palette),
         ]
     }
 }
@@ -84,7 +101,7 @@ impl ShortcutBindings {
 /// A list rather than three constants: the combinations change with the
 /// preferences, so the handler cannot compare them against values captured once
 /// and for all.
-type ActiveShortcuts = Mutex<Vec<(Shortcut, &'static str)>>;
+type ActiveShortcuts = Mutex<Vec<(Shortcut, GlobalAction)>>;
 
 /// Installs the plugin and takes the default shortcuts.
 ///
@@ -101,11 +118,11 @@ pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
                     return;
                 }
 
-                let Some(topic) = topic_of(app, shortcut) else {
+                let Some(action) = action_of(app, shortcut) else {
                     return;
                 };
 
-                reveal_and_emit(app, topic);
+                reveal_and_emit(app, action);
             })
             .build(),
     )?;
@@ -121,14 +138,14 @@ pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-fn topic_of(app: &AppHandle, shortcut: &Shortcut) -> Option<&'static str> {
+fn action_of(app: &AppHandle, shortcut: &Shortcut) -> Option<GlobalAction> {
     let active = app.try_state::<ActiveShortcuts>()?;
     let active = active.lock().ok()?;
 
     active
         .iter()
         .find(|(registered, _)| registered == shortcut)
-        .map(|(_, topic)| *topic)
+        .map(|(_, action)| *action)
 }
 
 /// Takes the three shortcuts from scratch and returns **what could not be
@@ -330,9 +347,9 @@ fn build_tray(app: &AppHandle, menu: &Menu<Wry>) -> tauri::Result<()> {
         .menu(menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             OPEN_ITEM => reveal(app),
-            NEW_NOTE_ITEM => reveal_and_emit(app, NEW_NOTE_EVENT),
-            CAPTURE_ITEM => reveal_and_emit(app, CAPTURE_EVENT),
-            PALETTE_ITEM => reveal_and_emit(app, PALETTE_EVENT),
+            NEW_NOTE_ITEM => reveal_and_emit(app, GlobalAction::NewNote),
+            CAPTURE_ITEM => reveal_and_emit(app, GlobalAction::Capture),
+            PALETTE_ITEM => reveal_and_emit(app, GlobalAction::Palette),
             // The only path that actually terminates the process: the window's
             // close button only hides it.
             QUIT_ITEM => app.exit(0),

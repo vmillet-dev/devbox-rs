@@ -1,44 +1,30 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  ElementRef,
-  computed,
-  effect,
-  inject,
-  signal,
-  viewChildren,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AppEventsService } from '@core/ipc/app-events.service';
+import { AppEventsService, GlobalAction } from '@core/ipc/app-events.service';
 import { contribute } from '@core/contributions/contribution.registry';
 import { AppMenuEntry, AppMenuRegistry } from '@core/menu/app-menu.registry';
 import { SettingsPage, SettingsRegistry } from '@core/settings/settings-registry';
 import { ShortcutGroup, ShortcutsRegistry } from '@core/shortcuts/shortcuts.registry';
-import { ClipboardService } from '@core/clipboard/clipboard.service';
 import { ClockService } from '@core/time/clock.service';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
-import { FileDropService } from '@core/window/file-drop.service';
-import { StatusNotifier } from '@core/notifications/status.service';
-import { Note } from './model/note.model';
+import { DialogStack } from '@shared/ui/dialog/dialog-stack';
 import { AttachmentsStore } from './state/attachments.store';
 import { LibraryStore } from './state/library.store';
+import { NoteSelectionStore } from './state/note-selection.store';
+import { NotesQueryStore } from './state/notes-query.store';
 import { NotesRevision } from './state/notes-revision';
 import { NotesStore } from './state/notes.store';
+import { PlaceholderFillStore } from './state/placeholder-fill.store';
 import { SampleNotesService } from './state/sample-notes.service';
 import { PaletteStore } from './state/palette.store';
 import { SpacesStore } from './state/spaces.store';
 import { TagsStore } from './state/tags.store';
 import { TrashStore } from './state/trash.store';
+import { CANVAS_SHORTCUT_GROUP, CanvasKeyboardDirective } from './ui/canvas-keyboard.directive';
 import { FilterChipsComponent } from './ui/filter-chips/filter-chips.component';
-import { CardBox, FocusDirection, nextFocusIndex } from './ui/grid-navigation.util';
 import { LanguageRailComponent } from './ui/language-rail/language-rail.component';
 import { NewNoteButtonComponent } from './ui/new-note-button/new-note-button.component';
 import { NoteActivation } from './ui/note-card/note-card.component';
-import {
-  FillRequest,
-  NoteEditorOverlayComponent,
-} from './ui/note-editor-overlay/note-editor-overlay.component';
+import { NoteEditorOverlayComponent } from './ui/note-editor-overlay/note-editor-overlay.component';
 import { NoteSectionComponent } from './ui/note-section/note-section.component';
 import { PlaceholderFormComponent } from './ui/placeholder-form/placeholder-form.component';
 import { ImageLightboxComponent } from './ui/image-lightbox/image-lightbox.component';
@@ -56,21 +42,6 @@ import { TrashPanelComponent } from './ui/trash-panel/trash-panel.component';
 import { VariablesPageComponent } from './ui/variables-page/variables-page.component';
 import { UndoBarComponent } from './ui/undo-bar/undo-bar.component';
 
-/** Canvas arrows, used when focus is not in a field. */
-const DIRECTIONS: Record<string, FocusDirection> = {
-  ArrowLeft: 'prev',
-  ArrowRight: 'next',
-  ArrowUp: 'up',
-  ArrowDown: 'down',
-};
-
-/** A keystroke meant for an input does not belong to the canvas. */
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
-}
-
 /**
  * "Variables" edits `{{field}}` values — notes vocabulary, which is why it is
  * contributed from here rather than known by `layout/`.
@@ -85,33 +56,16 @@ const SETTINGS_PAGES: readonly SettingsPage[] = [
 ];
 
 /**
- * The canvas, editor and palette keys belong to the notes, so the sheet lists
- * them without knowing them. The **global** shortcuts are not here — they are
- * the application's, and the sheet reads them from the preferences.
+ * What the shortcuts sheet lists for this feature. The canvas group comes from
+ * [`CanvasKeyboardDirective`], where the same table also binds the keys; the two
+ * below are documentation, their keys being handled by the editor and by the
+ * palette themselves.
  *
  * Key names are left untranslated: they are already the vocabulary of the
- * accelerators shown in the preferences. What is not a key press — a click — is
- * said in the label rather than drawn as a cap.
+ * accelerators shown in the preferences.
  */
-const CANVAS_SHORTCUTS: readonly ShortcutGroup[] = [
-  {
-    id: 'notes.canvas',
-    labelKey: 'shortcuts.groups.canvas',
-    order: 10,
-    shortcuts: [
-      { keys: ['Ctrl', 'K'], labelKey: 'shortcuts.canvas.search' },
-      { keys: ['↑ ↓ ← →'], labelKey: 'shortcuts.canvas.move' },
-      { keys: ['Enter'], labelKey: 'shortcuts.canvas.open' },
-      { keys: ['C'], labelKey: 'shortcuts.canvas.copy' },
-      { keys: ['P'], labelKey: 'shortcuts.canvas.pin' },
-      { keys: ['X'], labelKey: 'shortcuts.canvas.check' },
-      { keys: ['Ctrl'], labelKey: 'shortcuts.canvas.checkWithClick' },
-      { keys: ['Shift'], labelKey: 'shortcuts.canvas.extendWithClick' },
-      { keys: ['Delete'], labelKey: 'shortcuts.canvas.trash' },
-      { keys: ['Ctrl', 'Z'], labelKey: 'shortcuts.canvas.undo' },
-      { keys: ['Escape'], labelKey: 'shortcuts.canvas.clearSelection' },
-    ],
-  },
+const NOTES_SHORTCUTS: readonly ShortcutGroup[] = [
+  CANVAS_SHORTCUT_GROUP,
   {
     id: 'notes.editor',
     labelKey: 'shortcuts.groups.editor',
@@ -141,9 +95,9 @@ const CANVAS_SHORTCUTS: readonly ShortcutGroup[] = [
  * whose children stay purely derived from their inputs.
  *
  * It is also what **contributes the "File" menu entries**, the preferences page
- * and the shortcut groups: the titlebar knows no feature. Reloading the canvas
- * after another store has written is *not* its job any more — that goes through
- * [`NotesRevision`].
+ * and the shortcut groups — the titlebar knows no feature, and `contribute()`
+ * withdraws them when this page is destroyed, which is why they are registered
+ * from here and not from a root store that would outlive it.
  */
 @Component({
   selector: 'app-notes-page',
@@ -165,14 +119,14 @@ const CANVAS_SHORTCUTS: readonly ShortcutGroup[] = [
     UndoBarComponent,
     TranslocoPipe,
   ],
+  hostDirectives: [CanvasKeyboardDirective],
   templateUrl: './notes-page.component.html',
   styleUrl: './notes-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown)': 'onDocumentKeydown($event)',
-  },
 })
 export class NotesPageComponent {
+  protected readonly canvas = inject(NotesQueryStore);
+  protected readonly selection = inject(NoteSelectionStore);
   protected readonly store = inject(NotesStore);
   protected readonly spaces = inject(SpacesStore);
   protected readonly palette = inject(PaletteStore);
@@ -180,96 +134,70 @@ export class NotesPageComponent {
   protected readonly tags = inject(TagsStore);
   protected readonly library = inject(LibraryStore);
   protected readonly attachments = inject(AttachmentsStore);
+  protected readonly fill = inject(PlaceholderFillStore);
 
-  private readonly clipboard = inject(ClipboardService);
   private readonly clock = inject(ClockService);
-  private readonly notifier = inject(ErrorNotifier);
-  private readonly status = inject(StatusNotifier);
   private readonly menu = inject(AppMenuRegistry);
   private readonly settingsPages = inject(SettingsRegistry);
   private readonly shortcutGroups = inject(ShortcutsRegistry);
   private readonly samples = inject(SampleNotesService);
   private readonly revision = inject(NotesRevision);
-
-  /** The preview shown full size above the editor. */
-  protected readonly imageZoomed = signal(false);
-
-  /** Note dont on remplit les `{{champs}}` avant copie, hors palette. */
-  protected readonly fillTarget = signal<Note | null>(null);
-
-  /** The filled body the editor preview shows; `null` before the first request. */
-  protected readonly filledPreview = signal<string | null>(null);
+  private readonly dialogs = inject(DialogStack);
 
   /**
-   * The last preview request sent. Filling crosses the bridge, and two answers
-   * can come back out of order: only the current request may render.
+   * An open modal takes the keyboard, so the search shortcut must not act
+   * behind it. Asked of [`DialogStack`] rather than of each store in turn: the
+   * page used to name its five modals here and would have missed the sixth —
+   * and it now also steps aside for the ones `layout/` opens.
    */
-  private latestPreviewRequest: FillRequest | null = null;
+  protected readonly searchShortcutEnabled = computed(() => !this.dialogs.hasOpenDialog());
 
-  private readonly sectionElements = viewChildren(NoteSectionComponent, { read: ElementRef });
-
-  /**
-   * An open modal takes the keyboard: neither the search shortcut nor canvas
-   * navigation may act behind it.
-   */
-  protected readonly canvasHasFocus = computed(
-    () =>
-      this.store.selectedNote() === null &&
-      !this.palette.isOpen() &&
-      !this.trash.isOpen() &&
-      !this.tags.isOpen() &&
-      this.fillTarget() === null,
-  );
-
-  protected readonly searchShortcutEnabled = this.canvasHasFocus;
-
-  /**
-   * The global shortcuts are registered on the Rust side, which only shows the
-   * window and says so: creation stays here, and so goes through the same
-   * `create_note` as any other note.
-   */
   constructor() {
     const events = inject(AppEventsService);
-    const drops = inject(FileDropService);
     const destroyRef = inject(DestroyRef);
 
-    destroyRef.onDestroy(events.on('devbox:capture', () => void this.store.captureFromClipboard()));
-    destroyRef.onDestroy(events.on('devbox:new-note', () => this.store.createNote()));
-    destroyRef.onDestroy(events.on('devbox:palette', () => void this.palette.open()));
-
-    // Drag and drop is a window event: this is where its target is decided, and
-    // it targets something only when the editor is open.
-    destroyRef.onDestroy(drops.on((paths) => void this.onFilesDropped(paths)));
+    destroyRef.onDestroy(events.on((action) => this.runGlobalAction(action)));
 
     contribute(this.menu, this.menuEntries());
     contribute(this.settingsPages, SETTINGS_PAGES);
-    contribute(this.shortcutGroups, CANVAS_SHORTCUTS);
+    contribute(this.shortcutGroups, NOTES_SHORTCUTS);
 
     // A fresh installation has no space, so not even a creatable note: the
     // samples are what replaces an empty, silent canvas.
     void this.seedSamples();
-
-    // Attachments follow the **persisted** note: a draft has no row yet, and
-    // nothing can be attached to it.
-    effect(() => void this.attachments.openFor(this.store.persistedNoteId()));
-
-    // A preview belongs to the note that asked for it: keeping it while opening
-    // the next would show the previous note's filled body for a round trip.
-    effect(() => {
-      this.store.selectedNoteId();
-      this.latestPreviewRequest = null;
-      this.filledPreview.set(null);
-    });
   }
 
-  // --- Menu « Fichier » ------------------------------------------------------
+  /**
+   * What a global shortcut or a tray entry asked for. The native side shows the
+   * window and says what was wanted; creating the note stays here, so it goes
+   * through the same `create_note` as any other.
+   *
+   * No `default`: the switch is exhaustive over a **generated** union, so a
+   * variant added in Rust stops this compiling until it is handled here.
+   */
+  private runGlobalAction(action: GlobalAction): void {
+    switch (action) {
+      case 'capture':
+        void this.store.captureFromClipboard();
+        break;
+      case 'new-note':
+        this.store.createNote();
+        break;
+      case 'palette':
+        void this.palette.open();
+        break;
+    }
+  }
+
+  // --- The "File" menu -------------------------------------------------------
 
   /**
    * The titlebar shows what the features register. `disabled` is a signal:
    * "Export selection" follows what is ticked right now.
    */
   private menuEntries(): readonly AppMenuEntry[] {
-    const nothingChecked = computed(() => !this.store.hasSelection());
+    const nothingChecked = computed(() => !this.selection.hasSelection());
+    const checked = (): readonly string[] => this.selection.checkedNoteIds();
 
     return [
       { id: 'notes.import', labelKey: 'file.import', order: 10, run: () => void this.onImport() },
@@ -291,14 +219,14 @@ export class NotesPageComponent {
         labelKey: 'file.exportSelection',
         order: 40,
         disabled: nothingChecked,
-        run: () => void this.library.exportSelection(this.checkedIds(), this.clock.now()),
+        run: () => void this.library.exportSelection(checked(), this.clock.now()),
       },
       {
         id: 'notes.copyMarkdown',
         labelKey: 'file.copyMarkdown',
         order: 50,
         disabled: nothingChecked,
-        run: () => void this.library.copyAsMarkdown(this.checkedIds()),
+        run: () => void this.library.copyAsMarkdown(checked()),
       },
     ];
   }
@@ -312,10 +240,6 @@ export class NotesPageComponent {
 
     this.spaces.reload();
     this.revision.bump();
-  }
-
-  private checkedIds(): readonly string[] {
-    return this.store.checkedNotes().map((note) => note.id);
   }
 
   private async onImport(): Promise<void> {
@@ -342,19 +266,19 @@ export class NotesPageComponent {
 
   protected onNoteActivated({ noteId, toggleChecked, extendRange }: NoteActivation): void {
     if (extendRange) {
-      this.store.checkRangeTo(noteId);
+      this.selection.checkRangeTo(noteId);
       return;
     }
     if (toggleChecked) {
-      this.store.toggleChecked(noteId);
-      this.store.focusNote(noteId);
+      this.selection.toggleChecked(noteId);
+      this.selection.focusNote(noteId);
       return;
     }
     this.store.openNote(noteId);
   }
 
   protected onCopySelection(): void {
-    void this.library.copyAsMarkdown(this.checkedIds());
+    void this.library.copyAsMarkdown(this.selection.checkedNoteIds());
   }
 
   // --- Trash and tags --------------------------------------------------------
@@ -371,129 +295,7 @@ export class NotesPageComponent {
     void this.tags.deleteSelected();
   }
 
-  // --- Attachments -----------------------------------------------------------
-
-  /**
-   * Attaching demands a note **in the database**, so the draft is saved on the
-   * way — a note you attach a file to is no longer empty.
-   *
-   * ⚠️ The attachment store is re-pointed **here** rather than waiting for the
-   * effect on `persistedNoteId`, which only runs on the next detection cycle —
-   * after the write that follows, which would attach nothing and not say so.
-   * `openFor` is idempotent, so this is a no-op when the note already existed.
-   */
-  private async noteToAttachTo(): Promise<string | null> {
-    const noteId = await this.store.materialiseDraft();
-    if (noteId) {
-      await this.attachments.openFor(noteId);
-    }
-
-    return noteId;
-  }
-
-  protected async onAttachRequested(): Promise<void> {
-    if (await this.noteToAttachTo()) {
-      await this.attachments.attach();
-    }
-  }
-
-  protected async onImagePasted(): Promise<void> {
-    if (!(await this.noteToAttachTo())) return;
-
-    if (!(await this.attachments.attachClipboardImage(this.clock.now()))) {
-      this.notifier.notify({ ref: { key: 'attachments.pasteEmpty' } });
-    }
-  }
-
-  protected async onSaveAttachment(id: string): Promise<void> {
-    const path = await this.attachments.saveAs(id);
-    if (path) {
-      this.status.notify({ key: 'attachments.saved', params: { path } });
-    }
-  }
-
-  /**
-   * Closing the preview closes the lightbox too: it shows the bytes the preview
-   * loaded, and keeping them on screen without it makes no sense.
-   */
-  protected onTogglePreview(id: string): void {
-    this.imageZoomed.set(false);
-    void this.attachments.togglePreview(id);
-  }
-
-  /** A drop targets something only when a note is open to receive it. */
-  private async onFilesDropped(paths: readonly string[]): Promise<void> {
-    if (this.store.selectedNote() === null || paths.length === 0) return;
-    if (!(await this.noteToAttachTo())) return;
-
-    for (const path of paths) {
-      await this.attachments.attachPath(path);
-    }
-  }
-
-  // --- `{{…}}` fields --------------------------------------------------------
-
-  protected onFillRequested(noteId: string): void {
-    this.fillTarget.set(this.store.visibleNotes().find((note) => note.id === noteId) ?? null);
-  }
-
-  /**
-   * Fills then copies: filling is a back-end rule, not one of ours.
-   *
-   * The values are **kept** on the way. There is one set per note — the
-   * editor panel, the card and the palette all share it — otherwise filling
-   * twice in a row at the same place would ask the same thing twice.
-   */
-  protected async onFillSubmitted(values: Record<string, string>): Promise<void> {
-    const note = this.fillTarget();
-    if (!note) return;
-
-    this.fillTarget.set(null);
-    await this.copy(await this.store.fillPlaceholders(note.content, values));
-    await this.store.setPlaceholderValues(note.id, values);
-  }
-
-  /** The editor preview: the page fills, the editor displays. */
-  protected async onFillPreviewRequested(request: FillRequest): Promise<void> {
-    this.latestPreviewRequest = request;
-    const filled = await this.store.fillPlaceholders(request.content, request.values);
-
-    if (this.latestPreviewRequest === request) {
-      this.filledPreview.set(filled);
-    }
-  }
-
-  /**
-   * Copy from the editor. The acknowledgement goes through the status banner
-   * rather than the button's tick: the text only exists once the bridge has
-   * been crossed, and ticking early would announce a copy that did not happen.
-   */
-  protected async onFilledCopyRequested(request: FillRequest): Promise<void> {
-    const filled = await this.store.fillPlaceholders(request.content, request.values);
-
-    if (await this.copy(filled)) {
-      this.status.notify({ key: 'placeholders.copiedFilled' });
-    }
-  }
-
-  protected async onFillRaw(): Promise<void> {
-    const note = this.fillTarget();
-    this.fillTarget.set(null);
-    if (note) {
-      await this.copy(note.content);
-    }
-  }
-
   // --- Palette ---------------------------------------------------------------
-
-  protected async onPaletteFill(values: Record<string, string>): Promise<void> {
-    const note = this.palette.pendingFill();
-    if (!note) return;
-
-    await this.palette.copyAndDismiss(await this.store.fillPlaceholders(note.content, values));
-    // Kept as elsewhere: the palette fills the same note as the editor.
-    await this.store.setPlaceholderValues(note.id, values);
-  }
 
   protected onPaletteOpen(noteId: string): void {
     this.palette.close();
@@ -515,122 +317,5 @@ export class NotesPageComponent {
     }
 
     await this.palette.chooseHighlighted();
-  }
-
-  // --- Keyboard navigation ---------------------------------------------------
-
-  /**
-   * The canvas is driven by keyboard when focus is neither in a field nor
-   * behind a modal. The keys are deliberately bare letters: they only serve
-   * here, where no typing is in progress.
-   */
-  protected onDocumentKeydown(event: KeyboardEvent): void {
-    if (!this.canvasHasFocus() || isTypingTarget(event.target)) return;
-
-    // `Ctrl+Z` takes back the last deletion even after the banner is gone: it
-    // is the gesture one makes without looking at the screen.
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
-      if (this.store.lastDeletion()) {
-        event.preventDefault();
-        void this.store.undoDeletion();
-      }
-      return;
-    }
-
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
-
-    const direction = DIRECTIONS[event.key];
-    if (direction) {
-      event.preventDefault();
-      this.moveFocus(direction);
-      return;
-    }
-
-    const focused = this.focusedNote();
-
-    switch (event.key) {
-      case 'Enter':
-        if (focused) {
-          event.preventDefault();
-          this.store.openNote(focused.id);
-        }
-        break;
-      case 'x':
-      case 'X':
-        if (focused) {
-          event.preventDefault();
-          this.store.toggleChecked(focused.id);
-        }
-        break;
-      case 'c':
-      case 'C':
-        if (focused) {
-          event.preventDefault();
-          void this.copy(focused.content);
-        }
-        break;
-      case 'p':
-      case 'P':
-        if (focused) {
-          event.preventDefault();
-          void this.store.togglePinned(focused.id);
-        }
-        break;
-      case 'Delete':
-      case 'Backspace':
-        if (focused) {
-          event.preventDefault();
-          void this.store.deleteNote(focused.id);
-        }
-        break;
-      case 'Escape':
-        if (this.store.hasSelection()) {
-          event.preventDefault();
-          this.store.clearSelection();
-        }
-        break;
-    }
-  }
-
-  private focusedNote(): Note | null {
-    const index = this.store.focusedIndex();
-    return index < 0 ? null : (this.store.visibleNotes()[index] ?? null);
-  }
-
-  /**
-   * The positions are **measured**: the column count depends on the window
-   * width, and each section has its own number of cards. With no current focus,
-   * the first move enters through the first card.
-   */
-  private moveFocus(direction: FocusDirection): void {
-    const boxes = this.cardBoxes();
-    if (boxes.length === 0) return;
-
-    const current = this.store.focusedIndex();
-    if (current < 0) {
-      this.store.focusIndex(0);
-      return;
-    }
-
-    this.store.focusIndex(nextFocusIndex(boxes, current, direction));
-  }
-
-  private cardBoxes(): readonly CardBox[] {
-    return this.sectionElements()
-      .flatMap((section) =>
-        Array.from((section.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.card-shell')),
-      )
-      .map((element) => {
-        const rect = element.getBoundingClientRect();
-        return { top: rect.top, left: rect.left };
-      });
-  }
-
-  /** Answers what the clipboard actually accepted: an acknowledgement is earned. */
-  private async copy(content: string): Promise<boolean> {
-    if (await this.clipboard.copy(content)) return true;
-
-    this.notifier.notify({ ref: { key: 'errors.copyFailed' } });
-    return false;
   }
 }

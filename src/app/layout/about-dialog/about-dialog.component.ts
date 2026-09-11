@@ -1,8 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AUTHOR_HANDLE, AUTHOR_NAME, AppInfoService, REPOSITORY_URL } from '@core/app-info/app-info.service';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
 /** How the repository is displayed: the URL without its scheme. */
 const REPOSITORY_LABEL = REPOSITORY_URL.replace(/^https:\/\//, '');
@@ -15,13 +14,10 @@ const REPOSITORY_LABEL = REPOSITORY_URL.replace(/^https:\/\//, '');
  */
 @Component({
   selector: 'app-about-dialog',
-  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
+  imports: [DialogComponent, TranslocoPipe],
   templateUrl: './about-dialog.component.html',
   styleUrl: './about-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class AboutDialogComponent {
   private readonly appInfo = inject(AppInfoService);

@@ -31,8 +31,7 @@
   cursor: text;
 }
 
-// `display: contents` : le formulaire n'existe que pour capter la validation,
-// il ne doit pas créer de boîte dans la rangée.
+// The form exists only to catch the submit; it must not create a box in the row.
 .selection-tag-form {
   display: contents;
 }

@@ -1,12 +1,20 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { FileDialogService } from '@core/dialogs/file-dialog.service';
 import { StatusNotifier } from '@core/notifications/status.service';
+import { ClockService } from '@core/time/clock.service';
+import { FileDropService } from '@core/window/file-drop.service';
 import { AttachmentsRepository } from '../data/attachments.repository';
 import { Attachment } from '../model/note.model';
+import { NotesStore } from './notes.store';
 
 /**
- * The open note's attachments.
+ * The open note's attachments: the list, the preview, and the three ways of
+ * adding one — the picker, a paste, a file dropped on the window.
+ *
+ * It follows the open note itself rather than being told to: the page used to
+ * chain "save the draft, then re-point the store, then attach", and forgetting
+ * the middle step attached nothing without saying so.
  *
  * ⚠️ The bytes are never loaded in bulk: `preview` asks for **one** at a time,
  * and a `data:` URI weighs a third more than the file — preloading the list
@@ -18,12 +26,88 @@ export class AttachmentsStore {
   private readonly dialog = inject(FileDialogService);
   private readonly status = inject(StatusNotifier);
   private readonly notifier = inject(ErrorNotifier);
+  private readonly clock = inject(ClockService);
+  private readonly notes = inject(NotesStore);
 
   private readonly _noteId = signal<string | null>(null);
   private readonly _attachments = signal<readonly Attachment[]>([]);
   private readonly _isBusy = signal(false);
   private readonly _previewId = signal<string | null>(null);
   private readonly _previewData = signal<string | null>(null);
+  private readonly _zoomed = signal(false);
+
+  /** The preview shown full size, above the editor. */
+  readonly zoomed = this._zoomed.asReadonly();
+
+  constructor() {
+    // Attachments follow the **persisted** note: a draft has no row yet, and
+    // nothing can be attached to it.
+    effect(() => void this.openFor(this.notes.persistedNoteId()));
+
+    // A drop is a window event, not a DOM one: it targets something only while
+    // a note is open to receive it.
+    const drops = inject(FileDropService);
+    inject(DestroyRef).onDestroy(drops.on((paths) => void this.addDroppedFiles(paths)));
+  }
+
+  zoom(): void {
+    this._zoomed.set(true);
+  }
+
+  closeZoom(): void {
+    this._zoomed.set(false);
+  }
+
+  /** Adds the file the picker returns, saving the draft on the way. */
+  async addFromPicker(): Promise<void> {
+    if (await this.targetNote()) {
+      await this.attach();
+    }
+  }
+
+  /** `Ctrl+V` in the editor with an image on the clipboard. */
+  async addPastedImage(): Promise<void> {
+    if (!(await this.targetNote())) return;
+
+    if (!(await this.attachClipboardImage(this.clock.now()))) {
+      this.notifier.notify({ ref: { key: 'attachments.pasteEmpty' } });
+    }
+  }
+
+  /** Saves an attachment somewhere the user picks, and says where it went. */
+  async saveToDisk(id: string): Promise<void> {
+    const path = await this.saveAs(id);
+    if (path) {
+      this.status.notify({ key: 'attachments.saved', params: { path } });
+    }
+  }
+
+  private async addDroppedFiles(paths: readonly string[]): Promise<void> {
+    if (this.notes.selectedNote() === null || paths.length === 0) return;
+    if (!(await this.targetNote())) return;
+
+    for (const path of paths) {
+      await this.attachPath(path);
+    }
+  }
+
+  /**
+   * Attaching demands a note **in the database**, so the draft is saved on the
+   * way — a note you attach a file to is no longer empty.
+   *
+   * ⚠️ The store is re-pointed **here** rather than waiting for the effect on
+   * `persistedNoteId`, which only runs on the next detection cycle — after the
+   * write that follows, which would attach nothing and not say so. `openFor` is
+   * idempotent, so this is a no-op when the note already existed.
+   */
+  private async targetNote(): Promise<string | null> {
+    const noteId = await this.notes.materialiseDraft();
+    if (noteId) {
+      await this.openFor(noteId);
+    }
+
+    return noteId;
+  }
 
   readonly attachments = this._attachments.asReadonly();
   readonly isBusy = this._isBusy.asReadonly();
@@ -147,8 +231,13 @@ export class AttachmentsStore {
     return true;
   }
 
-  /** A toggle: asking again for the open preview closes it, with no round trip. */
+  /**
+   * A toggle: asking again for the open preview closes it, with no round trip.
+   * The lightbox goes with it — it shows the bytes the preview loaded, and
+   * keeping them on screen without it makes no sense.
+   */
   async togglePreview(id: string): Promise<void> {
+    this._zoomed.set(false);
     if (this._previewId() === id) {
       this.closePreview();
       return;
@@ -171,6 +260,7 @@ export class AttachmentsStore {
   closePreview(): void {
     this._previewId.set(null);
     this._previewData.set(null);
+    this._zoomed.set(false);
   }
 
   private async load(noteId: string): Promise<void> {

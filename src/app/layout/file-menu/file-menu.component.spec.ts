@@ -50,8 +50,8 @@ describe('FileMenuComponent', () => {
   });
 
   it('always offers the preferences and quitting, even with no feature loaded', async () => {
-    // Les deux règlent l'application elle-même : elles ne passent pas par le
-    // registre, et un outil non chargé ne les fait pas disparaître.
+    // Both act on the application itself: they do not go through the registry, and
+    // an unloaded tool does not make them disappear.
     await openMenu();
 
     expect(options().map((option) => option.textContent?.trim())).toEqual(['Préférences…', 'Quitter DevBox']);
@@ -83,8 +83,8 @@ describe('FileMenuComponent', () => {
   });
 
   it('runs the entry and closes, the report showing elsewhere', async () => {
-    // Un sélecteur de fichiers natif passe devant : rouvrir le menu pour lire le
-    // résultat serait absurde, d'où le bandeau sous la barre de titre.
+    // A native file picker covers the menu: reopening it to read the result would
+    // be absurd, hence the banner under the titlebar.
     let ran = 0;
     registry.register([{ id: 'a', labelKey: 'file.import', order: 10, run: () => (ran += 1) }]);
     await openMenu();

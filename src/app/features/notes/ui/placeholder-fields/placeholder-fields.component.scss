@@ -14,9 +14,8 @@
   min-width: 0;
 }
 
-// Largeur fixe : les champs d'un même snippet s'alignent, et c'est cet
-// alignement qui fait lire la liste comme un formulaire plutôt que comme un
-// empilement de lignes.
+// A fixed width: the fields of one snippet line up, and that alignment is what
+// makes the list read as a form rather than a pile of rows.
 .field-name {
   width: 116px;
   flex-shrink: 0;
@@ -26,8 +25,8 @@
   overflow-wrap: anywhere;
 }
 
-// Le jeton tel qu'il est écrit dans le texte, en plus sourd que son nom : ce
-// sont les accolades qui disent d'où vient la ligne.
+// The token as the text writes it, dimmer than its name: the braces are what
+// say where the row comes from.
 .field-name::before,
 .field-name::after {
   color: var(--text-2);
@@ -61,8 +60,8 @@
   outline-offset: -1px;
 }
 
-// La suggestion doit se lire comme une suggestion, pas comme une valeur déjà
-// saisie : c'est toute la différence entre « ce sera 5432 » et « j'ai tapé 5432 ».
+// A suggestion has to read as one, not as a value already typed: that is the
+// whole difference between "it will be 5432" and "I typed 5432".
 .field-input::placeholder {
   color: var(--text-2);
   font-style: italic;

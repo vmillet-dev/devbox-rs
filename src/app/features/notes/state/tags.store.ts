@@ -5,7 +5,7 @@ import { TagUsage } from '../model/note.model';
 import { NotesRevision } from './notes-revision';
 
 /**
- * Gestion globale des tags : renommer, fusionner, retirer du corpus.
+ * Corpus-wide tag management: rename, merge, remove.
  *
  * Scoped to the **whole corpus** and not to the active space — a tag that
  * drifts (`auth`, `authentication`, `Auth`) drifts everywhere, and mending it

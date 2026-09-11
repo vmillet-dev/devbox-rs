@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, output } from '@a
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SettingsStore } from '@core/settings/settings.store';
 import { DEFAULT_SHORTCUTS } from '@core/shortcuts/shortcut.model';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
 /**
  * The chapters of the guide, in reading order. Each one names two keys,
@@ -36,13 +35,10 @@ const CHAPTERS = [
  */
 @Component({
   selector: 'app-getting-started-dialog',
-  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
+  imports: [DialogComponent, TranslocoPipe],
   templateUrl: './getting-started-dialog.component.html',
   styleUrl: './getting-started-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class GettingStartedDialogComponent {
   private readonly settings = inject(SettingsStore);

@@ -1,7 +1,7 @@
 @use 'mixins' as *;
 
-// Le composant est positionné par la carte hôte (`.card-shell`), qui porte le
-// `position: relative` ; il n'ancre que son propre menu déroulant.
+// The host card (`.card-shell`) carries the `position: relative` and places
+// this component; it anchors only its own dropdown.
 :host {
   position: absolute;
   top: 8px;
@@ -18,13 +18,13 @@
   line-height: 1.2;
   color: var(--text-2);
   cursor: pointer;
-  // Discret au repos plutôt que masqué : `display: none` sortirait le bouton de
-  // l'ordre de tabulation, et le menu deviendrait inatteignable au clavier.
+  // Quiet at rest rather than hidden: `display: none` would take the button out
+  // of the tab order, and the menu out of reach of the keyboard.
   opacity: 0;
 }
 
-// `:focus-within` sur la carte : le survol seul laisserait le bouton invisible
-// pendant une navigation au clavier.
+// `:focus-within` on the card: hover alone would leave the button invisible
+// while navigating by keyboard.
 :host-context(.card-shell:hover) .card-menu-trigger,
 .card-menu-trigger:focus-visible,
 .card-menu-trigger[aria-expanded='true'] {

@@ -24,7 +24,7 @@ describe('PlaceholderFormComponent', () => {
   }
 
   async function submit(): Promise<void> {
-    fixture.debugElement.query(By.css('.fields-panel')).triggerEventHandler('submit', new Event('submit'));
+    fixture.debugElement.query(By.css('.fields-form')).triggerEventHandler('submit', new Event('submit'));
     await fixture.whenStable();
   }
 
@@ -54,16 +54,16 @@ describe('PlaceholderFormComponent', () => {
   });
 
   it('offers the values the note already holds', async () => {
-    // Il n'y a qu'un jeu de valeurs par note : le formulaire les propose au
-    // lieu de reposer la question à chaque copie.
+    // There is one set of values per note: the form offers them rather than
+    // asking again on every copy.
     await open([{ name: 'host', defaultValue: '', value: 'db.internal' }]);
 
     expect(inputs().map((input) => input.value)).toEqual(['db.internal']);
   });
 
   it('leaves a default as a suggestion rather than a typed value', () => {
-    // La recopier figerait `5432` le jour où le snippet en propose un autre :
-    // vide veut dire « je garde ce que le texte propose ».
+    // Copying it across would freeze `5432` the day the snippet offers another:
+    // empty means "I keep what the text offers".
     expect(inputs().map((input) => input.value)).toEqual(['', '']);
     expect(inputs()[1].placeholder).toBe('5432');
   });
@@ -75,8 +75,8 @@ describe('PlaceholderFormComponent', () => {
 
     await submit();
 
-    // C'est le back qui décide ce qu'un champ vide vaut : le formulaire
-    // transmet, il n'interprète pas.
+    // The back end decides what an empty field is worth: the form passes it on,
+    // it does not interpret.
     expect(emitted).toEqual({ host: 'db.internal', port: '' });
   });
 

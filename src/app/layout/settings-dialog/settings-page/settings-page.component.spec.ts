@@ -78,8 +78,8 @@ describe('SettingsPageComponent', () => {
   });
 
   it('lets a bare keystroke through, which is what keeps Tab and Escape working', () => {
-    // Sans modificateur ce n'est pas une combinaison : le champ n'a rien à
-    // retenir, et l'événement repart au dialogue.
+    // With no modifier it is not a combination: the field has nothing to keep, and
+    // the event goes back to the dialog.
     const event = press({ code: 'Tab' });
 
     expect(event.defaultPrevented).toBe(false);

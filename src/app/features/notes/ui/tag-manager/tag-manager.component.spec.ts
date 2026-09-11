@@ -67,7 +67,7 @@ describe('TagManagerComponent', () => {
     expect(applyButton().textContent?.trim()).toBe('Renommer');
 
     await select('auth', 'api');
-    // Côté base c'est la même opération : seul le libellé change.
+    // In the database it is the same operation: only the label changes.
     expect(applyButton().textContent?.trim()).toBe('Fusionner');
   });
 

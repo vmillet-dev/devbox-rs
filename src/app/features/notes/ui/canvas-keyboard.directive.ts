@@ -1,0 +1,223 @@
+import { Directive, ElementRef, inject } from '@angular/core';
+import { ShortcutGroup } from '@core/shortcuts/shortcuts.registry';
+import { DialogStack } from '@shared/ui/dialog/dialog-stack';
+import { Note } from '../model/note.model';
+import { NoteCopyService } from '../state/note-copy.service';
+import { NoteSelectionStore } from '../state/note-selection.store';
+import { NotesStore } from '../state/notes.store';
+import { CardBox, FocusDirection, nextFocusIndex } from './grid-navigation.util';
+
+/** What a canvas key is given to act on. */
+interface CanvasContext {
+  readonly focused: Note | null;
+  readonly notes: NotesStore;
+  readonly selection: NoteSelectionStore;
+  readonly copy: (content: string) => void;
+  readonly move: (direction: FocusDirection) => void;
+}
+
+/**
+ * One canvas key: what the sheet draws, and what pressing it does.
+ *
+ * ⚠️ The two used to be separate lists — a `ShortcutGroup` for the sheet and a
+ * `switch` for the handler — and nothing kept them in step. Here a key is one
+ * entry: documenting it and binding it are the same act.
+ */
+interface CanvasKey {
+  /** Drawn on the shortcuts sheet, as caps. */
+  readonly keys: readonly string[];
+  readonly labelKey: string;
+  /**
+   * The `KeyboardEvent.key` values it answers. Absent means the key is only
+   * **documented** here and handled elsewhere — `Ctrl+K` belongs to the search
+   * field, and a modifier held during a click is not a key press at all.
+   */
+  readonly on?: readonly string[];
+  /** Ctrl (or ⌘) must be held. Without it, no modifier may be. */
+  readonly ctrl?: boolean;
+  /** Answers whether it acted: only then is the browser's own behaviour cancelled. */
+  readonly run?: (context: CanvasContext, key: string) => boolean;
+}
+
+const DIRECTIONS: Record<string, FocusDirection> = {
+  ArrowLeft: 'prev',
+  ArrowRight: 'next',
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+};
+
+/**
+ * The two shapes a key's action takes: acting on something that may be absent,
+ * and acting only under a condition. Both answer whether they did anything,
+ * which is what decides the `preventDefault`.
+ */
+function given<T>(value: T | null | undefined, action: (value: T) => void): boolean {
+  if (value === null || value === undefined) return false;
+
+  action(value);
+  return true;
+}
+
+function when(condition: boolean, action: () => void): boolean {
+  if (!condition) return false;
+
+  action();
+  return true;
+}
+
+/**
+ * The canvas keyboard, in reading order — which is also the order the sheet
+ * lists them in.
+ *
+ * The letters are deliberately bare: they only serve here, where no typing is
+ * in progress.
+ */
+const CANVAS_KEYS: readonly CanvasKey[] = [
+  { keys: ['Ctrl', 'K'], labelKey: 'shortcuts.canvas.search' },
+  {
+    keys: ['↑ ↓ ← →'],
+    labelKey: 'shortcuts.canvas.move',
+    on: Object.keys(DIRECTIONS),
+    run: ({ move }, key) => given(DIRECTIONS[key], move),
+  },
+  {
+    keys: ['Enter'],
+    labelKey: 'shortcuts.canvas.open',
+    on: ['Enter'],
+    run: ({ focused, notes }) => given(focused, (note) => notes.openNote(note.id)),
+  },
+  {
+    keys: ['C'],
+    labelKey: 'shortcuts.canvas.copy',
+    on: ['c', 'C'],
+    run: ({ focused, copy }) => given(focused, (note) => copy(note.content)),
+  },
+  {
+    keys: ['P'],
+    labelKey: 'shortcuts.canvas.pin',
+    on: ['p', 'P'],
+    run: ({ focused, notes }) => given(focused, (note) => void notes.togglePinned(note.id)),
+  },
+  {
+    keys: ['X'],
+    labelKey: 'shortcuts.canvas.check',
+    on: ['x', 'X'],
+    run: ({ focused, selection }) => given(focused, (note) => selection.toggleChecked(note.id)),
+  },
+  { keys: ['Ctrl'], labelKey: 'shortcuts.canvas.checkWithClick' },
+  { keys: ['Shift'], labelKey: 'shortcuts.canvas.extendWithClick' },
+  {
+    keys: ['Delete'],
+    labelKey: 'shortcuts.canvas.trash',
+    on: ['Delete', 'Backspace'],
+    run: ({ focused, notes }) => given(focused, (note) => void notes.deleteNote(note.id)),
+  },
+  {
+    keys: ['Ctrl', 'Z'],
+    labelKey: 'shortcuts.canvas.undo',
+    on: ['z', 'Z'],
+    ctrl: true,
+    // Takes back the last deletion even after the banner is gone: it is the
+    // gesture one makes without looking at the screen.
+    run: ({ notes }) => when(notes.lastDeletion() !== null, () => void notes.undoDeletion()),
+  },
+  {
+    keys: ['Escape'],
+    labelKey: 'shortcuts.canvas.clearSelection',
+    on: ['Escape'],
+    run: ({ selection }) => when(selection.hasSelection(), () => selection.clearSelection()),
+  },
+];
+
+/** The sheet's canvas group, built from the table that binds the same keys. */
+export const CANVAS_SHORTCUT_GROUP: ShortcutGroup = {
+  id: 'notes.canvas',
+  labelKey: 'shortcuts.groups.canvas',
+  order: 10,
+  shortcuts: CANVAS_KEYS.map(({ keys, labelKey }) => ({ keys, labelKey })),
+};
+
+/** A keystroke meant for an input does not belong to the canvas. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+}
+
+/**
+ * Drives the canvas from the keyboard: moving between cards, opening, copying,
+ * pinning, ticking, trashing, undoing.
+ *
+ * Applied as a **host directive** of the notes page, so its element is the
+ * canvas itself — which is how it can measure the card grid without the page
+ * handing it a list of sections.
+ *
+ * It acts only when no modal has the keyboard and no field has focus.
+ */
+@Directive({
+  selector: '[appCanvasKeyboard]',
+  host: {
+    '(document:keydown)': 'onKeydown($event)',
+  },
+})
+export class CanvasKeyboardDirective {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly selection = inject(NoteSelectionStore);
+  private readonly notes = inject(NotesStore);
+  private readonly copier = inject(NoteCopyService);
+  private readonly dialogs = inject(DialogStack);
+
+  protected onKeydown(event: KeyboardEvent): void {
+    if (this.dialogs.hasOpenDialog() || isTypingTarget(event.target)) return;
+
+    const withCtrl = event.ctrlKey || event.metaKey;
+    const entry = CANVAS_KEYS.find(
+      (candidate) =>
+        candidate.on?.includes(event.key) === true &&
+        (candidate.ctrl ?? false) === withCtrl &&
+        // A bare key stays bare: Alt is a different gesture entirely.
+        (candidate.ctrl === true || !event.altKey),
+    );
+    if (!entry?.run) return;
+
+    if (entry.run(this.context(), event.key)) {
+      event.preventDefault();
+    }
+  }
+
+  private context(): CanvasContext {
+    return {
+      focused: this.selection.focusedNote(),
+      notes: this.notes,
+      selection: this.selection,
+      copy: (content) => void this.copier.copy(content),
+      move: (direction) => this.moveFocus(direction),
+    };
+  }
+
+  /**
+   * The positions are **measured**: the column count depends on the window
+   * width, and each section has its own number of cards. With no current focus,
+   * the first move enters through the first card.
+   */
+  private moveFocus(direction: FocusDirection): void {
+    const boxes = this.cardBoxes();
+    if (boxes.length === 0) return;
+
+    const current = this.selection.focusedIndex();
+    if (current < 0) {
+      this.selection.focusIndex(0);
+      return;
+    }
+
+    this.selection.focusIndex(nextFocusIndex(boxes, current, direction));
+  }
+
+  /** In DOM order, which is the order `visibleNotes` is in. */
+  private cardBoxes(): readonly CardBox[] {
+    return Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.card-shell')).map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { top: rect.top, left: rect.left };
+    });
+  }
+}

@@ -44,7 +44,7 @@ interface Drag {
 })
 export class ChecklistEditorComponent {
   readonly items = input.required<readonly ChecklistItem[]>();
-  /** Ce sur quoi le brouillon se recale : l'identifiant, jamais l'objet note. */
+  /** What the draft re-keys on: the id, never the note object. */
   readonly noteId = input.required<string>();
 
   readonly itemsChanged = output<readonly ChecklistItem[]>();

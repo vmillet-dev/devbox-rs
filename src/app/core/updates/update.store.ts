@@ -79,7 +79,7 @@ export class UpdateStore {
       this._checkState.set(found ? 'idle' : 'upToDate');
     } catch (error) {
       this._checkState.set('failed');
-      console.warn('Vérification des mises à jour impossible.', error);
+      console.warn('Could not check for updates.', error);
       if (!silent) {
         this.notifier.notify({
           ref: { key: 'errors.updateCheckFailed' },

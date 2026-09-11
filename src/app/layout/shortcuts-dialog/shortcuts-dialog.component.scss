@@ -1,15 +1,5 @@
 @use 'mixins' as *;
 
-// Same rung as the About card (55): both open from the same menu, and only one
-// of them is ever on screen.
-.sheet-backdrop {
-  @include backdrop(55);
-}
-
-.sheet-panel {
-  @include help-panel(560px);
-}
-
 .sheet-header {
   @include help-header;
 }

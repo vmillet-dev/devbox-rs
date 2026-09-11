@@ -144,6 +144,9 @@ export const commands = {
 	setWindowBehavior: (behavior: WindowBehavior) => __TAURI_INVOKE<void>("set_window_behavior", { behavior }),
 };
 
+/* Constants */
+export const GLOBAL_ACTION_EVENT = "devbox:action" as const;
+
 /* Types */
 export type AppError = {
 	code: ErrorCode,
@@ -216,6 +219,15 @@ export type DisplayNote = {
 	 *  database. Zero until someone sets it.
 	 */
 	attachmentCount: number,
+	/**
+	 *  What copying this note puts on the clipboard, when that is **not** its
+	 *  content: a todo list has no body, so it travels as the Markdown of its
+	 *  items. `None` for a snippet, whose content is already on the wire.
+	 * 
+	 *  Decided here so that `checklist::to_markdown` stays the only place the
+	 *  `- [x] ` syntax is written — the front end used to carry a second copy.
+	 */
+	copyText: string | null,
 } & Note;
 
 /**
@@ -239,6 +251,20 @@ export type ExportReport = {
 	notes: number,
 	spaces: number,
 };
+
+/**
+ *  What the native side can ask the front end to do.
+ * 
+ *  **One** event carrying a closed value, and not one topic per action: the
+ *  three topic strings used to be mirrored in `app-events.service.ts`, where
+ *  a typo produced a subscription that was silently inert and that nothing
+ *  reported. This crosses as a generated TypeScript union — `lib.rs` exports
+ *  it with `.typ::<GlobalAction>()` — so a variant added here stops the front
+ *  end compiling until its `switch` handles it.
+ */
+export type GlobalAction = 
+/**  The clipboard, as a note. */
+"capture" | "new-note" | "palette";
 
 /**
  *  `skipped`: notes already present (same id) or whose space is missing from the

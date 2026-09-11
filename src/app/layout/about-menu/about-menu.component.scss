@@ -31,8 +31,8 @@
   font-size: 9px;
 }
 
-// Ancré à droite : le menu est en fin de barre, l'ouvrir vers la gauche évite
-// qu'il déborde de la fenêtre.
+// Anchored right: the menu sits at the end of the bar, and opening leftwards is
+// what keeps it inside the window.
 .about-dropdown {
   position: absolute;
   top: calc(100% + 6px);
@@ -74,8 +74,8 @@
   color: var(--text-2);
 }
 
-// Vide tant qu'il n'y a rien à annoncer : pas de `display: none`, la zone
-// `aria-live` doit exister dans le DOM avant la mise à jour pour être annoncée.
+// Empty while there is nothing to announce, but never `display: none`: an
+// `aria-live` region has to be in the DOM before the update to be read out.
 .about-option-status {
   font-size: 11px;
   color: var(--text-2);

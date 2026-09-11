@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
 /**
  * An attached image at full size, above everything else.
@@ -15,13 +14,10 @@ import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
  */
 @Component({
   selector: 'app-image-lightbox',
-  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
+  imports: [DialogComponent, TranslocoPipe],
   templateUrl: './image-lightbox.component.html',
   styleUrl: './image-lightbox.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class ImageLightboxComponent {
   /** A `data:` URI already in memory: the CSP forbids a file path. */

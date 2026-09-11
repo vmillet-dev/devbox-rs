@@ -27,7 +27,7 @@ export class AppInfoService {
   private readonly versionResource = resource({ loader: () => getVersion() });
 
   /**
-   * Version de `tauri.conf.json`, que le job CI `check-version` maintient
+   * The version from `tauri.conf.json`, which the `check-version` CI job keeps
    * aligned with the tag. `null` outside the Tauri runtime (`ng serve` alone):
    * the card then shows a dash rather than lying.
    */

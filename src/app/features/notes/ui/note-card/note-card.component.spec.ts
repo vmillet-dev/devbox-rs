@@ -9,7 +9,7 @@ import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
 import { ItemToggle, NoteActivation, NoteCardComponent, NoteMove } from './note-card.component';
 
-/** Un littéral, pour garder les chaînes attendues sur une seule ligne. */
+/** A literal, so the expected strings stay on one line. */
 const NEWLINE = String.fromCharCode(10);
 
 describe('NoteCardComponent', () => {
@@ -157,8 +157,8 @@ describe('NoteCardComponent', () => {
     let emitted: string | undefined;
     fixture.componentInstance.opened.subscribe(({ noteId }) => (emitted = noteId));
 
-    // Un `MouseEvent` explicite : la carte lit ses modificateurs pour décider
-    // entre ouvrir, cocher et étendre la sélection.
+    // An explicit `MouseEvent`: the card reads its modifiers to choose between
+    // opening, ticking and extending the selection.
     fixture.debugElement.query(By.css('.card')).triggerEventHandler('click', new MouseEvent('click'));
 
     expect(emitted).toBe('note-42');
@@ -338,7 +338,7 @@ describe('NoteCardComponent', () => {
       fixture.nativeElement.querySelector('.card-item').click();
 
       // Les items vivent hors du bouton de carte, mais un clic remonterait
-      // jusqu'à lui sans le `stopPropagation`.
+      // reach it without the `stopPropagation`.
       expect(opened).toEqual([]);
     });
 

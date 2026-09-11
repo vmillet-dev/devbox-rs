@@ -82,23 +82,19 @@ describe('ShortcutsDialogComponent', () => {
     expect(row.querySelector('.shortcut-plus')!.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('is a modal dialog, labelled by its own title', () => {
-    const panel = fixture.nativeElement.querySelector('.sheet-panel') as HTMLElement;
+  it('names itself to the dialog shell by its own title', () => {
+    const panel = fixture.nativeElement.querySelector('.dialog-panel') as HTMLElement;
 
-    expect(panel.getAttribute('role')).toBe('dialog');
-    expect(panel.getAttribute('aria-modal')).toBe('true');
     expect(panel.getAttribute('aria-labelledby')).toBe('shortcuts-dialog-title');
   });
 
-  it('closes from the button, the backdrop and Escape', async () => {
+  it('closes from its button', async () => {
     let closed = 0;
     fixture.componentInstance.closed.subscribe(() => (closed += 1));
 
     (fixture.nativeElement.querySelector('.sheet-close') as HTMLButtonElement).click();
-    (fixture.nativeElement.querySelector('.sheet-backdrop') as HTMLElement).click();
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await fixture.whenStable();
 
-    expect(closed).toBe(3);
+    expect(closed).toBe(1);
   });
 });

@@ -1,8 +1,8 @@
-//! Notes lues et écrites contre une vraie base : le chemin complet
-//! `storage::notes` puis `domain::view`, tel que `query_notes` l'assemble.
+//! Notes read and written against a real database: the whole path through
+//! `notes::store` and then `notes::view`, the way `query_notes` assembles it.
 //!
-//! Les règles ont leurs tests unitaires dans `domain/` ; ici on vérifie
-//! qu'elles s'appliquent à ce que la base a réellement rendu.
+//! The rules have their unit tests beside them; what is checked here is that
+//! they apply to what the database actually returned.
 
 use std::collections::BTreeMap;
 
@@ -26,8 +26,8 @@ use devbox_lib::notes::store::{
 use devbox_lib::notes::view::{self, NoteFilter, NotesQuery, NotesView};
 use devbox_lib::spaces::store as spaces;
 
-/// Un tel raccourci n'existe pas dans le code de production : il inviterait à
-/// refiltrer côté front.
+/// No such shortcut exists in production code: it would invite re-filtering on
+/// the front end.
 fn list(connection: &mut SqliteConnection) -> Result<Vec<Note>, StorageError> {
     fetch(
         connection,
@@ -306,7 +306,7 @@ fn a_checklist_is_read_back_in_the_order_it_was_written() {
         created.items,
         [item("Relire", true), item("Déployer", false)]
     );
-    // La position porte l'ordre : une relecture ne doit pas le retrier.
+    // The position carries the order: reading back must not re-sort it.
     assert_eq!(list(&mut connection).unwrap()[0].items, created.items);
 }
 
@@ -410,8 +410,8 @@ fn purging_removes_the_note_and_its_items_for_good() {
 
     purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
 
-    // Le `ON DELETE CASCADE` ne s'applique que si `PRAGMA foreign_keys` est posé
-    // sur la connexion — c'est ce que ce compte vérifie réellement.
+    // `ON DELETE CASCADE` only applies when `PRAGMA foreign_keys` is set on the
+    // connection — which is what this count really checks.
     assert_eq!(
         note_items::table
             .count()
@@ -524,7 +524,7 @@ fn deleting_takes_the_note_off_the_canvas_without_destroying_it() {
     delete(&mut connection, &created.id, t1()).unwrap();
 
     assert!(list(&mut connection).unwrap().is_empty());
-    // Les tags survivent : ils reviendront avec la note si elle est restaurée.
+    // The tags survive: they come back with the note if it is restored.
     let kept_tags = note_tags::table
         .count()
         .get_result::<i64>(&mut connection)
@@ -552,7 +552,7 @@ fn a_restored_note_comes_back_whole() {
     let listed = list(&mut connection).unwrap();
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].tags, ["api", "auth"]);
-    // `updated_at` intact : restaurer ne fait pas remonter la note en tête.
+    // `updated_at` untouched: restoring does not float the note to the top.
     assert_eq!(listed[0].updated_at, t0());
 }
 
@@ -594,7 +594,7 @@ fn a_note_still_on_the_canvas_cannot_be_purged() {
     let space_id = space(&mut connection, "Perso");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    // Le sursis de 30 jours ne doit pas pouvoir être court-circuité.
+    // Nothing may short-circuit the 30-day reprieve.
     assert_eq!(
         purge(&mut connection, std::slice::from_ref(&created.id)).unwrap(),
         0
@@ -637,10 +637,9 @@ fn deleting_the_same_note_twice_reports_an_error_rather_than_a_silent_ok() {
     assert!(matches!(error, StorageError::NoteNotFound(_)));
 }
 
-// --- Valeurs des champs `{{…}}` ---------------------------------------------
+// --- `{{field}}` values -------------------------------------------------------
 
-/// Le snippet de référence de cette section : deux champs, dont un à valeur
-/// par défaut.
+/// This section's reference snippet: two fields, one of them with a default.
 fn templated(space_id: &str) -> NoteDraft {
     NoteDraft {
         content: "psql -h {{host}} -p {{port=5432}}".to_string(),
@@ -669,8 +668,8 @@ fn a_filled_field_is_read_back_on_the_next_opening() {
 
 #[test]
 fn filling_a_field_does_not_touch_updated_at() {
-    // Le canevas trie sur cette colonne : une valeur tapée dans le panneau
-    // ferait sinon remonter la note en tête sans que rien de la note n'ait bougé.
+    // The canvas sorts on that column: a value typed in the panel would otherwise
+    // float the note to the top without anything of the note having moved.
     let mut connection = open_in_memory().unwrap();
     let space_id = space(&mut connection, "Perso");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
@@ -694,8 +693,8 @@ fn writing_the_values_replaces_the_whole_set() {
     )
     .unwrap();
 
-    // Ce qui n'est plus envoyé est ce que l'utilisateur a effacé : le laisser
-    // en base continuerait de remplir le texte avec.
+    // What is no longer sent is what the user cleared: leaving it stored would go
+    // on filling the text with it.
     set_placeholder_values(&mut connection, &created.id, &values(&[("host", "db")])).unwrap();
 
     assert_eq!(
@@ -722,8 +721,8 @@ fn a_value_whose_token_left_the_content_stays_stored_but_out_of_the_fields() {
     )
     .unwrap();
 
-    // La valeur survit — le renommage peut être une faute de frappe — mais
-    // c'est le texte qui dit quels champs existent.
+    // The value survives — the rename may be a typo — but the text is what says
+    // which fields exist.
     assert_eq!(renamed.placeholder_values, values(&[("host", "db")]));
     let fields = decorate(renamed, t1()).placeholders;
     assert_eq!(fields.len(), 1);
@@ -754,8 +753,8 @@ fn purging_removes_the_note_and_its_values_for_good() {
 
     purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
 
-    // Comme pour les items : le `ON DELETE CASCADE` n'agit que si
-    // `PRAGMA foreign_keys` est posé sur la connexion.
+    // As with the items: `ON DELETE CASCADE` only acts when `PRAGMA foreign_keys`
+    // is set on the connection.
     assert_eq!(
         note_placeholders::table
             .count()
@@ -782,8 +781,8 @@ fn global_variables_read_back_what_was_written() {
 
 #[test]
 fn writing_the_set_again_drops_what_is_no_longer_sent() {
-    // Ce qui n'est plus envoyé est ce que l'utilisateur a retiré : une écriture
-    // partielle laisserait une variable effacée continuer à remplir les jetons.
+    // What is no longer sent is what the user removed: a partial write would let a
+    // cleared variable go on filling the tokens.
     let mut connection = open_in_memory().unwrap();
     replace_global_placeholder_values(
         &mut connection,
@@ -810,7 +809,7 @@ fn a_global_variable_belongs_to_no_note_and_survives_a_purge() {
 
     purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
 
-    // Aucune cascade ne les atteint : elles n'ont pas de `note_id`.
+    // No cascade reaches them: they have no `note_id`.
     assert_eq!(
         global_placeholder_values(&mut connection).unwrap(),
         values(&[("host", "db.internal")])
@@ -827,8 +826,8 @@ fn a_global_variable_shows_up_as_the_suggested_value_of_a_field() {
     let mut display = decorate(created, t1());
     devbox_lib::notes::model::apply_global_defaults(&mut display, &globals);
 
-    // Proposée, pas saisie : la recopier dans `value` figerait la variable le
-    // jour où elle change.
+    // Proposed, not typed: copying it into `value` would freeze the variable the
+    // day it changes.
     let field = display
         .placeholders
         .iter()
@@ -856,7 +855,7 @@ fn moving_a_selection_leaves_the_notes_already_there_untouched() {
     )
     .unwrap();
 
-    // Celle qui y était déjà n'est pas comptée, et son `updated_at` ne bouge pas.
+    // The one already carrying it is not counted, and its `updated_at` stays put.
     assert_eq!(count, 1);
     let listed = list(&mut connection).unwrap();
     assert!(listed.iter().all(|note| note.space_id == target));
@@ -909,7 +908,7 @@ fn tagging_twice_does_not_duplicate_the_tag() {
     let space_id = space(&mut connection, "Perso");
     let note = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    // La clé primaire de `note_tags` est NOCASE : la seconde pose est ignorée.
+    // `note_tags`'s primary key is NOCASE: the second write is ignored.
     tag_many(
         &mut connection,
         std::slice::from_ref(&note.id),
@@ -921,7 +920,7 @@ fn tagging_twice_does_not_duplicate_the_tag() {
     assert_eq!(list(&mut connection).unwrap()[0].tags, ["api", "auth"]);
 }
 
-// --- Gestion globale des tags -----------------------------------------------
+// --- Corpus-wide tag management -----------------------------------------------
 
 #[test]
 fn every_tag_is_listed_with_the_number_of_notes_carrying_it() {
@@ -956,7 +955,7 @@ fn renaming_a_tag_onto_an_existing_one_merges_them() {
     let space_id = space(&mut connection, "Perso");
     let note = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    // La note porte déjà « auth » : un `UPDATE` violerait la clé primaire.
+    // The note already carries "auth": an `UPDATE` would violate the primary key.
     let touched = retag(&mut connection, &["api".to_string()], "auth").unwrap();
 
     assert_eq!(touched, 1);
@@ -986,8 +985,8 @@ fn correcting_the_case_of_a_tag_does_not_erase_it() {
     let space_id = space(&mut connection, "Perso");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    // La cible figure parmi les sources : supprimer « auth » après avoir écrit
-    // « Auth » effacerait les deux, la collation étant NOCASE.
+    // The target is among the sources: deleting "auth" after writing "Auth" would
+    // erase both, the collation being NOCASE.
     retag(&mut connection, &["auth".to_string()], "Auth").unwrap();
 
     assert_eq!(list(&mut connection).unwrap()[0].tags, ["api", "Auth"]);
@@ -1014,8 +1013,8 @@ fn a_global_retag_does_not_float_the_corpus_to_the_top_of_the_canvas() {
 
     retag(&mut connection, &["auth".to_string()], "identity").unwrap();
 
-    // Le canevas trie sur `updated_at` : le toucher remonterait toutes les
-    // notes que personne n'a rouvertes.
+    // The canvas sorts on `updated_at`: touching it would float every note nobody
+    // has reopened to the top.
     assert_eq!(list(&mut connection).unwrap()[0].updated_at, t0());
 }
 
@@ -1069,8 +1068,8 @@ fn importing_the_same_note_twice_leaves_the_first_one_alone() {
     let mut note = create(&mut connection, draft(&space_id), t0()).unwrap();
     note.title = "Écrasé ?".to_string();
 
-    // Même identifiant : l'import doit compter la note comme ignorée, pas
-    // remplacer ce que la machine contient déjà.
+    // The same id: the import must count the note as skipped, not replace what the
+    // machine already holds.
     assert!(!insert_imported(&mut connection, &note).unwrap());
     assert_eq!(list(&mut connection).unwrap()[0].title, "Titre");
 }
@@ -1750,8 +1749,8 @@ fn deleting_a_space_takes_its_notes_with_it() {
 
 #[test]
 fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
-    // Les branches « date illisible » du domaine ont disparu avec le typage :
-    // la faillibilité a migré ici, où elle est signalée au lieu d'être devinée.
+    // The model’s "unreadable date" branches went away with the typing:
+    // fallibility moved here, where it is reported rather than guessed at.
     let mut connection = open_in_memory().unwrap();
     let space_id = space(&mut connection, "Perso");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
@@ -1775,7 +1774,7 @@ fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
 #[test]
 fn a_stored_date_always_carries_its_milliseconds() {
     // Le canevas trie sur cette colonne TEXT : sans millisecondes, deux notes de
-    // la même seconde s'ordonnent à l'envers (voir `domain::iso8601`).
+    // within the same second sort the wrong way round (see `db::iso8601`).
     let mut connection = open_in_memory().unwrap();
     let space_id = space(&mut connection, "Perso");
     let round_second = at("2026-07-25T09:00:00Z");

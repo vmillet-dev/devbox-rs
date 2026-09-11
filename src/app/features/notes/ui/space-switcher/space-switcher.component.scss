@@ -116,8 +116,8 @@
   outline-offset: 2px;
 }
 
-// L'option occupe toute la largeur restante : le ⋯ ne doit pas rogner la zone
-// de clic qui sélectionne l'espace.
+// The option takes all the remaining width: the ⋯ must not eat into the click
+// area that selects the space.
 .space-row {
   display: flex;
   align-items: center;
@@ -137,8 +137,8 @@
   line-height: 1;
   color: var(--text-2);
   cursor: pointer;
-  // Discret au repos, mais jamais masqué : `visibility: hidden` le sortirait de
-  // l'ordre de tabulation et le rendrait inatteignable au clavier.
+  // Quiet at rest but never hidden: `visibility: hidden` would take it out of
+  // the tab order and out of reach of the keyboard.
   opacity: 0.45;
 }
 

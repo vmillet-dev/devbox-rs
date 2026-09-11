@@ -1,15 +1,5 @@
 @use 'mixins' as *;
 
-.tags-backdrop {
-  @include backdrop(50);
-}
-
-.tags-panel {
-  @include dialog-panel(480px);
-  gap: 12px;
-  max-height: 80vh;
-}
-
 .tags-header {
   display: flex;
   align-items: baseline;

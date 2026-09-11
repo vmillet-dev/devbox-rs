@@ -144,6 +144,11 @@ That last rule is why `ErrorBannerComponent`, `UpdatePromptComponent` and
 `AboutDialogComponent` live in `layout/` and not in `shared/ui/`: they inject. And why
 `LifecycleBadgeComponent`, which reads `NoteLifecycle`, lives under `features/notes/ui/`.
 
+There is **one** exception, and it is deliberate: `DialogComponent` (`shared/ui/dialog/`)
+injects `DialogStack`, its own neighbour in the same folder. What the rule forbids is a shared
+component knowing a feature or an application store; a modal has to know which modal is in
+front, and that knowledge cannot be handed down an `input()` from twelve callers.
+
 ### Imports
 
 Path aliases rather than deep relative paths: `@core/*`, `@shared/*`, `@features/*`,
@@ -197,18 +202,15 @@ A component that only relays inputs and outputs is not a component. The page com
 topbar and a canvas wrapper, which added two files and eleven declarations without a single
 decision between them.
 
-### Shared behaviour lives in directives, not in copies
+### Shared behaviour lives in one place, not in copies
 
-Three menus (space switcher, card actions, about) and three modals (editor, about, update
-prompt) share their interaction rules. Those rules live in `shared/a11y/`, and are applied
-through `hostDirectives` so no wrapper element is needed:
+Three menus (space switcher, card actions, about) share their interaction rules through
+directives in `shared/a11y/`, applied with `hostDirectives` so no wrapper element is needed:
 
-| Directive                 | Selector                                  | Owns                                                                              |
-| ------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------- |
-| `MenuTriggerDirective`    | `[appMenuTrigger]`, `exportAs: 'appMenu'` | open state, outside click, Escape, focus returned to `[appMenuAnchor]`            |
-| `MenuPanelDirective`      | `[appMenuPanel]`                          | `role="menu"`, focus on the first entry, arrows and Home/End over `[appMenuItem]` |
-| `DialogBackdropDirective` | `[appDialogBackdrop]`                     | dismissal when the click lands on the backdrop itself                             |
-| `FocusTrapDirective`      | `[appFocusTrap]`                          | keyboard focus confined to a dialog, restored on destroy                          |
+| Directive              | Selector                                  | Owns                                                                              |
+| ---------------------- | ----------------------------------------- | --------------------------------------------------------------------------------- |
+| `MenuTriggerDirective` | `[appMenuTrigger]`, `exportAs: 'appMenu'` | open state, outside click, Escape, focus returned to `[appMenuAnchor]`            |
+| `MenuPanelDirective`   | `[appMenuPanel]`                          | `role="menu"`, focus on the first entry, arrows and Home/End over `[appMenuItem]` |
 
 Two details are load-bearing:
 
@@ -223,17 +225,51 @@ Putting the click listener in a directive also removes the `click-events-have-ke
 suppressions the three modal templates used to carry: the keyboard equivalent exists, it is
 Escape, and the template no longer declares a bare `(click)` for the linter to flag.
 
-The matching CSS lives in `src/styles/_mixins.scss` as `backdrop($z-index)` and
-`dialog-panel($width)`. The z-index stays with the caller: the stacking order (editor 50,
-about 55, update 60, palette 65, fields form 70, enlarged image 75) is a decision, not an
-implementation detail.
+#### The modal frame
+
+The twelve modals do **not** each carry a frame. `DialogComponent` (`shared/ui/dialog/`) owns
+the scrim, the panel, `role="dialog"`, `aria-modal`, the focus trap, Escape and the backdrop
+click; a dialog projects its content into it and says which rung it sits on:
+
+```html
+<app-dialog [layer]="'app'" [width]="420" labelledBy="about-dialog-title" (closed)="closed.emit()">
+  …the panel's content…
+</app-dialog>
+```
+
+| Input                  | Decides                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `layer` (required)     | the rung: `editor`, `app`, `settings`, `update`, `palette`, `fields`, `zoom`      |
+| `variant`              | `fitted` (height follows the content), `framed` (fixed, scrolling middle), `bare` |
+| `width` / `height`     | the panel's size in px, capped at 90vw / 86vh                                     |
+| `fullscreen`           | fills the window — the editor's toggle                                            |
+| `dismissible`          | `false` refuses Escape and the backdrop click (an update being installed)         |
+| `labelledBy` / `label` | what names it to assistive technology                                             |
+
+What a shell cannot guess — the gap between a panel's blocks, its padding, where it sits on
+the scrim — comes from CSS custom properties the consumer sets on the `app-dialog` element
+from its own stylesheet: `--dialog-gap`, `--dialog-padding`, `--dialog-align`,
+`--dialog-offset`, `--dialog-scrim`.
+
+**The stacking order is a list, not a set of magic numbers.** `dialog.model.ts` holds
+`LAYERS` in back-to-front order, and its index _is_ both the `z-index` and the priority
+Escape follows. No stylesheet carries a modal `z-index` any more, and adding a rung is one
+entry in that array.
+
+`DialogStack` is what makes Escape reach **one** dialog. Every open modal listens on
+`document`, so without it they all answer the same keystroke — which used to be patched case
+by case (the editor checked whether the lightbox was open; the "About" menu's four panels
+shared one signal so two could never stack). The stack orders by rung and not by arrival,
+because a dialog opened _by_ another one — the fields form, from the palette — is created
+second but drawn in front. It also answers `hasOpenDialog()`, which is how the notes page
+knows to keep its hands off the keyboard: the page used to name its five modals one by one and
+could not see the ones `layout/` opens at all.
 
 **80 is reserved for the two banners** in `layout/` — `StatusToastComponent` and
 `ErrorBannerComponent`. They sit in the flow under the titlebar, so without it a modal's fixed,
 blurred backdrop covers them; and it is precisely from a modal that they get raised ("copied
-with your field values" from the editor, "could not save the note" while editing). They keep
-their place in the flow and only stop being painted over. A new modal therefore goes **below**
-that line, never above it.
+with your field values" from the editor, "could not save the note" while editing). A new rung
+therefore goes **below** that line, never above it.
 
 ### Syntax highlighting
 
@@ -267,11 +303,24 @@ that imports highlight.js.
 
 ### State
 
-`NotesStore` (`providedIn: 'root'`) holds the **query state** — search text, active filter,
-selected tags, selected languages, selected note — and the view the back-end returned for it.
-It does no filtering, sorting or grouping of its own: those criteria are sent to
-`query_notes`, and `sections`, `allTags`, `allLanguages`, `isFiltering` and `hasNoResults` are
-all reads of the resulting `NotesView`.
+The canvas is held by **three** stores, all `providedIn: 'root'`, split by the question they
+answer. They were one 800-line class, which is the shape a store takes when nobody asks what
+it is _about_:
+
+| Store                | Answers                                         | Depends on               |
+| -------------------- | ----------------------------------------------- | ------------------------ |
+| `NotesQueryStore`    | which notes the canvas shows                    | `SpacesStore`, the clock |
+| `NoteSelectionStore` | which one it is pointing at, and what is ticked | `NotesQueryStore`        |
+| `NotesStore`         | the open note: creating, writing, deleting      | both of the above        |
+
+The dependency runs one way only, which is what makes each of them readable on its own. The
+notes page injects all three under names that say which is which (`canvas`, `selection`,
+`store`).
+
+`NotesQueryStore` holds the **query state** — search text, active filter, selected tags,
+selected languages — and the view the back-end returned for it. It does no filtering, sorting
+or grouping of its own: those criteria are sent to `query_notes`, and `sections`, `allTags`,
+`allLanguages`, `isFiltering` and `hasNoResults` are all reads of the resulting `NotesView`.
 
 ⚠️ Any new query criterion needs three edits in lockstep: a field in `QueryParams`, its clause
 in `sameQueryParams`, and the copy into the `NotesQuery` the loader builds. `resource` compares
@@ -304,26 +353,38 @@ Creating a note files it in the active space, falling back to the first one in "
 mode; with no space at all, creation is refused with a translated message, because a note
 with no `spaceId` would vanish as soon as a space filter is applied.
 
-`NotesStore` also owns two things that are **not** query criteria and deliberately never
-reach `query_notes`:
+`NoteSelectionStore` owns two things that are **not** query criteria and deliberately never
+reach `query_notes`. They live together because they are the same idea — a **position in the
+visible list** — and a range selection spans from one to the other:
 
 - **The multiple selection** (`checkedIds`), derived through `checkedNotes` so that an id
   checked and then gone — note deleted, filter tightened — never reaches a bulk action.
-- **The keyboard focus** (`focusedNoteId`), plus `visibleNotes`, the sections flattened in
-  display order. Both the arrow keys and the Shift-range selection reason in **indexes** into
-  that list, the only reference that survives a note being renamed.
+- **The keyboard focus** (`focusedNoteId`), read against `visibleNotes`, the sections
+  flattened in display order. Both the arrow keys and the Shift-range selection reason in
+  **indexes** into that list, the only reference that survives a note being renamed.
 
-Five smaller stores sit beside it, each for a screen that is not the canvas. None of them
-knows `NotesStore` — the reverse dependency already exists and closing the loop would be an
-injection cycle — so each returns a **boolean** and `NotesPageComponent` chains the reload:
+`NotesStore` is left with the note itself: the open one, its unsaved draft, every write to it,
+its deletion and the undo window. **One method writes a note's fields**, `applyPatch(id,
+patch)`, and a table of per-field comparators (`UNCHANGED`) decides what actually moved — so
+closing the editor on an untouched note makes no round trip. There used to be nine setters,
+each restating that comparison, and a new field meant editing four files.
 
-| Store              | Owns                                                                 |
-| ------------------ | -------------------------------------------------------------------- |
-| `TrashStore`       | the trash panel: open/close, list, restore, purge, empty             |
-| `TagsStore`        | global tag management: list with counts, selection, rename/merge     |
-| `LibraryStore`     | import, export and copy-out, each reporting through `StatusNotifier` |
-| `PaletteStore`     | the quick-paste palette: its own search, highlight and copy          |
-| `AttachmentsStore` | the open note's attachments, and the one preview being displayed     |
+Smaller stores sit beside them, each for a screen or a job that is not the canvas:
+
+| Store                  | Owns                                                                          |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `TrashStore`           | the trash panel: open/close, list, restore, purge, empty                      |
+| `TagsStore`            | global tag management: list with counts, selection, rename/merge              |
+| `LibraryStore`         | import, export and copy-out, each reporting through `StatusNotifier`          |
+| `PaletteStore`         | the quick-paste palette: its own search, highlight and copy                   |
+| `AttachmentsStore`     | the open note's attachments, the preview, and the three ways of adding one    |
+| `PlaceholderFillStore` | filling a snippet's `{{fields}}` before copying, from card, palette or editor |
+| `NoteCopyService`      | putting text on the clipboard, and saying so when that failed                 |
+
+The first four know nothing of `NotesStore` — the reverse dependency exists and closing the
+loop would be an injection cycle — so each writes through `NotesRevision` and the canvas
+re-queries on its own. The last three do inject it, in that direction only: they orchestrate
+_around_ the open note rather than being read by it.
 
 `TrashStore` and `TagsStore` load **on opening** rather than through a permanent `resource`:
 neither is displayed anywhere else, and a resource would re-query on every deletion.
@@ -431,6 +492,12 @@ a counter beside them would be the identity mapper this codebase refuses elsewhe
 and the editor each count in a `computed()`. That is the same line as relative-time
 formatting: presenting data the front already holds is the front's job.
 
+What _is_ on the wire is `DisplayNote.copy_text`: `Some(markdown)` for a checklist, `None` for
+a snippet, whose `content` is already there. Counting an array is presentation; deciding that
+a task list reads `- [x] …` is a rule, and it now has exactly one home —
+`notes::checklist::to_markdown`, which sharing and exporting already used. The front end held
+a second copy of that syntax, and one of the two was going to drift.
+
 ### A tickable card, and why it is two layers
 
 A card is a `<button>`, and a `<button>` may not contain another — the reason the `⋯` menu
@@ -520,7 +587,13 @@ keeps its direct menuitem children. Arrow-key navigation stays on the select but
 The editor overlay is where every note mutation starts (title, body, language, tags, pin,
 deletion). It stays presentational — it emits, the store persists — but it holds **local
 drafts** for the title and the body, because persisting on every keystroke means one IPC
-round-trip per character. Drafts are confirmed on blur, and, crucially, on every closing path:
+round-trip per character.
+
+**It emits one output for all of them**, `patchRequested = output<NotePatch>()`, and the page
+answers it with `store.applyPatch(note.id, $event)`. There were nine outputs, each wired to a
+store method of its own, so adding a field to the editor meant editing four files. Whether a
+value actually moved is not the editor's call either: the store holds what is stored, and it
+is the one that drops an unchanged field. Drafts are confirmed on blur, and, crucially, on every closing path:
 Escape, the backdrop and the close button all skip `blur`, so closing goes through a single
 `requestClose()` that commits first.
 
@@ -548,18 +621,20 @@ border-box }` folds that padding into the width. Getting this wrong shifts typin
   the empty space below a short note still reaches the field.
 - The viewer is `aria-hidden` and `pointer-events: none`: the textarea carries the accessible
   text and every interaction, otherwise a screen reader reads the body twice.
-- Escape leaves the body before closing the overlay (`onEscape` blurs the textarea when it
-  holds focus), so a keystroke aimed at the field does not dismiss the whole modal.
+- Escape leaves the body before closing the overlay (`onDismiss` blurs the textarea when it
+  holds focus), so a keystroke aimed at the field does not dismiss the whole modal. Escape
+  itself comes from the dialog shell, which only gives it to the modal in front — the editor
+  no longer has to know whether the lightbox is open.
 
 Deletion is a two-step confirm in the toolbar rather than a native `confirm()`, which would
 freeze the whole WebView. The fullscreen toggle expands the panel to fill the backdrop and
 persists through `PreferencesService`.
 
 The attachment strip sits between the meta row and the body. It is fed by inputs and emits
-outputs like everything else here: `AttachmentsStore` owns the state, and an effect in
-`NotesPageComponent` points it at the open note. Attachments deliberately do **not** travel
-inside `Note` — they have their own write cycle, and routing them through the note would mean
-reloading the whole note on every add.
+outputs like everything else here: `AttachmentsStore` owns the state and follows the open note
+itself, through an effect on `NotesStore.persistedNoteId()`. Attachments deliberately do
+**not** travel inside `Note` — they have their own write cycle, and routing them through the
+note would mean reloading the whole note on every add.
 
 ### The trash, and undoing a deletion
 
@@ -592,11 +667,25 @@ canvas shortcut: it is the one gesture people make without looking at the screen
 
 ### Keyboard navigation of the canvas
 
-The canvas is driven from the keyboard whenever the focus is neither in a field nor behind a
-modal (`canvasHasFocus`, which also disables the `Ctrl+K` search shortcut). Arrows move,
-`Enter` opens, `C` copies, `P` pins, `X` checks, `Delete` trashes, `Escape` clears the
-selection. The keys are deliberately bare letters: they only ever fire where no typing is
-happening.
+`CanvasKeyboardDirective` (`features/notes/ui/`) drives the canvas from the keyboard whenever
+the focus is neither in a field nor behind a modal (`DialogStack.hasOpenDialog()`, which also
+disables the `Ctrl+K` search shortcut). Arrows move, `Enter` opens, `C` copies, `P` pins, `X`
+checks, `Delete` trashes, `Escape` clears the selection. The keys are deliberately bare
+letters: they only ever fire where no typing is happening.
+
+It is applied as a **host directive** of `NotesPageComponent`, so its element is the canvas
+itself — which is how it measures the card grid without the page handing it a list of
+sections.
+
+**One table binds the keys and documents them.** `CANVAS_KEYS` gives each entry the caps the
+shortcuts sheet draws (`keys`, `labelKey`) _and_, where there is one, the behaviour (`on`,
+`ctrl`, `run`); `CANVAS_SHORTCUT_GROUP` is derived from it. An entry with no `run` is a key
+documented here and handled elsewhere — `Ctrl+K` belongs to the search field, and a modifier
+held during a click is not a key press at all. Before this, the sheet and the handler were two
+lists and nothing kept them in step.
+
+A `run` answers whether it acted, and only then is the browser's own behaviour cancelled: a
+`Delete` with nothing focused has to stay a `Delete`.
 
 **The number of columns is measured, not assumed.** It depends on the window width and each
 section has its own card count, so `nextFocusIndex` (`ui/grid-navigation.util.ts`) takes the
@@ -710,9 +799,10 @@ The palette is an overlay in the main window rather than a second Tauri window: 
 already warm behind the global shortcut, and a second one would mean a second Angular
 bootstrap, its own CSP and its own lifecycle for the same result.
 
-⚠️ It has **no focus trap**, unlike the other modals. The field keeps the focus from start to
-finish and the list is walked with `aria-activedescendant`; moving the real focus onto an
-option would lose the query being typed.
+The field keeps the focus from start to finish and the list is walked with
+`aria-activedescendant`; moving the real focus onto an option would lose the query being
+typed. The dialog shell's focus trap only ever intervenes on Tab, which the palette handles
+itself — Tab opens the highlighted note rather than copying it.
 
 ### Global tag management
 
@@ -748,6 +838,13 @@ onto the window (`FileDropService` — the drop is a _window_ event carrying rea
 through `open_attachment` (the system's default application) or `save_attachment` (copied
 where the user asks). A file you can only read the name of is not attached, it is stored.
 
+All three go through `AttachmentsStore`, which owns the order of operations rather than
+leaving it to the page: **attaching demands a note in the database**, so the draft is saved on
+the way (`targetNote()`) — a note you attach a file to is no longer empty. ⚠️ The store
+re-points itself there rather than waiting for its effect on `persistedNoteId`, which only
+runs on the next detection cycle, after the write; the page used to chain those three steps by
+hand, and forgetting the middle one attached nothing and said nothing.
+
 The pasted image is the one worth explaining: the editor's `paste` handler reads only the
 **type** of what was pasted and, for an image, calls `attach_clipboard_image`. The bytes never
 cross the bridge — the native side reads the system clipboard, which hands it raw RGBA, and
@@ -758,9 +855,10 @@ display the image anyway.
 The strip's inline preview is capped at 220 px so it cannot push the editor off screen, which
 makes a screenshot of code unreadable — clicking it opens `ImageLightboxComponent`, bounded
 only by the window. It **reuses the `data:` URI the preview already loaded**: a multi-megabyte
-payload has no business crossing the bridge twice. Two consequences: the lightbox only exists
-while a preview does (closing one closes the other), and the editor's Escape handler yields to
-it (`imageZoomed`) since both listen on the document and the topmost layer should close first.
+payload has no business crossing the bridge twice. The lightbox therefore only exists while a
+preview does, and closing one closes the other (`togglePreview` clears the zoom). Escape
+reaches it and not the editor underneath because it declares the `zoom` rung and `DialogStack`
+gives the keystroke to whichever modal is in front.
 
 Ordering matters on write: the file is copied **before** the record is inserted, and the
 record is rolled back with the file if the insert fails. A record without a file shows a
@@ -1178,9 +1276,19 @@ who remember to touch the select. Three things keep it honest:
 
 `bindings.ts` covers the front asking the back a question. The reverse — the back telling the
 front something happened — goes through **`AppEventsService`** (`core/ipc/app-events.service.ts`),
-which wraps `listen` from `@tauri-apps/api/event`. tauri-specta can generate typed events too
-(`collect_events![…]`); the desktop events are declared in `desktop.rs` rather than as command
-payloads, so they are not part of the generated surface today.
+which wraps `listen` from `@tauri-apps/api/event`.
+
+**One topic, carrying a closed action.** There used to be three (`devbox:capture`,
+`devbox:new-note`, `devbox:palette`), spelled out on both sides, where a typo produced a
+subscription that was silently inert and that nothing reported. Now `desktop::GlobalAction` is a
+`closed_enum!` and the topic is a single constant, and **both are generated**: `lib.rs` exports
+them with `.typ::<GlobalAction>()` and `.constant("GLOBAL_ACTION_EVENT", …)`, neither of which
+needs a command to hang off. The front imports both from `bindings.ts`, and its `switch` over
+the action is exhaustive — a variant added in Rust stops the front compiling.
+
+That is deliberately **not** `collect_events![…]`: it would generate a `listen` call per event,
+imported straight from `@tauri-apps/api/event`, and the `EVENT_SUBSCRIBER` token every spec
+substitutes would have nothing left to stand in front of.
 
 Today it carries the desktop integration, which lives in `src-tauri/src/desktop.rs` — global
 shortcuts and the system tray. It is native glue rather than a feature, so it sits beside
@@ -1188,13 +1296,13 @@ shortcuts and the system tray. It is native glue rather than a feature, so it si
 capability: capabilities gate the API the **WebView** calls, not what the native side does on
 its own.
 
-Two producers, **the same three events**, so the front wires the actions once:
+Two producers, **the same three actions**, so the front wires them once:
 
 - `Ctrl+Alt+V` / `Ctrl+Alt+N` / `Ctrl+Alt+P`, registered at startup;
 - the tray menu's "new note", "paste from clipboard" and "quick paste" items.
 
-Each reveals the window and emits `devbox:capture`, `devbox:new-note` or `devbox:palette`;
-`NotesPageComponent` listens, reads the clipboard, creates the note or opens the palette.
+Each reveals the window and emits `GlobalAction::Capture`, `NewNote` or `Palette`;
+`NotesPageComponent` listens once, reads the clipboard, creates the note or opens the palette.
 
 ⚠️ **A global shortcut is first-come, first-served across the whole machine**, and the loser
 gets no error — the key simply does nothing. `Ctrl+Alt+Space` was the palette's first choice
@@ -1207,9 +1315,8 @@ would keep answering.
 - **Rust does not create the note.** Keeping creation on the front means one creation path
   (`create_note`), so a captured note gets language detection without a second implementation,
   and the adapter stays thin.
-- The topic strings are a **mirror**: `mod events` in `lib.rs` and `AppEventTopic` in the
-  service. Nothing checks them against each other, and a typo produces a subscription that is
-  silently inert rather than an error.
+- Neither the topic nor the action set is spelled twice any more: both are generated, so a
+  typo cannot produce the silently inert subscription this used to risk.
 - A shortcut already taken by another application is **logged and ignored**, never fatal:
   DevBox has to start without it.
 - `AppEventsService.on()` returns an unsubscribe immediately although the subscription only
@@ -1486,9 +1593,10 @@ Treated as part of the definition of done, and partly enforced by
 - **Toggles expose `aria-pressed`**, not just a CSS class: tag pills, filter chips, the pin
   button, the locale switcher. A non-interactive tag pill renders a `<span>`, not a button —
   announcing a button would advertise an action that does not exist.
-- **The editor overlay is a real dialog**: `role="dialog"`, `aria-modal`, `aria-labelledby`,
-  plus `appFocusTrap` (`shared/a11y/`), which confines Tab and restores focus on close.
-  Written by hand rather than pulling in `@angular/cdk` for a single directive.
+- **Every modal is a real dialog**: `role="dialog"`, `aria-modal`, `aria-labelledby` and a
+  focus trap that confines Tab and restores focus on close. All of it comes from
+  `DialogComponent` (`shared/ui/dialog/`), written once — an accessibility fix here used to be
+  a twelve-file change. Written by hand rather than pulling in `@angular/cdk` for it.
 - **The space switcher is a real menu**: `aria-expanded`, `aria-haspopup`, focus moved into
   the menu on open, arrow/Home/End navigation, Escape closing and restoring focus. Creating a
   space _replaces_ the menu with a form instead of nesting a text field inside `role="menu"`,
@@ -1612,13 +1720,16 @@ environment (configured in `angular.json`'s `test` target and `vitest-base.confi
 no browser is needed. Specs sit next to the file they cover. Coverage thresholds are set at
 80% and enforced by `npm run test:coverage`.
 
-Test descriptions and comments are written in **English**, the one deliberate exception to
-this repo's French-first convention.
+Test descriptions and comments are written in **English**, like the rest of the repository.
 
 Shared helpers live in `src/testing/`, which is outside the `**/*.spec.ts` include and so
 never collected as tests: `Note` and `NoteSection` fixture builders, in-memory repository
 doubles, and `provideAppTesting()` — one call providing both repositories and Transloco, so
 a new data seam does not have to be added to a dozen spec files by hand.
+
+`createNotesHarness()` builds the three canvas stores together onto one fake repository,
+because they _are_ one object graph: the selection reads what the query holds, and a write
+reloads it. Testing any of them against fakes of the other two would test the fakes.
 
 `FakeNotesRepository` and `FakeSpacesRepository` behave like real persistence (they own the
 list and assign ids and timestamps) and expose `failNext`, which is what makes the stores'

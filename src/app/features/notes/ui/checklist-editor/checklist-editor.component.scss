@@ -36,8 +36,8 @@
   white-space: nowrap;
 }
 
-// `order` porte l'aperçu du déplacement : les lignes gardent leur place dans le
-// DOM (donc leur focus et leur curseur), seule leur position visuelle bouge.
+// `order` carries the drag preview: the rows keep their place in the DOM — and
+// so their focus and caret — while only their visual position moves.
 .checklist-items {
   display: flex;
   flex-direction: column;
@@ -71,7 +71,7 @@
   cursor: grab;
   font-size: 12px;
   line-height: 1;
-  // Sans quoi le geste de déplacement sélectionne le texte des lignes voisines.
+  // Otherwise the drag gesture selects the neighbouring rows’ text.
   touch-action: none;
   user-select: none;
 }
@@ -103,8 +103,8 @@
   font-size: 13px;
 }
 
-// Barré **et** estompé : la couleur seule ne suffit pas à distinguer une tâche
-// faite pour qui ne la perçoit pas.
+// Struck through **and** dimmed: colour alone does not tell a finished task
+// apart for someone who cannot see it.
 .row-text.done {
   color: var(--text-2);
   text-decoration: line-through;
@@ -114,8 +114,8 @@
   color: var(--text-2);
 }
 
-// Discret au repos plutôt que masqué : `display: none` le sortirait de la
-// tabulation, comme le bouton de copie d'une carte.
+// Quiet at rest rather than hidden: `display: none` would take it out of the
+// tab order, like a card’s copy button.
 .row-remove {
   @include unstyled-control;
   padding: 3px 5px;

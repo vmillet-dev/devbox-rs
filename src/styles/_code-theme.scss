@@ -1,19 +1,19 @@
-// Thème de coloration syntaxique : traduction des classes `.hljs-*` émises par
-// highlight.js en couleurs du thème DevBox. Les feuilles livrées avec
-// highlight.js codent leurs couleurs en hexadécimal ; celle-ci ne consomme que
-// des variables CSS, comme le reste de l'application.
+// The syntax-highlighting theme: the `.hljs-*` classes highlight.js emits,
+// translated into DevBox's colours. The stylesheets shipped with highlight.js
+// write their colours in hex; this one reads CSS variables only, like the rest
+// of the application.
 //
 /*
- * IMPORTANT : ces règles doivent rester GLOBALES.
+ * ⚠️ These rules must stay GLOBAL.
  *
- * Le HTML colorié est injecté par [innerHTML] dans `CodeViewerComponent`, et
- * Angular n'appose pas d'attribut `_ngcontent-*` sur du DOM créé de cette
- * façon. Une règle `.hljs-keyword` écrite dans `code-viewer.component.scss`
- * serait réécrite en `.hljs-keyword[_ngcontent-xxx]` et ne correspondrait
- * jamais : la coloration serait silencieusement absente.
+ * The coloured HTML is injected through [innerHTML] in `CodeViewerComponent`,
+ * and Angular puts no `_ngcontent-*` attribute on DOM created that way. A
+ * `.hljs-keyword` rule written in `code-viewer.component.scss` would be rewritten
+ * as `.hljs-keyword[_ngcontent-xxx]` and never match: the colouring would simply
+ * be missing.
  */
 
-// Mots-clés, types, opérateurs : la structure du langage.
+// Keywords, types, operators: the language's structure.
 .hljs-keyword,
 .hljs-type,
 .hljs-built_in,
@@ -24,7 +24,7 @@
   color: var(--blue);
 }
 
-// Chaînes et tout ce qui se lit comme une valeur textuelle.
+// Strings, and anything that reads as a textual value.
 .hljs-string,
 .hljs-regexp,
 .hljs-char.escape_,
@@ -34,7 +34,7 @@
   color: var(--green);
 }
 
-// Littéraux : nombres, booléens, constantes.
+// Literals: numbers, booleans, constants.
 .hljs-number,
 .hljs-literal,
 .hljs-symbol,
@@ -43,7 +43,7 @@
   color: var(--amber);
 }
 
-// Noms définis par le code : fonctions, classes, sections.
+// Names the code defines: functions, classes, sections.
 .hljs-title,
 .hljs-section,
 .hljs-name,
@@ -53,7 +53,7 @@
   color: var(--purple);
 }
 
-// Noms de clés et d'attributs — la « colonne de gauche » d'un JSON ou d'un YAML.
+// Key and attribute names — the "left column" of a JSON or a YAML file.
 .hljs-attr,
 .hljs-attribute,
 .hljs-property,
@@ -63,7 +63,7 @@
   color: var(--text-0);
 }
 
-// Directives et métadonnées : présentes sans être le propos.
+// Directives and metadata: present without being the point.
 .hljs-meta,
 .hljs-meta .hljs-keyword,
 .hljs-meta .hljs-string {
@@ -79,7 +79,7 @@
   color: var(--red);
 }
 
-// Markdown : le balisage doit rester visible à travers l'emphase.
+// Markdown: the markup has to stay visible through the emphasis.
 .hljs-emphasis {
   font-style: italic;
 }

@@ -4,7 +4,7 @@ import { PreferencesService } from '@core/preferences/preferences.service';
 import { SETTINGS_KEYS } from './app-settings.model';
 import { SettingsStore } from './settings.store';
 
-/** Ce que la WebView tiendrait de l'OS ; jsdom en fournit une, toujours fausse. */
+/** What the WebView would get from the OS; jsdom supplies one, always false. */
 function stubSystemTheme(prefersDark: boolean): void {
   vi.stubGlobal('matchMedia', (query: string) => ({
     matches: prefersDark,
@@ -15,7 +15,7 @@ function stubSystemTheme(prefersDark: boolean): void {
 }
 
 describe('SettingsStore', () => {
-  /** Miroir de l'initialiseur : instancier, puis relire ce qui est enregistré. */
+  /** Mirrors the initializer: build it, then read back what was stored. */
   function createStore(): SettingsStore {
     const store = TestBed.inject(SettingsStore);
     store.restore();
@@ -42,8 +42,8 @@ describe('SettingsStore', () => {
 
     expect(store.theme()).toBe('system');
     expect(store.density()).toBe('comfortable');
-    // Ce que DevBox a toujours fait : basculer ce défaut ferait quitter
-    // l'application à qui n'attendait qu'un rangement.
+    // What DevBox has always done: flipping this default would quit the
+    // application on someone who only meant to tidy it away.
     expect(store.closeToTray()).toBe(true);
     expect(store.minimizeToTray()).toBe(false);
     expect(store.paletteShortcut()).toBe('Ctrl+Alt+P');
@@ -72,8 +72,8 @@ describe('SettingsStore', () => {
   });
 
   it('keeps the default of a flag nothing has stored, rather than reading it as false', () => {
-    // `closeToTray` vaut `true` par défaut : lire l'absence comme un `false`
-    // ferait quitter l'application dès la première fermeture.
+    // `closeToTray` defaults to `true`: reading its absence as `false` would quit
+    // the application on the very first close.
     expect(createStore().closeToTray()).toBe(true);
   });
 
@@ -113,7 +113,7 @@ describe('SettingsStore', () => {
   });
 
   it('stamps the resolved theme and the density on the document', () => {
-    // Les variables CSS vivent sur `:root` : une classe posée plus bas ne les
+    // The CSS variables live on `:root`: a class set any lower would not
     // atteindrait pas.
     const store = createStore();
     store.setTheme('light');

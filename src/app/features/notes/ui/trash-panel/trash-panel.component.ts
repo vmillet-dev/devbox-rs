@@ -3,8 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslationRef } from '@core/i18n/translation-ref.model';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/time/relative-time.util';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { TrashedNote } from '@features/notes/model/note.model';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -32,13 +31,10 @@ interface TrashRow {
  */
 @Component({
   selector: 'app-trash-panel',
-  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
+  imports: [DialogComponent, TranslocoPipe],
   templateUrl: './trash-panel.component.html',
   styleUrl: './trash-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class TrashPanelComponent {
   private readonly clock = inject(ClockService);
@@ -51,7 +47,7 @@ export class TrashPanelComponent {
   readonly purgeRequested = output<string>();
   readonly emptyRequested = output<void>();
 
-  /** Une confirmation par ligne : l'identifiant en attente, ou `null`. */
+  /** One confirmation per row: the id awaiting it, or `null`. */
   protected readonly confirmingPurge = signal<string | null>(null);
   protected readonly confirmingEmpty = signal(false);
 

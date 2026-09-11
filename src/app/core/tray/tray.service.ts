@@ -25,8 +25,8 @@ const LABEL_KEYS = {
  * nothing to show. The subscription re-emits on every language change, which is
  * what re-translates the menu.
  *
- * The actions do not go through here — the menu emits the same `devbox:*`
- * events as the global shortcuts.
+ * The actions do not go through here — the menu emits the same `GlobalAction`
+ * as the global shortcuts do.
  */
 @Injectable({ providedIn: 'root' })
 export class TrayService {

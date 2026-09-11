@@ -18,13 +18,12 @@ import {
   LanguageTag,
   isLanguageTag,
 } from '@core/language/language.model';
-import { checklistProgress, checklistToText } from '@features/notes/model/checklist.model';
-import { Attachment, ChecklistItem, Note, NoteLifecycle } from '@features/notes/model/note.model';
+import { checklistProgress } from '@features/notes/model/checklist.model';
+import { Attachment, Note, NotePatch } from '@features/notes/model/note.model';
 import { PreferencesService } from '@core/preferences/preferences.service';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/time/relative-time.util';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
 import { AttachmentStripComponent } from '../attachment-strip/attachment-strip.component';
 import { ChecklistEditorComponent } from '../checklist-editor/checklist-editor.component';
@@ -94,7 +93,7 @@ function toDateInputValue(date: Date): string {
 @Component({
   selector: 'app-note-editor-overlay',
   imports: [
-    DialogBackdropDirective,
+    DialogComponent,
     AttachmentStripComponent,
     ChecklistEditorComponent,
     CopyButtonComponent,
@@ -102,15 +101,11 @@ function toDateInputValue(date: Date): string {
     LifecycleBadgeComponent,
     PlaceholderPanelComponent,
     CodeViewerComponent,
-    FocusTrapDirective,
     TranslocoPipe,
   ],
   templateUrl: './note-editor-overlay.component.html',
   styleUrl: './note-editor-overlay.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'onEscape()',
-  },
 })
 export class NoteEditorOverlayComponent {
   private readonly clock = inject(ClockService);
@@ -127,8 +122,6 @@ export class NoteEditorOverlayComponent {
   readonly attachmentsBusy = input(false);
   readonly attachmentPreviewId = input<string | null>(null);
   readonly attachmentPreviewData = input<string | null>(null);
-  /** The lightbox opens above: it takes Escape before the editor does. */
-  readonly imageZoomed = input(false);
 
   /**
    * The body once its `{{fields}}` are filled, as the page got it from the back
@@ -138,15 +131,15 @@ export class NoteEditorOverlayComponent {
   readonly filledContent = input<string | null>(null);
 
   readonly closed = output<void>();
-  readonly titleChanged = output<string>();
-  readonly contentChanged = output<string>();
-  readonly sourceChanged = output<string>();
-  readonly languageChanged = output<LanguageTag>();
-  readonly tagAdded = output<string>();
-  readonly tagRemoved = output<string>();
-  readonly pinToggled = output<void>();
-  readonly lifecycleChanged = output<NoteLifecycle>();
-  readonly checklistChanged = output<readonly ChecklistItem[]>();
+  /**
+   * Every edit to the note's own fields, as the patch it is.
+   *
+   * One output rather than one per field: the page used to wire nine of them,
+   * each to its own store method, so adding a field to the editor meant editing
+   * four files. Whether a value actually moved is `NotesStore`'s call, not
+   * ours — it is the one holding what is stored.
+   */
+  readonly patchRequested = output<NotePatch>();
   readonly deleteRequested = output<void>();
   readonly attachmentAddRequested = output<void>();
   readonly attachmentRemoveRequested = output<string>();
@@ -220,7 +213,7 @@ export class NoteEditorOverlayComponent {
    * list rendered as Markdown for a todo list, which has no body.
    */
   protected readonly copyText = computed(() =>
-    this.isChecklist() ? checklistToText(this.note()?.items ?? []) : this.draftContent(),
+    this.isChecklist() ? (this.note()?.copyText ?? '') : this.draftContent(),
   );
 
   /** A todo list has no body and so no tokens: `placeholders` is simply empty. */
@@ -353,25 +346,36 @@ export class NoteEditorOverlayComponent {
     this.imagePasted.emit();
   }
 
-  /** Emits only when the body actually changed. */
-  protected commitContent(): void {
-    const note = this.note();
-    if (note && this.draftContent() !== note.content) {
-      this.contentChanged.emit(this.draftContent());
+  /** Nothing is emitted with no note open; the rest is the store's business. */
+  protected requestPatch(patch: NotePatch): void {
+    if (this.note()) {
+      this.patchRequested.emit(patch);
     }
+  }
+
+  protected commitContent(): void {
+    this.requestPatch({ content: this.draftContent() });
   }
 
   protected commitTitle(): void {
-    const note = this.note();
-    if (note && this.draftTitle() !== note.title) {
-      this.titleChanged.emit(this.draftTitle());
-    }
+    this.requestPatch({ title: this.draftTitle() });
   }
 
   protected commitSource(): void {
+    this.requestPatch({ source: this.draftSource() });
+  }
+
+  protected togglePin(): void {
     const note = this.note();
-    if (note && this.draftSource() !== note.source) {
-      this.sourceChanged.emit(this.draftSource());
+    if (note) {
+      this.requestPatch({ pinned: !note.pinned });
+    }
+  }
+
+  protected removeTag(tag: string): void {
+    const note = this.note();
+    if (note) {
+      this.requestPatch({ tags: note.tags.filter((existing) => existing !== tag) });
     }
   }
 
@@ -382,13 +386,13 @@ export class NoteEditorOverlayComponent {
    */
   protected onExpiryChange(value: string): void {
     if (!value) {
-      this.lifecycleChanged.emit({ kind: 'permanent' });
+      this.requestPatch({ lifecycle: { kind: 'permanent' } });
       return;
     }
 
     const at = endOfLocalDay(value);
     if (at) {
-      this.lifecycleChanged.emit({ kind: 'expires', at });
+      this.requestPatch({ lifecycle: { kind: 'expires', at } });
     }
   }
 
@@ -396,7 +400,7 @@ export class NoteEditorOverlayComponent {
     // The select only offers known languages; the guard covers the option table
     // and the type drifting apart.
     if (isLanguageTag(value)) {
-      this.languageChanged.emit(value);
+      this.requestPatch({ language: value });
     }
   }
 
@@ -404,8 +408,10 @@ export class NoteEditorOverlayComponent {
     event.preventDefault();
     const value = this.tagInputValue();
     this.tagInputValue.set('');
-    if (value.trim()) {
-      this.tagAdded.emit(value);
+
+    const note = this.note();
+    if (note && value.trim()) {
+      this.requestPatch({ tags: [...note.tags, value] });
     }
   }
 
@@ -421,12 +427,11 @@ export class NoteEditorOverlayComponent {
    * Escape leaves the body first, then closes the modal: otherwise a keystroke
    * meant for the field would make the whole editor disappear. The `blur`
    * commits the draft on the way.
+   *
+   * A backdrop click reaches the same path and behaves: pressing the mouse
+   * outside the field has already taken the focus off it.
    */
-  protected onEscape(): void {
-    // The lightbox opens **above** the editor: it has to close first, and both
-    // listen on the same document.
-    if (!this.note() || this.imageZoomed()) return;
-
+  protected onDismiss(): void {
     const editor = this.bodyEditor()?.nativeElement;
     if (editor && document.activeElement === editor) {
       editor.blur();

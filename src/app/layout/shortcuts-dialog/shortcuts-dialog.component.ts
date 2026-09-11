@@ -3,8 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { SettingsStore } from '@core/settings/settings.store';
 import { DEFAULT_SHORTCUTS, acceleratorKeys } from '@core/shortcuts/shortcut.model';
 import { ShortcutGroup, ShortcutsRegistry } from '@core/shortcuts/shortcuts.registry';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
 /**
  * The keyboard sheet: what to press, and what it does.
@@ -22,13 +21,10 @@ import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
  */
 @Component({
   selector: 'app-shortcuts-dialog',
-  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
+  imports: [DialogComponent, TranslocoPipe],
   templateUrl: './shortcuts-dialog.component.html',
   styleUrl: './shortcuts-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class ShortcutsDialogComponent {
   private readonly registry = inject(ShortcutsRegistry);

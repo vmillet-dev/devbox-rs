@@ -56,8 +56,8 @@ describe('SelectionBarComponent', () => {
     await fixture.whenStable();
 
     expect(emitted).toBe('space-2');
-    // Sinon le sélecteur resterait figé sur la dernière destination et la
-    // rejouer demanderait de repasser par « Déplacer vers ».
+    // Otherwise the picker would stay stuck on the last destination, and doing it
+    // again would mean going back through "Move to".
     expect(select.value).toBe('');
   });
 

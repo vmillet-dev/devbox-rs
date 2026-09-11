@@ -6,8 +6,8 @@ import { SettingsStore } from '@core/settings/settings.store';
 import { GlobalShortcutsService } from './global-shortcuts.service';
 
 describe('GlobalShortcutsService', () => {
-  // Les bindings générés appellent `invoke` directement : c'est l'objet de
-  // commandes qu'une spec substitue, il n'y a plus de couture injectable.
+  // The generated bindings call `invoke` directly: what a spec substitutes is the
+  // commands object, there is no injectable seam any more.
   let setGlobalShortcuts: MockInstance<typeof commands.setGlobalShortcuts>;
   let service: GlobalShortcutsService;
   let settings: SettingsStore;
@@ -47,7 +47,7 @@ describe('GlobalShortcutsService', () => {
   });
 
   it('says which combinations another application already holds', async () => {
-    // Le natif ne peut qu'échouer en silence : sans ce message, presser la
+    // The native side can only fail silently: without this message, pressing the
     // touche ne fait rien et rien ne dit pourquoi.
     setGlobalShortcuts.mockResolvedValue(['Ctrl+Alt+P']);
     service.start();
@@ -69,7 +69,7 @@ describe('GlobalShortcutsService', () => {
   });
 
   it('stays silent when there is no bridge to talk to', async () => {
-    // Hors Tauri (jsdom) : il n'y a pas de raccourci global à prendre.
+    // Outside Tauri (jsdom): there is no global shortcut to take.
     setGlobalShortcuts.mockRejectedValue(new Error('no bridge'));
 
     expect(() => service.start()).not.toThrow();

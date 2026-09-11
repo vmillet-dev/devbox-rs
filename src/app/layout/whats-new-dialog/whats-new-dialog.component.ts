@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, output, resource 
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AppInfoService } from '@core/app-info/app-info.service';
 import { ChangelogRelease, ChangelogService, RELEASES_URL } from '@core/app-info/changelog.service';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
 /** Display of the repository: the URL without its scheme, more readable and enough. */
 const RELEASES_LABEL = RELEASES_URL.replace(/^https:\/\//, '');
@@ -21,13 +20,10 @@ const RELEASES_LABEL = RELEASES_URL.replace(/^https:\/\//, '');
  */
 @Component({
   selector: 'app-whats-new-dialog',
-  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
+  imports: [DialogComponent, TranslocoPipe],
   templateUrl: './whats-new-dialog.component.html',
   styleUrl: './whats-new-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class WhatsNewDialogComponent {
   private readonly changelog = inject(ChangelogService);

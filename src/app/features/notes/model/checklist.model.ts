@@ -1,5 +1,5 @@
 /**
- * Le vocabulaire des notes todolist.
+ * The vocabulary of todo-list notes.
  *
  * The functions are pure and inject nothing: they present data the front
  * already holds. The same deliberate exception as relative-time formatting — an
@@ -28,18 +28,13 @@ export function checklistProgress(items: readonly ChecklistItem[]): ChecklistPro
 }
 
 /**
- * ⚠️ Markdown rendering for the clipboard. Mirrors `notes::checklist::to_markdown`
- * on the Rust side, which serves sharing: two uses, two paths, one syntax.
+ * What a note puts on the clipboard.
+ *
+ * A todo list's Markdown is **not** rendered here: `copyText` carries what
+ * `notes::checklist::to_markdown` produced, which is also what sharing and
+ * exporting emit. The front end used to hold a second copy of the `- [x] `
+ * syntax, and one of the two was going to drift.
  */
-export function checklistToText(items: readonly ChecklistItem[]): string {
-  return items.map((item) => `- [${item.done ? 'x' : ' '}] ${item.text}`).join('\n');
-}
-
-/** What a note puts on the clipboard, depending on what it is. */
-export function noteCopyText(note: {
-  readonly kind: NoteKind;
-  readonly content: string;
-  readonly items: readonly ChecklistItem[];
-}): string {
-  return note.kind === 'checklist' ? checklistToText(note.items) : note.content;
+export function noteCopyText(note: { readonly content: string; readonly copyText: string | null }): string {
+  return note.copyText ?? note.content;
 }

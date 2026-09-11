@@ -28,38 +28,27 @@ describe('AppEventsService', () => {
     setUp(async () => () => undefined);
   });
 
-  it('forwards the event to the handler', async () => {
-    let fire: () => void = () => undefined;
+  it('forwards the action the native side sent', async () => {
+    let fire: (action: 'capture' | 'new-note' | 'palette') => void = () => undefined;
     const handler = vi.fn();
-    setUp(async (_topic, incoming) => {
+    setUp(async (incoming) => {
       fire = incoming;
       return () => undefined;
     });
 
-    service.on('devbox:capture', handler);
+    service.on(handler);
     await Promise.resolve();
-    fire();
+    fire('new-note');
 
-    expect(handler).toHaveBeenCalledOnce();
-  });
-
-  it('subscribes under the topic the native side emits', () => {
-    const topics: string[] = [];
-    setUp(async (topic) => {
-      topics.push(topic);
-      return () => undefined;
-    });
-
-    service.on('devbox:new-note', () => undefined);
-
-    expect(topics).toEqual(['devbox:new-note']);
+    // The payload is what says which action: there is one topic, not three.
+    expect(handler).toHaveBeenCalledExactlyOnceWith('new-note');
   });
 
   it('unsubscribes once the subscription has landed', async () => {
     const { state, settle, subscriber } = deferred();
     setUp(subscriber);
 
-    const unlisten = service.on('devbox:capture', () => undefined);
+    const unlisten = service.on(() => undefined);
     settle();
     await Promise.resolve();
     unlisten();
@@ -73,7 +62,7 @@ describe('AppEventsService', () => {
     const { state, settle, subscriber } = deferred();
     setUp(subscriber);
 
-    const unlisten = service.on('devbox:capture', () => undefined);
+    const unlisten = service.on(() => undefined);
     unlisten();
     settle();
     await Promise.resolve();
@@ -85,7 +74,7 @@ describe('AppEventsService', () => {
     // This is the case outside Tauri, and the one every other spec runs under.
     setUp(() => Promise.reject(new Error('no bridge')));
 
-    const unlisten = service.on('devbox:capture', () => undefined);
+    const unlisten = service.on(() => undefined);
     await Promise.resolve();
 
     expect(() => unlisten()).not.toThrow();

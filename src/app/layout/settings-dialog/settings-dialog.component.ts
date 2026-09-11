@@ -2,8 +2,7 @@ import { NgComponentOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SettingsPage, SettingsRegistry } from '@core/settings/settings-registry';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { SettingsPageComponent } from './settings-page/settings-page.component';
 
 /**
@@ -31,13 +30,10 @@ const GENERAL_PAGE: SettingsPage = {
  */
 @Component({
   selector: 'app-settings-dialog',
-  imports: [DialogBackdropDirective, FocusTrapDirective, NgComponentOutlet, TranslocoPipe],
+  imports: [DialogComponent, NgComponentOutlet, TranslocoPipe],
   templateUrl: './settings-dialog.component.html',
   styleUrl: './settings-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class SettingsDialogComponent {
   private readonly registry = inject(SettingsRegistry);

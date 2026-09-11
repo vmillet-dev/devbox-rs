@@ -23,8 +23,7 @@ describe('UndoBarComponent', () => {
   });
 
   it('announces itself as a status, not an alert', () => {
-    // Une suppression demandée par l'utilisateur ne justifie pas de couper la
-    // parole à un lecteur d'écran.
+    // A deletion the user asked for does not justify interrupting a screen reader.
     expect(fixture.nativeElement.querySelector('.undo-bar').getAttribute('role')).toBe('status');
   });
 

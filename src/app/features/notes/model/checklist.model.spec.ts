@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checklistProgress, checklistToText, noteCopyText } from './checklist.model';
-
-/** Un littéral, pour garder les chaînes attendues sur une seule ligne. */
-const NEWLINE = String.fromCharCode(10);
+import { checklistProgress, noteCopyText } from './checklist.model';
 
 describe('checklistProgress', () => {
   it('counts what is ticked', () => {
@@ -25,31 +22,16 @@ describe('checklistProgress', () => {
   });
 });
 
-describe('checklistToText', () => {
-  it('renders the markdown task list a ticket or a message expects', () => {
-    const text = checklistToText([
-      { text: 'Relire', done: true },
-      { text: 'Déployer', done: false },
-    ]);
-
-    expect(text).toBe(['- [x] Relire', '- [ ] Déployer'].join(NEWLINE));
-  });
-
-  it('renders an empty list as nothing at all', () => {
-    expect(checklistToText([])).toBe('');
-  });
-});
-
+// The Markdown itself is `notes::checklist::to_markdown`'s and is tested there;
+// what is left here is the choice between the two texts a note can carry.
 describe('noteCopyText', () => {
   it('copies the body of an ordinary note', () => {
-    expect(noteCopyText({ kind: 'snippet', content: 'select 1', items: [] })).toBe('select 1');
+    expect(noteCopyText({ content: 'select 1', copyText: null })).toBe('select 1');
   });
 
   it('copies the rendered list of a checklist, which has no body', () => {
-    // Sans ça la carte et la palette poseraient une chaîne vide dans le
-    // presse-papier.
-    expect(noteCopyText({ kind: 'checklist', content: '', items: [{ text: 'Relire', done: false }] })).toBe(
-      '- [ ] Relire',
-    );
+    // Without this the card and the palette would put an empty string on the
+    // clipboard.
+    expect(noteCopyText({ content: '', copyText: '- [ ] Relire' })).toBe('- [ ] Relire');
   });
 });

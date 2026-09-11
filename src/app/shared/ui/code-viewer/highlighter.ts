@@ -13,7 +13,7 @@ import yaml from 'highlight.js/lib/languages/yaml';
 import { LanguageTag } from '@core/language/language.model';
 
 /**
- * Seul point de contact avec highlight.js.
+ * The only point of contact with highlight.js.
  *
  * Grammars are imported **one by one** from `highlight.js/lib/`: the full
  * package carries close to 200 languages, which would blow the initial bundle
@@ -74,7 +74,7 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>]/g, (character) => HTML_ESCAPES[character] ?? character);
 }
 
-/** Ouverture ou fermeture de balise dans la sortie de highlight.js. */
+/** An opening or closing tag in highlight.js's output. */
 const SPAN_PATTERN = /<span class="([^"]*)">|<\/span>/g;
 
 /**

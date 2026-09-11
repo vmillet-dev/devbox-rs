@@ -8,8 +8,8 @@ describe('isVariableName', () => {
   });
 
   it('refuses what could never designate a token', () => {
-    // La règle vit en Rust ; sans ce miroir, une ligne mal nommée disparaîtrait
-    // à l'enregistrement sans un mot.
+    // The rule lives in Rust; without this mirror a badly named row would vanish
+    // on save without a word.
     expect(isVariableName('')).toBe(false);
     expect(isVariableName('user.name')).toBe(false);
     expect(isVariableName('mon nom')).toBe(false);
@@ -22,8 +22,8 @@ describe('toVariableRecord', () => {
       { name: 'host', value: 'db.internal' },
       { name: '', value: 'orpheline' },
       { name: 'user.name', value: 'x' },
-      // Vide = « je garde ce que le snippet propose » : l'écrire figerait
-      // cette réponse le jour où le texte propose autre chose.
+      // Empty means "I keep what the snippet offers": writing it would freeze that
+      // answer the day the text offers something else.
       { name: 'port', value: '' },
     ]);
 
@@ -52,7 +52,7 @@ describe('duplicateNames', () => {
   });
 
   it('does not call two unnamed rows a duplicate', () => {
-    // Deux lignes fraîchement ajoutées ne sont pas une faute.
+    // Two freshly added rows are not a mistake.
     expect(
       duplicateNames([
         { name: '', value: '' },

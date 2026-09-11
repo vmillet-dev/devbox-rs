@@ -20,7 +20,7 @@ describe('SettingsRegistry', () => {
   });
 
   it('offers nothing until a feature contributes', () => {
-    // Une page pour un outil qui n'est pas chargé n'aurait rien à afficher.
+    // A page for a tool that is not loaded would have nothing to show.
     expect(registry.pages()).toEqual([]);
   });
 

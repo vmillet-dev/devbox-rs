@@ -184,7 +184,9 @@ export function toNotePatchDto(patch: NotePatch): NotePatchDto {
 
   if (lifecycle !== undefined) dto.lifecycle = toLifecycleDto(lifecycle);
   if (tags !== undefined) dto.tags = [...tags];
-  if (items !== undefined) dto.items = [...items];
+  // Copied item by item, not just the array: a patch is the last thing to hold
+  // these objects, and nothing downstream should be able to reach back.
+  if (items !== undefined) dto.items = items.map((item) => ({ ...item }));
 
   return dto;
 }
