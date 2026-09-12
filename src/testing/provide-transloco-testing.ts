@@ -1,6 +1,5 @@
 import { EnvironmentProviders } from '@angular/core';
-import { provideTransloco, provideTranslocoInterceptor } from '@jsverse/transloco';
-import { AppNameInterceptor } from '@core/i18n/app-name.interceptor';
+import { provideTransloco } from '@jsverse/transloco';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
 
 /**
@@ -16,5 +15,5 @@ export function provideTranslocoTesting(): EnvironmentProviders[] {
       missingHandler: { logMissingKey: false, useFallbackTranslation: false, allowEmpty: true },
     },
     loader: AppTranslocoLoader,
-  }).concat(provideTranslocoInterceptor(AppNameInterceptor));
+  });
 }

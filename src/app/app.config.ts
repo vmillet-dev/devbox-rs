@@ -7,13 +7,12 @@ import {
   provideZonelessChangeDetection,
 } from '@angular/core';
 import { provideRouter, withHashLocation } from '@angular/router';
-import { provideTransloco, provideTranslocoInterceptor } from '@jsverse/transloco';
+import { provideTransloco } from '@jsverse/transloco';
 
 import { routes } from './app.routes';
 import { AppErrorHandler } from '@core/errors/app-error-handler';
 import { APP_LOCALES, DEFAULT_LOCALE } from '@core/i18n/locale.model';
 import { LocaleService } from '@core/i18n/locale.service';
-import { AppNameInterceptor } from '@core/i18n/app-name.interceptor';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
 import { AutostartService } from '@core/autostart/autostart.service';
 import { PreferencesService } from '@core/preferences/preferences.service';
@@ -41,8 +40,6 @@ export const appConfig: ApplicationConfig = {
       },
       loader: AppTranslocoLoader,
     }),
-    // Substitutes `%APP%` when a language loads, so no call site carries the name.
-    provideTranslocoInterceptor(AppNameInterceptor),
 
     // One initialiser for both steps rather than two chained: Angular starts them
     // together and awaits their promises as a block, so `restore()` would read a

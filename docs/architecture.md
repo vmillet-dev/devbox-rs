@@ -1614,14 +1614,13 @@ Transloco's `transloco` pipe. French is the fallback locale.
 - Code that produces user-visible text returns a **`TranslationRef`** (`{ key, params }`)
   instead of a formatted string, so translation always happens in the template. This applies
   to error messages too.
-- **The application's name is never written in a translation.** A string carries `%APP%`, and
-  `AppNameInterceptor` (`core/i18n/`) substitutes `APP_INFO.name` in `preSaveTranslation`, once
-  per language load, before any pipe reads the string. Two things follow, both deliberate:
-  the token is **not** Transloco syntax — `{{app}}` would be replaced by the _empty string_ the
-  day the interceptor went missing, silently, where `%APP%` stays visible on screen — and no
-  call site has to pass a parameter, so none can forget to. `provideTranslocoTesting()`
-  registers the same interceptor, so specs assert what the application renders. A spec on the
-  shipped locale files refuses a string that spells the name out.
+- **The application's name is never written in a translation.** A string carries `{{app}}`, and
+  `AppTranslocoLoader` adds one key to every language: `app: APP_INFO.name`. No interceptor and
+  no transpiler — Transloco's own transpiler resolves an interpolation it cannot find in the
+  params against a **sibling key of the same translation**, so a key is all the mechanism
+  needed. It costs one line in the loader, no call site passes a parameter, and a string that
+  carries parameters of its own (`{{palette}}`, `{{version}}`) still resolves both. A spec on
+  the shipped locale files refuses a string that spells the name out.
 - A new string means adding it to **both** locale files.
 - Nothing user-visible is hard-coded in the Rust back-end. A new note is created with an
   empty title and source, and the UI renders translated placeholders — storing
