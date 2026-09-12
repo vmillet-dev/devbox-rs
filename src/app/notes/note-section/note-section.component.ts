@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { NoteSection } from '@features/notes/model/note.model';
-import { NotesStore } from '@features/notes/state/notes.store';
-import { NoteActivation, NoteCardComponent } from '../note-card/note-card.component';
+import { NoteSection } from '@notes/model/note.model';
+import { NotesStore } from '@notes/state/notes.store';
+import { NoteActivation, NoteCardComponent } from './note-card/note-card.component';
 
 @Component({
   selector: 'app-note-section',

@@ -1,5 +1,5 @@
 import type { ExportReport, ImportReport } from '@core/ipc/bindings';
-import { LanguageTag } from '@core/language/language.model';
+import { LanguageTag } from '@notes/model/language.model';
 import { ChecklistItem, NoteKind } from './checklist.model';
 
 export { type ChecklistItem, type NoteKind } from './checklist.model';

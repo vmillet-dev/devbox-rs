@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { type MockInstance, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PreferencesService } from '@core/preferences/preferences.service';
-import { NotesRepository } from '@features/notes/data/notes.repository';
-import { SpacesRepository } from '@features/notes/data/spaces.repository';
-import { NoteDraft } from '@features/notes/model/note.model';
+import { NotesRepository } from '@notes/data/notes.repository';
+import { SpacesRepository } from '@notes/data/spaces.repository';
+import { NoteDraft } from '@notes/model/note.model';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { FakeSpacesRepository } from '@testing/fake-spaces-repository';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';

@@ -2,9 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { RouterOutlet, provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ErrorBannerComponent } from '@layout/error-banner/error-banner.component';
-import { TitlebarComponent } from '@layout/titlebar/titlebar.component';
-import { UpdatePromptComponent } from '@layout/update-prompt/update-prompt.component';
+import { ErrorBannerComponent } from '@banners/error-banner/error-banner.component';
+import { TitlebarComponent } from '@titlebar/titlebar.component';
+import { UpdatePromptComponent } from '@banners/update-prompt/update-prompt.component';
 import { provideAppTesting } from '@testing/testing.providers';
 import { AppComponent } from './app.component';
 

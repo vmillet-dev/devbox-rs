@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { FALLBACK_LANGUAGE, LanguageTag } from '@core/language/language.model';
+import { FALLBACK_LANGUAGE, LanguageTag } from '@notes/model/language.model';
 import { highlightLines } from './highlighter';
 
 /**

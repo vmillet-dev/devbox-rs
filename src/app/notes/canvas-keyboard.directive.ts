@@ -1,10 +1,10 @@
 import { Directive, ElementRef, inject } from '@angular/core';
 import { ShortcutGroup } from '@core/shortcuts/shortcut.model';
-import { DialogStack } from '@shared/ui/dialog/dialog-stack';
-import { Note } from '../model/note.model';
-import { NoteCopyService } from '../state/note-copy.service';
-import { NoteSelectionStore } from '../state/note-selection.store';
-import { NotesStore } from '../state/notes.store';
+import { DialogStack } from '@shared/dialog/dialog-stack';
+import { Note } from './model/note.model';
+import { NoteCopyService } from './state/note-copy.service';
+import { NoteSelectionStore } from './state/note-selection.store';
+import { NotesStore } from './state/notes.store';
 import { CardBox, FocusDirection, nextFocusIndex } from './grid-navigation.util';
 
 interface CanvasContext {

@@ -3,8 +3,8 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslationRef } from '@core/i18n/translation-ref.model';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/time/relative-time.util';
-import { DialogComponent } from '@shared/ui/dialog/dialog.component';
-import { TrashedNote } from '@features/notes/model/note.model';
+import { DialogComponent } from '@shared/dialog/dialog.component';
+import { TrashedNote } from '@notes/model/note.model';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const SNIPPET_LINES = 2;

@@ -1,6 +1,6 @@
 import { Signal, computed, inject, linkedSignal, resource, untracked } from '@angular/core';
 import { Injectable, signal } from '@angular/core';
-import { LanguageTag } from '@core/language/language.model';
+import { LanguageTag } from '@notes/model/language.model';
 import { ClockService } from '@core/time/clock.service';
 import { SEARCH_DEBOUNCE_MS, debounced } from '@core/time/debounce';
 import { NotesRepository } from '../data/notes.repository';

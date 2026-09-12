@@ -4,10 +4,10 @@ import { TranslationRef } from '@core/i18n/translation-ref.model';
 import { UpdateStore } from '@core/updates/update.store';
 import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
-import { AboutDialogComponent } from '@layout/about-dialog/about-dialog.component';
-import { GettingStartedDialogComponent } from '@layout/getting-started-dialog/getting-started-dialog.component';
-import { ShortcutsDialogComponent } from '@layout/shortcuts-dialog/shortcuts-dialog.component';
-import { WhatsNewDialogComponent } from '@layout/whats-new-dialog/whats-new-dialog.component';
+import { AboutDialogComponent } from '@titlebar/about-menu/about-dialog/about-dialog.component';
+import { GettingStartedDialogComponent } from '@titlebar/about-menu/getting-started-dialog/getting-started-dialog.component';
+import { ShortcutsDialogComponent } from '@titlebar/about-menu/shortcuts-dialog/shortcuts-dialog.component';
+import { WhatsNewDialogComponent } from '@titlebar/about-menu/whats-new-dialog/whats-new-dialog.component';
 
 /**
  * One signal rather than one flag per panel: they share a backdrop rung and only ever

@@ -1,12 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NotesStore } from '@features/notes/state/notes.store';
-import { SpacesStore } from '@features/notes/state/spaces.store';
+import { NotesStore } from '@notes/state/notes.store';
+import { SpacesStore } from '@notes/state/spaces.store';
 import { createNote } from '@testing/note.fixture';
 import { createSection } from '@testing/section.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
-import { NoteCardComponent } from '../note-card/note-card.component';
+import { NoteCardComponent } from './note-card/note-card.component';
 import { NoteSectionComponent } from './note-section.component';
 
 describe('NoteSectionComponent', () => {

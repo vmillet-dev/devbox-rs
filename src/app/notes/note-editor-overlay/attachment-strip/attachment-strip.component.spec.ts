@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Attachment } from '@features/notes/model/note.model';
+import { Attachment } from '@notes/model/note.model';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { AttachmentStripComponent } from './attachment-strip.component';
 

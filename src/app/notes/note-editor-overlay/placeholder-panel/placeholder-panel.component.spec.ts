@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Placeholder } from '@features/notes/model/note.model';
+import { Placeholder } from '@notes/model/note.model';
 import { provideAppTesting } from '@testing/testing.providers';
 import { PlaceholderPanelComponent } from './placeholder-panel.component';
 

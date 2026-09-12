@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Attachment } from '@features/notes/model/note.model';
+import { Attachment } from '@notes/model/note.model';
 
 const BYTES_PER_KB = 1024;
 

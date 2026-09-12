@@ -1,6 +1,6 @@
 import { guard } from './fail-next';
-import { TransferRepository } from '@features/notes/data/transfer.repository';
-import { ExportReport, ImportReport } from '@features/notes/model/note.model';
+import { TransferRepository } from '@notes/data/transfer.repository';
+import { ExportReport, ImportReport } from '@notes/model/note.model';
 
 /**
  * It writes and reads nothing: the file is the back end's business, so the double records

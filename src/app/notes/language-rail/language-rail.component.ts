@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { LanguageTag } from '@core/language/language.model';
-import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
+import { LanguageTag } from '@notes/model/language.model';
+import { LanguageBadgeComponent } from '@notes/ui/language-badge/language-badge.component';
 
 /**
  * Twin of `TagRailComponent`: same union semantics, same scope to the active space. The

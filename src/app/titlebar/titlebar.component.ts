@@ -3,8 +3,8 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { APP_INFO } from '@core/app-info/app-info.service';
 import { APP_LOCALES } from '@core/i18n/locale.model';
 import { LocaleService } from '@core/i18n/locale.service';
-import { AboutMenuComponent } from '../about-menu/about-menu.component';
-import { FileMenuComponent } from '../file-menu/file-menu.component';
+import { AboutMenuComponent } from './about-menu/about-menu.component';
+import { FileMenuComponent } from './file-menu/file-menu.component';
 
 @Component({
   selector: 'app-titlebar',

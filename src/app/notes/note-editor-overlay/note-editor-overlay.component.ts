@@ -12,27 +12,22 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import {
-  FALLBACK_LANGUAGE,
-  LANGUAGE_LABELS,
-  LanguageTag,
-  isLanguageTag,
-} from '@core/language/language.model';
-import { checklistProgress } from '@features/notes/model/checklist.model';
-import { Note, NotePatch } from '@features/notes/model/note.model';
-import { AttachmentsStore } from '@features/notes/state/attachments.store';
-import { PlaceholderFillStore } from '@features/notes/state/placeholder-fill.store';
+import { FALLBACK_LANGUAGE, LANGUAGE_LABELS, LanguageTag, isLanguageTag } from '@notes/model/language.model';
+import { checklistProgress } from '@notes/model/checklist.model';
+import { Note, NotePatch } from '@notes/model/note.model';
+import { AttachmentsStore } from '@notes/state/attachments.store';
+import { PlaceholderFillStore } from '@notes/state/placeholder-fill.store';
 import { PreferencesService } from '@core/preferences/preferences.service';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/time/relative-time.util';
-import { DialogComponent } from '@shared/ui/dialog/dialog.component';
-import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
-import { AttachmentStripComponent } from '../attachment-strip/attachment-strip.component';
-import { ChecklistEditorComponent } from '../checklist-editor/checklist-editor.component';
-import { CopyButtonComponent } from '../copy-button/copy-button.component';
-import { LifecycleBadgeComponent } from '../lifecycle-badge/lifecycle-badge.component';
-import { PlaceholderPanelComponent } from '../placeholder-panel/placeholder-panel.component';
-import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
+import { DialogComponent } from '@shared/dialog/dialog.component';
+import { CodeViewerComponent } from '@notes/ui/code-viewer/code-viewer.component';
+import { AttachmentStripComponent } from './attachment-strip/attachment-strip.component';
+import { ChecklistEditorComponent } from './checklist-editor/checklist-editor.component';
+import { CopyButtonComponent } from '../ui/copy-button/copy-button.component';
+import { LifecycleBadgeComponent } from './lifecycle-badge/lifecycle-badge.component';
+import { PlaceholderPanelComponent } from './placeholder-panel/placeholder-panel.component';
+import { TagPillComponent } from '@notes/ui/tag-pill/tag-pill.component';
 
 const TEXT_ENCODER = new TextEncoder();
 

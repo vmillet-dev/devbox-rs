@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { NoteFilter } from '@features/notes/state/notes.store';
+import { NoteFilter } from '@notes/state/notes.store';
 
 interface FilterChip {
   readonly key: NoteFilter;

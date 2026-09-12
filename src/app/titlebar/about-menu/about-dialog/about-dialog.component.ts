@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, VERSION, computed, inject, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { APP_INFO, AppInfoService } from '@core/app-info/app-info.service';
-import { DialogComponent } from '@shared/ui/dialog/dialog.component';
+import { DialogComponent } from '@shared/dialog/dialog.component';
 
 const REPOSITORY_LABEL = APP_INFO.repository.replace(/^https:\/\//, '');
 

@@ -8,7 +8,7 @@ import {
   output,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Space } from '@features/notes/model/space.model';
+import { Space } from '@notes/model/space.model';
 import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 

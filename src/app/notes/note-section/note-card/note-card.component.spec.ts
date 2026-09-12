@@ -1,16 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Space } from '@features/notes/model/space.model';
-import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
-import { NoteSelectionStore } from '@features/notes/state/note-selection.store';
-import { NotesQueryStore } from '@features/notes/state/notes-query.store';
-import { NotesStore } from '@features/notes/state/notes.store';
-import { PlaceholderFillStore } from '@features/notes/state/placeholder-fill.store';
+import { Space } from '@notes/model/space.model';
+import { LanguageBadgeComponent } from '@notes/ui/language-badge/language-badge.component';
+import { NoteSelectionStore } from '@notes/state/note-selection.store';
+import { NotesQueryStore } from '@notes/state/notes-query.store';
+import { NotesStore } from '@notes/state/notes.store';
+import { PlaceholderFillStore } from '@notes/state/placeholder-fill.store';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
-import { CopyButtonComponent } from '../copy-button/copy-button.component';
-import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
+import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component';
+import { NoteCardMenuComponent } from './note-card-menu/note-card-menu.component';
 import { NoteActivation, NoteCardComponent } from './note-card.component';
 
 /** A literal, so the expected strings stay on one line. */

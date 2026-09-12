@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { NotesRepository } from '../data/notes.repository';
 import { ClipboardService } from '@core/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
-import { FALLBACK_LANGUAGE } from '@core/language/language.model';
+import { FALLBACK_LANGUAGE } from '@notes/model/language.model';
 import { ChecklistItem, Note, NoteDraft, NoteKind, NoteLifecycle, NotePatch } from '../model/note.model';
 import { ClockService } from '@core/time/clock.service';
 import { debounced } from '@core/time/debounce';

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
+import { TagPillComponent } from '@notes/ui/tag-pill/tag-pill.component';
 
 @Component({
   selector: 'app-tag-rail',

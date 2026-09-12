@@ -11,7 +11,7 @@ import {
   viewChildren,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ChecklistItem, checklistProgress } from '@features/notes/model/checklist.model';
+import { ChecklistItem, checklistProgress } from '@notes/model/checklist.model';
 
 interface Drag {
   readonly from: number;

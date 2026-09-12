@@ -10,19 +10,19 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { checklistProgress, noteCopyText } from '@features/notes/model/checklist.model';
-import { Note } from '@features/notes/model/note.model';
-import { NoteSelectionStore } from '@features/notes/state/note-selection.store';
-import { NotesStore } from '@features/notes/state/notes.store';
-import { PlaceholderFillStore } from '@features/notes/state/placeholder-fill.store';
-import { SpacesStore } from '@features/notes/state/spaces.store';
+import { checklistProgress, noteCopyText } from '@notes/model/checklist.model';
+import { Note } from '@notes/model/note.model';
+import { NoteSelectionStore } from '@notes/state/note-selection.store';
+import { NotesStore } from '@notes/state/notes.store';
+import { PlaceholderFillStore } from '@notes/state/placeholder-fill.store';
+import { SpacesStore } from '@notes/state/spaces.store';
 import { TranslationRef } from '@core/i18n/translation-ref.model';
 import { ClockService } from '@core/time/clock.service';
 import { expiryRef, relativeTimeRef } from '@core/time/relative-time.util';
-import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
-import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
-import { CopyButtonComponent } from '../copy-button/copy-button.component';
-import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
+import { CodeViewerComponent } from '@notes/ui/code-viewer/code-viewer.component';
+import { LanguageBadgeComponent } from '@notes/ui/language-badge/language-badge.component';
+import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component';
+import { NoteCardMenuComponent } from './note-card-menu/note-card-menu.component';
 
 /** The footer label is either plain text (a source name) or a translation reference (a time). */
 type FooterLabel = { kind: 'text'; value: string } | { kind: 'ref'; ref: TranslationRef };

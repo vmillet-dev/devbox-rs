@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
+import { TagPillComponent } from '@notes/ui/tag-pill/tag-pill.component';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { TagRailComponent } from './tag-rail.component';
 

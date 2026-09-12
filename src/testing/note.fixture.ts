@@ -1,5 +1,5 @@
-import { ChecklistItem } from '@features/notes/model/checklist.model';
-import { Note } from '@features/notes/model/note.model';
+import { ChecklistItem } from '@notes/model/checklist.model';
+import { Note } from '@notes/model/note.model';
 
 /** Builds a fully-populated `Note` for tests, with sensible defaults overridable per test. */
 export function createNote(overrides: Partial<Note> = {}): Note {

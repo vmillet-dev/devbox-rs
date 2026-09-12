@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ChecklistItem } from '@features/notes/model/note.model';
+import { ChecklistItem } from '@notes/model/note.model';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { ChecklistEditorComponent } from './checklist-editor.component';
 

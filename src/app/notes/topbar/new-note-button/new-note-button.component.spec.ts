@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { NoteKind } from '@features/notes/model/note.model';
+import { NoteKind } from '@notes/model/note.model';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { NewNoteButtonComponent } from './new-note-button.component';
 

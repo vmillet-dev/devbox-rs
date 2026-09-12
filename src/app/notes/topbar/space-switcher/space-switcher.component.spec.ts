@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Space } from '@features/notes/model/space.model';
+import { Space } from '@notes/model/space.model';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { SpaceSwitcherComponent } from './space-switcher.component';
 

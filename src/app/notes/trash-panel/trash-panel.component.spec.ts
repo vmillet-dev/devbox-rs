@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TrashedNote } from '@features/notes/model/note.model';
+import { TrashedNote } from '@notes/model/note.model';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { TrashPanelComponent } from './trash-panel.component';
 

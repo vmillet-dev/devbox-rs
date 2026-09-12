@@ -8,12 +8,12 @@ import {
   untracked,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Placeholder } from '@features/notes/model/note.model';
-import { CopyButtonComponent } from '../copy-button/copy-button.component';
+import { Placeholder } from '@notes/model/note.model';
+import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component';
 import {
   PlaceholderFieldsComponent,
   PlaceholderValue,
-} from '../placeholder-fields/placeholder-fields.component';
+} from '@notes/ui/placeholder-fields/placeholder-fields.component';
 
 const SUMMARY_LIMIT = 2;
 

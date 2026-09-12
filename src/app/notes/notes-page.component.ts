@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AppEventsService, GlobalAction } from '@core/ipc/app-events.service';
-import { DialogStack } from '@shared/ui/dialog/dialog-stack';
+import { DialogStack } from '@shared/dialog/dialog-stack';
 import { AttachmentsStore } from './state/attachments.store';
 import { LibraryStore } from './state/library.store';
 import { NoteSelectionStore } from './state/note-selection.store';
@@ -14,27 +14,27 @@ import { PaletteStore } from './state/palette.store';
 import { SpacesStore } from './state/spaces.store';
 import { TagsStore } from './state/tags.store';
 import { TrashStore } from './state/trash.store';
-import { CanvasKeyboardDirective } from './ui/canvas-keyboard.directive';
-import { FilterChipsComponent } from './ui/filter-chips/filter-chips.component';
-import { LanguageRailComponent } from './ui/language-rail/language-rail.component';
-import { NewNoteButtonComponent } from './ui/new-note-button/new-note-button.component';
-import { NoteActivation } from './ui/note-card/note-card.component';
-import { NoteEditorOverlayComponent } from './ui/note-editor-overlay/note-editor-overlay.component';
-import { NoteSectionComponent } from './ui/note-section/note-section.component';
-import { PlaceholderFormComponent } from './ui/placeholder-form/placeholder-form.component';
-import { ImageLightboxComponent } from './ui/image-lightbox/image-lightbox.component';
-import { QuickPaletteComponent } from './ui/quick-palette/quick-palette.component';
-import { SearchBoxComponent } from './ui/search-box/search-box.component';
-import { SelectionBarComponent } from './ui/selection-bar/selection-bar.component';
+import { CanvasKeyboardDirective } from './canvas-keyboard.directive';
+import { FilterChipsComponent } from './topbar/filter-chips/filter-chips.component';
+import { LanguageRailComponent } from './language-rail/language-rail.component';
+import { NewNoteButtonComponent } from './topbar/new-note-button/new-note-button.component';
+import { NoteActivation } from './note-section/note-card/note-card.component';
+import { NoteEditorOverlayComponent } from './note-editor-overlay/note-editor-overlay.component';
+import { NoteSectionComponent } from './note-section/note-section.component';
+import { PlaceholderFormComponent } from './placeholder-form/placeholder-form.component';
+import { ImageLightboxComponent } from './image-lightbox/image-lightbox.component';
+import { QuickPaletteComponent } from './quick-palette/quick-palette.component';
+import { SearchBoxComponent } from './topbar/search-box/search-box.component';
+import { SelectionBarComponent } from './selection-bar/selection-bar.component';
 import {
   SpaceDeletion,
   SpaceRenaming,
   SpaceSwitcherComponent,
-} from './ui/space-switcher/space-switcher.component';
-import { TagManagerComponent } from './ui/tag-manager/tag-manager.component';
-import { TagRailComponent } from './ui/tag-rail/tag-rail.component';
-import { TrashPanelComponent } from './ui/trash-panel/trash-panel.component';
-import { UndoBarComponent } from './ui/undo-bar/undo-bar.component';
+} from './topbar/space-switcher/space-switcher.component';
+import { TagManagerComponent } from './tag-manager/tag-manager.component';
+import { TagRailComponent } from './tag-rail/tag-rail.component';
+import { TrashPanelComponent } from './trash-panel/trash-panel.component';
+import { UndoBarComponent } from './undo-bar/undo-bar.component';
 
 @Component({
   selector: 'app-notes-page',
