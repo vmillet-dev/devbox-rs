@@ -31,15 +31,19 @@ yet — a round trip per keystroke), and plain UI concerns like keyboard shortcu
 src/                Angular front-end
 ├── app/
 │   ├── app.component.*   the frame: titlebar, banners, <router-outlet>
+│   ├── core/       everything that has no place on screen
+│   │   ├── model/      the vocabulary: note, space, checklist, variable, language
+│   │   ├── data/       repositories and the wire mapper
+│   │   ├── state/      the stores, flat
+│   │   ├── ipc/        generated bindings, error contract, native events
+│   │   └── services/   one folder per subject: i18n, errors, time, preferences,
+│   │                   settings, updates, app-info, clipboard, dialogs, window,
+│   │                   shortcuts, autostart, tray, notifications
+│   ├── notes/      the interface, nested as it is on screen: notes-page/, topbar/,
+│   │               note-section/note-card/…, overlays/ for the five modals
 │   ├── titlebar/   titlebar.component, then file-menu/ and about-menu/ with the panels
 │   │               each of them opens, nested where they open from
 │   ├── banners/    error banner, status toast, update prompt — siblings of the outlet
-│   ├── notes/      the page, its components nested as they are on screen, plus the
-│   │               flat state/, data/ and model/ the whole page shares
-│   ├── core/       cross-cutting infrastructure, one folder per subject: IPC, i18n,
-│   │               errors, time, preferences, settings, updates, app-info,
-│   │               clipboard, dialogs (native file picker), window (hide / quit /
-│   │               close-to-tray), shortcuts, autostart
 │   └── shared/     what crosses two areas of the screen: the modal frame, a11y directives
 ├── assets/         static images
 ├── styles/         global theme (styles.scss) and SCSS partials
@@ -120,10 +124,10 @@ also derives `specta::Type`, which is what lets tauri-specta generate the front-
 
 ### Where a file goes
 
-> **A folder's path is its address in the interface.** A component lives in the folder of its
-> parent on screen; one with two parents rises to their nearest common ancestor. `core/` is
-> cross-cutting infrastructure, one folder per subject. `shared/` is what crosses two areas of
-> the screen.
+> **A folder's path is its address in the interface** — for everything that has one. A
+> component lives in the folder of its parent on screen; one with two parents rises to their
+> nearest common ancestor. What has no place on screen lives in `core/`: the model, the data
+> access, the stores, the IPC, and one folder per cross-cutting subject under `services/`.
 
 The tree used to answer a question nobody asks. Every path said what _technical kind_ a file
 was — `state/`, `data/`, `ui/`, `layout/` — which you know before you open the tree. What you
@@ -131,12 +135,17 @@ do not know, and what you are actually looking for, is **where the thing is on s
 see a button, you want the code behind it. `titlebar/about-menu/whats-new-dialog/` says
 exactly where to click. Walking down the tree is walking down the screen.
 
-**But state is not a component.** A `providedIn: 'root'` store has no place on screen — it has
-consumers, and `SpacesStore`, `NoteSelectionStore` and `LibraryStore` are read by the File menu
-in the titlebar as much as by the canvas. Filing a singleton under one of its consumers would
-claim a containment that does not exist. So the tree mirrors the interface **where there is
-interface**, and stays flat where there is state: `notes/state/`, `notes/data/` and
-`notes/model/` are one folder each. Only a store with exactly one consumer travels with it.
+**But a store is not a component.** A `providedIn: 'root'` singleton has no place on screen —
+it has consumers, and `SpacesStore`, `NoteSelectionStore` and `LibraryStore` are read by the
+File menu in the titlebar as much as by the canvas. Filing one under a consumer would claim a
+containment that does not exist. The same holds for the model and the repositories: there is
+**one application and one domain**, so its vocabulary sits at the top rather than inside the
+single screen that happens to show it. `core/model/`, `core/data/` and `core/state/` are one
+flat folder each, and `notes/` holds the interface alone.
+
+⚠️ The cost is explicit and was accepted: deleting `notes/` no longer deletes the feature — the
+vocabulary, the repositories and the stores stay behind in `core/`. `core/` is therefore no
+longer "what a second tool would inject verbatim"; it is "what has no place on screen".
 
 Membership is decidable, not a matter of taste:
 
@@ -144,8 +153,8 @@ Membership is decidable, not a matter of taste:
 | ------------------------------------------- | -------------------------------------------- |
 | Where does this component appear on screen? | in the folder of the component that shows it |
 | Two or more parents show it?                | their nearest common ancestor                |
-| Is it state rather than a component?        | the flat `state/` of the page that shares it |
-| Would an unrelated tool inject it verbatim? | `core/`                                      |
+| Is it a model, a repository or a store?     | `core/model/`, `core/data/`, `core/state/`   |
+| Is it a cross-cutting service?              | `core/services/<subject>/`                   |
 | Does it cross two areas of the screen?      | `shared/`                                    |
 
 Two consequences worth stating. **Rendering something is not owning it:** the preferences
@@ -166,8 +175,8 @@ front, and that knowledge cannot be handed down an `input()` from twelve callers
 which part of the interface it reaches into before it says which file.
 
 The rule is **relative when a single `../` reaches the target, alias otherwise** — so
-`notes/state/notes.store.ts` reads `../data/notes.repository`, while
-`notes/note-section/note-card/` reaches the model through `@notes/model/note.model`. There is
+`core/state/notes.store.ts` reads `../data/notes.repository`, while
+`notes/note-section/note-card/` reaches the model through `@core/model/note.model`. There is
 no `../../` anywhere in `src/`, and since this reorganisation that is **enforced**:
 `no-restricted-imports` in `eslint.config.mjs` refuses the pattern. The aliases are what make
 it possible — the tree is four levels deep in places, and without them a card reaching the
@@ -177,7 +186,7 @@ model would write `../../../`.
 would pull `data/`, `state/` and every component into the lazy chunk _while hiding that it
 does_ — the explicit `loadComponent` path is what keeps the chunk honest; barrels re-close
 import cycles by construction, and this codebase has one deliberate cycle broken by hand
-(`core/ipc` ↔ `notes/data`, see below); and with six aliases the
+(`core/ipc` ↔ `core/data`, see below); and with six aliases the
 import lines are already short. The tree has zero barrels — keep it that way.
 
 The app bootstraps standalone components (`src/main.ts` → `bootstrapApplication`); there
@@ -1040,7 +1049,7 @@ not look alike would read as three unrelated windows.
 ### The first launch
 
 A brand-new installation opens on **sample notes**, in a space of their own
-(`SampleNotesService`, `notes/state/`). This is not decoration: a virgin database has
+(`SampleNotesService`, `core/state/`). This is not decoration: a virgin database has
 no space, and creating a note with nowhere to file it is refused on purpose — so without them
 the first screen is empty, silent, and offers a "+ Nouvelle note" button that does nothing.
 
@@ -1175,7 +1184,7 @@ in `lib.rs` is now the single list: it both registers the commands with Tauri an
 what `bindings.ts` contains. Tauri matches arguments **by name** and renames them to
 camelCase; nobody spells `targetSpaceId` by hand any more.
 
-Only `notes/data/` and `core/ipc/` call a generated **command**: everything above the
+Only `core/data/` and `core/ipc/` call a generated **command**: everything above the
 boundary speaks the **model**, which `note.mapper.ts` converts to and from. The generated file
 stays behind the same boundary the hand-written types were behind. `core/app-info/` is the
 third and last file to import `bindings.ts`, and it reads a **constant** and not a command —
@@ -1242,7 +1251,7 @@ generated ones, imported under a `Wire*` name where a model type carries the sam
 Where the two shapes coincide, the model type travels as it is: a space still has no mapper.
 An identity mapper is not symmetry, it is one more name for one type.
 
-What generation does **not** remove, and why `notes/data/note.mapper.ts` is still
+What generation does **not** remove, and why `core/data/note.mapper.ts` is still
 the biggest file in `data/`:
 
 - **JSON has no date type.** Rust types every timestamp as a `String`, so the bindings do too.
@@ -1266,7 +1275,7 @@ this front-end build does not — and since Rust types it as a plain string, the
 rule it out. A section key needs no such guard any more: `NoteSectionKey` is generated, so a
 variant added in Rust breaks the assignment at compile time instead of throwing at runtime.
 
-The known list is `notes/language.rs` (`Language`), aliased by `core/language/language.model.ts`
+The known list is `notes/language.rs` (`Language`), aliased by `core/model/language.model.ts`
 (`LanguageTag` + `LANGUAGE_LABELS`). Adding a language means editing both, plus a `.lang-*`
 rule in `language-badge.component.scss` and, if it should be coloured, an entry in `GRAMMARS`.
 Nothing compares the two lists, so a drift only surfaces at runtime as a fallback to `txt`.
