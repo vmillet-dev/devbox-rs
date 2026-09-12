@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { commands } from '@core/ipc/bindings';
 import { unwrap } from '@core/ipc/ipc.error';
 import { Attachment } from '../model/note.model';
-import { toAttachment } from './note.dto';
+import { toAttachment } from './note.mapper';
 
 /**
  * The bytes are only read on demand: `read` answers a `data:` URI, the one form an

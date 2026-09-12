@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import type { DisplayNote as WireNote } from '@core/ipc/bindings';
 import { Note, NoteDraft } from '../model/note.model';
 import {
   ContractError,
-  NoteDto,
   toAttachment,
   toNote,
-  toNoteDraftDto,
-  toNotePatchDto,
+  toWireNoteDraft,
+  toWireNotePatch,
   toTrashedNote,
-} from './note.dto';
+} from './note.mapper';
 
-const BASE_DTO: NoteDto = {
+const BASE_DTO: WireNote = {
   id: 'note-1',
   spaceId: 'space-1',
   title: 'Payload',
@@ -93,7 +93,7 @@ describe('toNote', () => {
     });
 
     it('throws a contract error on a footer variant this build does not know', () => {
-      const unknown = { ...BASE_DTO, footer: { kind: 'weather', at: '2026-01-01' } } as unknown as NoteDto;
+      const unknown = { ...BASE_DTO, footer: { kind: 'weather', at: '2026-01-01' } } as unknown as WireNote;
 
       expect(() => toNote(unknown)).toThrow(ContractError);
     });
@@ -104,7 +104,7 @@ describe('toNote', () => {
   });
 });
 
-describe('toNoteDraftDto', () => {
+describe('toWireNoteDraft', () => {
   it('serialises dates and omits the fields the backend owns', () => {
     const draft: NoteDraft = {
       spaceId: 'space-1',
@@ -119,7 +119,7 @@ describe('toNoteDraftDto', () => {
       items: [],
     };
 
-    const dto = toNoteDraftDto(draft);
+    const dto = toWireNoteDraft(draft);
 
     expect(dto).toEqual({
       spaceId: 'space-1',
@@ -138,41 +138,43 @@ describe('toNoteDraftDto', () => {
   });
 });
 
-describe('toNotePatchDto', () => {
+describe('toWireNotePatch', () => {
   it('isolates the checklist it sends from the array it was given', () => {
     const outgoing = [{ text: 'Relire', done: true }];
 
-    const dto = toNotePatchDto({ items: outgoing });
+    const dto = toWireNotePatch({ items: outgoing });
     outgoing[0].text = 'Changed afterwards';
 
     expect(dto.items).toEqual([{ text: 'Relire', done: true }]);
   });
 
   it('includes only the fields actually present in the patch', () => {
-    const dto = toNotePatchDto({ pinned: true });
+    const dto = toWireNotePatch({ pinned: true });
 
     expect(dto).toEqual({ pinned: true });
     expect(Object.keys(dto)).toEqual(['pinned']);
   });
 
   it('keeps falsy values that were explicitly set', () => {
-    const dto = toNotePatchDto({ title: '', pinned: false });
+    const dto = toWireNotePatch({ title: '', pinned: false });
 
     expect(dto).toEqual({ title: '', pinned: false });
   });
 
   it('carries a space change, which is how a note is moved between spaces', () => {
-    expect(toNotePatchDto({ spaceId: 'space-2' })).toEqual({ spaceId: 'space-2' });
+    expect(toWireNotePatch({ spaceId: 'space-2' })).toEqual({ spaceId: 'space-2' });
   });
 
   it('serialises a lifecycle change', () => {
     const patch: Partial<Note> = { lifecycle: { kind: 'expires', at: new Date('2026-06-01T00:00:00.000Z') } };
 
-    expect(toNotePatchDto(patch)).toEqual({ lifecycle: { kind: 'expires', at: '2026-06-01T00:00:00.000Z' } });
+    expect(toWireNotePatch(patch)).toEqual({
+      lifecycle: { kind: 'expires', at: '2026-06-01T00:00:00.000Z' },
+    });
   });
 
   it('produces an empty object for an empty patch', () => {
-    expect(toNotePatchDto({})).toEqual({});
+    expect(toWireNotePatch({})).toEqual({});
   });
 });
 
