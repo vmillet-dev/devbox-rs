@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DialogComponent } from '@shared/dialog/dialog.component';
+import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 import { Placeholder } from '@core/model/note.model';
 import {
   PlaceholderFieldsComponent,

@@ -8,10 +8,10 @@ import {
   input,
   output,
 } from '@angular/core';
-import { DialogBackdropDirective } from './dialog-backdrop.directive';
+import { DialogBackdropDirective } from '@shared/directives/dialog-backdrop.directive';
 import { DialogLayer, DialogVariant, dialogRung } from './dialog.model';
 import { DialogStack } from './dialog-stack';
-import { FocusTrapDirective } from './focus-trap.directive';
+import { FocusTrapDirective } from '@shared/directives/focus-trap.directive';
 
 /**
  * The frame every modal shares: scrim, focus trap, `role="dialog"`, Escape and the

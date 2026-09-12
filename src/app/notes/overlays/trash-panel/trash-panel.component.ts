@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslationRef } from '@core/services/i18n/translation-ref.model';
 import { ClockService } from '@core/services/time/clock.service';
-import { relativeTimeRef } from '@core/services/time/relative-time.util';
-import { DialogComponent } from '@shared/dialog/dialog.component';
+import { relativeTimeRef } from '@core/utils/relative-time.util';
+import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 import { TrashedNote } from '@core/model/note.model';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, output, resource 
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AppInfoService } from '@core/services/app-info/app-info.service';
 import { ChangelogRelease, ChangelogService, RELEASES_URL } from '@core/services/app-info/changelog.service';
-import { DialogComponent } from '@shared/dialog/dialog.component';
+import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
 const RELEASES_LABEL = RELEASES_URL.replace(/^https:\/\//, '');
 

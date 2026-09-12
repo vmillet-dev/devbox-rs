@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, output } from '@a
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SettingsStore } from '@core/services/settings/settings.store';
 import { DEFAULT_SHORTCUTS } from '@core/services/shortcuts/shortcut.model';
-import { DialogComponent } from '@shared/dialog/dialog.component';
+import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
 /**
  * Each chapter names two keys, `gettingStarted.chapters.<id>.title` and `.body`.

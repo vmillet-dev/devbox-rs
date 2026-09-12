@@ -3,7 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteLifecycle } from '@core/model/note.model';
 import { TranslationRef } from '@core/services/i18n/translation-ref.model';
 import { ClockService } from '@core/services/time/clock.service';
-import { expiryRef } from '@core/services/time/relative-time.util';
+import { expiryRef } from '@core/utils/relative-time.util';
 
 @Component({
   selector: 'app-lifecycle-badge',

@@ -5,8 +5,8 @@ import { AppWindowService } from '@core/services/window/app-window.service';
 import { LibraryStore } from '@core/state/library.store';
 import { NoteSelectionStore } from '@core/state/note-selection.store';
 import { SpacesStore } from '@core/state/spaces.store';
-import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
-import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
+import { MenuPanelDirective } from '@shared/directives/menu-panel.directive';
+import { MenuTriggerDirective } from '@shared/directives/menu-trigger.directive';
 import { SettingsDialogComponent } from '@titlebar/file-menu/settings-dialog/settings-dialog.component';
 
 /**

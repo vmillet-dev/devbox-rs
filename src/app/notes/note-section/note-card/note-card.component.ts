@@ -18,7 +18,7 @@ import { PlaceholderFillStore } from '@core/state/placeholder-fill.store';
 import { SpacesStore } from '@core/state/spaces.store';
 import { TranslationRef } from '@core/services/i18n/translation-ref.model';
 import { ClockService } from '@core/services/time/clock.service';
-import { expiryRef, relativeTimeRef } from '@core/services/time/relative-time.util';
+import { expiryRef, relativeTimeRef } from '@core/utils/relative-time.util';
 import { CodeViewerComponent } from '@notes/ui/code-viewer/code-viewer.component';
 import { LanguageBadgeComponent } from '@notes/ui/language-badge/language-badge.component';
 import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component';

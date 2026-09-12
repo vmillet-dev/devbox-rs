@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AppEventsService, GlobalAction } from '@core/ipc/app-events.service';
-import { DialogStack } from '@shared/dialog/dialog-stack';
+import { DialogStack } from '@shared/layout/dialog/dialog-stack';
 import { AttachmentsStore } from '@core/state/attachments.store';
 import { LibraryStore } from '@core/state/library.store';
 import { NoteSelectionStore } from '@core/state/note-selection.store';
@@ -14,7 +14,7 @@ import { PaletteStore } from '@core/state/palette.store';
 import { SpacesStore } from '@core/state/spaces.store';
 import { TagsStore } from '@core/state/tags.store';
 import { TrashStore } from '@core/state/trash.store';
-import { CanvasKeyboardDirective } from '../canvas-keyboard.directive';
+import { CanvasKeyboardDirective } from '@shared/directives/canvas-keyboard.directive';
 import { FilterChipsComponent } from '../topbar/filter-chips/filter-chips.component';
 import { LanguageRailComponent } from '../language-rail/language-rail.component';
 import { NewNoteButtonComponent } from '../topbar/new-note-button/new-note-button.component';

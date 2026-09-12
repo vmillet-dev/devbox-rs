@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DialogComponent } from '@shared/dialog/dialog.component';
+import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
 /**
  * The strip bounds its preview to 220 px so as not to push the editor off screen; this

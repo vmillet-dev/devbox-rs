@@ -1,11 +1,11 @@
 import { Directive, ElementRef, inject } from '@angular/core';
 import { ShortcutGroup } from '@core/services/shortcuts/shortcut.model';
-import { DialogStack } from '@shared/dialog/dialog-stack';
-import { Note } from '../core/model/note.model';
-import { NoteCopyService } from '../core/state/note-copy.service';
-import { NoteSelectionStore } from '../core/state/note-selection.store';
-import { NotesStore } from '../core/state/notes.store';
-import { CardBox, FocusDirection, nextFocusIndex } from './grid-navigation.util';
+import { DialogStack } from '@shared/layout/dialog/dialog-stack';
+import { Note } from '@core/model/note.model';
+import { NoteCopyService } from '@core/state/note-copy.service';
+import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { NotesStore } from '@core/state/notes.store';
+import { CardBox, FocusDirection, nextFocusIndex } from '@core/utils/grid-navigation.util';
 
 interface CanvasContext {
   readonly focused: Note | null;
@@ -130,7 +130,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Applied as a **host directive** of the notes page, so its element is the canvas
+ * Applied as a **host directives** of the notes page, so its element is the canvas
  * itself — which is how it measures the card grid without the page handing it a list
  * of sections. It acts only when no modal has the keyboard and no field has focus.
  */

@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslationRef } from '@core/services/i18n/translation-ref.model';
 import { UpdateStore } from '@core/services/updates/update.store';
-import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
-import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
+import { MenuPanelDirective } from '@shared/directives/menu-panel.directive';
+import { MenuTriggerDirective } from '@shared/directives/menu-trigger.directive';
 import { AboutDialogComponent } from '@titlebar/about-menu/about-dialog/about-dialog.component';
 import { GettingStartedDialogComponent } from '@titlebar/about-menu/getting-started-dialog/getting-started-dialog.component';
 import { ShortcutsDialogComponent } from '@titlebar/about-menu/shortcuts-dialog/shortcuts-dialog.component';

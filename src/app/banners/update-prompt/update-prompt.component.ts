@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslationRef } from '@core/services/i18n/translation-ref.model';
 import { UpdateStore } from '@core/services/updates/update.store';
-import { DialogComponent } from '@shared/dialog/dialog.component';
+import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
 /**
  * Once installing starts both buttons disappear and the dialog stops being dismissible:

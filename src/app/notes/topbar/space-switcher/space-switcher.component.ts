@@ -12,8 +12,8 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Space } from '@core/model/space.model';
-import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
-import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
+import { MenuPanelDirective } from '@shared/directives/menu-panel.directive';
+import { MenuTriggerDirective } from '@shared/directives/menu-trigger.directive';
 
 export interface SpaceDeletion {
   readonly id: string;

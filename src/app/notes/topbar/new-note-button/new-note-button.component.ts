@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteKind } from '@core/model/note.model';
-import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
-import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
+import { MenuPanelDirective } from '@shared/directives/menu-panel.directive';
+import { MenuTriggerDirective } from '@shared/directives/menu-trigger.directive';
 
 /**
  * A split button rather than a plain dropdown: the two gestures do not share a

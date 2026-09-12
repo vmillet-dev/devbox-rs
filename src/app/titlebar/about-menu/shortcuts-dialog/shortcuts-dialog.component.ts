@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, output } from '@a
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SettingsStore } from '@core/services/settings/settings.store';
 import { DEFAULT_SHORTCUTS, ShortcutGroup, acceleratorKeys } from '@core/services/shortcuts/shortcut.model';
-import { NOTES_SHORTCUT_GROUPS } from '@notes/notes-shortcuts';
-import { DialogComponent } from '@shared/dialog/dialog.component';
+import { NOTES_SHORTCUT_GROUPS } from '@core/constantes/notes-shortcuts';
+import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
 /**
  * The **global** group is built here rather than registered, because it is the

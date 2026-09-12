@@ -2,7 +2,7 @@ import { NgComponentOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Type, computed, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { VariablesPageComponent } from '@notes/variables-page/variables-page.component';
-import { DialogComponent } from '@shared/dialog/dialog.component';
+import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 import { SettingsPageComponent } from './settings-page/settings-page.component';
 
 /** `component` is rendered through `NgComponentOutlet`: the rail is one list, the pages
