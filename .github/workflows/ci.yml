@@ -225,9 +225,34 @@ jobs:
           npm run e2e:build
           echo "\`build-e2e\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
-      # Le service télécharge le MSEdgeDriver correspondant à la WebView2 du binaire
-      # et installe `tauri-driver` s'il manque — d'où la marge sur le timeout.
+      - name: Does the binary survive without a driver?
+        run: |
+          set +e
+          echo "--- WebView2 Runtime ---"
+          ls "/c/Program Files (x86)/Microsoft/EdgeWebView/Application/" 2>/dev/null \
+            || echo "::warning::WebView2 Runtime introuvable — cause probable à elle seule"
+
+          log="$RUNNER_TEMP/app-start.log"
+          ./src-tauri/target/debug/devbox.exe > "$log" 2>&1 &
+          pid=$!
+          sleep 15
+
+          if kill -0 "$pid" 2>/dev/null; then
+            echo "Vivant après 15 s : le binaire démarre seul, la cause est le bac à sable ou le driver."
+            kill "$pid" 2>/dev/null
+          else
+            wait "$pid"
+            code=$?
+            echo "::warning::Mort sans driver, code de sortie $code — la cause est dans l'application, pas dans wdio."
+          fi
+
+          echo "--- sortie de l'application ---"
+          cat "$log" 2>/dev/null
+          exit 0
+
       - name: Run the scenarios
+        env:
+          WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--no-sandbox --disable-gpu --disable-dev-shm-usage'
         run: |
           start=$(date +%s)
           npm run test:e2e
