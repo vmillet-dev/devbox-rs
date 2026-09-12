@@ -23,14 +23,12 @@ export class AboutDialogComponent {
   protected readonly authorHandle = APP_INFO.authorHandle;
   protected readonly repositoryLabel = REPOSITORY_LABEL;
 
-  /** Tauri answers over the bridge, so the line completes itself a tick later. */
-  protected readonly builtWith = computed(() =>
-    [
-      `Angular ${VERSION.full}`,
-      `Rust ${APP_INFO.rustVersion}`,
-      `Tauri ${this.appInfo.tauriVersion() ?? '—'}`,
-    ].join(' · '),
-  );
+  /** Tauri answers over the bridge, so its line completes itself a tick later. */
+  protected readonly builtWith = computed(() => [
+    `Angular ${VERSION.full}`,
+    `Rust ${APP_INFO.rustVersion}`,
+    `Tauri ${this.appInfo.tauriVersion() ?? '—'}`,
+  ]);
 
   protected openRepository(): void {
     void this.appInfo.openRepository();

@@ -50,6 +50,9 @@ app-dialog {
 }
 
 .about-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-family: var(--font-mono), serif;
   font-size: 11px;
   color: var(--text-2);
