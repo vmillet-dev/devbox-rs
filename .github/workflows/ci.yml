@@ -250,9 +250,13 @@ jobs:
           cat "$log" 2>/dev/null
           exit 0
 
+      # ⚠️ Ne pas poser `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` ici : c'est la variable
+      # par laquelle `tauri-driver` injecte `--remote-debugging-port` dans la WebView2.
+      # La définir l'écrase, et le port de débogage que msedgedriver attend n'est alors
+      # jamais ouvert — exactement le `DevToolsActivePort file doesn't exist` qu'on
+      # cherche à corriger. Essayé, sans effet, et dangereux : la suite passe en local
+      # sans elle.
       - name: Run the scenarios
-        env:
-          WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--no-sandbox --disable-gpu --disable-dev-shm-usage'
         run: |
           start=$(date +%s)
           npm run test:e2e

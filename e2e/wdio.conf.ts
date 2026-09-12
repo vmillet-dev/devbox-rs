@@ -64,12 +64,25 @@ export const config: WebdriverIO.Config = {
   reporters: ['spec'],
   mochaOpts: { ui: 'bdd', timeout: 120_000 },
 
-  logLevel: 'warn',
+  /**
+   * `trace`, not `warn`: at `warn` the files under `outputDir` hold almost nothing,
+   * and a session that fails to open leaves no trace of what the driver actually
+   * tried. The volume only matters when something breaks, which is the only time
+   * anyone opens them.
+   */
+  logLevel: 'trace',
   outputDir: join(here, 'logs'),
   waitforTimeout: 10_000,
   connectionRetryTimeout: 120_000,
   connectionRetryCount: 3,
-  bail: 0,
+
+  /**
+   * A session that will not open fails **every** spec file the same way, so the
+   * twelfth failure teaches nothing the first did not — it only costs ten minutes
+   * and a cancelled run that uploads no artifact. Stopping on the first keeps the
+   * report readable and the logs collected.
+   */
+  bail: 1,
 
   /**
    * Before the binary is spawned, not between tests: the database file is locked
