@@ -1,4 +1,4 @@
-use std::{env, fs, path::Path};
+use std::{env, fs, path::Path, process::Command};
 
 fn main() {
     export_metadata();
@@ -37,4 +37,22 @@ fn export_metadata() {
     let author = authors.split(';').next().unwrap_or_default();
 
     println!("cargo:rustc-env=DEVBOX_AUTHOR={author}");
+    println!("cargo:rustc-env=DEVBOX_RUST_VERSION={}", rust_version());
+}
+
+/// No runtime API reports it, so the compiler cargo is about to run is asked directly —
+/// which is the one that built the binary, and not whatever `rust-toolchain.toml` pins.
+fn rust_version() -> String {
+    let rustc = env::var("RUSTC").expect("RUSTC is set by cargo");
+    let output = Command::new(rustc)
+        .arg("--version")
+        .output()
+        .expect("rustc answers --version");
+    let text = String::from_utf8_lossy(&output.stdout);
+
+    // `rustc 1.97.1 (hash date)`
+    text.split_whitespace()
+        .nth(1)
+        .unwrap_or_default()
+        .to_string()
 }

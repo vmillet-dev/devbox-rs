@@ -21,6 +21,9 @@ pub struct AppMetadata {
     pub repository: &'static str,
     pub author: &'static str,
     pub author_handle: &'static str,
+    /// What the binary was built with, for the about card.
+    pub rust_version: &'static str,
+    pub tauri_version: &'static str,
 }
 
 pub const METADATA: AppMetadata = AppMetadata {
@@ -28,4 +31,6 @@ pub const METADATA: AppMetadata = AppMetadata {
     repository: env!("CARGO_PKG_REPOSITORY"),
     author: env!("DEVBOX_AUTHOR"),
     author_handle: env!("DEVBOX_AUTHOR_HANDLE"),
+    rust_version: env!("DEVBOX_RUST_VERSION"),
+    tauri_version: tauri::VERSION,
 };

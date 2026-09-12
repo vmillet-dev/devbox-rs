@@ -1,7 +1,8 @@
+import { VERSION } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppInfoService } from '@core/app-info/app-info.service';
+import { APP_INFO, AppInfoService } from '@core/app-info/app-info.service';
 import { FakeAppInfo } from '@testing/fake-app-info';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { AboutDialogComponent } from './about-dialog.component';
@@ -44,6 +45,17 @@ describe('AboutDialogComponent', () => {
     expect(facts).toContain('Valentin MILLET');
     expect(facts).toContain('@vmillet-dev');
     expect(facts).toContain('github.com/vmillet-dev/devbox-rs');
+  });
+
+  it('names the stack it was built with, read and not retyped', () => {
+    const stack = fixture.nativeElement.querySelector('.about-stack').textContent as string;
+
+    expect(stack).toContain(`Angular ${VERSION.full}`);
+    expect(stack).toContain(`Rust ${APP_INFO.rustVersion}`);
+    expect(stack).toContain(`Tauri ${APP_INFO.tauriVersion}`);
+    // The three values are generated or read from the framework, so the one thing a
+    // test can hold is that none of them is missing.
+    expect(stack).not.toContain('undefined');
   });
 
   it('opens the repository through the seam rather than navigating the WebView', () => {

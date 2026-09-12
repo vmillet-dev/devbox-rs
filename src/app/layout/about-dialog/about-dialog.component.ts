@@ -1,9 +1,15 @@
-import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, VERSION, inject, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { APP_INFO, AppInfoService } from '@core/app-info/app-info.service';
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
 const REPOSITORY_LABEL = APP_INFO.repository.replace(/^https:\/\//, '');
+
+const BUILT_WITH = [
+  `Angular ${VERSION.full}`,
+  `Rust ${APP_INFO.rustVersion}`,
+  `Tauri ${APP_INFO.tauriVersion}`,
+].join(' · ');
 
 /** Purely informative — the update check lives in the menu that opens this card. */
 @Component({
@@ -22,6 +28,7 @@ export class AboutDialogComponent {
   protected readonly authorName = APP_INFO.author;
   protected readonly authorHandle = APP_INFO.authorHandle;
   protected readonly repositoryLabel = REPOSITORY_LABEL;
+  protected readonly builtWith = BUILT_WITH;
 
   protected openRepository(): void {
     void this.appInfo.openRepository();

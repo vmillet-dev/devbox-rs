@@ -49,6 +49,12 @@ app-dialog {
   color: var(--text-1);
 }
 
+.about-stack {
+  font-family: var(--font-mono), serif;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
 .about-repo {
   @include unstyled-control;
   display: inline-flex;
