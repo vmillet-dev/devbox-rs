@@ -1296,10 +1296,12 @@ the action is exhaustive — a variant added in Rust stops the front compiling.
 
 **Application metadata travels the same way.** `app_info::METADATA` is exported with
 `.constant("APP_METADATA", …)` and holds what the front used to spell out: the display name,
-the repository URL, the author and their handle, plus the Rust and Tauri versions the binary
-was built with — `tauri::VERSION` for one, and for the other the compiler cargo is about to
-run, asked by `build.rs`, since nothing reports it at runtime. The about card completes the
-list with Angular's own `VERSION.full`. Every value comes from `Cargo.toml` — the
+the repository URL, the author and their handle, plus the Rust toolchain the project pins —
+`build.rs` reads the `channel` out of `rust-toolchain.toml`, the same file rustup resolves for
+every build. The about card completes the line with Angular's own `VERSION.full` and with
+`getTauriVersion()`: that one is **asked of the running framework**, not baked in, for the
+same reason as the application's own version — a committed `bindings.ts` can lag behind a
+dependency bump, an answer from the bridge cannot. Every value comes from `Cargo.toml` — the
 standard fields through `CARGO_PKG_*`, and what Cargo has no field for through
 `[package.metadata.devbox]`, which `build.rs` hands to the crate as environment variables
 read with `env!`. It is a constant and not a command on purpose: the titlebar reads the name

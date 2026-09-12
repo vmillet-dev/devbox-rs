@@ -1,4 +1,4 @@
-use std::{env, fs, path::Path, process::Command};
+use std::{env, fs, path::Path};
 
 fn main() {
     export_metadata();
@@ -37,22 +37,24 @@ fn export_metadata() {
     let author = authors.split(';').next().unwrap_or_default();
 
     println!("cargo:rustc-env=DEVBOX_AUTHOR={author}");
-    println!("cargo:rustc-env=DEVBOX_RUST_VERSION={}", rust_version());
+    println!(
+        "cargo:rustc-env=DEVBOX_RUST_VERSION={}",
+        pinned_toolchain(&manifest_dir)
+    );
 }
 
-/// No runtime API reports it, so the compiler cargo is about to run is asked directly —
-/// which is the one that built the binary, and not whatever `rust-toolchain.toml` pins.
-fn rust_version() -> String {
-    let rustc = env::var("RUSTC").expect("RUSTC is set by cargo");
-    let output = Command::new(rustc)
-        .arg("--version")
-        .output()
-        .expect("rustc answers --version");
-    let text = String::from_utf8_lossy(&output.stdout);
+/// The toolchain `rust-toolchain.toml` pins, which rustup resolves for every build.
+fn pinned_toolchain(manifest_dir: &str) -> String {
+    let path = Path::new(manifest_dir).join("../rust-toolchain.toml");
+    println!("cargo:rerun-if-changed=../rust-toolchain.toml");
 
-    // `rustc 1.97.1 (hash date)`
-    text.split_whitespace()
-        .nth(1)
-        .unwrap_or_default()
+    let text = fs::read_to_string(&path).expect("rust-toolchain.toml is readable");
+    let pinned: toml::Table = toml::from_str(&text).expect("rust-toolchain.toml is valid TOML");
+
+    pinned
+        .get("toolchain")
+        .and_then(|toolchain| toolchain.get("channel"))
+        .and_then(toml::Value::as_str)
+        .expect("rust-toolchain.toml pins a channel")
         .to_string()
 }

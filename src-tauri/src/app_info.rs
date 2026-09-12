@@ -1,9 +1,9 @@
-//! What the application says about itself, from `Cargo.toml` and nowhere else: the
-//! standard fields through `CARGO_PKG_*`, and what Cargo has no field for through
-//! `[package.metadata.devbox]`, which `build.rs` hands over as environment variables.
+//! What the application says about itself: the standard `Cargo.toml` fields through
+//! `CARGO_PKG_*`, and what Cargo has no field for through `[package.metadata.devbox]`
+//! and `rust-toolchain.toml`, both read by `build.rs`.
 //!
-//! The **version** is deliberately absent. The front reads it from the running binary
-//! (`getVersion()`), which cannot go stale the way a committed `bindings.ts` can.
+//! Its own version and Tauri's are absent on purpose — the front asks the running
+//! binary, which cannot go stale the way a committed `bindings.ts` can.
 
 use serde::Serialize;
 use specta::Type;
@@ -21,9 +21,8 @@ pub struct AppMetadata {
     pub repository: &'static str,
     pub author: &'static str,
     pub author_handle: &'static str,
-    /// What the binary was built with, for the about card.
+    /// The toolchain the project pins, for the about card.
     pub rust_version: &'static str,
-    pub tauri_version: &'static str,
 }
 
 pub const METADATA: AppMetadata = AppMetadata {
@@ -32,5 +31,4 @@ pub const METADATA: AppMetadata = AppMetadata {
     author: env!("DEVBOX_AUTHOR"),
     author_handle: env!("DEVBOX_AUTHOR_HANDLE"),
     rust_version: env!("DEVBOX_RUST_VERSION"),
-    tauri_version: tauri::VERSION,
 };
