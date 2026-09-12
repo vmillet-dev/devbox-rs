@@ -1,10 +1,14 @@
 <div class="titlebar">
-  <div class="dots" aria-hidden="true">
-    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <div class="titlebar-menus">
+    <div class="dots" aria-hidden="true">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    </div>
+    <app-file-menu />
+    <app-about-menu />
   </div>
+
   <div class="titlebar-title">{{ title }}</div>
-  <app-file-menu />
-  <app-about-menu />
+
   <div class="locale-switch" role="group" [attr.aria-label]="'locale.groupLabel' | transloco">
     @for (locale of locales; track locale) {
       <button
