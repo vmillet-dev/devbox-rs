@@ -175,6 +175,7 @@
   },
   "locale": {
     "groupLabel": "Langue de l'interface",
+    "system": "Système",
     "fr": "Français",
     "en": "Anglais"
   },
@@ -371,6 +372,7 @@
     "copied": "Copié dans le presse-papier.",
     "appearance": {
       "title": "Apparence",
+      "language": "Langue",
       "theme": "Thème",
       "density": "Densité"
     },

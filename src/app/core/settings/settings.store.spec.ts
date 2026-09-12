@@ -40,6 +40,7 @@ describe('SettingsStore', () => {
   it('starts on the documented defaults', () => {
     const store = createStore();
 
+    expect(store.locale()).toBe('system');
     expect(store.theme()).toBe('system');
     expect(store.density()).toBe('comfortable');
     expect(store.closeToTray()).toBe(true);

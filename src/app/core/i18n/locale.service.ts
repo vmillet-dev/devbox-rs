@@ -1,76 +1,53 @@
 import { Injectable, Signal, computed, effect, inject } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { PreferencesService } from '../preferences/preferences.service';
-
-/** The UI display languages — unrelated to `LanguageTag`, which colours notes. */
-export const APP_LOCALES = ['fr', 'en'] as const;
-export type AppLocale = (typeof APP_LOCALES)[number];
-
-export const DEFAULT_LOCALE: AppLocale = 'fr';
-
-const STORAGE_KEY = 'devbox.locale';
-
-function isAppLocale(value: string | null): value is AppLocale {
-  return (APP_LOCALES as readonly string[]).includes(value ?? '');
-}
+import { LocaleChoice } from '@core/settings/app-settings.model';
+import { SettingsStore } from '@core/settings/settings.store';
+import { AppLocale, DEFAULT_LOCALE, isAppLocale, resolveSystemLocale } from './locale.model';
 
 /**
- * The WebView reports the system display language, which is as close to asking the OS as
- * we get without a plugin and an extra round trip in the initializer. `null` when the
- * system speaks neither of the two languages DevBox does.
+ * The active UI language: the choice belongs to [`SettingsStore`], this resolves it and
+ * pushes it to Transloco — the same shape as the services that carry a preference down to
+ * the native side.
  */
-function detectSystemLocale(): AppLocale | null {
-  const tags = navigator.languages?.length ? navigator.languages : [navigator.language];
-
-  for (const tag of tags) {
-    const primary = tag.split('-')[0]?.toLowerCase() ?? '';
-    if (isAppLocale(primary)) return primary;
-  }
-
-  return null;
-}
-
-/** The active UI language: the source of truth is Transloco's, persisted locally. */
 @Injectable({ providedIn: 'root' })
 export class LocaleService {
   private readonly transloco = inject(TranslocoService);
-  private readonly preferences = inject(PreferencesService);
+  private readonly settings = inject(SettingsStore);
 
+  /** What is on screen, `system` already resolved. */
   readonly activeLocale: Signal<AppLocale> = computed(() => {
     const active = this.transloco.activeLang();
     return isAppLocale(active) ? active : DEFAULT_LOCALE;
   });
+
+  /** What the user picked, which the preferences panel shows back. */
+  readonly preference: Signal<LocaleChoice> = this.settings.locale;
 
   constructor() {
     // `<html lang>` drives screen-reader pronunciation and typographic rules.
     effect(() => {
       document.documentElement.lang = this.activeLocale();
     });
+
+    effect(() => {
+      this.apply(this.settings.locale());
+    });
   }
 
   /**
-   * The stored choice first, the system language second, `DEFAULT_LOCALE` last.
-   *
-   * Called from a `provideAppInitializer`, so before the first render: otherwise the
-   * interface would briefly appear in the default language.
+   * Called from a `provideAppInitializer`, **after** `SettingsStore.restore()`: the effect
+   * above would only flush after the first render, showing the interface in one language
+   * then the other.
    */
   restore(): void {
-    const stored = this.preferences.read(STORAGE_KEY);
-    if (isAppLocale(stored)) {
-      this.transloco.setActiveLang(stored);
-      return;
-    }
-
-    // Deliberately not persisted: until the user picks a language, DevBox follows the
-    // system. Writing the guess here would turn a default into a decision.
-    const detected = detectSystemLocale();
-    if (detected !== null) {
-      this.transloco.setActiveLang(detected);
-    }
+    this.apply(this.settings.locale());
   }
 
-  setLocale(locale: AppLocale): void {
-    this.transloco.setActiveLang(locale);
-    this.preferences.write(STORAGE_KEY, locale);
+  setLocale(choice: LocaleChoice): void {
+    this.settings.setLocale(choice);
+  }
+
+  private apply(choice: LocaleChoice): void {
+    this.transloco.setActiveLang(choice === 'system' ? resolveSystemLocale() : choice);
   }
 }

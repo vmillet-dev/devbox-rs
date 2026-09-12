@@ -5,6 +5,8 @@ import {
   DEFAULT_SETTINGS,
   DENSITIES,
   Density,
+  LOCALE_CHOICES,
+  LocaleChoice,
   ResolvedTheme,
   SETTINGS_KEYS,
   THEME_CHOICES,
@@ -58,6 +60,7 @@ export class SettingsStore {
    */
   private readonly restorers: (() => void)[] = [];
 
+  readonly locale = this.setting('locale', asOneOf(LOCALE_CHOICES));
   readonly theme = this.setting('theme', asOneOf(THEME_CHOICES));
   readonly density = this.setting('density', asOneOf(DENSITIES));
   readonly startWithSystem = this.setting('startWithSystem', asBoolean);
@@ -97,6 +100,10 @@ export class SettingsStore {
     for (const restore of this.restorers) {
       restore();
     }
+  }
+
+  setLocale(locale: LocaleChoice): void {
+    this.locale.write(locale);
   }
 
   setTheme(theme: ThemeChoice): void {

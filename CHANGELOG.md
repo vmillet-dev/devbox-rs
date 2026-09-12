@@ -22,8 +22,10 @@ rendered. It is deliberately untranslated, like the release notes the updater ha
 
 ### Changed
 
-- **The interface opens in the system language** when you have not picked one yourself, and
-  keeps following it until you do.
+- **The interface language is a preference**, in Préférences → Apparence: Système, Français or
+  Anglais. `Système` follows the display language of the machine — English when it speaks
+  neither — and keeps following it until you pick one yourself. The `FR` / `EN` buttons in the
+  titlebar are still there and set an explicit language.
 - **The Fichier and À propos menus moved to the left** of the titlebar, where a menu bar
   belongs on Windows and Linux.
 

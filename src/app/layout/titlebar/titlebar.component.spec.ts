@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LocaleService } from '@core/i18n/locale.service';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { TitlebarComponent } from './titlebar.component';
@@ -12,12 +12,27 @@ describe('TitlebarComponent', () => {
     return [...fixture.nativeElement.querySelectorAll('.locale-option')];
   }
 
+  /**
+   * The buttons show the *active* language, which with no choice made is the system one —
+   * and jsdom's is `en-US`. Pinned here so "French by default" means something.
+   */
+  function stubSystemLanguage(tag: string): void {
+    Object.defineProperty(navigator, 'languages', { value: [tag], configurable: true });
+    Object.defineProperty(navigator, 'language', { value: tag, configurable: true });
+  }
+
   beforeEach(() => {
     TestBed.resetTestingModule();
     localStorage.clear();
+    stubSystemLanguage('fr-FR');
     TestBed.configureTestingModule({ imports: [TitlebarComponent], providers: [provideTranslocoTesting()] });
     fixture = TestBed.createComponent(TitlebarComponent);
     fixture.autoDetectChanges();
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'languages');
+    Reflect.deleteProperty(navigator, 'language');
   });
 
   it('renders the application name', () => {
