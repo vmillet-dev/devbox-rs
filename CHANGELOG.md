@@ -20,6 +20,13 @@ rendered. It is deliberately untranslated, like the release notes the updater ha
 - **Help in the About menu:** "Nouveautés" (this file), "Prise en main" and "Raccourcis clavier".
 - **Sample notes on first launch**, in their own space, to show what a note can carry.
 
+### Changed
+
+- **The interface opens in the system language** when you have not picked one yourself, and
+  keeps following it until you do.
+- **The Fichier and À propos menus moved to the left** of the titlebar, where a menu bar
+  belongs on Windows and Linux.
+
 ## [0.1.1] - 2026-08-27
 
 ### Fixed

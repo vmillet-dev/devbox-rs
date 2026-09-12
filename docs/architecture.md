@@ -1563,7 +1563,7 @@ installed or shipped alongside the executable. The database file lives in Tauri'
 ## i18n
 
 UI strings live in `src/app/core/i18n/translations/{fr,en}.json` and render through
-Transloco's `transloco` pipe. French is the default locale.
+Transloco's `transloco` pipe. French is the fallback locale.
 
 - Translations are `import`ed and bundled at build time rather than fetched over HTTP — a
   small desktop binary with two locales gains nothing from `HttpClient` and a round-trip.
@@ -1571,8 +1571,13 @@ Transloco's `transloco` pipe. French is the default locale.
   `dist` a second time, never to be read.
 - `LocaleService` wraps `TranslocoService`, persists the choice through `PreferencesService`
   and keeps `<html lang>` in sync (it drives screen-reader pronunciation and typography).
-  `restore()` runs from an app initializer so the stored locale applies before the first
-  render, avoiding a flash of the default language.
+  `restore()` runs from an app initializer so the locale applies before the first render,
+  avoiding a flash of the wrong language.
+- `restore()` reads three sources in order: the **stored choice**, then the **system
+  language** (`navigator.languages`, which the WebView takes from the OS), then
+  `DEFAULT_LOCALE`. The detected value is deliberately **not persisted** — until the user
+  picks a language, DevBox follows the system; writing the guess would turn a default into
+  a decision that outlives it.
 - Code that produces user-visible text returns a **`TranslationRef`** (`{ key, params }`)
   instead of a formatted string, so translation always happens in the template. This applies
   to error messages too.
