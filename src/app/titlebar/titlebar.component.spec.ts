@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { LocaleService } from '@core/i18n/locale.service';
+import { LocaleService } from '@core/services/i18n/locale.service';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { TitlebarComponent } from './titlebar.component';
 

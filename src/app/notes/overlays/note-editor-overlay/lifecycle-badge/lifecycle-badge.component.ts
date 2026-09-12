@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { NoteLifecycle } from '@notes/model/note.model';
-import { TranslationRef } from '@core/i18n/translation-ref.model';
-import { ClockService } from '@core/time/clock.service';
-import { expiryRef } from '@core/time/relative-time.util';
+import { NoteLifecycle } from '@core/model/note.model';
+import { TranslationRef } from '@core/services/i18n/translation-ref.model';
+import { ClockService } from '@core/services/time/clock.service';
+import { expiryRef } from '@core/services/time/relative-time.util';
 
 @Component({
   selector: 'app-lifecycle-badge',

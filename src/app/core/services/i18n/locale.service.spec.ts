@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { PreferencesService } from '@core/preferences/preferences.service';
-import { SettingsStore } from '@core/settings/settings.store';
+import { PreferencesService } from '@core/services/preferences/preferences.service';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { LocaleService } from './locale.service';
 

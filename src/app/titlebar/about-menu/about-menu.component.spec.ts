@@ -1,10 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppInfoService } from '@core/app-info/app-info.service';
-import { ChangelogService } from '@core/app-info/changelog.service';
-import { UpdateStore } from '@core/updates/update.store';
-import { UpdaterService } from '@core/updates/updater.service';
+import { AppInfoService } from '@core/services/app-info/app-info.service';
+import { ChangelogService } from '@core/services/app-info/changelog.service';
+import { UpdateStore } from '@core/services/updates/update.store';
+import { UpdaterService } from '@core/services/updates/updater.service';
 import { AboutDialogComponent } from '@titlebar/about-menu/about-dialog/about-dialog.component';
 import { GettingStartedDialogComponent } from '@titlebar/about-menu/getting-started-dialog/getting-started-dialog.component';
 import { ShortcutsDialogComponent } from '@titlebar/about-menu/shortcuts-dialog/shortcuts-dialog.component';

@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NotesStore } from '@notes/state/notes.store';
-import { SpacesStore } from '@notes/state/spaces.store';
+import { NotesStore } from '@core/state/notes.store';
+import { SpacesStore } from '@core/state/spaces.store';
 import { createNote } from '@testing/note.fixture';
 import { createSection } from '@testing/section.fixture';
 import { provideAppTesting } from '@testing/testing.providers';

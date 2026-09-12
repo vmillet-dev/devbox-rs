@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { LanguageTag } from '@notes/model/language.model';
+import { LanguageTag } from '@core/model/language.model';
 import { LanguageBadgeComponent } from '@notes/ui/language-badge/language-badge.component';
 
 /**

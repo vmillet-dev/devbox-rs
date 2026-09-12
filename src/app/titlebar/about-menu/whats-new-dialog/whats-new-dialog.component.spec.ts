@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AppInfoService } from '@core/app-info/app-info.service';
-import { ChangelogService } from '@core/app-info/changelog.service';
+import { AppInfoService } from '@core/services/app-info/app-info.service';
+import { ChangelogService } from '@core/services/app-info/changelog.service';
 import { FakeAppInfo } from '@testing/fake-app-info';
 import { FakeChangelog } from '@testing/fake-changelog';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';

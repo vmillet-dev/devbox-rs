@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { NotesRepository } from '../data/notes.repository';
 import { Variable, duplicateNames, toVariableRecord } from '../model/variable.model';
 

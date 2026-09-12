@@ -12,19 +12,19 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { FALLBACK_LANGUAGE, LANGUAGE_LABELS, LanguageTag, isLanguageTag } from '@notes/model/language.model';
-import { checklistProgress } from '@notes/model/checklist.model';
-import { Note, NotePatch } from '@notes/model/note.model';
-import { AttachmentsStore } from '@notes/state/attachments.store';
-import { PlaceholderFillStore } from '@notes/state/placeholder-fill.store';
-import { PreferencesService } from '@core/preferences/preferences.service';
-import { ClockService } from '@core/time/clock.service';
-import { relativeTimeRef } from '@core/time/relative-time.util';
+import { FALLBACK_LANGUAGE, LANGUAGE_LABELS, LanguageTag, isLanguageTag } from '@core/model/language.model';
+import { checklistProgress } from '@core/model/checklist.model';
+import { Note, NotePatch } from '@core/model/note.model';
+import { AttachmentsStore } from '@core/state/attachments.store';
+import { PlaceholderFillStore } from '@core/state/placeholder-fill.store';
+import { PreferencesService } from '@core/services/preferences/preferences.service';
+import { ClockService } from '@core/services/time/clock.service';
+import { relativeTimeRef } from '@core/services/time/relative-time.util';
 import { DialogComponent } from '@shared/dialog/dialog.component';
 import { CodeViewerComponent } from '@notes/ui/code-viewer/code-viewer.component';
 import { AttachmentStripComponent } from './attachment-strip/attachment-strip.component';
 import { ChecklistEditorComponent } from './checklist-editor/checklist-editor.component';
-import { CopyButtonComponent } from '../ui/copy-button/copy-button.component';
+import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component';
 import { LifecycleBadgeComponent } from './lifecycle-badge/lifecycle-badge.component';
 import { PlaceholderPanelComponent } from './placeholder-panel/placeholder-panel.component';
 import { TagPillComponent } from '@notes/ui/tag-pill/tag-pill.component';

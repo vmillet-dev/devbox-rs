@@ -10,17 +10,17 @@ import { provideRouter, withHashLocation } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 
 import { routes } from './app.routes';
-import { AppErrorHandler } from '@core/errors/app-error-handler';
-import { APP_LOCALES, DEFAULT_LOCALE } from '@core/i18n/locale.model';
-import { LocaleService } from '@core/i18n/locale.service';
-import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
-import { AutostartService } from '@core/autostart/autostart.service';
-import { PreferencesService } from '@core/preferences/preferences.service';
-import { SettingsStore } from '@core/settings/settings.store';
-import { GlobalShortcutsService } from '@core/shortcuts/global-shortcuts.service';
-import { TrayService } from '@core/tray/tray.service';
-import { UpdateStore } from '@core/updates/update.store';
-import { WindowBehaviorService } from '@core/window/window-behavior.service';
+import { AppErrorHandler } from '@core/services/errors/app-error-handler';
+import { APP_LOCALES, DEFAULT_LOCALE } from '@core/services/i18n/locale.model';
+import { LocaleService } from '@core/services/i18n/locale.service';
+import { AppTranslocoLoader } from '@core/services/i18n/transloco-loader';
+import { AutostartService } from '@core/services/autostart/autostart.service';
+import { PreferencesService } from '@core/services/preferences/preferences.service';
+import { SettingsStore } from '@core/services/settings/settings.store';
+import { GlobalShortcutsService } from '@core/services/shortcuts/global-shortcuts.service';
+import { TrayService } from '@core/services/tray/tray.service';
+import { UpdateStore } from '@core/services/updates/update.store';
+import { WindowBehaviorService } from '@core/services/window/window-behavior.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [

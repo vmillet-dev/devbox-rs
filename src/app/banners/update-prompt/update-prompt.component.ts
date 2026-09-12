@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { TranslationRef } from '@core/i18n/translation-ref.model';
-import { UpdateStore } from '@core/updates/update.store';
+import { TranslationRef } from '@core/services/i18n/translation-ref.model';
+import { UpdateStore } from '@core/services/updates/update.store';
 import { DialogComponent } from '@shared/dialog/dialog.component';
 
 /**

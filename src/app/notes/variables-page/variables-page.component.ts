@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { VariablesStore } from '@notes/state/variables.store';
-import { Variable, isVariableName } from '@notes/model/variable.model';
+import { VariablesStore } from '@core/state/variables.store';
+import { Variable, isVariableName } from '@core/model/variable.model';
 
 function typedValue(event: Event): string {
   return (event.target as HTMLInputElement).value;

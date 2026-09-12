@@ -1,8 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { ClipboardService } from '@core/clipboard/clipboard.service';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
-import { FileDialogService } from '@core/dialogs/file-dialog.service';
-import { StatusNotifier } from '@core/notifications/status.service';
+import { ClipboardService } from '@core/services/clipboard/clipboard.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { FileDialogService } from '@core/services/dialogs/file-dialog.service';
+import { StatusNotifier } from '@core/services/notifications/status.service';
 import { TransferRepository } from '../data/transfer.repository';
 import { NotesRevision } from './notes-revision';
 

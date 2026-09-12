@@ -1,10 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { StatusNotifier } from '@core/notifications/status.service';
-import { NoteSelectionStore } from '@notes/state/note-selection.store';
-import { NotesQueryStore } from '@notes/state/notes-query.store';
-import { SpacesStore } from '@notes/state/spaces.store';
-import { Space } from '@notes/model/space.model';
+import { StatusNotifier } from '@core/services/notifications/status.service';
+import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { NotesQueryStore } from '@core/state/notes-query.store';
+import { SpacesStore } from '@core/state/spaces.store';
+import { Space } from '@core/model/space.model';
 import { FakeAppWindow } from '@testing/fake-app-window';
 import { FakeClipboard } from '@testing/fake-clipboard';
 import { FakeFileDialog } from '@testing/fake-file-dialog';

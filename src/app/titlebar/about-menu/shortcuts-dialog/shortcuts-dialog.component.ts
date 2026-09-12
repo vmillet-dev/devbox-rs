@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { SettingsStore } from '@core/settings/settings.store';
-import { DEFAULT_SHORTCUTS, ShortcutGroup, acceleratorKeys } from '@core/shortcuts/shortcut.model';
+import { SettingsStore } from '@core/services/settings/settings.store';
+import { DEFAULT_SHORTCUTS, ShortcutGroup, acceleratorKeys } from '@core/services/shortcuts/shortcut.model';
 import { NOTES_SHORTCUT_GROUPS } from '@notes/notes-shortcuts';
 import { DialogComponent } from '@shared/dialog/dialog.component';
 

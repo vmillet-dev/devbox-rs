@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogComponent } from '@shared/dialog/dialog.component';
-import { Placeholder } from '@notes/model/note.model';
+import { Placeholder } from '@core/model/note.model';
 import {
   PlaceholderFieldsComponent,
   PlaceholderValue,
-} from '../ui/placeholder-fields/placeholder-fields.component';
+} from '@notes/ui/placeholder-fields/placeholder-fields.component';
 
 /**
  * Seeded with the values **already stored** on the note: there is one set per note, and

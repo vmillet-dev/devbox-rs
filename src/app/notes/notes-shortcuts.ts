@@ -1,4 +1,4 @@
-import { ShortcutGroup } from '@core/shortcuts/shortcut.model';
+import { ShortcutGroup } from '@core/services/shortcuts/shortcut.model';
 import { CANVAS_SHORTCUT_GROUP } from './canvas-keyboard.directive';
 
 /**

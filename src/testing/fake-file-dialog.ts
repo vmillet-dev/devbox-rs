@@ -1,4 +1,4 @@
-import { FileDialogAdapter } from '@core/dialogs/file-dialog.service';
+import { FileDialogAdapter } from '@core/services/dialogs/file-dialog.service';
 import type { OpenDialogOptions, SaveDialogOptions } from '@tauri-apps/plugin-dialog';
 
 /**

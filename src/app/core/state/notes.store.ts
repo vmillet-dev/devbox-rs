@@ -1,11 +1,11 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { NotesRepository } from '../data/notes.repository';
-import { ClipboardService } from '@core/clipboard/clipboard.service';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
-import { FALLBACK_LANGUAGE } from '@notes/model/language.model';
+import { ClipboardService } from '@core/services/clipboard/clipboard.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { FALLBACK_LANGUAGE } from '@core/model/language.model';
 import { ChecklistItem, Note, NoteDraft, NoteKind, NoteLifecycle, NotePatch } from '../model/note.model';
-import { ClockService } from '@core/time/clock.service';
-import { debounced } from '@core/time/debounce';
+import { ClockService } from '@core/services/time/clock.service';
+import { debounced } from '@core/services/time/debounce';
 import { NoteSelectionStore } from './note-selection.store';
 import { NotesQueryStore } from './notes-query.store';
 import { SpacesStore } from './spaces.store';

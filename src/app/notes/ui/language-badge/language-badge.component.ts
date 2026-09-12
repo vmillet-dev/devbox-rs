@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { LANGUAGE_LABELS, LanguageTag } from '@notes/model/language.model';
+import { LANGUAGE_LABELS, LanguageTag } from '@core/model/language.model';
 
 @Component({
   selector: 'app-language-badge',

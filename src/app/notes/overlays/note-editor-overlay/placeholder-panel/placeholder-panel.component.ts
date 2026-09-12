@@ -8,7 +8,7 @@ import {
   untracked,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Placeholder } from '@notes/model/note.model';
+import { Placeholder } from '@core/model/note.model';
 import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component';
 import {
   PlaceholderFieldsComponent,

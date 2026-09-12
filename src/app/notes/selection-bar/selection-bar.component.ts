@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Space } from '@notes/model/space.model';
+import { Space } from '@core/model/space.model';
 
 /**
  * Only appears when there is a selection: a permanently empty bar would eat canvas

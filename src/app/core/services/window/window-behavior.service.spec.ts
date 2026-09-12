@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { type MockInstance, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commands } from '@core/ipc/bindings';
-import { SettingsStore } from '@core/settings/settings.store';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { WindowBehaviorService } from './window-behavior.service';
 
 describe('WindowBehaviorService', () => {

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PreferencesService } from '@core/preferences/preferences.service';
+import { PreferencesService } from '@core/services/preferences/preferences.service';
 import { SETTINGS_KEYS } from './app-settings.model';
 import { SettingsStore } from './settings.store';
 

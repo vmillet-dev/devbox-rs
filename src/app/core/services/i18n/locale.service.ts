@@ -1,7 +1,7 @@
 import { Injectable, Signal, computed, effect, inject } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { LocaleChoice } from '@core/settings/app-settings.model';
-import { SettingsStore } from '@core/settings/settings.store';
+import { LocaleChoice } from '@core/services/settings/app-settings.model';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { AppLocale, DEFAULT_LOCALE, isAppLocale, resolveSystemLocale } from './locale.model';
 
 /**

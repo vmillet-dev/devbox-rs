@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CLIPBOARD_ADAPTER, ClipboardAdapter } from '@core/clipboard/clipboard.service';
+import { CLIPBOARD_ADAPTER, ClipboardAdapter } from '@core/services/clipboard/clipboard.service';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { CopyButtonComponent } from './copy-button.component';
 

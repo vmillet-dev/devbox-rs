@@ -1,9 +1,9 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
-import { FileDialogService } from '@core/dialogs/file-dialog.service';
-import { StatusNotifier } from '@core/notifications/status.service';
-import { ClockService } from '@core/time/clock.service';
-import { FileDropService } from '@core/window/file-drop.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { FileDialogService } from '@core/services/dialogs/file-dialog.service';
+import { StatusNotifier } from '@core/services/notifications/status.service';
+import { ClockService } from '@core/services/time/clock.service';
+import { FileDropService } from '@core/services/window/file-drop.service';
 import { AttachmentsRepository } from '../data/attachments.repository';
 import { Attachment } from '../model/note.model';
 import { NotesStore } from './notes.store';

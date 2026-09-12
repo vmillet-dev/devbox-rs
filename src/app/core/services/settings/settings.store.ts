@@ -1,5 +1,5 @@
 import { Injectable, Signal, computed, effect, inject, signal } from '@angular/core';
-import { PreferencesService } from '@core/preferences/preferences.service';
+import { PreferencesService } from '@core/services/preferences/preferences.service';
 import {
   AppSettings,
   DEFAULT_SETTINGS,

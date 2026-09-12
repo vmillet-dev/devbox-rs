@@ -10,7 +10,7 @@ import sql from 'highlight.js/lib/languages/sql';
 import typescript from 'highlight.js/lib/languages/typescript';
 import xml from 'highlight.js/lib/languages/xml';
 import yaml from 'highlight.js/lib/languages/yaml';
-import { LanguageTag } from '@notes/model/language.model';
+import { LanguageTag } from '@core/model/language.model';
 
 /**
  * Grammars are imported **one by one** from `highlight.js/lib/`: the full package carries

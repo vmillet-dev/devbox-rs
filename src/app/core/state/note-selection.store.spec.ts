@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { createNote } from '@testing/note.fixture';
 import { NotesHarness, awaitQuery, createNotesHarness, visibleIds } from '@testing/notes-harness';
 

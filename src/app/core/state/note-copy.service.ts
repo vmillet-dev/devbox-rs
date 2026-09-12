@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { ClipboardService } from '@core/clipboard/clipboard.service';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { ClipboardService } from '@core/services/clipboard/clipboard.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 
 /**
  * A service rather than a method on whoever needs it: copying happens from the canvas,

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 
 /**
  * The global error banner. On a desktop app the console is not an interface: a

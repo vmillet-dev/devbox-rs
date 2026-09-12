@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { APP_INFO } from '@core/app-info/app-info.service';
+import { APP_INFO } from '@core/services/app-info/app-info.service';
 import en from './translations/en.json';
 import fr from './translations/fr.json';
 import { AppTranslocoLoader } from './transloco-loader';

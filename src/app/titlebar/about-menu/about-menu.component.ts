@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { TranslationRef } from '@core/i18n/translation-ref.model';
-import { UpdateStore } from '@core/updates/update.store';
+import { TranslationRef } from '@core/services/i18n/translation-ref.model';
+import { UpdateStore } from '@core/services/updates/update.store';
 import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 import { AboutDialogComponent } from '@titlebar/about-menu/about-dialog/about-dialog.component';

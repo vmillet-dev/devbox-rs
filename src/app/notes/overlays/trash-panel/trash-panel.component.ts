@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { TranslationRef } from '@core/i18n/translation-ref.model';
-import { ClockService } from '@core/time/clock.service';
-import { relativeTimeRef } from '@core/time/relative-time.util';
+import { TranslationRef } from '@core/services/i18n/translation-ref.model';
+import { ClockService } from '@core/services/time/clock.service';
+import { relativeTimeRef } from '@core/services/time/relative-time.util';
 import { DialogComponent } from '@shared/dialog/dialog.component';
-import { TrashedNote } from '@notes/model/note.model';
+import { TrashedNote } from '@core/model/note.model';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const SNIPPET_LINES = 2;

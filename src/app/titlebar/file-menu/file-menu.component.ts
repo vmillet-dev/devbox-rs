@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, Signal, computed, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ClockService } from '@core/time/clock.service';
-import { AppWindowService } from '@core/window/app-window.service';
-import { LibraryStore } from '@notes/state/library.store';
-import { NoteSelectionStore } from '@notes/state/note-selection.store';
-import { SpacesStore } from '@notes/state/spaces.store';
+import { ClockService } from '@core/services/time/clock.service';
+import { AppWindowService } from '@core/services/window/app-window.service';
+import { LibraryStore } from '@core/state/library.store';
+import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { SpacesStore } from '@core/state/spaces.store';
 import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 import { SettingsDialogComponent } from '@titlebar/file-menu/settings-dialog/settings-dialog.component';

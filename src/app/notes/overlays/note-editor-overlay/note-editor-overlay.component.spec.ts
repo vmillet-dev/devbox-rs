@@ -1,13 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PreferencesService } from '@core/preferences/preferences.service';
+import { PreferencesService } from '@core/services/preferences/preferences.service';
 import { CodeViewerComponent } from '@notes/ui/code-viewer/code-viewer.component';
 import { LifecycleBadgeComponent } from './lifecycle-badge/lifecycle-badge.component';
 import { TagPillComponent } from '@notes/ui/tag-pill/tag-pill.component';
-import { NotePatch } from '@notes/model/note.model';
-import { AttachmentsStore } from '@notes/state/attachments.store';
-import { PlaceholderFillStore } from '@notes/state/placeholder-fill.store';
+import { NotePatch } from '@core/model/note.model';
+import { AttachmentsStore } from '@core/state/attachments.store';
+import { PlaceholderFillStore } from '@core/state/placeholder-fill.store';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
 import { NoteEditorOverlayComponent } from './note-editor-overlay.component';

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, input, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ClipboardService } from '@core/clipboard/clipboard.service';
+import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 
 /** Long enough to be seen, short enough not to follow the mouse to the next card. */
 const FEEDBACK_MS = 2000;

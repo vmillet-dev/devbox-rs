@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogComponent } from '@shared/dialog/dialog.component';
-import { TagUsage } from '@notes/model/note.model';
+import { TagUsage } from '@core/model/note.model';
 
 /**
  * One destination field for both renaming **and** merging: in the database it is the

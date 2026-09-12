@@ -1,7 +1,7 @@
 import { InjectionToken, Injectable, inject } from '@angular/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import type { OpenDialogOptions, SaveDialogOptions } from '@tauri-apps/plugin-dialog';
-import { APP_INFO } from '@core/app-info/app-info.service';
+import { APP_INFO } from '@core/services/app-info/app-info.service';
 
 /**
  * A token rather than a direct call, for the same practical reason as `CLIPBOARD_ADAPTER`:

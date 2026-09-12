@@ -1,6 +1,6 @@
 import { InjectionToken, Injectable, Injector, effect, inject } from '@angular/core';
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
-import { SettingsStore } from '@core/settings/settings.store';
+import { SettingsStore } from '@core/services/settings/settings.store';
 
 /** A token rather than a direct call, for the same reason as `PREFERENCES_STORE_LOADER`. */
 export interface AutostartAdapter {

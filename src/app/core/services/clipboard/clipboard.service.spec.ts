@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { StatusNotifier } from '@core/notifications/status.service';
-import { SettingsStore } from '@core/settings/settings.store';
+import { StatusNotifier } from '@core/services/notifications/status.service';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { CLIPBOARD_ADAPTER, ClipboardAdapter, ClipboardService } from './clipboard.service';
 
 function fakeAdapter(overrides: Partial<ClipboardAdapter> = {}): ClipboardAdapter {

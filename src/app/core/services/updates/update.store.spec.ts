@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { FakeUpdater } from '@testing/fake-updater';
 import { UpdateStore } from './update.store';
 import { UpdaterService } from './updater.service';

@@ -1,4 +1,4 @@
-import { AppWindowAdapter } from '@core/window/app-window.service';
+import { AppWindowAdapter } from '@core/services/window/app-window.service';
 
 /** Substituted in every spec: a real `exit()` would take the test runner down. */
 export class FakeAppWindow implements AppWindowAdapter {

@@ -10,15 +10,15 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { checklistProgress, noteCopyText } from '@notes/model/checklist.model';
-import { Note } from '@notes/model/note.model';
-import { NoteSelectionStore } from '@notes/state/note-selection.store';
-import { NotesStore } from '@notes/state/notes.store';
-import { PlaceholderFillStore } from '@notes/state/placeholder-fill.store';
-import { SpacesStore } from '@notes/state/spaces.store';
-import { TranslationRef } from '@core/i18n/translation-ref.model';
-import { ClockService } from '@core/time/clock.service';
-import { expiryRef, relativeTimeRef } from '@core/time/relative-time.util';
+import { checklistProgress, noteCopyText } from '@core/model/checklist.model';
+import { Note } from '@core/model/note.model';
+import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { NotesStore } from '@core/state/notes.store';
+import { PlaceholderFillStore } from '@core/state/placeholder-fill.store';
+import { SpacesStore } from '@core/state/spaces.store';
+import { TranslationRef } from '@core/services/i18n/translation-ref.model';
+import { ClockService } from '@core/services/time/clock.service';
+import { expiryRef, relativeTimeRef } from '@core/services/time/relative-time.util';
 import { CodeViewerComponent } from '@notes/ui/code-viewer/code-viewer.component';
 import { LanguageBadgeComponent } from '@notes/ui/language-badge/language-badge.component';
 import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component';

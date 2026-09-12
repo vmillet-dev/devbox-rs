@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
-import { StatusNotifier } from '@core/notifications/status.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { StatusNotifier } from '@core/services/notifications/status.service';
 import { FakeClipboard } from '@testing/fake-clipboard';
 import { FakeFileDialog } from '@testing/fake-file-dialog';
 import { FakeTransferRepository } from '@testing/fake-transfer-repository';

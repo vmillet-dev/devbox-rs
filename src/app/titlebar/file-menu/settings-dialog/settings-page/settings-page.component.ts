@@ -7,9 +7,9 @@ import {
   LocaleChoice,
   THEME_CHOICES,
   ThemeChoice,
-} from '@core/settings/app-settings.model';
-import { SettingsStore } from '@core/settings/settings.store';
-import { DEFAULT_SHORTCUTS, acceleratorFromEvent } from '@core/shortcuts/shortcut.model';
+} from '@core/services/settings/app-settings.model';
+import { SettingsStore } from '@core/services/settings/settings.store';
+import { DEFAULT_SHORTCUTS, acceleratorFromEvent } from '@core/services/shortcuts/shortcut.model';
 
 /** A native control's `value`, without an `$any` in the template. */
 function selectedValue(event: Event): string {

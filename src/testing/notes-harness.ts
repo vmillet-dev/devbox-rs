@@ -1,11 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { expect, vi } from 'vitest';
-import { Note } from '@notes/model/note.model';
-import { Space } from '@notes/model/space.model';
-import { NoteSelectionStore } from '@notes/state/note-selection.store';
-import { NotesQueryStore } from '@notes/state/notes-query.store';
-import { NotesStore } from '@notes/state/notes.store';
-import { SpacesStore } from '@notes/state/spaces.store';
+import { Note } from '@core/model/note.model';
+import { Space } from '@core/model/space.model';
+import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { NotesQueryStore } from '@core/state/notes-query.store';
+import { NotesStore } from '@core/state/notes.store';
+import { SpacesStore } from '@core/state/spaces.store';
 import { FakeClipboard } from './fake-clipboard';
 import { FakeNotesRepository } from './fake-notes-repository';
 import { provideAppTesting } from './testing.providers';

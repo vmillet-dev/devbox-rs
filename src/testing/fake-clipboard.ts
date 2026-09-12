@@ -1,4 +1,4 @@
-import { ClipboardAdapter } from '@core/clipboard/clipboard.service';
+import { ClipboardAdapter } from '@core/services/clipboard/clipboard.service';
 import { FailsNext, guard } from './fail-next';
 
 /**

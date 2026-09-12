@@ -1,7 +1,7 @@
 import { Injectable, Injector, effect, inject } from '@angular/core';
 import { commands } from '@core/ipc/bindings';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
-import { SettingsStore } from '@core/settings/settings.store';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { DEFAULT_SHORTCUTS, ShortcutBindings } from './shortcut.model';
 
 /**

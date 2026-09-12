@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
-import { ClockService } from '@core/time/clock.service';
-import { PreferencesService } from '@core/preferences/preferences.service';
+import { ClockService } from '@core/services/time/clock.service';
+import { PreferencesService } from '@core/services/preferences/preferences.service';
 import { NotesRepository } from '../data/notes.repository';
 import { SpacesRepository } from '../data/spaces.repository';
 import { NoteDraft } from '../model/note.model';

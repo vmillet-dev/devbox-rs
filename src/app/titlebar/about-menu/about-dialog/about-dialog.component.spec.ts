@@ -2,7 +2,7 @@ import { VERSION } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { APP_INFO, AppInfoService } from '@core/app-info/app-info.service';
+import { APP_INFO, AppInfoService } from '@core/services/app-info/app-info.service';
 import { FakeAppInfo } from '@testing/fake-app-info';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { AboutDialogComponent } from './about-dialog.component';

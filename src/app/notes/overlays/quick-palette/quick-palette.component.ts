@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogComponent } from '@shared/dialog/dialog.component';
 import { LanguageBadgeComponent } from '@notes/ui/language-badge/language-badge.component';
-import { Note } from '@notes/model/note.model';
+import { Note } from '@core/model/note.model';
 
 const SNIPPET_LINES = 2;
 

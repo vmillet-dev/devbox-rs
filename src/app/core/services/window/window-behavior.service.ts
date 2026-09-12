@@ -1,6 +1,6 @@
 import { Injectable, Injector, effect, inject } from '@angular/core';
 import { commands } from '@core/ipc/bindings';
-import { SettingsStore } from '@core/settings/settings.store';
+import { SettingsStore } from '@core/services/settings/settings.store';
 
 /**
  * Pushed to the native side like the tray labels: the preference lives in

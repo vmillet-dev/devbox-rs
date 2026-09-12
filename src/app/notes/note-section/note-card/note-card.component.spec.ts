@@ -1,12 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Space } from '@notes/model/space.model';
+import { Space } from '@core/model/space.model';
 import { LanguageBadgeComponent } from '@notes/ui/language-badge/language-badge.component';
-import { NoteSelectionStore } from '@notes/state/note-selection.store';
-import { NotesQueryStore } from '@notes/state/notes-query.store';
-import { NotesStore } from '@notes/state/notes.store';
-import { PlaceholderFillStore } from '@notes/state/placeholder-fill.store';
+import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { NotesQueryStore } from '@core/state/notes-query.store';
+import { NotesStore } from '@core/state/notes.store';
+import { PlaceholderFillStore } from '@core/state/placeholder-fill.store';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
 import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component';

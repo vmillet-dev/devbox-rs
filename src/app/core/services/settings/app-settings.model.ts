@@ -1,5 +1,5 @@
-import { APP_LOCALES } from '@core/i18n/locale.model';
-import { DEFAULT_SHORTCUTS } from '@core/shortcuts/shortcut.model';
+import { APP_LOCALES } from '@core/services/i18n/locale.model';
+import { DEFAULT_SHORTCUTS } from '@core/services/shortcuts/shortcut.model';
 
 /**
  * The application's settings, and nothing else: this file imports neither Angular nor

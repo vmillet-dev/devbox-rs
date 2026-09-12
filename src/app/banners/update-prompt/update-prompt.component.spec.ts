@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { UpdateStore } from '@core/updates/update.store';
-import { UpdaterService } from '@core/updates/updater.service';
+import { UpdateStore } from '@core/services/updates/update.store';
+import { UpdaterService } from '@core/services/updates/updater.service';
 import { FakeUpdater } from '@testing/fake-updater';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { UpdatePromptComponent } from './update-prompt.component';

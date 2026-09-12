@@ -1,6 +1,6 @@
 import { Injectable, Signal, signal } from '@angular/core';
 import { TranslationRef } from '../i18n/translation-ref.model';
-import { IpcError, IpcErrorCode } from '../ipc/ipc.error';
+import { IpcError, IpcErrorCode } from '@core/ipc/ipc.error';
 
 export interface AppNotice {
   readonly ref: TranslationRef;

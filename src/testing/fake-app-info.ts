@@ -1,5 +1,5 @@
 import { Signal, signal } from '@angular/core';
-import { AppInfoService } from '@core/app-info/app-info.service';
+import { AppInfoService } from '@core/services/app-info/app-info.service';
 
 /**
  * The real one calls `getVersion()` eagerly from a `resource`, which needs the Tauri

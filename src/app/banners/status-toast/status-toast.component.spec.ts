@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { StatusNotifier } from '@core/notifications/status.service';
+import { StatusNotifier } from '@core/services/notifications/status.service';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { StatusToastComponent } from './status-toast.component';
 

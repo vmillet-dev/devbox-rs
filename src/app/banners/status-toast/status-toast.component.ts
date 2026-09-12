@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { StatusNotifier } from '@core/notifications/status.service';
+import { StatusNotifier } from '@core/services/notifications/status.service';
 
 /**
  * In the same place as the error banner, and for the same reason: without something on

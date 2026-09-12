@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, output, resource } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AppInfoService } from '@core/app-info/app-info.service';
-import { ChangelogRelease, ChangelogService, RELEASES_URL } from '@core/app-info/changelog.service';
+import { AppInfoService } from '@core/services/app-info/app-info.service';
+import { ChangelogRelease, ChangelogService, RELEASES_URL } from '@core/services/app-info/changelog.service';
 import { DialogComponent } from '@shared/dialog/dialog.component';
 
 const RELEASES_LABEL = RELEASES_URL.replace(/^https:\/\//, '');

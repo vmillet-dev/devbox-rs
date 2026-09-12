@@ -1,5 +1,5 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { StatusNotifier } from '@core/notifications/status.service';
+import { StatusNotifier } from '@core/services/notifications/status.service';
 import { Note } from '../model/note.model';
 import { NoteCopyService } from './note-copy.service';
 import { NotesQueryStore } from './notes-query.store';

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Translation, TranslocoLoader } from '@jsverse/transloco';
 import { Observable, of } from 'rxjs';
-import { APP_INFO } from '@core/app-info/app-info.service';
+import { APP_INFO } from '@core/services/app-info/app-info.service';
 import en from './translations/en.json';
 import fr from './translations/fr.json';
 

@@ -1,10 +1,10 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { ClipboardService } from '@core/clipboard/clipboard.service';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
-import { SettingsStore } from '@core/settings/settings.store';
-import { SEARCH_DEBOUNCE_MS, debounced } from '@core/time/debounce';
-import { ClockService } from '@core/time/clock.service';
-import { AppWindowService } from '@core/window/app-window.service';
+import { ClipboardService } from '@core/services/clipboard/clipboard.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { SettingsStore } from '@core/services/settings/settings.store';
+import { SEARCH_DEBOUNCE_MS, debounced } from '@core/services/time/debounce';
+import { ClockService } from '@core/services/time/clock.service';
+import { AppWindowService } from '@core/services/window/app-window.service';
 import { NotesRepository } from '../data/notes.repository';
 import { noteCopyText } from '../model/checklist.model';
 import { Note } from '../model/note.model';

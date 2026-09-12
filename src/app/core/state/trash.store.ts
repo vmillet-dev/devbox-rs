@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { ErrorNotifier } from '@core/errors/error-notifier.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { NotesRepository } from '../data/notes.repository';
 import { TrashedNote } from '../model/note.model';
 import { NotesRevision } from './notes-revision';

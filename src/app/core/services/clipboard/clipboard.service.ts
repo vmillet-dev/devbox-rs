@@ -1,7 +1,7 @@
 import { InjectionToken, Injectable, inject } from '@angular/core';
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { StatusNotifier } from '@core/notifications/status.service';
-import { SettingsStore } from '@core/settings/settings.store';
+import { StatusNotifier } from '@core/services/notifications/status.service';
+import { SettingsStore } from '@core/services/settings/settings.store';
 
 /** A token rather than a direct call, for the same reason as `PREFERENCES_STORE_LOADER`. */
 export interface ClipboardAdapter {

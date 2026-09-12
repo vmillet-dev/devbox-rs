@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Placeholder } from '@notes/model/note.model';
+import { Placeholder } from '@core/model/note.model';
 
 export interface PlaceholderValue {
   readonly name: string;

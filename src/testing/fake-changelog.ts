@@ -1,4 +1,4 @@
-import { ChangelogRelease } from '@core/app-info/changelog.service';
+import { ChangelogRelease } from '@core/services/app-info/changelog.service';
 
 /**
  * The real one goes through the Tauri bridge and the `opener` plugin, neither of which

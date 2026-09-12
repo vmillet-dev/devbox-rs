@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SettingsStore } from '@core/settings/settings.store';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { AUTOSTART_ADAPTER, AutostartAdapter, AutostartService } from './autostart.service';
 
 function fakeAdapter(enabled = false) {

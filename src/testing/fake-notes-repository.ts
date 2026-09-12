@@ -1,7 +1,7 @@
 import { guard } from './fail-next';
-import { NotesRepository } from '@notes/data/notes.repository';
-import { Note, NoteDraft, NotePatch, TagUsage, TrashedNote } from '@notes/model/note.model';
-import { NotesQuery, NotesView } from '@notes/model/note.model';
+import { NotesRepository } from '@core/data/notes.repository';
+import { Note, NoteDraft, NotePatch, TagUsage, TrashedNote } from '@core/model/note.model';
+import { NotesQuery, NotesView } from '@core/model/note.model';
 import { checklistMarkdown } from './note.fixture';
 
 /** Mirrors `notes::trash::RETENTION`, so the double's `purgeAt` is plausible. */
