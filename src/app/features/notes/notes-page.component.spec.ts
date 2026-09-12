@@ -3,7 +3,6 @@ import { Provider } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EVENT_SUBSCRIBER, EventSubscriber, GlobalAction } from '@core/ipc/app-events.service';
-import { AppMenuRegistry } from '@core/menu/app-menu.registry';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { StatusNotifier } from '@core/notifications/status.service';
 import { FILE_DROP_SUBSCRIBER, FileDropSubscriber } from '@core/window/file-drop.service';
@@ -57,7 +56,6 @@ describe('NotesPageComponent', () => {
   let fileDialog: FakeFileDialog;
   let clipboard: FakeClipboard;
   let appWindow: FakeAppWindow;
-  let menu: AppMenuRegistry;
 
   /** Native pushes the page subscribes to; the spec fires them by hand. */
   let fireAction: (action: GlobalAction) => void;
@@ -131,7 +129,6 @@ describe('NotesPageComponent', () => {
     canvas = TestBed.inject(NotesQueryStore);
     selection = TestBed.inject(NoteSelectionStore);
     spaces = TestBed.inject(SpacesStore);
-    menu = TestBed.inject(AppMenuRegistry);
     fixture.autoDetectChanges();
     await vi.waitFor(() => expect(spaces.spaces()).toHaveLength(SPACES.length));
     await vi.waitFor(() => expect(actionHandler).not.toBeNull());
@@ -432,110 +429,8 @@ describe('NotesPageComponent', () => {
     });
   });
 
-  describe('file menu', () => {
-    function run(id: string): void {
-      menu
-        .entries()
-        .find((entry) => entry.id === id)!
-        .run();
-    }
-
-    it('contributes its entries to the title bar, which knows no feature', () => {
-      expect(menu.entries().map((entry) => entry.id)).toEqual([
-        'notes.import',
-        'notes.exportAll',
-        'notes.exportSpace',
-        'notes.exportSelection',
-        'notes.copyMarkdown',
-      ]);
-    });
-
-    it('takes its entries back when the page goes away', () => {
-      fixture.destroy();
-
-      expect(menu.entries()).toEqual([]);
-    });
-
-    it('keeps "export this space" unavailable until a space is active', async () => {
-      const entry = menu.entries().find((candidate) => candidate.id === 'notes.exportSpace')!;
-      expect(entry.disabled!()).toBe(true);
-
-      spaces.selectSpace('work');
-      await fixture.whenStable();
-
-      expect(entry.disabled!()).toBe(false);
-    });
-
-    it('keeps the selection entries unavailable until notes are checked', async () => {
-      const ids = ['notes.exportSelection', 'notes.copyMarkdown'];
-      const entries = menu.entries().filter((entry) => ids.includes(entry.id));
-      expect(entries.map((entry) => entry.disabled!())).toEqual([true, true]);
-
-      selection.toggleChecked('note-42');
-      await fixture.whenStable();
-
-      expect(entries.map((entry) => entry.disabled!())).toEqual([false, false]);
-    });
-
-    it('reloads spaces and canvas once an import brought notes in', async () => {
-      fileDialog.openPath = 'C:\\bundles\\devbox-2026-01-01.json';
-      const queries = repository.queryCount;
-
-      run('notes.import');
-
-      await vi.waitFor(() => expect(transferRepository.importedFrom).toBe(fileDialog.openPath));
-      await vi.waitFor(() => expect(repository.queryCount).toBeGreaterThan(queries));
-    });
-
-    it('leaves the canvas alone when the import added nothing', async () => {
-      fileDialog.openPath = 'C:\\bundles\\same-again.json';
-      transferRepository.importReport = { spacesCreated: 0, notesImported: 0, notesSkipped: 4 };
-      const queries = repository.queryCount;
-
-      run('notes.import');
-
-      await vi.waitFor(() => expect(transferRepository.importedFrom).not.toBeNull());
-      await fixture.whenStable();
-      expect(repository.queryCount).toBe(queries);
-    });
-
-    it('exports the whole corpus, then only the active space', async () => {
-      fileDialog.savePath = 'C:\\out\\all.json';
-
-      run('notes.exportAll');
-      await vi.waitFor(() =>
-        expect(transferRepository.exportedTo).toEqual({ path: 'C:\\out\\all.json', spaceId: null }),
-      );
-
-      spaces.selectSpace('work');
-      await fixture.whenStable();
-      run('notes.exportSpace');
-
-      await vi.waitFor(() => expect(transferRepository.exportedTo?.spaceId).toBe('work'));
-    });
-
-    it('exports exactly the checked notes', async () => {
-      fileDialog.savePath = 'C:\\out\\selection.json';
-      selection.toggleChecked('note-42');
-      await fixture.whenStable();
-
-      run('notes.exportSelection');
-
-      await vi.waitFor(() => expect(transferRepository.exportedIds).toEqual(['note-42']));
-    });
-
-    it('copies the checked notes as markdown rather than sending them anywhere', async () => {
-      selection.toggleChecked('note-42');
-      await fixture.whenStable();
-
-      run('notes.copyMarkdown');
-
-      await vi.waitFor(() => expect(clipboard.content).toBe(transferRepository.markdown));
-      expect(transferRepository.sharedIds).toEqual(['note-42']);
-      expect(TestBed.inject(StatusNotifier).status()?.key).toBe('file.copied');
-    });
-
-    it('copies the checked notes from the selection bar too', async () => {
+  describe('bulk actions', () => {
+    it('copies the checked notes as markdown from the selection bar', async () => {
       selection.toggleChecked('note-42');
       await fixture.whenStable();
 

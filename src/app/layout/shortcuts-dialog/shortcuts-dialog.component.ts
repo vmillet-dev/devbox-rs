@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SettingsStore } from '@core/settings/settings.store';
-import { DEFAULT_SHORTCUTS, acceleratorKeys } from '@core/shortcuts/shortcut.model';
-import { ShortcutGroup, ShortcutsRegistry } from '@core/shortcuts/shortcuts.registry';
+import { DEFAULT_SHORTCUTS, ShortcutGroup, acceleratorKeys } from '@core/shortcuts/shortcut.model';
+import { NOTES_SHORTCUT_GROUPS } from '@features/notes/ui/notes-shortcuts';
 import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 
 /**
@@ -11,8 +11,8 @@ import { DialogComponent } from '@shared/ui/dialog/dialog.component';
  * front has started, and the quick-paste one follows a preference — reading
  * `SettingsStore` is what makes the sheet show the key that is really bound.
  *
- * Everything else comes from [`ShortcutsRegistry`]. The sheet is read-only on purpose:
- * the one shortcut that can be changed is changed in the preferences.
+ * The sheet is read-only on purpose: the one shortcut that can be changed is changed in
+ * the preferences.
  */
 @Component({
   selector: 'app-shortcuts-dialog',
@@ -22,7 +22,6 @@ import { DialogComponent } from '@shared/ui/dialog/dialog.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ShortcutsDialogComponent {
-  private readonly registry = inject(ShortcutsRegistry);
   private readonly settings = inject(SettingsStore);
 
   readonly closed = output<void>();
@@ -31,8 +30,7 @@ export class ShortcutsDialogComponent {
     {
       id: 'global',
       labelKey: 'shortcuts.groups.global',
-      // Ahead of every registered group: these keys work with the window closed.
-      order: 0,
+      // First: these keys work with the window closed.
       shortcuts: [
         {
           keys: acceleratorKeys(this.settings.paletteShortcut()),
@@ -42,6 +40,6 @@ export class ShortcutsDialogComponent {
         { keys: acceleratorKeys(DEFAULT_SHORTCUTS.newNote), labelKey: 'shortcuts.global.newNote' },
       ],
     },
-    ...this.registry.groups(),
+    ...NOTES_SHORTCUT_GROUPS,
   ]);
 }

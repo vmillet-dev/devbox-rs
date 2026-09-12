@@ -3,6 +3,23 @@ import type { ShortcutBindings } from '@core/ipc/bindings';
 export type { ShortcutBindings };
 
 /**
+ * `keys` is already split — `['Ctrl', 'K']` and not `'Ctrl+K'` — because each one is
+ * rendered as its own `<kbd>`. A step that is not a key press (`Ctrl` + click, a drag) is
+ * spelled out in the label instead: a `<kbd>Click</kbd>` would read as a key to press.
+ */
+export interface ShortcutEntry {
+  readonly keys: readonly string[];
+  readonly labelKey: string;
+}
+
+/** A heading of the sheet, owned whole by whoever owns those keys. */
+export interface ShortcutGroup {
+  readonly id: string;
+  readonly labelKey: string;
+  readonly shortcuts: readonly ShortcutEntry[];
+}
+
+/**
  * ⚠️ Mirror of `ShortcutBindings::defaults()` (`src-tauri/src/desktop.rs`), and
  * deliberately so: the native side takes these **before** the front has started, and
  * without them `Ctrl+Alt+P` would be dead for the length of the first render.

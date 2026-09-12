@@ -1,20 +1,10 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SettingsRegistry } from '@core/settings/settings-registry';
 import { provideAppTesting } from '@testing/testing.providers';
 import { SettingsDialogComponent } from './settings-dialog.component';
 
-@Component({
-  selector: 'app-contributed-page',
-  template: '<p class="contributed">Contribué</p>',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-})
-class ContributedPageComponent {}
-
 describe('SettingsDialogComponent', () => {
   let fixture: ComponentFixture<SettingsDialogComponent>;
-  let registry: SettingsRegistry;
 
   function railOptions(): HTMLButtonElement[] {
     return [...fixture.nativeElement.querySelectorAll('.settings-rail-option')];
@@ -38,7 +28,6 @@ describe('SettingsDialogComponent', () => {
       imports: [SettingsDialogComponent],
       providers: [provideAppTesting()],
     });
-    registry = TestBed.inject(SettingsRegistry);
   });
 
   it('names itself to the dialog shell by its own title', async () => {
@@ -49,75 +38,27 @@ describe('SettingsDialogComponent', () => {
     expect(panel.getAttribute('aria-labelledby')).toBe('settings-dialog-title');
   });
 
-  it('offers its own page even with no feature loaded', async () => {
-    await render();
-
-    expect(railOptions().map((option) => option.textContent?.trim())).toEqual(['Paramètres']);
-  });
-
-  it('shows what a feature contributed, after its own page', async () => {
-    registry.register([
-      {
-        id: 'notes.variables',
-        labelKey: 'settings.pages.variables',
-        order: 20,
-        component: ContributedPageComponent,
-      },
-    ]);
+  it('lists its pages in the order it declares them', async () => {
     await render();
 
     expect(railOptions().map((option) => option.textContent?.trim())).toEqual(['Paramètres', 'Variables']);
   });
 
   it('opens on the settings page, which is what the menu entry promised', async () => {
-    registry.register([
-      {
-        id: 'notes.variables',
-        labelKey: 'settings.pages.variables',
-        order: 20,
-        component: ContributedPageComponent,
-      },
-    ]);
     await render();
 
     expect(optionLabelled('Paramètres').getAttribute('aria-current')).toBe('page');
-    expect(fixture.nativeElement.querySelector('.contributed')).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-variables-page')).toBeNull();
   });
 
-  it('renders the contributed page without knowing anything about it', async () => {
-    registry.register([
-      {
-        id: 'notes.variables',
-        labelKey: 'settings.pages.variables',
-        order: 20,
-        component: ContributedPageComponent,
-      },
-    ]);
+  it('renders the chosen page through the outlet', async () => {
     await render();
 
     optionLabelled('Variables').click();
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.querySelector('.contributed')).not.toBeNull();
-  });
-
-  it('falls back to the first page when the chosen one is unregistered', async () => {
-    registry.register([
-      {
-        id: 'notes.variables',
-        labelKey: 'settings.pages.variables',
-        order: 20,
-        component: ContributedPageComponent,
-      },
-    ]);
-    await render();
-    optionLabelled('Variables').click();
-    await fixture.whenStable();
-
-    registry.unregister(['notes.variables']);
-    await fixture.whenStable();
-
-    expect(optionLabelled('Paramètres').getAttribute('aria-current')).toBe('page');
+    expect(optionLabelled('Variables').getAttribute('aria-current')).toBe('page');
+    expect(fixture.nativeElement.querySelector('app-variables-page')).not.toBeNull();
   });
 
   it('emits on the close button', async () => {

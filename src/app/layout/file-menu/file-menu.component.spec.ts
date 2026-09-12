@@ -1,16 +1,31 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { AppMenuRegistry } from '@core/menu/app-menu.registry';
-import { APP_WINDOW_ADAPTER } from '@core/window/app-window.service';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { StatusNotifier } from '@core/notifications/status.service';
+import { NoteSelectionStore } from '@features/notes/state/note-selection.store';
+import { NotesQueryStore } from '@features/notes/state/notes-query.store';
+import { SpacesStore } from '@features/notes/state/spaces.store';
+import { Space } from '@features/notes/model/space.model';
 import { FakeAppWindow } from '@testing/fake-app-window';
-import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
+import { FakeClipboard } from '@testing/fake-clipboard';
+import { FakeFileDialog } from '@testing/fake-file-dialog';
+import { FakeTransferRepository } from '@testing/fake-transfer-repository';
+import { createNote } from '@testing/note.fixture';
+import { provideAppTesting } from '@testing/testing.providers';
 import { FileMenuComponent } from './file-menu.component';
+
+const SPACES: readonly Space[] = [
+  { id: 'space-1', name: 'Space one' },
+  { id: 'work', name: 'Work' },
+];
 
 describe('FileMenuComponent', () => {
   let fixture: ComponentFixture<FileMenuComponent>;
-  let registry: AppMenuRegistry;
   let appWindow: FakeAppWindow;
+  let transferRepository: FakeTransferRepository;
+  let fileDialog: FakeFileDialog;
+  let clipboard: FakeClipboard;
+  let selection: NoteSelectionStore;
+  let spaces: SpacesStore;
 
   function trigger(): HTMLButtonElement {
     return fixture.nativeElement.querySelector('.file-trigger');
@@ -31,14 +46,35 @@ describe('FileMenuComponent', () => {
     await fixture.whenStable();
   }
 
+  /** The menu acts on the selection, which is derived from what the canvas shows. */
+  async function check(id: string): Promise<void> {
+    await vi.waitFor(() => expect(TestBed.inject(NotesQueryStore).visibleNotes().length).toBeGreaterThan(0));
+    selection.toggleChecked(id);
+    await fixture.whenStable();
+  }
+
   beforeEach(async () => {
     TestBed.resetTestingModule();
     appWindow = new FakeAppWindow();
+    transferRepository = new FakeTransferRepository();
+    fileDialog = new FakeFileDialog();
+    clipboard = new FakeClipboard();
+
     TestBed.configureTestingModule({
       imports: [FileMenuComponent],
-      providers: [provideTranslocoTesting(), { provide: APP_WINDOW_ADAPTER, useValue: appWindow }],
+      providers: [
+        provideAppTesting({
+          notes: [createNote({ id: 'note-42' })],
+          spaces: SPACES,
+          transferRepository,
+          fileDialog,
+          clipboard,
+          appWindow,
+        }),
+      ],
     });
-    registry = TestBed.inject(AppMenuRegistry);
+    selection = TestBed.inject(NoteSelectionStore);
+    spaces = TestBed.inject(SpacesStore);
     fixture = TestBed.createComponent(FileMenuComponent);
     fixture.autoDetectChanges();
     await fixture.whenStable();
@@ -49,10 +85,18 @@ describe('FileMenuComponent', () => {
     expect(trigger().getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('always offers the preferences and quitting, even with no feature loaded', async () => {
+  it('lists what it can do, in the order it declares it', async () => {
     await openMenu();
 
-    expect(options().map((option) => option.textContent?.trim())).toEqual(['Préférences…', 'Quitter DevBox']);
+    expect(options().map((option) => option.textContent?.trim())).toEqual([
+      'Importer…',
+      'Exporter tout…',
+      "Exporter l'espace actif…",
+      'Exporter la sélection…',
+      'Copier la sélection en Markdown',
+      'Préférences…',
+      'Quitter DevBox',
+    ]);
   });
 
   it('opens the preferences panel, closing the menu behind it', async () => {
@@ -65,53 +109,75 @@ describe('FileMenuComponent', () => {
     expect(options()).toHaveLength(0);
   });
 
-  it('renders what the features contributed, in order', async () => {
-    registry.register([
-      { id: 'b', labelKey: 'file.exportAll', order: 20, run: () => undefined },
-      { id: 'a', labelKey: 'file.import', order: 10, run: () => undefined },
-    ]);
-    await openMenu();
-
-    expect(options().map((option) => option.textContent?.trim())).toEqual([
-      'Importer…',
-      'Exporter tout…',
-      'Préférences…',
-      'Quitter DevBox',
-    ]);
-  });
-
-  it('runs the entry and closes, the report showing elsewhere', async () => {
-    let ran = 0;
-    registry.register([{ id: 'a', labelKey: 'file.import', order: 10, run: () => (ran += 1) }]);
+  it('imports a bundle and closes, the report showing elsewhere', async () => {
+    fileDialog.openPath = 'C:\\bundles\\devbox-2026-01-01.json';
     await openMenu();
 
     optionLabelled('Importer').click();
     await fixture.whenStable();
 
-    expect(ran).toBe(1);
+    await vi.waitFor(() => expect(transferRepository.importedFrom).toBe(fileDialog.openPath));
     expect(options()).toHaveLength(0);
   });
 
-  it('refuses to run a disabled entry', async () => {
-    let ran = 0;
-    registry.register([
-      {
-        id: 'a',
-        labelKey: 'file.exportSelection',
-        order: 10,
-        disabled: signal(true),
-        run: () => (ran += 1),
-      },
-    ]);
+  it('exports the whole corpus', async () => {
+    fileDialog.savePath = 'C:\\out\\all.json';
     await openMenu();
 
-    const option = optionLabelled('Exporter la sélection');
-    expect(option.getAttribute('aria-disabled')).toBe('true');
+    optionLabelled('Exporter tout').click();
 
-    option.click();
+    await vi.waitFor(() =>
+      expect(transferRepository.exportedTo).toEqual({ path: 'C:\\out\\all.json', spaceId: null }),
+    );
+  });
+
+  it('keeps "export this space" unavailable until a space is active', async () => {
+    fileDialog.savePath = 'C:\\out\\space.json';
+    await openMenu();
+    expect(optionLabelled("Exporter l'espace").getAttribute('aria-disabled')).toBe('true');
+
+    optionLabelled("Exporter l'espace").click();
     await fixture.whenStable();
+    expect(transferRepository.exportedTo).toBeNull();
 
-    expect(ran).toBe(0);
+    spaces.selectSpace('work');
+    await fixture.whenStable();
+    optionLabelled("Exporter l'espace").click();
+
+    await vi.waitFor(() => expect(transferRepository.exportedTo?.spaceId).toBe('work'));
+  });
+
+  it('keeps the selection entries unavailable until notes are checked', async () => {
+    await openMenu();
+
+    expect(optionLabelled('Exporter la sélection').getAttribute('aria-disabled')).toBe('true');
+    expect(optionLabelled('Copier la sélection').getAttribute('aria-disabled')).toBe('true');
+
+    await check('note-42');
+
+    expect(optionLabelled('Exporter la sélection').getAttribute('aria-disabled')).toBe('false');
+    expect(optionLabelled('Copier la sélection').getAttribute('aria-disabled')).toBe('false');
+  });
+
+  it('exports exactly the checked notes', async () => {
+    fileDialog.savePath = 'C:\\out\\selection.json';
+    await check('note-42');
+    await openMenu();
+
+    optionLabelled('Exporter la sélection').click();
+
+    await vi.waitFor(() => expect(transferRepository.exportedIds).toEqual(['note-42']));
+  });
+
+  it('copies the checked notes as markdown rather than sending them anywhere', async () => {
+    await check('note-42');
+    await openMenu();
+
+    optionLabelled('Copier la sélection').click();
+
+    await vi.waitFor(() => expect(clipboard.content).toBe(transferRepository.markdown));
+    expect(transferRepository.sharedIds).toEqual(['note-42']);
+    expect(TestBed.inject(StatusNotifier).status()?.key).toBe('file.copied');
   });
 
   it('quits only on a second click', async () => {

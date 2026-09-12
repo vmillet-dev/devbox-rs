@@ -877,14 +877,16 @@ The titlebar carries a **File menu** next to "À propos" — the convention of a
 application. It holds import, export, "copy the selection as Markdown", the preferences and
 quitting.
 
-`layout/` still knows no feature. `AppMenuRegistry` (`core/menu/`) holds the entries, and
-`NotesPageComponent` **contributes** its own on construction and takes them back on
-destruction. The titlebar renders whatever is registered plus its own "Quitter"; the hashing
-tool will add its entries without touching that component. `disabled` is a `Signal` because
-"Exporter la sélection" follows what is checked at that instant.
+**The menu owns its entries**: `FileMenuComponent` declares them as an array and injects what
+they need — `LibraryStore`, `NoteSelectionStore`, `SpacesStore`, `ClockService`. `disabled` is
+a `Signal` because "Exporter la sélection" follows what is checked at that instant, and the
+order on screen is the order in the array.
 
-"Préférences…" and "Quitter" are **not** registered entries: they act on the application
-itself rather than on a tool, so the menu offers them whatever is loaded.
+There used to be a contribution registry here — three of them, in fact, one per extension
+point — so `layout/` could stay ignorant of a feature it might not have. That indirection had
+exactly one purpose, a second tool, and [#23](https://github.com/vmillet-dev/devbox-rs/issues/23)
+decided there would not be one. With a single feature it protected nothing and cost a real
+detour: reading what a menu entry did meant opening the notes page. They are gone.
 
 Two things deliberately did **not** go in that menu, because they are views on the notes and
 not operations on a file:
@@ -904,12 +906,9 @@ interface follows on the spot. That is already the idiom everywhere else in the 
 editor commits on blur, the locale switch flips on click — and a theme you only see after
 validating is not chosen, it is guessed.
 
-**The panel knows one page, its own.** The others come from `SettingsRegistry`
-(`core/settings/`), the exact counterpart of `AppMenuRegistry`: `NotesPageComponent`
-contributes "Variables" on construction and takes it back on destruction, and
-`NgComponentOutlet` renders a component the panel knows nothing about. A `{{field}}` is notes
-vocabulary; importing it from `layout/` would break the rule that deleting a feature folder
-deletes the feature.
+**The pages are a list in the panel**: the general settings and "Variables", rendered through
+`NgComponentOutlet` so the rail stays one loop over one array. The order on screen is the order
+of the list.
 
 `SettingsStore` holds one signal per setting — the interface language, the theme, the density,
 the tray behaviour, the palette accelerator — backed by `PreferencesService`: one key per
@@ -979,21 +978,19 @@ the loser keeps the keyboard.
   drift apart. The panel marks the release the running binary is, and its footer opens the
   repository's releases page through the `opener` plugin.
 - **"Prise en main"** is nine chapters of prose, keyed by translation
-  (`gettingStarted.chapters.<id>`). The list of chapters lives in the component rather than in a
-  registry, unlike the menu entries and the shortcut groups, because a chapter carries **no
-  code**: nothing to run, nothing a feature has to be loaded to provide, so `layout/` imports
-  nothing from a feature by naming them. The bodies are handed the live key bindings as
+  (`gettingStarted.chapters.<id>`). The list of chapters lives in the component. The bodies are
+  handed the live key bindings as
   interpolation parameters — a guide quoting the combination that shipped would be wrong for
   anyone who changed it.
 - **"Raccourcis clavier"** is a read-only sheet. Read-only because the one shortcut that can be
   changed is changed in the preferences, and a second editor for it would be a second place to
   keep in step.
 
-`ShortcutsRegistry` (`core/shortcuts/`) is the third instance of the contribution pattern, after
-`AppMenuRegistry` and `SettingsRegistry`: the arrows of the canvas, `X` to check a card and
-`Alt+↑` to reorder a checklist item belong to the notes, and listing them from `layout/` would
-leave a sheet full of keys that do nothing the day the hashing tool is alone on screen.
-`NotesPageComponent` registers three groups on construction and takes them back on destruction.
+The groups of the notes — the canvas arrows, `X` to check a card, `Alt+↑` to reorder a
+checklist item — come from `features/notes/ui/notes-shortcuts.ts`, which the sheet imports.
+They live with the notes rather than in the sheet because the canvas group is **derived from
+the key table that binds them** (`CANVAS_SHORTCUT_GROUP`, from `CanvasKeyboardDirective`): a
+key documented but not bound, or the reverse, is not possible.
 
 The **global** group is the exception and is built by the dialog itself: those three
 combinations are the application's, they work with the window closed, and the quick-paste one

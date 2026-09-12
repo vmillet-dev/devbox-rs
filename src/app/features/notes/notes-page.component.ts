@@ -1,11 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AppEventsService, GlobalAction } from '@core/ipc/app-events.service';
-import { contribute } from '@core/contributions/contribution.registry';
-import { AppMenuEntry, AppMenuRegistry } from '@core/menu/app-menu.registry';
-import { SettingsPage, SettingsRegistry } from '@core/settings/settings-registry';
-import { ShortcutGroup, ShortcutsRegistry } from '@core/shortcuts/shortcuts.registry';
-import { ClockService } from '@core/time/clock.service';
 import { DialogStack } from '@shared/ui/dialog/dialog-stack';
 import { AttachmentsStore } from './state/attachments.store';
 import { LibraryStore } from './state/library.store';
@@ -19,7 +14,7 @@ import { PaletteStore } from './state/palette.store';
 import { SpacesStore } from './state/spaces.store';
 import { TagsStore } from './state/tags.store';
 import { TrashStore } from './state/trash.store';
-import { CANVAS_SHORTCUT_GROUP, CanvasKeyboardDirective } from './ui/canvas-keyboard.directive';
+import { CanvasKeyboardDirective } from './ui/canvas-keyboard.directive';
 import { FilterChipsComponent } from './ui/filter-chips/filter-chips.component';
 import { LanguageRailComponent } from './ui/language-rail/language-rail.component';
 import { NewNoteButtonComponent } from './ui/new-note-button/new-note-button.component';
@@ -39,59 +34,8 @@ import {
 import { TagManagerComponent } from './ui/tag-manager/tag-manager.component';
 import { TagRailComponent } from './ui/tag-rail/tag-rail.component';
 import { TrashPanelComponent } from './ui/trash-panel/trash-panel.component';
-import { VariablesPageComponent } from './ui/variables-page/variables-page.component';
 import { UndoBarComponent } from './ui/undo-bar/undo-bar.component';
 
-/**
- * Notes vocabulary, which is why it is contributed from here rather than known by
- * `layout/`.
- */
-const SETTINGS_PAGES: readonly SettingsPage[] = [
-  {
-    id: 'notes.variables',
-    labelKey: 'settings.pages.variables',
-    order: 20,
-    component: VariablesPageComponent,
-  },
-];
-
-/**
- * The canvas group comes from [`CanvasKeyboardDirective`], where the same table also
- * binds the keys; the two below are documentation, their keys being handled by the
- * editor and by the palette themselves. Key names stay untranslated.
- */
-const NOTES_SHORTCUTS: readonly ShortcutGroup[] = [
-  CANVAS_SHORTCUT_GROUP,
-  {
-    id: 'notes.editor',
-    labelKey: 'shortcuts.groups.editor',
-    order: 20,
-    shortcuts: [
-      { keys: ['Escape'], labelKey: 'shortcuts.editor.close' },
-      { keys: ['Enter'], labelKey: 'shortcuts.editor.newItem' },
-      { keys: ['Backspace'], labelKey: 'shortcuts.editor.removeItem' },
-      { keys: ['Alt', '↑ ↓'], labelKey: 'shortcuts.editor.moveItem' },
-    ],
-  },
-  {
-    id: 'notes.palette',
-    labelKey: 'shortcuts.groups.palette',
-    order: 30,
-    shortcuts: [
-      { keys: ['↑ ↓'], labelKey: 'shortcuts.palette.navigate' },
-      { keys: ['Enter'], labelKey: 'shortcuts.palette.paste' },
-      { keys: ['Tab'], labelKey: 'shortcuts.palette.open' },
-      { keys: ['Escape'], labelKey: 'shortcuts.palette.close' },
-    ],
-  },
-];
-
-/**
- * It is what **contributes the "File" menu entries**, the preferences page and the
- * shortcut groups: the titlebar knows no feature, and `contribute()` withdraws them
- * when this page is destroyed — hence here and not in a root store that would outlive
- * it.
- */
 @Component({
   selector: 'app-notes-page',
   imports: [
@@ -129,10 +73,6 @@ export class NotesPageComponent {
   protected readonly attachments = inject(AttachmentsStore);
   protected readonly fill = inject(PlaceholderFillStore);
 
-  private readonly clock = inject(ClockService);
-  private readonly menu = inject(AppMenuRegistry);
-  private readonly settingsPages = inject(SettingsRegistry);
-  private readonly shortcutGroups = inject(ShortcutsRegistry);
   private readonly samples = inject(SampleNotesService);
   private readonly revision = inject(NotesRevision);
   private readonly dialogs = inject(DialogStack);
@@ -149,10 +89,6 @@ export class NotesPageComponent {
     const destroyRef = inject(DestroyRef);
 
     destroyRef.onDestroy(events.on((action) => this.runGlobalAction(action)));
-
-    contribute(this.menu, this.menuEntries());
-    contribute(this.settingsPages, SETTINGS_PAGES);
-    contribute(this.shortcutGroups, NOTES_SHORTCUTS);
 
     // A fresh installation has no space, so not even a creatable note.
     void this.seedSamples();
@@ -179,56 +115,12 @@ export class NotesPageComponent {
     }
   }
 
-  /** `disabled` is a signal: "Export selection" follows what is ticked right now. */
-  private menuEntries(): readonly AppMenuEntry[] {
-    const nothingChecked = computed(() => !this.selection.hasSelection());
-    const checked = (): readonly string[] => this.selection.checkedNoteIds();
-
-    return [
-      { id: 'notes.import', labelKey: 'file.import', order: 10, run: () => void this.onImport() },
-      {
-        id: 'notes.exportAll',
-        labelKey: 'file.exportAll',
-        order: 20,
-        run: () => void this.library.export(null, this.clock.now()),
-      },
-      {
-        id: 'notes.exportSpace',
-        labelKey: 'file.exportSpace',
-        order: 30,
-        disabled: computed(() => this.spaces.activeSpaceId() === null),
-        run: () => void this.library.export(this.spaces.activeSpaceId(), this.clock.now()),
-      },
-      {
-        id: 'notes.exportSelection',
-        labelKey: 'file.exportSelection',
-        order: 40,
-        disabled: nothingChecked,
-        run: () => void this.library.exportSelection(checked(), this.clock.now()),
-      },
-      {
-        id: 'notes.copyMarkdown',
-        labelKey: 'file.copyMarkdown',
-        order: 50,
-        disabled: nothingChecked,
-        run: () => void this.library.copyAsMarkdown(checked()),
-      },
-    ];
-  }
-
   /** The spaces reload afterwards — they had already read an empty database. */
   private async seedSamples(): Promise<void> {
     if (!(await this.samples.seedIfFirstRun())) return;
 
     this.spaces.reload();
     this.revision.bump();
-  }
-
-  private async onImport(): Promise<void> {
-    // Only the spaces: the canvas follows `NotesRevision`, which the library bumps.
-    if (await this.library.import()) {
-      this.spaces.reload();
-    }
   }
 
   protected onSpaceRenamed({ id, name }: SpaceRenaming): void {
