@@ -137,16 +137,16 @@
     </div>
 
     <app-attachment-strip
-      [attachments]="attachments()"
-      [isBusy]="attachmentsBusy()"
-      [previewId]="attachmentPreviewId()"
-      [previewData]="attachmentPreviewData()"
-      (addRequested)="attachmentAddRequested.emit()"
-      (removeRequested)="attachmentRemoveRequested.emit($event)"
-      (previewToggled)="attachmentPreviewToggled.emit($event)"
-      (openRequested)="attachmentOpenRequested.emit($event)"
-      (saveRequested)="attachmentSaveRequested.emit($event)"
-      (zoomRequested)="imageZoomRequested.emit()"
+      [attachments]="attachments.attachments()"
+      [isBusy]="attachments.isBusy()"
+      [previewId]="attachments.previewId()"
+      [previewData]="attachments.previewData()"
+      (addRequested)="attachments.addFromPicker()"
+      (removeRequested)="attachments.remove($event)"
+      (previewToggled)="attachments.togglePreview($event)"
+      (openRequested)="attachments.open($event)"
+      (saveRequested)="attachments.saveToDisk($event)"
+      (zoomRequested)="attachments.zoom()"
     />
 
     <!-- Nothing for a note with no token: a header always present and always empty
@@ -173,7 +173,7 @@
       @if (showingPreview()) {
         <!-- The filled body, read-only: the input is absent rather than hidden, or
              typing would go into text nobody keeps. -->
-        <app-code-viewer [content]="filledContent() ?? ''" [language]="note.language" />
+        <app-code-viewer [content]="fill.preview() ?? ''" [language]="note.language" />
       } @else if (isChecklist()) {
         <app-checklist-editor
           [items]="note.items"

@@ -13,6 +13,7 @@ import { NoteSelectionStore } from './state/note-selection.store';
 import { NotesQueryStore } from './state/notes-query.store';
 import { NotesStore } from './state/notes.store';
 import { PaletteStore } from './state/palette.store';
+import { PlaceholderFillStore } from './state/placeholder-fill.store';
 import { SpacesStore } from './state/spaces.store';
 import { TagsStore } from './state/tags.store';
 import { TrashStore } from './state/trash.store';
@@ -602,7 +603,7 @@ describe('NotesPageComponent', () => {
     it('attaches the file the picker returned', async () => {
       fileDialog.openPath = 'C:\\shots\\capture.png';
 
-      child(NoteEditorOverlayComponent).attachmentAddRequested.emit();
+      void TestBed.inject(AttachmentsStore).addFromPicker();
 
       await vi.waitFor(() =>
         expect(
@@ -619,7 +620,7 @@ describe('NotesPageComponent', () => {
       expect(store.persistedNoteId()).toBeNull();
       fileDialog.openPath = 'C:\\shots\\capture.png';
 
-      child(NoteEditorOverlayComponent).attachmentAddRequested.emit();
+      void TestBed.inject(AttachmentsStore).addFromPicker();
 
       await vi.waitFor(() => expect(store.persistedNoteId()).not.toBeNull());
       await vi.waitFor(() =>
@@ -661,7 +662,7 @@ describe('NotesPageComponent', () => {
     });
 
     it('attaches the clipboard image on paste', async () => {
-      child(NoteEditorOverlayComponent).imagePasted.emit();
+      void TestBed.inject(AttachmentsStore).addPastedImage();
 
       await vi.waitFor(() => expect(TestBed.inject(AttachmentsStore).attachments()).toHaveLength(1));
     });
@@ -669,7 +670,7 @@ describe('NotesPageComponent', () => {
     it('says so when the pasted clipboard carried no image after all', async () => {
       attachmentsRepository.failNext = new Error('no image in clipboard');
 
-      child(NoteEditorOverlayComponent).imagePasted.emit();
+      void TestBed.inject(AttachmentsStore).addPastedImage();
 
       await vi.waitFor(() =>
         expect(TestBed.inject(ErrorNotifier).notice()?.ref.key).toBe('attachments.pasteEmpty'),
@@ -678,12 +679,12 @@ describe('NotesPageComponent', () => {
 
     it('announces where an attachment was saved', async () => {
       fileDialog.openPath = 'C:\\shots\\capture.png';
-      child(NoteEditorOverlayComponent).attachmentAddRequested.emit();
+      void TestBed.inject(AttachmentsStore).addFromPicker();
       await vi.waitFor(() => expect(TestBed.inject(AttachmentsStore).attachments()).toHaveLength(1));
       const id = TestBed.inject(AttachmentsStore).attachments()[0].id;
       fileDialog.savePath = 'D:\\keep\\capture.png';
 
-      child(NoteEditorOverlayComponent).attachmentSaveRequested.emit(id);
+      void TestBed.inject(AttachmentsStore).saveToDisk(id);
 
       await vi.waitFor(() =>
         expect(TestBed.inject(StatusNotifier).status()).toEqual({
@@ -695,13 +696,11 @@ describe('NotesPageComponent', () => {
 
     it('says nothing when the save dialog was dismissed', async () => {
       fileDialog.openPath = 'C:\\shots\\capture.png';
-      child(NoteEditorOverlayComponent).attachmentAddRequested.emit();
+      void TestBed.inject(AttachmentsStore).addFromPicker();
       await vi.waitFor(() => expect(TestBed.inject(AttachmentsStore).attachments()).toHaveLength(1));
       TestBed.inject(StatusNotifier).dismiss();
 
-      child(NoteEditorOverlayComponent).attachmentSaveRequested.emit(
-        TestBed.inject(AttachmentsStore).attachments()[0].id,
-      );
+      void TestBed.inject(AttachmentsStore).saveToDisk(TestBed.inject(AttachmentsStore).attachments()[0].id);
       await fixture.whenStable();
 
       expect(TestBed.inject(StatusNotifier).status()).toBeNull();
@@ -709,14 +708,14 @@ describe('NotesPageComponent', () => {
 
     it('closes the zoomed view along with the preview it shows', async () => {
       fileDialog.openPath = 'C:\\shots\\capture.png';
-      child(NoteEditorOverlayComponent).attachmentAddRequested.emit();
+      void TestBed.inject(AttachmentsStore).addFromPicker();
       await vi.waitFor(() => expect(TestBed.inject(AttachmentsStore).previewData()).not.toBeNull());
       const id = TestBed.inject(AttachmentsStore).previewId()!;
 
-      child(NoteEditorOverlayComponent).imageZoomRequested.emit();
+      TestBed.inject(AttachmentsStore).zoom();
       await vi.waitFor(() => expect(maybeChild(ImageLightboxComponent)).not.toBeNull());
 
-      child(NoteEditorOverlayComponent).attachmentPreviewToggled.emit(id);
+      void TestBed.inject(AttachmentsStore).togglePreview(id);
       await vi.waitFor(() => expect(maybeChild(ImageLightboxComponent)).toBeNull());
     });
   });
@@ -785,13 +784,13 @@ describe('NotesPageComponent', () => {
       store.openNote('snippet');
       await fixture.whenStable();
 
-      child(NoteEditorOverlayComponent).fillPreviewRequested.emit({
+      void TestBed.inject(PlaceholderFillStore).refreshPreview({
         content: 'psql -h {{host}}',
         values: { host: 'db.internal' },
       });
 
       await vi.waitFor(() =>
-        expect(child(NoteEditorOverlayComponent).filledContent()).toBe('psql -h db.internal'),
+        expect(TestBed.inject(PlaceholderFillStore).preview()).toBe('psql -h db.internal'),
       );
     });
 
@@ -799,7 +798,7 @@ describe('NotesPageComponent', () => {
       store.openNote('snippet');
       await fixture.whenStable();
 
-      child(NoteEditorOverlayComponent).filledCopyRequested.emit({
+      void TestBed.inject(PlaceholderFillStore).copyFilled({
         content: 'psql -h {{host}}',
         values: { host: 'db.internal' },
       });
@@ -813,7 +812,7 @@ describe('NotesPageComponent', () => {
       await fixture.whenStable();
       clipboard.failNext = new Error('no clipboard');
 
-      child(NoteEditorOverlayComponent).filledCopyRequested.emit({
+      void TestBed.inject(PlaceholderFillStore).copyFilled({
         content: 'psql -h {{host}}',
         values: { host: 'db.internal' },
       });

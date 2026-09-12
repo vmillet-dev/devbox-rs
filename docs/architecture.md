@@ -183,15 +183,22 @@ sidesteps the problem entirely.
 
 ### Component contracts
 
-Components communicate exclusively through signal inputs (`input()` / `input.required()`),
-`model()` where a value is genuinely two-way (the search field), and `output()` emitters.
-Only the feature container (`NotesPageComponent`) injects stores; everything below it is
-presentational and stateless, which is what makes the components testable in isolation.
+Components communicate through signal inputs (`input()` / `input.required()`), `model()` where
+a value is genuinely two-way (the search field), and `output()` emitters.
 
-Presentational components that could serve any feature live in `shared/ui/` — including
-`CodeViewerComponent`, which knows nothing about notes and will be reused by the formatters
-feature. Components specific to notes live under the feature's own `ui/` folder, next to the
-page that composes them.
+**Where the line sits between an input and an injected store:** data still flows **down** as
+inputs — a component is driven by its parent and stays testable with a literal — but an
+**action goes straight to the store** rather than bubbling up to be forwarded. That is why
+`NoteEditorOverlayComponent` takes `[note]` as an input and injects `AttachmentsStore` and
+`PlaceholderFillStore`: attachments and `{{field}}` filling have a write cycle of their own,
+and routing them through the page cost seventeen bindings and made adding one a four-file
+change. What stays an output is what the **page** has to arbitrate: closing the overlay, a
+patch (only `NotesStore` knows whether the note exists yet), a deletion.
+
+**`shared/ui/` is the exception that injects nothing at all** — it is a presentation kit, and
+a component there takes everything through `input()`. `CodeViewerComponent` knows nothing
+about notes. Components specific to the notes live under their own `ui/` folder, and are free
+to reach for the feature's stores.
 
 Components never reach into each other imperatively. A keyboard shortcut belongs to the
 component that owns the affected element: `Ctrl/⌘+K` is handled inside `SearchBoxComponent`,

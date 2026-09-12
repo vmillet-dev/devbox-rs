@@ -1,11 +1,20 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { StatusNotifier } from '@core/notifications/status.service';
 import { Note } from '../model/note.model';
-import { FillRequest } from '../ui/note-editor-overlay/note-editor-overlay.component';
 import { NoteCopyService } from './note-copy.service';
 import { NotesQueryStore } from './notes-query.store';
 import { NotesStore } from './notes.store';
 import { PaletteStore } from './palette.store';
+
+/**
+ * What the editor asks to be filled: its **draft** body and the values typed in the
+ * panel, composed at the moment of the click — anything computed ahead of time would be
+ * stale after the next keystroke.
+ */
+export interface FillRequest {
+  readonly content: string;
+  readonly values: Record<string, string>;
+}
 
 /**
  * The filling itself belongs to `notes::placeholder::fill`; what is here is the order
