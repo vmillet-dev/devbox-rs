@@ -4,6 +4,7 @@
     <button
       type="button"
       class="tags-close"
+      data-testid="tag-manager-close"
       [attr.aria-label]="'tagManager.close' | transloco"
       (click)="closed.emit()"
     >
@@ -24,6 +25,8 @@
           <button
             type="button"
             class="tags-item"
+            data-testid="tag-item"
+            [attr.data-tag]="usage.tag"
             [class.selected]="selected().has(usage.tag)"
             [attr.aria-pressed]="selected().has(usage.tag)"
             [attr.aria-label]="'tagManager.selectLabel' | transloco: { tag: usage.tag }"
@@ -45,17 +48,19 @@
         #targetInput
         type="text"
         class="tags-target"
+        data-testid="tag-target"
         [attr.aria-label]="'tagManager.targetLabel' | transloco"
         [placeholder]="'tagManager.targetPlaceholder' | transloco"
         [value]="target()"
         (input)="target.set(targetInput.value)"
       />
-      <button type="submit" class="tags-action" [attr.aria-disabled]="!canApply()">
+      <button type="submit" class="tags-action" data-testid="tag-apply" [attr.aria-disabled]="!canApply()">
         {{ applyKey() | transloco }}
       </button>
       <button
         type="button"
         class="tags-action danger"
+        data-testid="tag-delete"
         [class.confirming]="confirmingDelete()"
         [attr.aria-disabled]="!canApply()"
         (click)="onDeleteClick()"

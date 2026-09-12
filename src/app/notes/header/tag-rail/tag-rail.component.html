@@ -4,7 +4,7 @@
     @for (tag of tags(); track tag) {
       <app-tag-pill [label]="tag" [active]="activeTags().has(tag)" (toggled)="tagToggled.emit($event)" />
     }
-    <button type="button" class="tag-rail-manage" (click)="manageRequested.emit()">
+    <button type="button" class="tag-rail-manage" data-testid="tag-manage" (click)="manageRequested.emit()">
       {{ 'notes.manageTags' | transloco }}
     </button>
   </div>

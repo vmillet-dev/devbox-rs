@@ -13,7 +13,7 @@
     (queryChange)="canvas.setSearchQuery($event)"
   />
   <app-filter-chips [active]="canvas.activeFilter()" (filterChanged)="canvas.setFilter($event)" />
-  <button type="button" class="trash-btn" (click)="trash.open()">
+  <button type="button" class="trash-btn" data-testid="trash-open" (click)="trash.open()">
     <span aria-hidden="true">🗑</span>
     {{ 'notes.trash' | transloco }}
   </button>
@@ -47,7 +47,7 @@
 
 @let error = canvas.loadError();
 
-<div class="canvas" [attr.aria-busy]="canvas.isLoading()">
+<div class="canvas" data-testid="canvas" [attr.aria-busy]="canvas.isLoading()">
   @if (error) {
     <!-- Loading is the one operation whose failure empties the whole screen: it
          deserves its own retry. -->
@@ -61,7 +61,7 @@
   } @else if (canvas.isLoading()) {
     <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
   } @else if (canvas.hasNoResults()) {
-    <p class="canvas-state-text">{{ 'notes.noResults' | transloco }}</p>
+    <p class="canvas-state-text" data-testid="canvas-no-results">{{ 'notes.noResults' | transloco }}</p>
   } @else {
     @for (section of canvas.sections(); track section.key) {
       <app-note-section [section]="section" (noteActivated)="onNoteActivated($event)" />

@@ -1,10 +1,18 @@
-<div class="selection-bar" role="group" [attr.aria-label]="'selection.label' | transloco">
-  <span class="selection-count">{{ 'selection.count' | transloco: { count: count() } }}</span>
+<div
+  class="selection-bar"
+  data-testid="selection-bar"
+  role="group"
+  [attr.aria-label]="'selection.label' | transloco"
+>
+  <span class="selection-count" data-testid="selection-count">{{
+    'selection.count' | transloco: { count: count() }
+  }}</span>
 
   @if (spaces().length > 0) {
     <select
       #moveSelect
       class="selection-move"
+      data-testid="selection-move"
       [attr.aria-label]="'selection.moveTo' | transloco"
       (change)="onMove(moveSelect.value); moveSelect.value = ''"
     >
@@ -20,6 +28,7 @@
       #tagInput
       type="text"
       class="selection-tag-input"
+      data-testid="selection-tag"
       [attr.aria-label]="'selection.addTagLabel' | transloco"
       [placeholder]="'selection.addTagPlaceholder' | transloco"
       [value]="tagDraft()"
@@ -27,13 +36,14 @@
     />
   </form>
 
-  <button type="button" class="selection-action" (click)="copyRequested.emit()">
+  <button type="button" class="selection-action" data-testid="selection-copy" (click)="copyRequested.emit()">
     {{ 'file.copyMarkdown' | transloco }}
   </button>
 
   <button
     type="button"
     class="selection-action danger"
+    data-testid="selection-delete"
     [class.confirming]="confirmingDelete()"
     (click)="onDeleteClick()"
   >
@@ -43,6 +53,7 @@
   <button
     type="button"
     class="selection-clear"
+    data-testid="selection-clear"
     [attr.aria-label]="'selection.clear' | transloco"
     (click)="cleared.emit()"
   >

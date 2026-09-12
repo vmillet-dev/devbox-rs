@@ -13,6 +13,7 @@
         #titleInput
         id="overlay-title-input"
         class="overlay-title-input"
+        data-testid="editor-title"
         [attr.aria-label]="'editor.titleLabel' | transloco"
         [placeholder]="'notes.untitled' | transloco"
         [value]="draftTitle()"
@@ -25,6 +26,7 @@
         <select
           #languageSelect
           class="overlay-language-select"
+          data-testid="editor-language"
           [attr.aria-label]="'editor.languageLabel' | transloco"
           [value]="note.language"
           (change)="onLanguageChange(languageSelect.value)"
@@ -40,6 +42,7 @@
       <button
         type="button"
         class="toolbar-btn"
+        data-testid="editor-pin"
         [class.pinned]="note.pinned"
         [attr.aria-pressed]="note.pinned"
         (click)="togglePin()"
@@ -49,7 +52,12 @@
       </button>
       <!-- A note with fields copies filled; "Copy as is" stays within reach in the panel. -->
       @if (hasPlaceholders()) {
-        <button type="button" class="toolbar-btn" (click)="requestFilledCopy()">
+        <button
+          type="button"
+          class="toolbar-btn"
+          data-testid="editor-copy-filled"
+          (click)="requestFilledCopy()"
+        >
           <span aria-hidden="true">⚡</span>
           {{ 'placeholders.copy' | transloco }}
         </button>
@@ -59,6 +67,7 @@
       <button
         type="button"
         class="toolbar-btn delete-btn"
+        data-testid="editor-delete"
         [class.confirming]="confirmingDelete()"
         (click)="onDeleteClick()"
       >
@@ -68,6 +77,7 @@
       <button
         type="button"
         class="icon-btn"
+        data-testid="editor-fullscreen"
         [attr.aria-pressed]="fullscreen()"
         [attr.aria-label]="(fullscreen() ? 'editor.exitFullscreen' : 'editor.fullscreen') | transloco"
         (click)="toggleFullscreen()"
@@ -77,6 +87,7 @@
       <button
         type="button"
         class="icon-btn close-btn"
+        data-testid="editor-close"
         [attr.aria-label]="'editor.close' | transloco"
         (click)="requestClose()"
       >
@@ -89,6 +100,7 @@
       <input
         #sourceInput
         class="overlay-source-input"
+        data-testid="editor-source"
         [attr.aria-label]="'editor.sourceLabel' | transloco"
         [placeholder]="'editor.sourcePlaceholder' | transloco"
         [value]="draftSource()"
@@ -103,6 +115,8 @@
             <button
               type="button"
               class="tag-remove"
+              data-testid="editor-tag-remove"
+              [attr.data-tag]="tag"
               [attr.aria-label]="'editor.removeTag' | transloco: { tag: tag }"
               (click)="removeTag(tag)"
             >
@@ -115,6 +129,7 @@
             #tagInput
             type="text"
             class="tag-add-input"
+            data-testid="editor-tag-add"
             [attr.aria-label]="'editor.addTagLabel' | transloco"
             [placeholder]="'editor.addTagPlaceholder' | transloco"
             [value]="tagInputValue()"
@@ -129,6 +144,7 @@
           #expiryInput
           type="date"
           class="overlay-expiry-input"
+          data-testid="editor-deadline"
           [attr.aria-label]="'editor.expiryLabel' | transloco"
           [value]="expiryInputValue()"
           (change)="onExpiryChange(expiryInput.value)"
@@ -186,6 +202,7 @@
           <textarea
             #bodyEditor
             class="overlay-body-editor"
+            data-testid="editor-body"
             spellcheck="false"
             [attr.aria-label]="'editor.contentLabel' | transloco"
             [placeholder]="'editor.emptyBody' | transloco"
@@ -198,7 +215,7 @@
       }
     </div>
 
-    <div class="overlay-footer">
+    <div class="overlay-footer" data-testid="editor-footer">
       <span>
         @if (isChecklist()) {
           {{

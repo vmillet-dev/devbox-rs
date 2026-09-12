@@ -16,6 +16,11 @@ author-handle = "@vmillet-dev"
 name = "devbox_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# The end-to-end harness, and nothing else. Off by default, so a release build
+# never links the test plugin into the shipped binary.
+e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 toml = "0.9"
@@ -42,6 +47,18 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-log = "2"
 log = "0.4"
 thiserror = "2.0.20"
+# Pulled in only by the `e2e` feature, and not optional in practice: the runner
+# waits on `window.wdioTauri` before it will open a session, so a binary without
+# the plugin hangs the suite rather than failing it. Its Rust half and the npm half
+# (`polyfills` in the `e2e` Angular configuration) go together — with one but not
+# the other, the front end invokes `plugin:wdio|…` commands nothing answers and the
+# error banner comes up on launch.
+#
+# ⚠️ Both crates, not one: the documentation presents `-webdriver` as needed by the
+# embedded driver provider alone, but it also serves the HTTP endpoint the runner's
+# `DirectEvalClient` posts to.
+tauri-plugin-wdio = { version = "1", optional = true }
+tauri-plugin-wdio-webdriver = { version = "1", optional = true }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

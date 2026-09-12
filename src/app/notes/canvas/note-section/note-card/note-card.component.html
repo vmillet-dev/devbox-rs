@@ -2,12 +2,19 @@
 
 <!-- A wrapper and not a root `<button>`: the action menu is itself a button, and a
      button's content model forbids nesting one. It also anchors the menu. -->
-<div class="card-shell" [class.checked]="checked()" [class.checklist]="isChecklist()">
+<div
+  class="card-shell"
+  data-testid="note-card"
+  [attr.data-note-id]="note().id"
+  [class.checked]="checked()"
+  [class.checklist]="isChecklist()"
+>
   <!-- Content in <span> and not <div>: a <button> admits only phrasing content. -->
   <button
     #cardButton
     type="button"
     class="card"
+    data-testid="note-card-open"
     [class.pinned]="note().pinned"
     [class.selected]="selected()"
     (click)="onOpen($event)"
@@ -24,22 +31,24 @@
         <app-language-badge [language]="note().language" />
       }
       @if (hasPlaceholders()) {
-        <span class="card-fields" aria-hidden="true">⚡</span>
+        <span class="card-fields" data-testid="note-card-fields" aria-hidden="true">⚡</span>
         <span class="visually-hidden">
           {{ 'notes.placeholdersCount' | transloco: { count: note().placeholders.length } }}
         </span>
       }
       @if (note().attachmentCount > 0) {
-        <span class="card-clip" aria-hidden="true">📎 {{ note().attachmentCount }}</span>
+        <span class="card-clip" data-testid="note-card-clip" aria-hidden="true"
+          >📎 {{ note().attachmentCount }}</span
+        >
         <span class="visually-hidden">
           {{ 'notes.attachmentsCount' | transloco: { count: note().attachmentCount } }}
         </span>
       }
       @if (note().pinned) {
-        <span class="card-pin" aria-hidden="true">📌</span>
+        <span class="card-pin" data-testid="note-card-pin" aria-hidden="true">📌</span>
       }
     </span>
-    <span class="card-title">
+    <span class="card-title" data-testid="note-card-title">
       @if (note().title) {
         {{ note().title }}
       } @else {
@@ -52,7 +61,7 @@
         <span class="progress-track" aria-hidden="true">
           <span class="progress-fill" [style.width.%]="progress().percent"></span>
         </span>
-        <span class="progress-count">
+        <span class="progress-count" data-testid="note-card-progress">
           {{ 'notes.checklistProgress' | transloco: { done: progress().done, total: progress().total } }}
         </span>
       </span>
@@ -74,7 +83,7 @@
       <span [class.stale]="note().expiringSoon"
         >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
       >
-      <span class="card-tags">
+      <span class="card-tags" data-testid="note-card-tags">
         @for (tag of displayedTags(); track tag) {
           <span>#{{ tag }}</span>
         }
@@ -87,6 +96,7 @@
   <button
     type="button"
     class="card-check"
+    data-testid="note-card-check"
     [class.checked]="checked()"
     [attr.aria-pressed]="checked()"
     [attr.aria-label]="'notes.selectNote' | transloco: { title: menuTitle }"
@@ -105,6 +115,7 @@
           <button
             type="button"
             class="card-item"
+            data-testid="note-card-item"
             role="checkbox"
             [class.done]="item.done"
             [attr.aria-checked]="item.done"
@@ -129,6 +140,7 @@
     <button
       type="button"
       class="card-fill"
+      data-testid="note-card-fill"
       [attr.aria-label]="'placeholders.title' | transloco"
       (click)="onFill($event)"
     >

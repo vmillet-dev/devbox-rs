@@ -4,6 +4,7 @@
     <button
       type="button"
       class="trash-close"
+      data-testid="trash-close"
       [attr.aria-label]="'trash.close' | transloco"
       (click)="closed.emit()"
     >
@@ -16,13 +17,13 @@
   @if (isLoading()) {
     <p class="trash-state">{{ 'trash.loading' | transloco }}</p>
   } @else if (rows().length === 0) {
-    <p class="trash-state">{{ 'trash.empty' | transloco }}</p>
+    <p class="trash-state" data-testid="trash-empty-state">{{ 'trash.empty' | transloco }}</p>
   } @else {
     <ul class="trash-list">
       @for (row of rows(); track row.note.id) {
-        <li class="trash-row">
+        <li class="trash-row" data-testid="trash-row" [attr.data-note-id]="row.note.id">
           <div class="trash-row-main">
-            <span class="trash-row-title">
+            <span class="trash-row-title" data-testid="trash-row-title">
               {{ row.note.title || ('trash.untitled' | transloco) }}
             </span>
             @if (row.snippetKey; as key) {
@@ -39,12 +40,18 @@
             </span>
           </div>
           <div class="trash-row-actions">
-            <button type="button" class="trash-action" (click)="restoreRequested.emit(row.note.id)">
+            <button
+              type="button"
+              class="trash-action"
+              data-testid="trash-restore"
+              (click)="restoreRequested.emit(row.note.id)"
+            >
               {{ 'trash.restore' | transloco }}
             </button>
             <button
               type="button"
               class="trash-action danger"
+              data-testid="trash-purge"
               [class.confirming]="confirmingPurge() === row.note.id"
               (click)="onPurgeClick(row.note.id)"
             >
@@ -59,6 +66,7 @@
       <button
         type="button"
         class="trash-action danger"
+        data-testid="trash-empty"
         [class.confirming]="confirmingEmpty()"
         (click)="onEmptyClick()"
       >

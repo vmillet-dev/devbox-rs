@@ -75,6 +75,12 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "e2e": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "polyfills": ["@wdio/tauri-plugin"]
             }
           },
           "defaultConfiguration": "production"

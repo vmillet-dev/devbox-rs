@@ -2,11 +2,17 @@
   <span class="strip-label">{{ 'attachments.title' | transloco }}</span>
 
   @for (attachment of attachments(); track attachment.id) {
-    <span class="strip-item" [class.previewing]="previewId() === attachment.id">
+    <span
+      class="strip-item"
+      data-testid="attachment-item"
+      [attr.data-file-name]="attachment.fileName"
+      [class.previewing]="previewId() === attachment.id"
+    >
       <!-- Open with the default application: what makes a PDF or an archive usable. -->
       <button
         type="button"
         class="strip-name"
+        data-testid="attachment-open"
         [attr.aria-label]="'attachments.open' | transloco: { name: attachment.fileName }"
         (click)="openRequested.emit(attachment.id)"
       >
@@ -41,6 +47,7 @@
       <button
         type="button"
         class="strip-icon strip-remove"
+        data-testid="attachment-remove"
         [class.confirming]="confirmingRemove() === attachment.id"
         [attr.aria-label]="'attachments.remove' | transloco: { name: attachment.fileName }"
         (click)="onRemoveClick(attachment.id)"
@@ -49,10 +56,16 @@
       </button>
     </span>
   } @empty {
-    <span class="strip-empty">{{ 'attachments.dropHint' | transloco }}</span>
+    <span class="strip-empty" data-testid="attachment-empty">{{ 'attachments.dropHint' | transloco }}</span>
   }
 
-  <button type="button" class="strip-add" [attr.aria-disabled]="isBusy()" (click)="addRequested.emit()">
+  <button
+    type="button"
+    class="strip-add"
+    data-testid="attachment-add"
+    [attr.aria-disabled]="isBusy()"
+    (click)="addRequested.emit()"
+  >
     {{ (isBusy() ? 'attachments.adding' : 'attachments.add') | transloco }}
   </button>
 </div>

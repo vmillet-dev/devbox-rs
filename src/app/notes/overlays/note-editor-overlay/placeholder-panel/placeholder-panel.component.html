@@ -2,10 +2,21 @@
   <div class="panel-head">
     <!-- The whole strip is the button: a row that lights up on hover reads as a
          control, where a bare label reads as a section heading. -->
-    <button type="button" class="panel-toggle" [attr.aria-expanded]="open()" (click)="toggled.emit()">
+    <button
+      type="button"
+      class="panel-toggle"
+      data-testid="placeholder-panel-toggle"
+      [attr.aria-expanded]="open()"
+      (click)="toggled.emit()"
+    >
       <span class="panel-caret" aria-hidden="true">▸</span>
       <span class="panel-title">{{ 'placeholders.panelTitle' | transloco }}</span>
-      <span class="panel-count" [class.complete]="filled() === total()" aria-hidden="true">
+      <span
+        class="panel-count"
+        data-testid="placeholder-panel-count"
+        [class.complete]="filled() === total()"
+        aria-hidden="true"
+      >
         {{ filled() }}/{{ total() }}
       </span>
       <span class="visually-hidden">

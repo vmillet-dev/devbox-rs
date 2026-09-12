@@ -12,6 +12,8 @@
           #valueInput
           type="text"
           class="field-input"
+          data-testid="placeholder-input"
+          [attr.data-field]="placeholder.name"
           spellcheck="false"
           autocomplete="off"
           [attr.aria-label]="'placeholders.fieldLabel' | transloco: { name: placeholder.name }"

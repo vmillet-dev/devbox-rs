@@ -56,11 +56,18 @@ retry screen. Use it for pure styling work, `npm run tauri dev` for anything els
 | `npm test`              | Unit tests (Vitest, jsdom — no browser required)   |
 | `npm run test:watch`    | Tests, re-running on change                        |
 | `npm run test:coverage` | Tests with a v8 coverage report (80% thresholds)   |
+| `npm run e2e:build`     | Builds the binary the end-to-end suite drives      |
+| `npm run test:e2e`      | End-to-end scenarios against that binary           |
 | `npm run lint`          | ESLint + Prettier check                            |
 | `npm run lint:fix`      | ESLint `--fix` + Prettier write                    |
 
 For Rust-only iteration, `cargo check` from `src-tauri/` is much faster than a full
 `tauri build`.
+
+`npm run e2e:build` has to be re-run after any change to `src/` or `src-tauri/`: the
+end-to-end suite drives a **built** binary, which carries the front end compiled into it.
+That binary keeps a profile of its own, so a local run never touches the library you are
+using day to day.
 
 ## Layout
 

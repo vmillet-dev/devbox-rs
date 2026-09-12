@@ -12,13 +12,14 @@
   <ul class="variables-list">
     <!-- Tracked by position: the name is precisely what changes as one types. -->
     @for (variable of store.variables(); track $index) {
-      <li class="variable-row">
+      <li class="variable-row" data-testid="variable-row">
         <span class="variable-name-field">
           <span class="variable-brace" aria-hidden="true">&#123;&#123;</span>
           <input
             #nameInput
             type="text"
             class="variable-name"
+            data-testid="variable-name"
             spellcheck="false"
             autocomplete="off"
             [class.rejected]="isRejected(variable) || store.duplicates().has(variable.name)"
@@ -35,6 +36,7 @@
         <input
           type="text"
           class="variable-value"
+          data-testid="variable-value"
           spellcheck="false"
           autocomplete="off"
           [attr.aria-label]="'settings.variables.value' | transloco"
@@ -47,6 +49,7 @@
         <button
           type="button"
           class="variable-remove"
+          data-testid="variable-remove"
           [attr.aria-label]="'settings.variables.remove' | transloco: { name: nameInput.value || '—' }"
           (click)="remove($index)"
         >
@@ -63,7 +66,7 @@
   }
 }
 
-<button type="button" class="variables-add" (click)="store.add()">
+<button type="button" class="variables-add" data-testid="variable-add" (click)="store.add()">
   <span aria-hidden="true">+</span>
   {{ 'settings.variables.add' | transloco }}
 </button>

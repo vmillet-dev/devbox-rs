@@ -2,6 +2,7 @@
   appMenuAnchor
   type="button"
   class="card-menu-trigger"
+  data-testid="note-card-menu"
   aria-haspopup="menu"
   [attr.aria-expanded]="menu.open()"
   [attr.aria-label]="'notes.noteOptionsLabel' | transloco: { title: noteTitle() }"
@@ -11,11 +12,19 @@
 </button>
 
 @if (menu.open()) {
-  <div appMenuPanel class="card-menu">
+  <div appMenuPanel class="card-menu" data-testid="note-card-menu-panel">
     @if (moveTargets().length > 0) {
       <p class="card-menu-title">{{ 'notes.moveToSpace' | transloco }}</p>
       @for (target of moveTargets(); track target.id) {
-        <button appMenuItem type="button" role="menuitem" class="card-menu-item" (click)="move(target.id)">
+        <button
+          appMenuItem
+          type="button"
+          role="menuitem"
+          class="card-menu-item"
+          data-testid="note-card-move"
+          [attr.data-space-id]="target.id"
+          (click)="move(target.id)"
+        >
           {{ target.name }}
         </button>
       }
@@ -25,6 +34,7 @@
       type="button"
       role="menuitem"
       class="card-menu-item card-menu-delete"
+      data-testid="note-card-delete"
       [class.confirming]="confirmingDelete()"
       (click)="onDeleteClick()"
     >

@@ -106,7 +106,8 @@ pub fn run() {
     #[cfg(debug_assertions)]
     export_bindings().expect("failed to generate TypeScript bindings");
 
-    tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut tauri_builder = tauri::Builder::default()
         // First: the plugins that follow already log.
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -123,7 +124,19 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_clipboard_manager::init());
+
+    // The end-to-end harness. `tauri_plugin_log` has already taken the global
+    // logger, so the plugin's own `set_boxed_logger` fails and WDIO captures no
+    // backend log — the log plugin's targets are what to read instead.
+    #[cfg(feature = "e2e")]
+    {
+        tauri_builder = tauri_builder
+            .plugin(tauri_plugin_wdio::init())
+            .plugin(tauri_plugin_wdio_webdriver::init());
+    }
+
+    tauri_builder
         .setup(|app| {
             // `tauri.conf.json` carries the product name, which is the crate's and is
             // lowercase; the window wears the name the user is shown everywhere else.

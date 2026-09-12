@@ -5,6 +5,8 @@
     <button
       type="button"
       class="chip"
+      data-testid="filter-chip"
+      [attr.data-filter]="filter.key"
       [class.active]="active() === filter.key"
       [attr.aria-pressed]="active() === filter.key"
       (click)="filterChanged.emit(filter.key)"

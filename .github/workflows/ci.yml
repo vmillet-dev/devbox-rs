@@ -184,6 +184,62 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --locked
           echo "\`test-rust\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
+  # Le seul job qui lance l'application assemblée : vrai binaire, vraie WebView2,
+  # vraie base SQLite sur disque. Windows parce que c'est la plateforme de la
+  # matrice de release et celle qui a une WebView2 à piloter.
+  #
+  # `continue-on-error` volontairement : un job E2E instable que tout le monde
+  # ignore vaut moins que pas de job du tout. À retirer une fois qu'il a fait ses
+  # preuves sur quelques dizaines de runs.
+  test-e2e:
+    name: Test E2E
+    runs-on: windows-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # L'étape apt de l'action est gardée par `runner.os == 'Linux'` : sur Windows
+      # elle n'installe que la toolchain et le cache cargo.
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: e2e-windows
+          save-if: 'true'
+
+      - run: npm ci
+
+      # `tauri build` enchaîne `beforeBuildCommand` (le build front e2e) puis cargo.
+      # Le binaire produit porte l'identifiant `com.devbox.app.e2e`, donc son profil
+      # est à lui : il ne peut pas écraser une bibliothèque existante.
+      - name: Build the e2e binary
+        run: |
+          start=$(date +%s)
+          npm run e2e:build
+          echo "\`build-e2e\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+
+      # Le service télécharge le MSEdgeDriver correspondant à la WebView2 du binaire
+      # et installe `tauri-driver` s'il manque — d'où la marge sur le timeout.
+      - name: Run the scenarios
+        run: |
+          start=$(date +%s)
+          npm run test:e2e
+          echo "\`test-e2e\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-logs
+          path: e2e/logs
+          retention-days: 7
+
   # Rien ne synchronise package.json et Cargo.toml. Job court et sans dépendance :
   # sur un tag qui a dérivé, la CI casse en quelques secondes plutôt qu'après la matrice.
   check-version:

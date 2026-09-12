@@ -3,6 +3,7 @@
     appMenuAnchor
     type="button"
     class="file-trigger"
+    data-testid="file-menu"
     aria-haspopup="menu"
     [attr.aria-expanded]="menu.open()"
     (click)="menu.toggle()"
@@ -19,6 +20,8 @@
           type="button"
           role="menuitem"
           class="file-option"
+          data-testid="file-option"
+          [attr.data-entry]="entry.id"
           [attr.aria-disabled]="entry.disabled?.() ?? false"
           (click)="run(entry)"
         >
@@ -28,7 +31,14 @@
 
       <hr class="file-separator" />
 
-      <button appMenuItem type="button" role="menuitem" class="file-option" (click)="openSettings()">
+      <button
+        appMenuItem
+        type="button"
+        role="menuitem"
+        class="file-option"
+        data-testid="file-preferences"
+        (click)="openSettings()"
+      >
         {{ 'file.preferences' | transloco }}
       </button>
 
@@ -37,6 +47,7 @@
         type="button"
         role="menuitem"
         class="file-option danger"
+        data-testid="file-quit"
         [class.confirming]="confirmingQuit()"
         (click)="onQuit()"
       >

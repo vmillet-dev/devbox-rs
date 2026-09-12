@@ -1901,3 +1901,80 @@ The tests split by what they need in order to run:
 
 Test names and comments are in English, like the front-end specs. `notes::store::list`
 survives only as a `#[cfg(test)]` helper — no command returns a raw list.
+
+### End to end
+
+`npm run test:e2e` drives the **assembled application**: the real binary, a real WebView2, the
+real IPC bridge and a real SQLite file. It is the only suite that can see a missing capability,
+a command registered but unreachable, an argument renamed on one side only, a CSP that blocks
+what it should not, or a front end that fails to boot at all — none of which is visible to
+jsdom or to `open_in_memory()`.
+
+The runner is WebdriverIO with `@wdio/tauri-service`, configured in `e2e/wdio.conf.ts`. Specs
+live in `e2e/specs/`, one file per scenario; every selector is held in `e2e/pageobjects/`, and
+`e2e/support/` holds the bridge helper and the application helpers.
+
+**Nothing of the harness ships.** Three seams keep it out of the release binary, and each one
+is checkable:
+
+- The `e2e` Cargo feature, off by default, gates the two `tauri-plugin-wdio*` plugins.
+- `src-tauri/tauri.e2e.conf.json`, merged at build time by `npm run e2e:build`, adds
+  `withGlobalTauri`, declares the `wdio` capability **inline** so no file under
+  `capabilities/` can leak into a release, and changes the identifier.
+- The `e2e` Angular configuration in `angular.json`, whose only difference is
+  `"polyfills": ["@wdio/tauri-plugin"]` — no production source file mentions the harness.
+
+⚠️ The Rust half and the npm half go **together**. With the crates but no polyfill the runner
+never sees `window.wdioTauri` and hangs before opening a session; with the polyfill but no
+crates the front end invokes `plugin:wdio|…` commands nothing answers, and the error banner
+comes up on launch.
+
+**The database is the part that makes the suite trustworthy.** `app_data_dir()` is
+`data_dir()/identifier`, and the e2e build carries `com.devbox.app.e2e`, so the whole suite
+works in a profile of its own — a local run cannot touch the library being dogfooded. On
+Windows the identifier is the only lever for this: `dirs::data_dir()` goes through the Known
+Folder API, which no environment variable redirects.
+
+The profile is wiped in `beforeSession`, **before the binary is spawned** — doing it between
+tests would meet a locked file and an open WAL, fail silently, and leave the next spec reading
+the previous one's notes. Every spec file therefore starts from a genuine fresh install:
+migrations replayed against a real path, sample notes seeded. That is why the twelve scenarios
+are twelve files rather than twelve `describe` blocks — the file boundary is where the state
+resets. Within a file the application stays up, which is what lets a scenario restart it
+deliberately (`restart()`, a `reloadSession` that keeps the profile) and assert what survived.
+
+**⚠️ `driverProvider: 'external'`, not the default `'embedded'`.** The embedded provider keeps
+the WebDriver server inside the application and reuses one process across every spec file, so
+the wipe above would never apply. `tauri-driver` spawns a process per session.
+
+**Seeding goes through the bridge.** `e2e/support/bridge.ts` calls the real commands with the
+types generated in `bindings.ts`, so a Rust signature that moves stops the harness compiling.
+It goes through `window.__TAURI__` rather than `browser.tauri.execute`: the service resolves
+that one through an HTTP endpoint it only addresses correctly under the embedded provider, and
+loses it entirely after a `reloadSession`. Writing the SQLite file directly from Node would
+bypass the migrations and the model rules, and would let a test pass against a state the
+application cannot produce.
+
+**Selectors are `data-testid`, and page objects own them.** Every `aria-label` and every
+visible string goes through `transloco`, and the default locale follows the machine — a text
+selector would depend on the runner. Repeated elements carry the identifying value beside the
+hook (`data-testid="note-card" data-note-id="…"`), because picking a card by position is the
+brittleness the attribute exists to remove. The preference controls are the exception: they are
+addressed by the `id` their own `<label for>` needs, which cannot be renamed without breaking
+the association.
+
+**What the suite deliberately does not cover**, because a WebView cannot reach it:
+
+- The OS-level global accelerator. WebDriver types into the WebView, not into the machine, so
+  the palette is opened by emitting the same `devbox:action` event the accelerator sends.
+- The native file picker. `window.__TAURI_INTERNALS__.invoke` — the funnel every `invoke` goes
+  through — is `writable: false, configurable: false`, so nothing can stand in front of it and
+  a picker opened by a click would block the application until a human clicked it. Import,
+  export and attaching a file are exercised through their commands, which take a path.
+- The tray menu, which is native.
+- The system clipboard where the machine will not release it: on Windows a clipboard manager
+  can hold the lock indefinitely, and `clipboardText()` answers `null` rather than failing.
+  What DevBox owns is asserted anyway, through `DisplayNote.copyText`.
+
+In CI the suite is a job of its own on `windows-latest`, kept `continue-on-error` until it has
+proved itself — a flaky E2E job that everybody ignores is worse than no job.

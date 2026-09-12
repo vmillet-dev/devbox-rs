@@ -6,6 +6,8 @@
       <button
         type="button"
         class="language-chip"
+        data-testid="language-chip"
+        [attr.data-language]="language"
         [class.on]="activeLanguages().has(language)"
         [attr.aria-pressed]="activeLanguages().has(language)"
         (click)="languageToggled.emit(language)"
