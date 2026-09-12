@@ -39,9 +39,9 @@ src/                Angular front-end
 │   │   └── services/   one folder per subject: i18n, errors, time, preferences,
 │   │                   settings, updates, app-info, clipboard, dialogs, window,
 │   │                   shortcuts, autostart, tray, notifications
-│   ├── notes/      the interface, in the page's three zones: header/ (above the
+│   ├── notes/      the page at the root, then its three zones: header/ (above the
 │   │               canvas), canvas/ (the cards), overlays/ (drawn over the page),
-│   │               plus notes-page/, variables-page/ and ui/
+│   │               plus ui/ for what two of them share
 │   ├── titlebar/   titlebar.component, then file-menu/ and about-menu/ with the panels
 │   │               each of them opens, nested where they open from
 │   ├── banners/    error banner, status toast, update prompt — siblings of the outlet
@@ -956,8 +956,9 @@ interface follows on the spot. That is already the idiom everywhere else in the 
 editor commits on blur, the locale switch flips on click — and a theme you only see after
 validating is not chosen, it is guessed.
 
-**The pages are a list in the panel**: the general settings and "Variables", rendered through
-`NgComponentOutlet` so the rail stays one loop over one array. The order on screen is the order
+**The pages are a list in the panel**: the general settings and "Variables", each in its own
+folder beside the dialog, rendered through `NgComponentOutlet` so the rail stays one loop over
+one array. The order on screen is the order
 of the list.
 
 `SettingsStore` holds one signal per setting — the interface language, the theme, the density,

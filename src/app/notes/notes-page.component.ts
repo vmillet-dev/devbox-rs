@@ -15,26 +15,26 @@ import { SpacesStore } from '@core/state/spaces.store';
 import { TagsStore } from '@core/state/tags.store';
 import { TrashStore } from '@core/state/trash.store';
 import { CanvasKeyboardDirective } from '@shared/directives/canvas-keyboard.directive';
-import { FilterChipsComponent } from '../header/filter-chips/filter-chips.component';
-import { LanguageRailComponent } from '../header/language-rail/language-rail.component';
-import { NewNoteButtonComponent } from '../header/new-note-button/new-note-button.component';
-import { NoteActivation } from '../canvas/note-section/note-card/note-card.component';
-import { NoteEditorOverlayComponent } from '../overlays/note-editor-overlay/note-editor-overlay.component';
-import { NoteSectionComponent } from '../canvas/note-section/note-section.component';
-import { PlaceholderFormComponent } from '../overlays/placeholder-form/placeholder-form.component';
-import { ImageLightboxComponent } from '../overlays/image-lightbox/image-lightbox.component';
-import { QuickPaletteComponent } from '../overlays/quick-palette/quick-palette.component';
-import { SearchBoxComponent } from '../header/search-box/search-box.component';
-import { SelectionBarComponent } from '../header/selection-bar/selection-bar.component';
+import { FilterChipsComponent } from './header/filter-chips/filter-chips.component';
+import { LanguageRailComponent } from './header/language-rail/language-rail.component';
+import { NewNoteButtonComponent } from './header/new-note-button/new-note-button.component';
+import { NoteActivation } from './canvas/note-section/note-card/note-card.component';
+import { NoteEditorOverlayComponent } from './overlays/note-editor-overlay/note-editor-overlay.component';
+import { NoteSectionComponent } from './canvas/note-section/note-section.component';
+import { PlaceholderFormComponent } from './overlays/placeholder-form/placeholder-form.component';
+import { ImageLightboxComponent } from './overlays/image-lightbox/image-lightbox.component';
+import { QuickPaletteComponent } from './overlays/quick-palette/quick-palette.component';
+import { SearchBoxComponent } from './header/search-box/search-box.component';
+import { SelectionBarComponent } from './header/selection-bar/selection-bar.component';
 import {
   SpaceDeletion,
   SpaceRenaming,
   SpaceSwitcherComponent,
-} from '../header/space-switcher/space-switcher.component';
-import { TagManagerComponent } from '../overlays/tag-manager/tag-manager.component';
-import { TagRailComponent } from '../header/tag-rail/tag-rail.component';
-import { TrashPanelComponent } from '../overlays/trash-panel/trash-panel.component';
-import { UndoBarComponent } from '../overlays/undo-bar/undo-bar.component';
+} from './header/space-switcher/space-switcher.component';
+import { TagManagerComponent } from './overlays/tag-manager/tag-manager.component';
+import { TagRailComponent } from './header/tag-rail/tag-rail.component';
+import { TrashPanelComponent } from './overlays/trash-panel/trash-panel.component';
+import { UndoBarComponent } from './overlays/undo-bar/undo-bar.component';
 
 @Component({
   selector: 'app-notes-page',
