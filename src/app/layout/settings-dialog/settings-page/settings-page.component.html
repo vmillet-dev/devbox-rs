@@ -3,6 +3,19 @@
     <h4 class="setting-group-title">{{ 'settings.appearance.title' | transloco }}</h4>
 
     <div class="setting-row">
+      <label class="setting-label" for="setting-locale">
+        {{ 'settings.appearance.language' | transloco }}
+      </label>
+      <select id="setting-locale" class="setting-select" (change)="onLocale($event)">
+        @for (choice of locales; track choice) {
+          <option [value]="choice" [selected]="choice === settings.locale()">
+            {{ 'locale.' + choice | transloco }}
+          </option>
+        }
+      </select>
+    </div>
+
+    <div class="setting-row">
       <label class="setting-label" for="setting-theme">
         {{ 'settings.appearance.theme' | transloco }}
       </label>
