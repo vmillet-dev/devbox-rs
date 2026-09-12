@@ -467,7 +467,7 @@ Rules of the house:
   why the view is recomputed rather than patched.
 - **Ids, timestamps and normalisation come from persistence**, never from the front-end.
 - Derived state is `computed()`, never a manually maintained signal.
-- Formatting logic that needs no injection lives beside its subject (relative time in `core/time/`) as pure functions taking
+- Formatting logic that needs no injection lives beside its subject (relative time in `core/services/time/`) as pure functions taking
   `now: Date` as a parameter.
 
 ### Display sections
@@ -1038,7 +1038,7 @@ the loser keeps the keyboard.
   keep in step.
 
 The groups of the notes — the canvas arrows, `X` to check a card, `Alt+↑` to reorder a
-checklist item — come from `notes/notes-shortcuts.ts`, which the sheet imports.
+checklist item — come from `core/constantes/notes-shortcuts.ts`, which the sheet imports.
 They live with the notes rather than in the sheet because the canvas group is **derived from
 the key table that binds them** (`CANVAS_SHORTCUT_GROUP`, from `CanvasKeyboardDirective`): a
 key documented but not bound, or the reverse, is not possible.
@@ -1106,7 +1106,7 @@ about samples nobody asked for would only add noise.
 re-importing at once is the first thing anyone tries, and it legitimately imports zero notes:
 every id is already there. Without a message that outcome is indistinguishable from a
 failure, so `LibraryStore` pushes a distinct `file.importedNothing` for it, and an export
-names the file it wrote. The report goes to `StatusNotifier` (`core/notifications/`), rendered
+names the file it wrote. The report goes to `StatusNotifier` (`core/services/notifications/`), rendered
 under the titlebar by `StatusToastComponent` — not inside the menu, which closes on the click
 and which a native file dialog covers anyway.
 
@@ -1196,7 +1196,7 @@ camelCase; nobody spells `targetSpaceId` by hand any more.
 
 Only `core/data/` and `core/ipc/` call a generated **command**: everything above the
 boundary speaks the **model**, which `note.mapper.ts` converts to and from. The generated file
-stays behind the same boundary the hand-written types were behind. `core/app-info/` is the
+stays behind the same boundary the hand-written types were behind. `core/services/app-info/` is the
 third and last file to import `bindings.ts`, and it reads a **constant** and not a command —
 see below.
 
@@ -1222,7 +1222,7 @@ This exists because business rules live in Rust. A message written there would b
 an English UI, and branching on a cause would mean parsing a sentence that breaks at the
 first rewording.
 
-The mapping lives in **one** place, `core/errors/error-notifier.service.ts`: `ipcNotice(error, fallback)`
+The mapping lives in **one** place, `core/services/errors/error-notifier.service.ts`: `ipcNotice(error, fallback)`
 turns a failure into the message that helps most. A named cause wins over the attempted
 action — "this note no longer exists" beats "could not save the note", which would leave the
 user retrying something that can never succeed. `fallback` is used when the cause adds
@@ -1353,7 +1353,7 @@ dependency bump, an answer from the bridge cannot. Every value comes from `Cargo
 standard fields through `CARGO_PKG_*`, and what Cargo has no field for through
 `[package.metadata.devbox]`, which `build.rs` hands to the crate as environment variables
 read with `env!`. It is a constant and not a command on purpose: the titlebar reads the name
-**synchronously**, where a round trip would leave it empty for a frame. `core/app-info/`
+**synchronously**, where a round trip would leave it empty for a frame. `core/services/app-info/`
 re-exports it once as `APP_INFO`, so nothing else imports `bindings.ts` for it.
 
 ⚠️ The **version** is not in it. It is read from the running binary with `getVersion()`, which
@@ -1406,7 +1406,7 @@ if closing it killed the shortcut. It is a preference now (see _Preferences_), s
 default; minimising to the tray is the same idea, off by default. Tauri emits nothing for
 "minimised", so `lib.rs` watches `Resized` and asks the window where it stands.
 
-- **The front creates the tray, not the native startup.** `TrayService` (`core/tray/`) pushes
+- **The front creates the tray, not the native startup.** `TrayService` (`core/services/tray/`) pushes
   the menu labels through `sync_tray`, and Rust holds **no user-visible string at all**: the
   interface language is a front-end preference, and a translation table in Rust would be a
   second source to keep in step. The subscription re-emits on every language change, so the
@@ -1585,11 +1585,11 @@ installed or shipped alongside the executable. The database file lives in Tauri'
 
 ## Cross-cutting services
 
-- **`ClockService`** (`core/time/`) exposes `now` as a signal ticking every 30 s. Relative
+- **`ClockService`** (`core/services/time/`) exposes `now` as a signal ticking every 30 s. Relative
   time computed with `new Date()` inside a `computed()` freezes: the computed depends on no
   signal representing time, so it never re-evaluates and a card shows "4 min ago" forever.
   Injecting `now()` makes those computeds both pure and self-refreshing.
-- **`PreferencesService`** (`core/preferences/`) stores UI preferences in a real file through
+- **`PreferencesService`** (`core/services/preferences/`) stores UI preferences in a real file through
   `tauri-plugin-store` (`preferences.json` in `app_config_dir()`), readable from Rust and
   immune to a WebView cache wipe — unlike the `localStorage` it replaced. Two consumers:
   `LocaleService`, and the editor overlay's two display toggles — fullscreen
@@ -1608,27 +1608,27 @@ installed or shipped alongside the executable. The database file lives in Tauri'
     clears it. Without that, updating the app would silently reset the interface language.
   - Adding a plugin also means declaring its permission (`store:default`) in
     `src-tauri/capabilities/default.json`, or the call is refused at runtime.
-- **`SettingsStore`** (`core/settings/`) is the application's own settings, on top of
+- **`SettingsStore`** (`core/services/settings/`) is the application's own settings, on top of
   `PreferencesService`. It writes as it is read — there is no draft to validate — and it talks
   to nobody: `GlobalShortcutsService`, `WindowBehaviorService` and `AutostartService` read its
   signals and carry each change to the native side. See _Preferences_.
-- **`ErrorNotifier` + `AppErrorHandler`** (`core/errors/`) surface failures on screen through
+- **`ErrorNotifier` + `AppErrorHandler`** (`core/services/errors/`) surface failures on screen through
   `ErrorBannerComponent`. On a desktop app the console is not an interface: an uncaught
   exception or a failed write has to be visible, or the app just looks unresponsive.
-- **`ClipboardService`** (`core/clipboard/`) is the system clipboard. The CSP locks the WebView
+- **`ClipboardService`** (`core/services/clipboard/`) is the system clipboard. The CSP locks the WebView
   to `'self'` and `navigator.clipboard` is unusable there, so everything goes through
   `tauri-plugin-clipboard-manager` (permissions `clipboard-manager:allow-read-text` and
   `allow-write-text`). Same `CLIPBOARD_ADAPTER` token and same degradation as
   `PreferencesService`: outside Tauri the plugin rejects, and the service reports a `false`
   rather than throwing — a copy that failed only has a visual acknowledgement to withhold.
   It is in `core/` by the usual test: a hashing tool would inject it verbatim.
-- **`FileDialogService`** (`core/dialogs/`) is the native file picker, behind
+- **`FileDialogService`** (`core/services/dialogs/`) is the native file picker, behind
   `tauri-plugin-dialog` (permissions `dialog:allow-open` and `dialog:allow-save`). Same
   `FILE_DIALOG_ADAPTER` token and same degradation as above, with one addition: `null` covers
   both a cancelled dialog **and** an unavailable plugin. An exception would force every caller
   to tell two non-choices apart, and there is nothing to open either way. It also flattens the
   plugin's `string | string[]` union, which stays a union even with `multiple: false`.
-- **`AppWindowService`** (`core/window/`) hides the window and quits the app
+- **`AppWindowService`** (`core/services/window/`) hides the window and quits the app
   (`core:window:allow-hide`, `process:allow-exit`). The two are and stay distinct: the window's
   close button **hides** (`lib.rs` intercepts `CloseRequested` while there is a tray), the
   palette hides after copying, and `quit()` is the only path that really ends the process. The
@@ -1649,7 +1649,7 @@ Transloco's `transloco` pipe. French is the fallback locale.
   Transloco and `<html lang>` — the same shape as the three services that carry a preference
   down to the native side. Two controls write that one setting: the preferences panel and the
   `FR` / `EN` buttons in the titlebar, which set an explicit language.
-- `system` resolves through `resolveSystemLocale()` (`core/i18n/locale.model.ts`), which reads
+- `system` resolves through `resolveSystemLocale()` (`core/services/i18n/locale.model.ts`), which reads
   `navigator.languages` — the WebView takes it from the OS — and falls back to
   `SYSTEM_FALLBACK_LOCALE` (English) when the machine speaks neither language. Nothing is
   persisted while the preference stays on `system`, so DevBox keeps following the OS.
@@ -1748,7 +1748,7 @@ update.
 - **The user decides.** `check()` only produces an offer; `UpdateStore.accept()` is the only
   path that downloads. A silent update would restart the app mid-keystroke, and the editor
   only commits its drafts on blur.
-- **`UpdaterService`** (`core/updates/`) is the seam, for the same reason the repositories are
+- **`UpdaterService`** (`core/services/updates/`) is the seam, for the same reason the repositories are
   one: no component or store imports `@tauri-apps/plugin-updater`, which needs a Tauri bridge
   that jsdom does not have. These are plugin commands, not ours, so they never appear in
   `bindings.ts`. The service also holds the plugin's `Update` object — a **native resource**
@@ -1797,7 +1797,7 @@ update.
   `https://github.com/vmillet-dev/*` may be opened. `opener:default` would let any URL through
   the WebView's only escape hatch to the system browser. The About dialog needs the plugin
   precisely because the CSP is locked to `'self'` — a plain `<a href>` leads nowhere — and
-  `AppInfoService` (`core/app-info/`) is its seam, alongside `getVersion()`. That one needs no
+  `AppInfoService` (`core/services/app-info/`) is its seam, alongside `getVersion()`. That one needs no
   permission of its own: `core:app:allow-version` already ships inside `core:default`.
 - `serde_json` is a **runtime** dependency, not just a dev one: `generate_context!` embeds the
   `plugins` section of `tauri.conf.json` as JSON, and drops the section without it.
