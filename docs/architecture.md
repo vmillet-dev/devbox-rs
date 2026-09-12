@@ -1306,8 +1306,7 @@ re-exports it once as `APP_INFO`, so nothing else imports `bindings.ts` for it.
 ⚠️ The **version** is not in it. It is read from the running binary with `getVersion()`, which
 cannot go stale the way a committed `bindings.ts` can, and `tauri.conf.json` no longer declares
 one either — without the key, Tauri takes the version from `Cargo.toml`. A CI job checks the
-tag against `package.json` and `Cargo.toml`, and refuses a `tauri.conf.json` that declares a
-version again.
+tag against `package.json` and `Cargo.toml` on a release.
 
 That is deliberately **not** `collect_events![…]`: it would generate a `listen` call per event,
 imported straight from `@tauri-apps/api/event`, and the `EVENT_SUBSCRIBER` token every spec

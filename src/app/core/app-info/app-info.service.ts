@@ -3,14 +3,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { APP_METADATA } from '@core/ipc/bindings';
 
-/**
- * The name, the author and the repository URL, straight from `Cargo.toml` through the
- * generated constant — the manifest is the only place they are written. Read here and
- * not from `bindings.ts` everywhere, so the rest of the app keeps one import for them.
- *
- * The **version** is not part of it: `version()` below reads it from the running binary,
- * which cannot go stale the way a committed `bindings.ts` can.
- */
+/** The application's own details, generated from `Cargo.toml` at compile time. */
 export const APP_INFO = APP_METADATA;
 
 /**
