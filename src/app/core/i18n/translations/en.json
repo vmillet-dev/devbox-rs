@@ -44,9 +44,9 @@
     "samples": {
       "space": "Getting started",
       "welcome": {
-        "title": "Welcome to DevBox",
-        "source": "DevBox / Getting started",
-        "content": "DevBox keeps your notes, your snippets and your lists within reach of a shortcut.\n\n- Cards file themselves: pinned, today, this week, older.\n- Click a card to open it, or copy it without opening it.\n- Everything is local: the database lives in your user folder, nothing goes over the network.\n\nThese four notes are samples. Edit them, or send them to the trash: the \"About → Getting started\" menu tells the same story and does not go away."
+        "title": "Welcome to %APP%",
+        "source": "%APP% / Getting started",
+        "content": "%APP% keeps your notes, your snippets and your lists within reach of a shortcut.\n\n- Cards file themselves: pinned, today, this week, older.\n- Click a card to open it, or copy it without opening it.\n- Everything is local: the database lives in your user folder, nothing goes over the network.\n\nThese four notes are samples. Edit them, or send them to the trash: the \"About → Getting started\" menu tells the same story and does not go away."
       },
       "snippet": {
         "title": "psql connection",
@@ -143,12 +143,12 @@
     "noteGone": "This note no longer exists.",
     "spaceGone": "This space no longer exists.",
     "invalidInput": "The engine rejected this value: {{field}}.",
-    "storageUnavailable": "Storage is unavailable. Restart DevBox.",
-    "updateFailed": "The update failed. DevBox remains usable on its current version.",
+    "storageUnavailable": "Storage is unavailable. Restart %APP%.",
+    "updateFailed": "The update failed. %APP% remains usable on its current version.",
     "updateCheckFailed": "The update check failed. Try again later.",
     "attachmentGone": "This attachment no longer exists.",
     "fileAccess": "The file cannot be reached.",
-    "importFormat": "This file is not a DevBox export this version can read.",
+    "importFormat": "This file is not a %APP% export this version can read.",
     "trashLoadFailed": "Could not load the trash.",
     "trashActionFailed": "The trash operation failed.",
     "tagsLoadFailed": "Could not load tags.",
@@ -167,10 +167,10 @@
     "variablesSaveFailed": "Could not save the variables."
   },
   "tray": {
-    "open": "Open DevBox",
+    "open": "Open %APP%",
     "newNote": "New note",
     "capture": "Paste from clipboard",
-    "quit": "Quit DevBox",
+    "quit": "Quit %APP%",
     "palette": "Quick paste"
   },
   "locale": {
@@ -181,23 +181,23 @@
   },
   "update": {
     "title": "Update available",
-    "summary": "DevBox {{version}} is available. You are currently running version {{current}}.",
+    "summary": "%APP% {{version}} is available. You are currently running version {{current}}.",
     "notesLabel": "Release notes",
     "install": "Install now",
     "later": "Later",
     "downloading": "Downloading…",
     "downloadingPercent": "Downloading… {{percent}}%",
-    "restarting": "Restarting DevBox…",
+    "restarting": "Restarting %APP%…",
     "progressLabel": "Download progress"
   },
   "about": {
     "menuLabel": "About",
     "checkUpdates": "Check for updates",
     "checking": "Checking…",
-    "upToDate": "✓ DevBox is up to date",
+    "upToDate": "✓ %APP% is up to date",
     "checkFailed": "✕ Check failed",
-    "openAbout": "About DevBox",
-    "title": "DevBox",
+    "openAbout": "About %APP%",
+    "title": "%APP%",
     "description": "A developer's Swiss Army knife: notes and snippets, with hashing and encoding to come. Angular 22 on the front, Rust and Tauri v2 as the native engine.",
     "versionLabel": "Version",
     "versionUnknown": "unknown",
@@ -307,7 +307,7 @@
     "exportSpace": "Export active space…",
     "exportSelection": "Export selection…",
     "copyMarkdown": "Copy selection as Markdown",
-    "quit": "Quit DevBox",
+    "quit": "Quit %APP%",
     "quitConfirm": "Confirm?",
     "imported": "{{notes}} note(s) imported from {{path}}, {{skipped}} skipped.",
     "importedNothing": "Nothing to import: those {{skipped}} note(s) are already in your library.",
@@ -390,7 +390,7 @@
       "startWithSystem": "Start with the system",
       "minimizeToTray": "Minimize to tray",
       "closeToTray": "Close to tray",
-      "trayNote": "Without a system tray the window minimizes and closes as usual: DevBox refuses to hide where nothing could call it back."
+      "trayNote": "Without a system tray the window minimizes and closes as usual: %APP% refuses to hide where nothing could call it back."
     },
     "quickPaste": {
       "title": "Quick paste",
@@ -418,7 +418,7 @@
   },
   "gettingStarted": {
     "title": "Getting started",
-    "subtitle": "What DevBox can do, in the order you meet it.",
+    "subtitle": "What %APP% can do, in the order you meet it.",
     "hint": "The sample notes from the first launch show all of this for real.",
     "close": "Close",
     "chapters": {
@@ -436,7 +436,7 @@
       },
       "fields": {
         "title": "Fields to fill in",
-        "body": "Write a field between double braces in a snippet — a name alone, or a name and a default value — and DevBox asks you for it when you copy. What you type is kept with the note, and global variables (File → Preferences → Variables) propose a value for the whole corpus, shown in grey until you replace it."
+        "body": "Write a field between double braces in a snippet — a name alone, or a name and a default value — and %APP% asks you for it when you copy. What you type is kept with the note, and global variables (File → Preferences → Variables) propose a value for the whole corpus, shown in grey until you replace it."
       },
       "checklists": {
         "title": "Lists to tick",
@@ -444,7 +444,7 @@
       },
       "palette": {
         "title": "Pasting without leaving what you are doing",
-        "body": "{{palette}} opens the quick-paste palette over any application: type, choose, and the content lands in the clipboard. {{capture}} does the opposite and files the clipboard into a fresh note, {{newNote}} opens an empty one. All three work with the window closed, DevBox staying in the system tray."
+        "body": "{{palette}} opens the quick-paste palette over any application: type, choose, and the content lands in the clipboard. {{capture}} does the opposite and files the clipboard into a fresh note, {{newNote}} opens an empty one. All three work with the window closed, %APP% staying in the system tray."
       },
       "attachments": {
         "title": "Attachments",
@@ -456,7 +456,7 @@
       },
       "transfer": {
         "title": "In and out",
-        "body": "The File menu exports everything, one space or the selection into a file DevBox can read back, and imports without ever creating a duplicate. \"Copy as Markdown\" puts the selection in the clipboard, ready to paste into a ticket or a message."
+        "body": "The File menu exports everything, one space or the selection into a file %APP% can read back, and imports without ever creating a duplicate. \"Copy as Markdown\" puts the selection in the clipboard, ready to paste into a ticket or a message."
       }
     }
   },

@@ -125,6 +125,12 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            // `tauri.conf.json` carries the product name, which is the crate's and is
+            // lowercase; the window wears the name the user is shown everywhere else.
+            if let Some(window) = app.get_webview_window("main") {
+                window.set_title(app_info::METADATA.name)?;
+            }
+
             // Absent from the mobile targets (see Cargo.toml).
             #[cfg(desktop)]
             app.handle()
