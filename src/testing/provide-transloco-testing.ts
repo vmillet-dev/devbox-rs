@@ -1,6 +1,6 @@
 import { EnvironmentProviders } from '@angular/core';
 import { provideTransloco } from '@jsverse/transloco';
-import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
+import { AppTranslocoLoader } from '@core/services/i18n/transloco-loader';
 
 /**
  * The same Transloco providers as the real app — the bundled loader is already

@@ -1,4 +1,4 @@
-import { AvailableUpdate, DownloadProgress } from '@core/updates/updater.service';
+import { AvailableUpdate, DownloadProgress } from '@core/services/updates/updater.service';
 
 /**
  * Substituted by class token: the real one reaches for the Tauri bridge, absent under

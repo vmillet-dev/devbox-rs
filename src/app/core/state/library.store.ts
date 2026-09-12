@@ -1,0 +1,133 @@
+import { Injectable, inject, signal } from '@angular/core';
+import { ClipboardService } from '@core/services/clipboard/clipboard.service';
+import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { FileDialogService } from '@core/services/dialogs/file-dialog.service';
+import { StatusNotifier } from '@core/services/notifications/status.service';
+import { TransferRepository } from '../data/transfer.repository';
+import { NotesRevision } from './notes-revision';
+
+/** The name offered to the picker: dated, so two exports do not overlap. */
+function defaultFileName(now: Date): string {
+  return `devbox-${now.toISOString().slice(0, 10)}.json`;
+}
+
+function fileNameOf(path: string): string {
+  return path.split(/[/\\]/).pop() ?? path;
+}
+
+/**
+ * **Every operation reports**, including when it changed nothing: an import that adds
+ * nothing because everything is already there and one that fails look too alike on
+ * screen to stay silent. Reports go under the titlebar — the menu closes on the click.
+ */
+@Injectable({ providedIn: 'root' })
+export class LibraryStore {
+  private readonly repository = inject(TransferRepository);
+  private readonly dialog = inject(FileDialogService);
+  private readonly clipboard = inject(ClipboardService);
+  private readonly status = inject(StatusNotifier);
+  private readonly notifier = inject(ErrorNotifier);
+  private readonly revision = inject(NotesRevision);
+
+  private readonly _isBusy = signal(false);
+
+  readonly isBusy = this._isBusy.asReadonly();
+
+  /** `true` when notes came in, which is what bumps the canvas revision. */
+  async import(): Promise<boolean> {
+    const path = await this.dialog.pickBundle();
+    if (path === null) return false;
+
+    return this.run(async () => {
+      const report = await this.repository.import(path);
+      const params = {
+        notes: String(report.notesImported),
+        skipped: String(report.notesSkipped),
+        path: fileNameOf(path),
+      };
+
+      // The most common gesture — export then re-import at once — adds nothing at
+      // all. Saying so explicitly stops it looking like a breakdown.
+      this.status.notify({
+        key: report.notesImported === 0 ? 'file.importedNothing' : 'file.imported',
+        params,
+      });
+
+      const changed = report.notesImported > 0 || report.spacesCreated > 0;
+      if (changed) this.revision.bump();
+
+      return changed;
+    }, 'errors.importFailed');
+  }
+
+  /** A `null` `spaceId` exports the whole corpus. */
+  async export(spaceId: string | null, now: Date): Promise<void> {
+    await this.write((path) => this.repository.export(path, spaceId), now);
+  }
+
+  async exportSelection(ids: readonly string[], now: Date): Promise<void> {
+    if (!this.requireSelection(ids)) return;
+
+    await this.write((path) => this.repository.exportSelection(path, ids), now);
+  }
+
+  /**
+   * Sharing stops at the clipboard: nothing is sent anywhere, which is also why there
+   * is nothing to confirm.
+   */
+  async copyAsMarkdown(ids: readonly string[]): Promise<void> {
+    if (!this.requireSelection(ids)) return;
+
+    await this.run(async () => {
+      const markdown = await this.repository.share(ids);
+      if (!(await this.clipboard.copy(markdown))) {
+        this.notifier.notify({ ref: { key: 'errors.copyFailed' } });
+        return false;
+      }
+
+      this.status.notify({ key: 'file.copied', params: { notes: String(ids.length) } });
+      return true;
+    }, 'errors.shareFailed');
+  }
+
+  private requireSelection(ids: readonly string[]): boolean {
+    if (ids.length > 0) return true;
+
+    this.notifier.notify({ ref: { key: 'file.needsSelection' } });
+    return false;
+  }
+
+  private async write(action: (path: string) => Promise<{ notes: number }>, now: Date): Promise<void> {
+    const path = await this.dialog.chooseBundleDestination(defaultFileName(now));
+    if (path === null) return;
+
+    await this.run(async () => {
+      const report = await action(path);
+
+      if (report.notes === 0) {
+        this.status.notify({ key: 'file.emptyLibrary' });
+        return false;
+      }
+
+      // The file name is part of the report: a successful export whose landing place
+      // is unknown is no use.
+      this.status.notify({
+        key: 'file.exported',
+        params: { notes: String(report.notes), path: fileNameOf(path) },
+      });
+      return true;
+    }, 'errors.exportFailed');
+  }
+
+  private async run(action: () => Promise<boolean>, failureKey: string): Promise<boolean> {
+    this._isBusy.set(true);
+    try {
+      return await action();
+    } catch (error) {
+      this.notifier.reportFailure(failureKey, error);
+      return false;
+    } finally {
+      this._isBusy.set(false);
+    }
+  }
+}

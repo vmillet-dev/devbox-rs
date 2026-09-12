@@ -25,8 +25,9 @@
     "paths": {
       "@core/*": ["./src/app/core/*"],
       "@shared/*": ["./src/app/shared/*"],
-      "@features/*": ["./src/app/features/*"],
-      "@layout/*": ["./src/app/layout/*"],
+      "@notes/*": ["./src/app/notes/*"],
+      "@titlebar/*": ["./src/app/titlebar/*"],
+      "@banners/*": ["./src/app/banners/*"],
       "@testing/*": ["./src/testing/*"]
     }
   },

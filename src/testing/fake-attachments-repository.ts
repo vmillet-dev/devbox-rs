@@ -1,6 +1,6 @@
 import { guard } from './fail-next';
-import { AttachmentsRepository } from '@features/notes/data/attachments.repository';
-import { Attachment } from '@features/notes/model/note.model';
+import { AttachmentsRepository } from '@core/data/attachments.repository';
+import { Attachment } from '@core/model/note.model';
 
 /**
  * `read` returns a stub `data:` URI rather than real bytes: what the front owns is *when*
