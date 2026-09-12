@@ -88,24 +88,10 @@
 @if (store.selectedNote(); as note) {
   <app-note-editor-overlay
     [note]="note"
-    [attachments]="attachments.attachments()"
-    [attachmentsBusy]="attachments.isBusy()"
-    [attachmentPreviewId]="attachments.previewId()"
-    [attachmentPreviewData]="attachments.previewData()"
-    [filledContent]="fill.preview()"
     (closed)="store.closeOverlay()"
     (patchRequested)="store.applyPatch(note.id, $event)"
     (deleteRequested)="store.deleteNote(note.id)"
-    (attachmentAddRequested)="attachments.addFromPicker()"
-    (attachmentRemoveRequested)="attachments.remove($event)"
-    (attachmentPreviewToggled)="attachments.togglePreview($event)"
-    (attachmentOpenRequested)="attachments.open($event)"
-    (attachmentSaveRequested)="attachments.saveToDisk($event)"
-    (imagePasted)="attachments.addPastedImage()"
-    (imageZoomRequested)="attachments.zoom()"
     (placeholderValuesChanged)="store.setPlaceholderValues(note.id, $event)"
-    (fillPreviewRequested)="fill.refreshPreview($event)"
-    (filledCopyRequested)="fill.copyFilled($event)"
   />
 }
 

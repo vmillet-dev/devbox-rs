@@ -19,7 +19,9 @@ import {
   isLanguageTag,
 } from '@core/language/language.model';
 import { checklistProgress } from '@features/notes/model/checklist.model';
-import { Attachment, Note, NotePatch } from '@features/notes/model/note.model';
+import { Note, NotePatch } from '@features/notes/model/note.model';
+import { AttachmentsStore } from '@features/notes/state/attachments.store';
+import { PlaceholderFillStore } from '@features/notes/state/placeholder-fill.store';
 import { PreferencesService } from '@core/preferences/preferences.service';
 import { ClockService } from '@core/time/clock.service';
 import { relativeTimeRef } from '@core/time/relative-time.util';
@@ -42,15 +44,6 @@ const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) =>
   value: value as LanguageTag,
   label,
 }));
-
-/**
- * The editor fills nothing itself: it says *what* to fill, and the page hands the
- * result back.
- */
-export interface FillRequest {
-  readonly content: string;
-  readonly values: Record<string, string>;
-}
 
 /**
  * ⚠️ Carried to the **end of the local day**, not to midnight: a note dated today
@@ -101,22 +94,15 @@ export class NoteEditorOverlayComponent {
   private readonly clock = inject(ClockService);
   private readonly preferences = inject(PreferencesService);
 
+  /**
+   * Attachments and `{{field}}` filling have a write cycle of their own, and the editor
+   * reaches for them directly: routing seventeen bindings through the page made adding
+   * one a four-file change.
+   */
+  protected readonly attachments = inject(AttachmentsStore);
+  protected readonly fill = inject(PlaceholderFillStore);
+
   readonly note = input<Note | null>(null);
-
-  /**
-   * A store of their own: attachments have their own write cycle, and routing them
-   * down the note would mean reloading it on every addition.
-   */
-  readonly attachments = input<readonly Attachment[]>([]);
-  readonly attachmentsBusy = input(false);
-  readonly attachmentPreviewId = input<string | null>(null);
-  readonly attachmentPreviewData = input<string | null>(null);
-
-  /**
-   * `null` until something is asked for, so the preview shows nothing rather than text
-   * still riddled with tokens.
-   */
-  readonly filledContent = input<string | null>(null);
 
   readonly closed = output<void>();
   /**
@@ -126,16 +112,8 @@ export class NoteEditorOverlayComponent {
    */
   readonly patchRequested = output<NotePatch>();
   readonly deleteRequested = output<void>();
-  readonly attachmentAddRequested = output<void>();
-  readonly attachmentRemoveRequested = output<string>();
-  readonly attachmentPreviewToggled = output<string>();
-  readonly attachmentOpenRequested = output<string>();
-  readonly attachmentSaveRequested = output<string>();
-  readonly imageZoomRequested = output<void>();
+  /** Stays an output: `NotesStore` is the one that knows whether the note exists yet. */
   readonly placeholderValuesChanged = output<Record<string, string>>();
-  readonly fillPreviewRequested = output<FillRequest>();
-  readonly filledCopyRequested = output<FillRequest>();
-  readonly imagePasted = output<void>();
 
   protected readonly languageOptions = LANGUAGE_OPTIONS;
 
@@ -198,9 +176,7 @@ export class NoteEditorOverlayComponent {
   protected readonly placeholders = computed(() => this.note()?.placeholders ?? []);
   protected readonly hasPlaceholders = computed(() => this.placeholders().length > 0);
 
-  protected readonly showingPreview = computed(
-    () => this.previewingFilled() && this.filledContent() !== null,
-  );
+  protected readonly showingPreview = computed(() => this.previewingFilled() && this.fill.preview() !== null);
 
   protected readonly languageLabel = computed(
     () => LANGUAGE_LABELS[this.note()?.language ?? FALLBACK_LANGUAGE],
@@ -259,7 +235,7 @@ export class NoteEditorOverlayComponent {
    * values trigger a new request.
    */
   private requestFillPreview(): void {
-    this.fillPreviewRequested.emit({
+    void this.fill.refreshPreview({
       content: this.draftContent(),
       values: this.placeholderValues(),
     });
@@ -270,7 +246,7 @@ export class NoteEditorOverlayComponent {
    * a field would make anything computed ahead of time stale.
    */
   protected requestFilledCopy(): void {
-    this.filledCopyRequested.emit({
+    void this.fill.copyFilled({
       content: this.draftContent(),
       values: this.placeholderValues(),
     });
@@ -314,7 +290,7 @@ export class NoteEditorOverlayComponent {
     if (!hasImage) return;
 
     event.preventDefault();
-    this.imagePasted.emit();
+    void this.attachments.addPastedImage();
   }
 
   protected requestPatch(patch: NotePatch): void {

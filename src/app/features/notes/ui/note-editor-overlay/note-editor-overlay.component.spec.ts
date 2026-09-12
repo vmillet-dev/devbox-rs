@@ -6,6 +6,8 @@ import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.componen
 import { LifecycleBadgeComponent } from '../lifecycle-badge/lifecycle-badge.component';
 import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
 import { NotePatch } from '@features/notes/model/note.model';
+import { AttachmentsStore } from '@features/notes/state/attachments.store';
+import { PlaceholderFillStore } from '@features/notes/state/placeholder-fill.store';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
 import { NoteEditorOverlayComponent } from './note-editor-overlay.component';
@@ -320,11 +322,13 @@ describe('NoteEditorOverlayComponent', () => {
       return event;
     }
 
-    async function openNote(): Promise<string[]> {
+    /** Spied rather than followed to the repository: what is asserted is that the editor
+     *  hands the paste over, not what attaching does. */
+    async function openNote(): Promise<ReturnType<typeof vi.fn>> {
       fixture.componentRef.setInput('note', createNote({ content: '' }));
       await fixture.whenStable();
-      const pasted: string[] = [];
-      fixture.componentInstance.imagePasted.subscribe(() => pasted.push('image'));
+      const pasted = vi.fn().mockResolvedValue(undefined);
+      vi.spyOn(TestBed.inject(AttachmentsStore), 'addPastedImage').mockImplementation(pasted);
       return pasted;
     }
 
@@ -335,7 +339,7 @@ describe('NoteEditorOverlayComponent', () => {
       bodyEditor().dispatchEvent(event);
       await fixture.whenStable();
 
-      expect(pasted).toEqual(['image']);
+      expect(pasted).toHaveBeenCalledOnce();
       expect(event.defaultPrevented).toBe(true);
     });
 
@@ -345,7 +349,7 @@ describe('NoteEditorOverlayComponent', () => {
       bodyEditor().dispatchEvent(pasteEvent(['image/png']));
       await fixture.whenStable();
 
-      expect(pasted).toEqual(['image']);
+      expect(pasted).toHaveBeenCalledOnce();
     });
 
     it('leaves a paste carrying text to the field, which handles it natively', async () => {
@@ -355,7 +359,7 @@ describe('NoteEditorOverlayComponent', () => {
       bodyEditor().dispatchEvent(event);
       await fixture.whenStable();
 
-      expect(pasted).toEqual([]);
+      expect(pasted).not.toHaveBeenCalled();
       expect(event.defaultPrevented).toBe(false);
     });
 
@@ -365,7 +369,7 @@ describe('NoteEditorOverlayComponent', () => {
       bodyEditor().dispatchEvent(pasteEvent(['application/pdf']));
       await fixture.whenStable();
 
-      expect(pasted).toEqual([]);
+      expect(pasted).not.toHaveBeenCalled();
     });
   });
 
@@ -846,8 +850,9 @@ describe('NoteEditorOverlayComponent', () => {
 
     it('copies filled rather than raw, and composes the text at the click', async () => {
       await openTemplated();
-      const requests: { content: string; values: Record<string, string> }[] = [];
-      fixture.componentInstance.filledCopyRequested.subscribe((request) => requests.push(request));
+      const copyFilled = vi
+        .spyOn(TestBed.inject(PlaceholderFillStore), 'copyFilled')
+        .mockResolvedValue(undefined);
 
       await type(fieldInputs()[1], '6543');
       await type(bodyEditor(), 'psql -h {{host}} -p {{port}} -d app');
@@ -857,7 +862,7 @@ describe('NoteEditorOverlayComponent', () => {
       copyButton.click();
       await fixture.whenStable();
 
-      expect(requests).toEqual([
+      expect(copyFilled.mock.calls.map(([request]) => request)).toEqual([
         {
           content: 'psql -h {{host}} -p {{port}} -d app',
           values: { host: 'db.internal', port: '6543' },
@@ -867,31 +872,38 @@ describe('NoteEditorOverlayComponent', () => {
 
     it('asks for a preview only once it is turned on, then at every keystroke', async () => {
       await openTemplated();
-      const requests: { values: Record<string, string> }[] = [];
-      fixture.componentInstance.fillPreviewRequested.subscribe((request) => requests.push(request));
+      const refresh = vi
+        .spyOn(TestBed.inject(PlaceholderFillStore), 'refreshPreview')
+        .mockResolvedValue(undefined);
 
       await type(fieldInputs()[1], '5');
-      expect(requests).toHaveLength(0);
+      expect(refresh).not.toHaveBeenCalled();
 
       panelAction('Aperçu')?.click();
       await fixture.whenStable();
       await type(fieldInputs()[1], '54');
 
-      expect(requests.map((request) => request.values['port'])).toEqual(['5', '54']);
+      expect(refresh.mock.calls.map(([request]) => request.values['port'])).toEqual(['5', '54']);
     });
 
     it('shows the filled body in place of the editable one while previewing', async () => {
       await openTemplated();
-      panelAction('Aperçu')?.click();
-      fixture.componentRef.setInput('filledContent', 'psql -h db.internal -p 5432');
-      await fixture.whenStable();
+      // Typed rather than left to the field's default: the fake repository substitutes
+      // what it is given, and the default is the back end's job.
+      await type(fieldInputs()[1], '5432');
 
-      expect(bodyEditor()).toBeNull();
+      panelAction('Aperçu')?.click();
+      await vi.waitFor(() => expect(bodyEditor()).toBeNull());
+
       expect(codeViewer().content()).toBe('psql -h db.internal -p 5432');
     });
 
     it('leaves the body editable while the filled text has not come back', async () => {
       await openTemplated();
+      // Never resolves: the point is the window between asking and being answered.
+      vi.spyOn(TestBed.inject(PlaceholderFillStore), 'refreshPreview').mockReturnValue(
+        new Promise(() => undefined),
+      );
 
       panelAction('Aperçu')?.click();
       await fixture.whenStable();
@@ -902,8 +914,7 @@ describe('NoteEditorOverlayComponent', () => {
     it('closes the preview when the panel is folded', async () => {
       await openTemplated();
       panelAction('Aperçu')?.click();
-      fixture.componentRef.setInput('filledContent', 'psql -h db.internal -p 5432');
-      await fixture.whenStable();
+      await vi.waitFor(() => expect(bodyEditor()).toBeNull());
 
       fixture.nativeElement.querySelector('.panel-toggle').click();
       await fixture.whenStable();
