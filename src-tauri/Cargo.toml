@@ -8,12 +8,20 @@ rust-version = "1.88"
 repository = "https://github.com/vmillet-dev/devbox-rs"
 default-run = "devbox"
 
+# What Cargo has no field for. Read by `build.rs`, which hands it to the crate as
+# environment variables — the standard fields above stay the source for everything else.
+[package.metadata.devbox]
+display-name = "DevBox"
+author-handle = "@vmillet-dev"
+
 [lib]
 name = "devbox_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+# Build-only: it reads `[package.metadata.devbox]` and never ships in the binary.
+toml = "0.9"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }

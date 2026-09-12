@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppInfoService, APP_NAME, REPOSITORY_URL } from './app-info.service';
+import { APP_INFO, AppInfoService } from './app-info.service';
 
 /**
  * `getVersion()` and `openUrl()` belong to the Tauri core and to a plugin, so there is no
@@ -21,10 +21,14 @@ describe('AppInfoService', () => {
     await vi.waitFor(() => expect(info.version()).toBeNull());
   });
 
-  it('points at the repository declared in the Tauri capabilities', () => {
+  it('carries what Cargo.toml declares, down to the capability scope', () => {
     // ⚠️ Outside the scope declared for `opener:allow-open-url`, the call is
-    // refused at runtime, and nothing says so before then.
-    expect(REPOSITORY_URL).toBe('https://github.com/vmillet-dev/devbox-rs');
-    expect(APP_NAME).toBe('DevBox');
+    // refused at runtime, and nothing says so before then. The values come from the
+    // manifest through `bindings.ts`, so this is what catches a manifest edit that
+    // leaves the capability behind.
+    expect(APP_INFO.repository).toBe('https://github.com/vmillet-dev/devbox-rs');
+    expect(APP_INFO.name).toBe('DevBox');
+    expect(APP_INFO.author).toBe('Valentin MILLET');
+    expect(APP_INFO.authorHandle).toBe('@vmillet-dev');
   });
 });

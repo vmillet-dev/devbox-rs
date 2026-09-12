@@ -104,6 +104,8 @@ export const commands = {
 };
 
 /* Constants */
+export const APP_METADATA = {"author":"Valentin MILLET","authorHandle":"@vmillet-dev","name":"DevBox","repository":"https://github.com/vmillet-dev/devbox-rs"} as const;
+
 export const GLOBAL_ACTION_EVENT = "devbox:action" as const;
 
 /* Types */

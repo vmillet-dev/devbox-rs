@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { APP_NAME } from '@core/app-info/app-info.service';
+import { APP_INFO } from '@core/app-info/app-info.service';
 import { APP_LOCALES } from '@core/i18n/locale.model';
 import { LocaleService } from '@core/i18n/locale.service';
 import { AboutMenuComponent } from '../about-menu/about-menu.component';
@@ -14,7 +14,7 @@ import { FileMenuComponent } from '../file-menu/file-menu.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TitlebarComponent {
-  protected readonly title = APP_NAME;
+  protected readonly title = APP_INFO.name;
 
   protected readonly locales = APP_LOCALES;
   protected readonly localeService = inject(LocaleService);

@@ -1146,9 +1146,11 @@ in `lib.rs` is now the single list: it both registers the commands with Tauri an
 what `bindings.ts` contains. Tauri matches arguments **by name** and renames them to
 camelCase; nobody spells `targetSpaceId` by hand any more.
 
-Only `features/notes/data/` and `core/ipc/` import `bindings.ts`: everything above the
-boundary speaks the **model**, which `note.mapper.ts` converts to and from. The generated
-file stays behind the same boundary the hand-written types were behind.
+Only `features/notes/data/` and `core/ipc/` call a generated **command**: everything above the
+boundary speaks the **model**, which `note.mapper.ts` converts to and from. The generated file
+stays behind the same boundary the hand-written types were behind. `core/app-info/` is the
+third and last file to import `bindings.ts`, and it reads a **constant** and not a command —
+see below.
 
 ### Calling a command
 
@@ -1291,6 +1293,21 @@ subscription that was silently inert and that nothing reported. Now `desktop::Gl
 them with `.typ::<GlobalAction>()` and `.constant("GLOBAL_ACTION_EVENT", …)`, neither of which
 needs a command to hang off. The front imports both from `bindings.ts`, and its `switch` over
 the action is exhaustive — a variant added in Rust stops the front compiling.
+
+**Application metadata travels the same way.** `app_info::METADATA` is exported with
+`.constant("APP_METADATA", …)` and holds what the front used to spell out: the display name,
+the repository URL, the author and their handle. Every value comes from `Cargo.toml` — the
+standard fields through `CARGO_PKG_*`, and what Cargo has no field for through
+`[package.metadata.devbox]`, which `build.rs` hands to the crate as environment variables
+read with `env!`. It is a constant and not a command on purpose: the titlebar reads the name
+**synchronously**, where a round trip would leave it empty for a frame. `core/app-info/`
+re-exports it once as `APP_INFO`, so nothing else imports `bindings.ts` for it.
+
+⚠️ The **version** is not in it. It is read from the running binary with `getVersion()`, which
+cannot go stale the way a committed `bindings.ts` can, and `tauri.conf.json` no longer declares
+one either — without the key, Tauri takes the version from `Cargo.toml`. A CI job checks the
+tag against `package.json` and `Cargo.toml`, and refuses a `tauri.conf.json` that declares a
+version again.
 
 That is deliberately **not** `collect_events![…]`: it would generate a `listen` call per event,
 imported straight from `@tauri-apps/api/event`, and the `EVENT_SUBSCRIBER` token every spec

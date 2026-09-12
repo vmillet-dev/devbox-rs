@@ -1,18 +1,17 @@
 import { Injectable, Signal, computed, resource } from '@angular/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { APP_METADATA } from '@core/ipc/bindings';
 
 /**
- * ⚠️ Must stay covered by the scope declared for `opener:allow-open-url` in
- * `src-tauri/capabilities/default.json`, or opening is refused at runtime.
+ * The name, the author and the repository URL, straight from `Cargo.toml` through the
+ * generated constant — the manifest is the only place they are written. Read here and
+ * not from `bindings.ts` everywhere, so the rest of the app keeps one import for them.
+ *
+ * The **version** is not part of it: `version()` below reads it from the running binary,
+ * which cannot go stale the way a committed `bindings.ts` can.
  */
-export const REPOSITORY_URL = 'https://github.com/vmillet-dev/devbox-rs';
-
-export const AUTHOR_NAME = 'Valentin MILLET';
-export const AUTHOR_HANDLE = '@vmillet-dev';
-
-/** The name shown in the titlebar. */
-export const APP_NAME = 'DevBox';
+export const APP_INFO = APP_METADATA;
 
 /**
  * The seam to the Tauri APIs that describe the application: core and plugin commands,
@@ -32,6 +31,6 @@ export class AppInfoService {
 
   /** Opens the repository in the system browser, outside the WebView. */
   async openRepository(): Promise<void> {
-    await openUrl(REPOSITORY_URL);
+    await openUrl(APP_INFO.repository);
   }
 }
