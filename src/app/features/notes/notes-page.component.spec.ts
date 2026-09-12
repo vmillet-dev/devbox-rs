@@ -258,24 +258,21 @@ describe('NotesPageComponent', () => {
       await fixture.whenStable();
 
       expect(sections().map((s) => s.section().key)).toEqual(['pinned', 'week']);
-      expect(sections().every((s) => s.selectedNoteId() === 'note-42')).toBe(true);
+      expect(store.selectedNoteId()).toBe('note-42');
     });
 
-    it('delegates note opening, create and reload requests to the store', () => {
+    it('opens the note a plain card activation points at', () => {
       const openNote = vi.spyOn(store, 'openNote');
-      const createNoteSpy = vi.spyOn(store, 'createNote').mockResolvedValue();
 
-      sections()[0].noteOpened.emit({ noteId: 'note-1', toggleChecked: false, extendRange: false });
-      sections()[0].createRequested.emit();
+      sections()[0].noteActivated.emit({ noteId: 'note-1', toggleChecked: false, extendRange: false });
 
       expect(openNote).toHaveBeenCalledWith('note-1');
-      expect(createNoteSpy).toHaveBeenCalled();
     });
 
     it('checks a note instead of opening it when the card reports a modified click', () => {
       const openNote = vi.spyOn(store, 'openNote');
 
-      sections()[0].noteOpened.emit({ noteId: 'note-42', toggleChecked: true, extendRange: false });
+      sections()[0].noteActivated.emit({ noteId: 'note-42', toggleChecked: true, extendRange: false });
 
       expect(selection.checkedIds().has('note-42')).toBe(true);
       expect(selection.focusedNoteId()).toBe('note-42');
@@ -286,23 +283,10 @@ describe('NotesPageComponent', () => {
       const checkRangeTo = vi.spyOn(selection, 'checkRangeTo');
       const toggleChecked = vi.spyOn(selection, 'toggleChecked');
 
-      sections()[0].noteOpened.emit({ noteId: 'note-42', toggleChecked: true, extendRange: true });
+      sections()[0].noteActivated.emit({ noteId: 'note-42', toggleChecked: true, extendRange: true });
 
       expect(checkRangeTo).toHaveBeenCalledWith('note-42');
       expect(toggleChecked).not.toHaveBeenCalled();
-    });
-
-    it('moves and deletes a note straight from its card', async () => {
-      const moveNote = vi.spyOn(store, 'moveNote').mockResolvedValue();
-      const deleteNote = vi.spyOn(store, 'deleteNote').mockResolvedValue();
-
-      sections()[0].noteMoved.emit({ noteId: 'note-42', spaceId: 'work' });
-      sections()[0].noteDeleted.emit('note-42');
-      sections()[0].noteChecked.emit('note-42');
-
-      expect(moveNote).toHaveBeenCalledWith('note-42', 'work');
-      expect(deleteNote).toHaveBeenCalledWith('note-42');
-      expect(selection.checkedIds().has('note-42')).toBe(true);
     });
   });
 
@@ -736,21 +720,21 @@ describe('NotesPageComponent', () => {
     });
 
     it('opens the field form for the note the card points at', async () => {
-      sections()[0].fillRequested.emit('snippet');
+      TestBed.inject(PlaceholderFillStore).openFor('snippet');
       await fixture.whenStable();
 
       expect(child(PlaceholderFormComponent).placeholders()).toEqual(snippet.placeholders);
     });
 
     it('ignores a fill asked for a note that is no longer on screen', async () => {
-      sections()[0].fillRequested.emit('vanished');
+      TestBed.inject(PlaceholderFillStore).openFor('vanished');
       await fixture.whenStable();
 
       expect(maybeChild(PlaceholderFormComponent)).toBeNull();
     });
 
     it('fills the fields, then copies the result', async () => {
-      sections()[0].fillRequested.emit('snippet');
+      TestBed.inject(PlaceholderFillStore).openFor('snippet');
       await fixture.whenStable();
 
       child(PlaceholderFormComponent).submitted.emit({ host: 'db.internal', port: '5432' });
@@ -760,13 +744,13 @@ describe('NotesPageComponent', () => {
     });
 
     it('keeps what was typed, so the next copy does not ask again', async () => {
-      sections()[0].fillRequested.emit('snippet');
+      TestBed.inject(PlaceholderFillStore).openFor('snippet');
       await fixture.whenStable();
 
       child(PlaceholderFormComponent).submitted.emit({ host: 'db.internal', port: '' });
       await vi.waitFor(() => expect(canvas.visibleNotes()[0].placeholders[0].value).toBe('db.internal'));
 
-      sections()[0].fillRequested.emit('snippet');
+      TestBed.inject(PlaceholderFillStore).openFor('snippet');
       await fixture.whenStable();
       expect(child(PlaceholderFormComponent).placeholders()[0].value).toBe('db.internal');
     });
@@ -824,7 +808,7 @@ describe('NotesPageComponent', () => {
     });
 
     it('copies the snippet untouched when the raw option is taken', async () => {
-      sections()[0].fillRequested.emit('snippet');
+      TestBed.inject(PlaceholderFillStore).openFor('snippet');
       await fixture.whenStable();
 
       child(PlaceholderFormComponent).rawRequested.emit();
@@ -835,7 +819,7 @@ describe('NotesPageComponent', () => {
     });
 
     it('copies nothing when the form is cancelled', async () => {
-      sections()[0].fillRequested.emit('snippet');
+      TestBed.inject(PlaceholderFillStore).openFor('snippet');
       await fixture.whenStable();
 
       child(PlaceholderFormComponent).cancelled.emit();

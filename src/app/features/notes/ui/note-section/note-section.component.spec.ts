@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NotesStore } from '@features/notes/state/notes.store';
+import { SpacesStore } from '@features/notes/state/spaces.store';
 import { createNote } from '@testing/note.fixture';
 import { createSection } from '@testing/section.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
@@ -15,7 +17,11 @@ describe('NoteSectionComponent', () => {
   }
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [NoteSectionComponent], providers: [provideAppTesting()] });
+    TestBed.configureTestingModule({
+      imports: [NoteSectionComponent],
+      // A draft needs somewhere to be filed: creating with no space is refused.
+      providers: [provideAppTesting({ spaces: [{ id: 'space-1', name: 'Space one' }] })],
+    });
     fixture = TestBed.createComponent(NoteSectionComponent);
     fixture.componentRef.setInput('section', createSection('today'));
     fixture.autoDetectChanges();
@@ -59,10 +65,9 @@ describe('NoteSectionComponent', () => {
     expect(section.getAttribute('aria-labelledby')).toBe(heading.id);
   });
 
-  it('renders one note card per note, forwarding the selected state', async () => {
+  it('renders one note card per note', async () => {
     const notes = [createNote({ id: 'a' }), createNote({ id: 'b' })];
     fixture.componentRef.setInput('section', createSection('today', notes));
-    fixture.componentRef.setInput('selectedNoteId', 'b');
     await fixture.whenStable();
 
     const cards = fixture.debugElement
@@ -70,14 +75,13 @@ describe('NoteSectionComponent', () => {
       .map((card) => card.componentInstance as NoteCardComponent);
 
     expect(cards.map((card) => card.note().id)).toEqual(['a', 'b']);
-    expect(cards.map((card) => card.selected())).toEqual([false, true]);
   });
 
-  it('forwards the opened event from a note card as noteOpened', async () => {
+  it('forwards a card activation, the one thing the canvas has to arbitrate', async () => {
     fixture.componentRef.setInput('section', createSection('today', [createNote({ id: 'a' })]));
     await fixture.whenStable();
     let emitted: string | undefined;
-    fixture.componentInstance.noteOpened.subscribe(({ noteId }) => (emitted = noteId));
+    fixture.componentInstance.noteActivated.subscribe(({ noteId }) => (emitted = noteId));
 
     const card = fixture.debugElement.query(By.directive(NoteCardComponent))
       .componentInstance as NoteCardComponent;
@@ -86,42 +90,17 @@ describe('NoteSectionComponent', () => {
     expect(emitted).toBe('a');
   });
 
-  it('forwards the remaining card events untouched, deciding nothing itself', async () => {
-    fixture.componentRef.setInput('section', createSection('today', [createNote({ id: 'a' })]));
-    await fixture.whenStable();
-    const emitted: unknown[] = [];
-    fixture.componentInstance.noteChecked.subscribe((id) => emitted.push(['checked', id]));
-    fixture.componentInstance.noteMoved.subscribe((move) => emitted.push(['moved', move]));
-    fixture.componentInstance.noteDeleted.subscribe((id) => emitted.push(['deleted', id]));
-    fixture.componentInstance.fillRequested.subscribe((id) => emitted.push(['fill', id]));
-
-    const card = fixture.debugElement.query(By.directive(NoteCardComponent))
-      .componentInstance as NoteCardComponent;
-    card.checkToggled.emit('a');
-    card.moveRequested.emit({ noteId: 'a', spaceId: 'work' });
-    card.deleteRequested.emit('a');
-    card.fillRequested.emit('a');
-
-    expect(emitted).toEqual([
-      ['checked', 'a'],
-      ['moved', { noteId: 'a', spaceId: 'work' }],
-      ['deleted', 'a'],
-      ['fill', 'a'],
-    ]);
-  });
-
   it('does not show the create-ghost button unless requested by the section', () => {
     expect(fixture.debugElement.query(By.css('.ghost'))).toBeNull();
   });
 
-  it('emits createRequested when the create-ghost button is clicked', async () => {
+  it('opens a draft from the create-ghost button', async () => {
     fixture.componentRef.setInput('section', createSection('week', [], { showCreateGhost: true }));
     await fixture.whenStable();
-    let emitted = false;
-    fixture.componentInstance.createRequested.subscribe(() => (emitted = true));
+    await vi.waitFor(() => expect(TestBed.inject(SpacesStore).spaces()).toHaveLength(1));
 
     fixture.debugElement.query(By.css('.ghost')).triggerEventHandler('click');
 
-    expect(emitted).toBe(true);
+    await vi.waitFor(() => expect(TestBed.inject(NotesStore).selectedNote()).not.toBeNull());
   });
 });
