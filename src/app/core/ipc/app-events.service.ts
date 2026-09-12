@@ -1,5 +1,6 @@
 import { InjectionToken, Injectable, inject } from '@angular/core';
 import { listen } from '@tauri-apps/api/event';
+import { Unlisten, subscribeCancellable } from '../utils/subscription.util';
 import { GLOBAL_ACTION_EVENT, GlobalAction } from './bindings';
 
 /**
@@ -7,9 +8,6 @@ import { GLOBAL_ACTION_EVENT, GlobalAction } from './bindings';
  * `switch` that handles it here.
  */
 export type { GlobalAction };
-
-/** Unsubscribes. A no-op when the subscription never landed. */
-export type Unlisten = () => void;
 
 export type EventSubscriber = (handler: (action: GlobalAction) => void) => Promise<Unlisten>;
 
@@ -30,29 +28,7 @@ export const EVENT_SUBSCRIBER = new InjectionToken<EventSubscriber>('EVENT_SUBSC
 export class AppEventsService {
   private readonly subscribe = inject(EVENT_SUBSCRIBER);
 
-  /**
-   * Hands back an unsubscribe **immediately**, where the subscription itself is only
-   * acquired on the next turn: without the flag, a component destroyed before it resolves
-   * would stay subscribed for the session.
-   */
   on(handler: (action: GlobalAction) => void): Unlisten {
-    let unlisten: Unlisten | null = null;
-    let cancelled = false;
-
-    void this.subscribe(handler)
-      .then((stop) => {
-        if (cancelled) {
-          stop();
-          return;
-        }
-        unlisten = stop;
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-      unlisten?.();
-      unlisten = null;
-    };
+    return subscribeCancellable(this.subscribe, handler);
   }
 }

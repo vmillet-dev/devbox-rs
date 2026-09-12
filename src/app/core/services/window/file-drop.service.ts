@@ -1,8 +1,6 @@
 import { InjectionToken, Injectable, inject } from '@angular/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-
-/** Unsubscribes. A no-op when the subscription never landed. */
-export type Unlisten = () => void;
+import { Unlisten, subscribeCancellable } from '@core/utils/subscription.util';
 
 export type FileDropSubscriber = (handler: (paths: readonly string[]) => void) => Promise<Unlisten>;
 
@@ -21,33 +19,11 @@ export const FILE_DROP_SUBSCRIBER = new InjectionToken<FileDropSubscriber>('FILE
     }),
 });
 
-/**
- * Same shape as `AppEventsService`: the unsubscribe is handed back at once where the
- * subscription only lands on the next turn, otherwise a component destroyed in between
- * would stay subscribed for the session. Outside Tauri the subscription is simply inert.
- */
 @Injectable({ providedIn: 'root' })
 export class FileDropService {
   private readonly subscribe = inject(FILE_DROP_SUBSCRIBER);
 
   on(handler: (paths: readonly string[]) => void): Unlisten {
-    let unlisten: Unlisten | null = null;
-    let cancelled = false;
-
-    void this.subscribe(handler)
-      .then((stop) => {
-        if (cancelled) {
-          stop();
-          return;
-        }
-        unlisten = stop;
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-      unlisten?.();
-      unlisten = null;
-    };
+    return subscribeCancellable(this.subscribe, handler);
   }
 }
