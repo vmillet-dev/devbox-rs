@@ -1,6 +1,7 @@
 import { InjectionToken, Injectable, inject } from '@angular/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import type { OpenDialogOptions, SaveDialogOptions } from '@tauri-apps/plugin-dialog';
+import { APP_INFO } from '@core/app-info/app-info.service';
 
 /**
  * A token rather than a direct call, for the same practical reason as `CLIPBOARD_ADAPTER`:
@@ -17,7 +18,7 @@ export const FILE_DIALOG_ADAPTER = new InjectionToken<FileDialogAdapter>('FILE_D
 });
 
 /** The exchange format's filter, shared by import and export. */
-const BUNDLE_FILTER = { name: 'DevBox', extensions: ['json'] };
+const BUNDLE_FILTER = { name: APP_INFO.name, extensions: ['json'] };
 
 /**
  * `null` covers both a cancellation and the plugin being unavailable (outside Tauri it
