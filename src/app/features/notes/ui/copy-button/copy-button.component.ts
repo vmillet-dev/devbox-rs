@@ -2,14 +2,12 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject, input, signal }
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ClipboardService } from '@core/clipboard/clipboard.service';
 
-/** Durée de l'accusé de copie : assez pour être vu, assez court pour ne pas suivre la souris sur la carte suivante. */
+/** Long enough to be seen, short enough not to follow the mouse to the next card. */
 const FEEDBACK_MS = 2000;
 
 /**
- * Copie une valeur dans le presse-papier et le fait savoir.
- *
- * Dans `features/` et non dans `shared/` : il injecte, et un composant de
- * `shared/` n'injecte rien.
+ * In `features/` and not in `shared/`: it injects, and a `shared/` component injects
+ * nothing.
  */
 @Component({
   selector: 'app-copy-button',
@@ -22,13 +20,12 @@ export class CopyButtonComponent {
   private readonly clipboard = inject(ClipboardService);
 
   readonly value = input.required<string>();
-  /** Ajoute le libellé à côté de l'icône, pour une barre d'outils. */
+  /** Adds the label next to the icon, for a toolbar. */
   readonly showLabel = input(false);
 
   /**
-   * Clé de traduction du libellé. Paramétrable parce que le même bouton dit
-   * « Copier » dans une barre d'outils et « Copier tel quel » à côté d'un
-   * panneau de champs, où c'est le **tel quel** qui porte l'information.
+   * Settable because the same button says "Copy" in a toolbar and "Copy as is" next to
+   * a fields panel, where **as is** is what carries the information.
    */
   readonly label = input('notes.copyContent');
 
@@ -40,10 +37,7 @@ export class CopyButtonComponent {
     inject(DestroyRef).onDestroy(() => this.clearTimeout());
   }
 
-  /**
-   * `stopPropagation` parce que la carte hôte est elle-même un bouton
-   * d'ouverture : sans lui, copier ouvrirait l'éditeur dans la foulée.
-   */
+  /** `stopPropagation` because the host card is itself an opening button. */
   protected async onCopy(event: MouseEvent): Promise<void> {
     event.stopPropagation();
 

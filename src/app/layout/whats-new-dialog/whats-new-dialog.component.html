@@ -1,59 +1,63 @@
-<div appDialogBackdrop class="news-backdrop" (dismissed)="closed.emit()">
-  <div appFocusTrap class="news-panel" role="dialog" aria-modal="true" aria-labelledby="whats-new-title">
-    <div class="news-header">
-      <h2 id="whats-new-title" class="news-title">{{ 'whatsNew.title' | transloco }}</h2>
-      <p class="news-subtitle">{{ 'whatsNew.subtitle' | transloco }}</p>
-    </div>
-
-    <div class="news-body">
-      @if (isLoading()) {
-        <p class="news-state" role="status">{{ 'whatsNew.loading' | transloco }}</p>
-      } @else if (hasFailed()) {
-        <p class="news-state">{{ 'whatsNew.unavailable' | transloco }}</p>
-      } @else if (releases().length === 0) {
-        <p class="news-state">{{ 'whatsNew.empty' | transloco }}</p>
-      } @else {
-        @for (release of releases(); track release.version) {
-          <section class="news-release">
-            <h3 class="news-release-head">
-              <span class="news-version">{{ release.version }}</span>
-              @if (release.date) {
-                <span class="news-date">{{ release.date }}</span>
-              }
-              @if (isInstalled(release)) {
-                <span class="news-installed">{{ 'whatsNew.installed' | transloco }}</span>
-              }
-            </h3>
-
-            <!-- Tracked by position: two categories of a release may legitimately carry
-                 the same heading, and so may two identical entries. -->
-            @for (section of release.sections; track $index) {
-              <!-- A release may list its entries with no category of its own:
-                   the heading is then dropped rather than rendered empty. -->
-              @if (section.title) {
-                <h4 class="news-section-title">{{ section.title }}</h4>
-              }
-              <ul class="news-items">
-                @for (item of section.items; track $index) {
-                  <li>{{ item }}</li>
-                }
-              </ul>
-            }
-          </section>
-        }
-      }
-    </div>
-
-    <div class="news-actions">
-      <!-- A <button> and not an <a>: the `opener` plugin acts, the WebView does
-           not navigate. An href would give a dead link. -->
-      <button type="button" class="news-link" (click)="openReleases()">
-        {{ releasesLabel }}
-        <span aria-hidden="true">↗</span>
-      </button>
-      <button type="button" class="news-close" (click)="closed.emit()">
-        {{ 'whatsNew.close' | transloco }}
-      </button>
-    </div>
+<app-dialog
+  [layer]="'app'"
+  [variant]="'framed'"
+  [width]="600"
+  labelledBy="whats-new-title"
+  (closed)="closed.emit()"
+>
+  <div class="news-header">
+    <h2 id="whats-new-title" class="news-title">{{ 'whatsNew.title' | transloco }}</h2>
+    <p class="news-subtitle">{{ 'whatsNew.subtitle' | transloco }}</p>
   </div>
-</div>
+
+  <div class="news-body">
+    @if (isLoading()) {
+      <p class="news-state" role="status">{{ 'whatsNew.loading' | transloco }}</p>
+    } @else if (hasFailed()) {
+      <p class="news-state">{{ 'whatsNew.unavailable' | transloco }}</p>
+    } @else if (releases().length === 0) {
+      <p class="news-state">{{ 'whatsNew.empty' | transloco }}</p>
+    } @else {
+      @for (release of releases(); track release.version) {
+        <section class="news-release">
+          <h3 class="news-release-head">
+            <span class="news-version">{{ release.version }}</span>
+            @if (release.date) {
+              <span class="news-date">{{ release.date }}</span>
+            }
+            @if (isInstalled(release)) {
+              <span class="news-installed">{{ 'whatsNew.installed' | transloco }}</span>
+            }
+          </h3>
+
+          <!-- Tracked by position: two categories of a release may legitimately carry the
+               same heading. -->
+          @for (section of release.sections; track $index) {
+            <!-- A release may list its entries with no category: the heading is then
+                 dropped rather than rendered empty. -->
+            @if (section.title) {
+              <h4 class="news-section-title">{{ section.title }}</h4>
+            }
+            <ul class="news-items">
+              @for (item of section.items; track $index) {
+                <li>{{ item }}</li>
+              }
+            </ul>
+          }
+        </section>
+      }
+    }
+  </div>
+
+  <div class="news-actions">
+    <!-- A <button> and not an <a>: the `opener` plugin acts, the WebView does not
+         navigate. -->
+    <button type="button" class="news-link" (click)="openReleases()">
+      {{ releasesLabel }}
+      <span aria-hidden="true">↗</span>
+    </button>
+    <button type="button" class="news-close" (click)="closed.emit()">
+      {{ 'whatsNew.close' | transloco }}
+    </button>
+  </div>
+</app-dialog>

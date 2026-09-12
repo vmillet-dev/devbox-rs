@@ -2,20 +2,18 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { NotesRepository } from '../data/notes.repository';
 import { TagUsage } from '../model/note.model';
+import { NotesRevision } from './notes-revision';
 
 /**
- * Gestion globale des tags : renommer, fusionner, retirer du corpus.
- *
- * Portée **au corpus entier**, pas à l'espace actif — un tag qui dérive
- * (`auth`, `authentication`, `Auth`) dérive partout, et ne le recoller que dans
- * un espace laisserait l'autre moitié en place.
- *
- * Comme `TrashStore`, ne recharge pas le canevas et renvoie un booléen.
+ * Scoped to the **whole corpus** and not to the active space: a tag that drifts (`auth`,
+ * `authentication`, `Auth`) drifts everywhere, and mending it in one space would leave
+ * the other half in place.
  */
 @Injectable({ providedIn: 'root' })
 export class TagsStore {
   private readonly repository = inject(NotesRepository);
   private readonly notifier = inject(ErrorNotifier);
+  private readonly revision = inject(NotesRevision);
 
   private readonly _tags = signal<readonly TagUsage[]>([]);
   private readonly _isLoading = signal(false);
@@ -28,7 +26,7 @@ export class TagsStore {
   readonly selected = this._selected.asReadonly();
   readonly isEmpty = computed(() => !this._isLoading() && this._tags().length === 0);
 
-  /** Une fusion demande au moins deux tags ; un renommage exactement un. */
+  /** A merge needs at least two tags; a rename exactly one. */
   readonly selectedCount = computed(() => this._selected().size);
 
   async open(): Promise<void> {
@@ -48,6 +46,7 @@ export class TagsStore {
     } catch (error) {
       this.notifier.reportFailure('errors.tagsLoadFailed', error);
     } finally {
+      // See `TrashStore.load`: a bracketing flag wants `finally`.
       this._isLoading.set(false);
     }
   }
@@ -62,17 +61,16 @@ export class TagsStore {
     });
   }
 
-  /**
-   * Renommer vers un tag existant **est** une fusion : la base ne peut pas
-   * porter deux fois le même tag sur une note. Le libellé du bouton le dit.
-   */
+  /** Renaming onto an existing tag **is** a merge: a note cannot carry one twice. */
   async renameSelected(into: string): Promise<boolean> {
     const selection = [...this._selected()];
     if (selection.length === 0 || !into.trim()) return false;
 
+    const [only] = selection;
+
     return this.run(() =>
-      selection.length === 1
-        ? this.repository.renameTag(selection[0], into)
+      only !== undefined && selection.length === 1
+        ? this.repository.renameTag(only, into)
         : this.repository.mergeTags(selection, into),
     );
   }
@@ -81,23 +79,16 @@ export class TagsStore {
     const selection = [...this._selected()];
     if (selection.length === 0) return false;
 
-    return this.run(async () => {
-      for (const tag of selection) {
-        await this.repository.deleteTag(tag);
-      }
-      return selection.length;
-    });
+    return this.run(() => this.repository.deleteTags(selection));
   }
 
   private async run(action: () => Promise<number>): Promise<boolean> {
-    try {
-      await action();
-      this._selected.set(new Set());
-      await this.load();
-      return true;
-    } catch (error) {
-      this.notifier.reportFailure('errors.tagActionFailed', error);
-      return false;
-    }
+    if ((await this.notifier.attempt('errors.tagActionFailed', action)) === null) return false;
+
+    // Retagging rewrites the corpus: the rail and the cards are both stale.
+    this.revision.bump();
+    this._selected.set(new Set());
+    await this.load();
+    return true;
   }
 }

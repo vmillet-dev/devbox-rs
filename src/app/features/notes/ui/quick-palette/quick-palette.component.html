@@ -1,85 +1,77 @@
-<div appDialogBackdrop class="palette-backdrop" (dismissed)="closed.emit()">
-  <div class="palette-panel" role="dialog" aria-modal="true" aria-labelledby="palette-title">
-    <h2 id="palette-title" class="visually-hidden">{{ 'palette.title' | transloco }}</h2>
+<app-dialog [layer]="'palette'" [width]="560" labelledBy="palette-title" (closed)="closed.emit()">
+  <h2 id="palette-title" class="visually-hidden">{{ 'palette.title' | transloco }}</h2>
 
-    <input
-      #searchInput
-      type="text"
-      class="palette-input"
-      role="combobox"
-      aria-expanded="true"
-      aria-controls="palette-results"
-      autocomplete="off"
-      [attr.aria-activedescendant]="results().length ? optionId(highlighted()) : null"
-      [attr.aria-label]="'palette.searchLabel' | transloco"
-      [placeholder]="'palette.placeholder' | transloco"
-      [value]="query()"
-      (input)="queryChanged.emit(searchInput.value)"
-      (keydown)="onKeydown($event)"
-    />
+  <input
+    #searchInput
+    type="text"
+    class="palette-input"
+    role="combobox"
+    aria-expanded="true"
+    aria-controls="palette-results"
+    autocomplete="off"
+    [attr.aria-activedescendant]="results().length ? optionId(highlighted()) : null"
+    [attr.aria-label]="'palette.searchLabel' | transloco"
+    [placeholder]="'palette.placeholder' | transloco"
+    [value]="query()"
+    (input)="queryChanged.emit(searchInput.value)"
+    (keydown)="onKeydown($event)"
+  />
 
-    <ul
-      id="palette-results"
-      class="palette-results"
-      role="listbox"
-      [attr.aria-label]="'palette.resultsLabel' | transloco"
-    >
-      @for (note of results(); track note.id; let index = $index) {
-        <li
-          class="palette-option"
-          role="option"
-          [id]="optionId(index)"
-          [class.highlighted]="index === highlighted()"
-          [attr.aria-selected]="index === highlighted()"
-        >
-          <!-- Le clic remonte le choix ; le clavier passe par le champ, qui ne
-               perd jamais le focus. -->
-          <button
-            type="button"
-            class="palette-option-button"
-            (click)="highlightSet.emit(index); chosen.emit()"
-          >
-            <span class="palette-option-head">
-              <app-language-badge [language]="note.language" />
-              <span class="palette-option-title">
-                {{ note.title || ('notes.untitled' | transloco) }}
-              </span>
-              @if (note.placeholders.length > 0) {
-                <span class="palette-option-fields">
-                  {{ 'notes.placeholdersCount' | transloco: { count: note.placeholders.length } }}
-                </span>
-              }
-            </span>
-            <span class="palette-option-snippet">{{ snippetOf(note) }}</span>
-          </button>
-        </li>
-      }
-
-      <!-- Après les résultats : retrouver un snippet reste le geste le plus
-           fréquent, et garde donc la première place. -->
-      @if (canCreate()) {
-        <li
-          class="palette-option palette-create"
-          role="option"
-          [id]="optionId(results().length)"
-          [class.highlighted]="highlighted() === results().length"
-          [attr.aria-selected]="highlighted() === results().length"
-        >
-          <button
-            type="button"
-            class="palette-option-button"
-            (click)="highlightSet.emit(results().length); chosen.emit()"
-          >
+  <ul
+    id="palette-results"
+    class="palette-results"
+    role="listbox"
+    [attr.aria-label]="'palette.resultsLabel' | transloco"
+  >
+    @for (note of results(); track note.id; let index = $index) {
+      <li
+        class="palette-option"
+        role="option"
+        [id]="optionId(index)"
+        [class.highlighted]="index === highlighted()"
+        [attr.aria-selected]="index === highlighted()"
+      >
+        <!-- The keyboard goes through the field, which never loses focus. -->
+        <button type="button" class="palette-option-button" (click)="highlightSet.emit(index); chosen.emit()">
+          <span class="palette-option-head">
+            <app-language-badge [language]="note.language" />
             <span class="palette-option-title">
-              {{ 'palette.createNote' | transloco: { query: query() } }}
+              {{ note.title || ('notes.untitled' | transloco) }}
             </span>
-          </button>
-        </li>
-      } @else if (results().length === 0) {
-        <li class="palette-empty">{{ 'palette.empty' | transloco }}</li>
-      }
-    </ul>
+            @if (note.placeholders.length > 0) {
+              <span class="palette-option-fields">
+                {{ 'notes.placeholdersCount' | transloco: { count: note.placeholders.length } }}
+              </span>
+            }
+          </span>
+          <span class="palette-option-snippet">{{ snippetOf(note) }}</span>
+        </button>
+      </li>
+    }
 
-    <p class="palette-hint">{{ 'palette.hint' | transloco }}</p>
-  </div>
-</div>
+    <!-- After the results: finding a snippet stays the most frequent gesture. -->
+    @if (canCreate()) {
+      <li
+        class="palette-option palette-create"
+        role="option"
+        [id]="optionId(results().length)"
+        [class.highlighted]="highlighted() === results().length"
+        [attr.aria-selected]="highlighted() === results().length"
+      >
+        <button
+          type="button"
+          class="palette-option-button"
+          (click)="highlightSet.emit(results().length); chosen.emit()"
+        >
+          <span class="palette-option-title">
+            {{ 'palette.createNote' | transloco: { query: query() } }}
+          </span>
+        </button>
+      </li>
+    } @else if (results().length === 0) {
+      <li class="palette-empty">{{ 'palette.empty' | transloco }}</li>
+    }
+  </ul>
+
+  <p class="palette-hint">{{ 'palette.hint' | transloco }}</p>
+</app-dialog>

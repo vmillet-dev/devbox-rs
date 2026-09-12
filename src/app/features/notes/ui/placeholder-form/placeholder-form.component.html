@@ -1,12 +1,5 @@
-<div appDialogBackdrop class="fields-backdrop" (dismissed)="cancelled.emit()">
-  <form
-    appFocusTrap
-    class="fields-panel"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="placeholder-form-title"
-    (submit)="submit($event)"
-  >
+<app-dialog [layer]="'fields'" [width]="420" labelledBy="placeholder-form-title" (closed)="cancelled.emit()">
+  <form class="fields-form" (submit)="submit($event)">
     <h2 id="placeholder-form-title" class="fields-title">
       {{ 'placeholders.title' | transloco }}
     </h2>
@@ -32,4 +25,4 @@
       </button>
     </div>
   </form>
-</div>
+</app-dialog>

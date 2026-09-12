@@ -89,7 +89,6 @@ describe('FocusTrapDirective', () => {
     await fixture.whenStable();
     element('first').focus();
 
-    // Native tabbing handles everything that is not a boundary.
     const event = pressTab(false);
 
     expect(event.defaultPrevented).toBe(false);

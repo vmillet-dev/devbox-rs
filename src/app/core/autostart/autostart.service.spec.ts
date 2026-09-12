@@ -14,8 +14,6 @@ function fakeAdapter(enabled = false) {
     }),
     isEnabled: vi.fn(async () => state.enabled),
   };
-  // Vérifie que le double couvre bien la couture, sans figer son type ici :
-  // les specs ont besoin des `mock*` de Vitest sur chaque méthode.
   state satisfies AutostartAdapter;
 
   return state;
@@ -39,8 +37,6 @@ describe('AutostartService', () => {
   beforeEach(() => setUp(fakeAdapter()));
 
   it('aligns the preference on what the system declares', async () => {
-    // L'état réel appartient au système : le désactiver depuis le gestionnaire
-    // des tâches doit décocher la case, pas la voir le réactiver.
     setUp(fakeAdapter(true));
 
     await service.start();
@@ -84,7 +80,6 @@ describe('AutostartService', () => {
   });
 
   it('leaves the preference alone when the plugin is unavailable', async () => {
-    // C'est le cas hors Tauri, et celui sous lequel tournent les autres specs.
     adapter.isEnabled.mockRejectedValue(new Error('no plugin'));
 
     await expect(service.start()).resolves.toBeUndefined();

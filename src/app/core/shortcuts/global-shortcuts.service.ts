@@ -5,16 +5,12 @@ import { SettingsStore } from '@core/settings/settings.store';
 import { DEFAULT_SHORTCUTS, ShortcutBindings } from './shortcut.model';
 
 /**
- * Les raccourcis actifs hors de la fenêtre, et ce qu'il faut dire quand une
- * autre application en garde un.
+ * ⚠️ The native side can only fail silently — first come, first served — and a log line is
+ * not an interface: without this message, pressing the key does nothing and nothing says
+ * why.
  *
- * Le natif ne peut qu'échouer en silence — le premier arrivé garde la
- * combinaison — et une ligne de journal n'est pas une interface : sans ce
- * message, presser `Ctrl+Alt+P` ne fait rien et rien ne dit pourquoi.
- *
- * Les trois voyagent ensemble parce que la commande native les reprend d'un
- * bloc ; seule la palette est réglable, les deux autres restent à leur valeur
- * d'origine.
+ * All three travel together because the native command takes them as a block; only the
+ * palette is settable.
  */
 @Injectable({ providedIn: 'root' })
 export class GlobalShortcutsService {
@@ -23,9 +19,10 @@ export class GlobalShortcutsService {
   private readonly injector = inject(Injector);
 
   /**
-   * Pousse les raccourcis maintenant, puis à chaque fois que la préférence
-   * change. Appelée depuis `provideAppInitializer`, donc hors constructeur :
-   * l'injecteur est passé explicitement plutôt que déduit de l'appelant.
+   * Pushes the shortcuts now, then on every preference change.
+   *
+   * ⚠️ Called from `provideAppInitializer`, so outside a constructor: the injector is
+   * passed explicitly rather than inferred from the caller.
    */
   start(): void {
     effect(
@@ -38,8 +35,7 @@ export class GlobalShortcutsService {
 
   private async apply(bindings: ShortcutBindings): Promise<void> {
     try {
-      // Commande sans `Result` côté Rust : elle lève directement si le pont est
-      // absent, comme `sync_tray`.
+      // A command with no `Result` on the Rust side: it throws when the bridge is absent.
       const taken = await commands.setGlobalShortcuts(bindings);
       if (taken.length > 0) {
         this.notifier.notify({
@@ -47,7 +43,7 @@ export class GlobalShortcutsService {
         });
       }
     } catch {
-      // Hors Tauri (jsdom) : il n'y a pas de raccourci global à prendre.
+      // Outside Tauri (jsdom): there is no global shortcut to take.
     }
   }
 }

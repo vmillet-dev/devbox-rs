@@ -3,11 +3,8 @@ import { SpacesRepository } from '@features/notes/data/spaces.repository';
 import { Space, SpaceDraft } from '@features/notes/model/space.model';
 
 /**
- * In-memory `SpacesRepository` test double.
- *
- * Like `FakeNotesRepository`, it owns the list and assigns ids, and it can be
- * made to reject through `failNext` so failure paths are testable. See that
- * file for why the implemented type is a `Pick`.
+ * Like `FakeNotesRepository`: it owns the list, assigns ids, and can be made to reject
+ * through `failNext`. See that file for why the implemented type is a `Pick`.
  */
 export class FakeSpacesRepository implements Pick<SpacesRepository, keyof SpacesRepository> {
   private spaces: readonly Space[];
@@ -41,9 +38,8 @@ export class FakeSpacesRepository implements Pick<SpacesRepository, keyof Spaces
   }
 
   /**
-   * The target is accepted without checking it holds the notes: this double owns
-   * no notes at all. `NotesStore` reloads from its own repository afterwards,
-   * which is what the move is observable through.
+   * The target is accepted without checking it holds the notes: this double owns none.
+   * `NotesStore` reloads from its own repository afterwards.
    */
   delete(id: string, _targetSpaceId: string): Promise<void> {
     return guard(this, () => {

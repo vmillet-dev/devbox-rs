@@ -1,10 +1,6 @@
 /**
- * Une **variable globale** : la valeur qu'un `{{champ}}` prend dans tout le
- * corpus, faute d'une valeur saisie sur la note elle-même.
- *
- * Une paire plutôt qu'une entrée de `Record` : le panneau édite une **liste**,
- * où une ligne à moitié remplie et une ligne en double doivent exister le temps
- * d'être corrigées. Un objet ne saurait porter ni l'une ni l'autre.
+ * A pair rather than a `Record` entry: the panel edits a **list**, where a half-filled
+ * row and a duplicate row have to exist long enough to be corrected.
  */
 export interface Variable {
   readonly name: string;
@@ -12,24 +8,18 @@ export interface Variable {
 }
 
 /**
- * ⚠️ Miroir de `notes::placeholder::is_field_name` (Rust).
- *
- * La règle vit là-bas — c'est elle qui décide si `{{ user.name }}` réclame un
- * formulaire — et le back refuse déjà ce qui n'y répond pas. Ce doublon ne sert
- * qu'à le **dire avant** : sans lui, une ligne mal nommée disparaîtrait à
- * l'enregistrement sans un mot.
+ * ⚠️ Mirror of `notes::placeholder::is_field_name` (Rust), which is where the rule
+ * lives. The back end already refuses what does not match; this copy only says so
+ * beforehand, without which a badly named row would vanish on save without a word.
  */
 export function isVariableName(name: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(name);
 }
 
 /**
- * Les variables prêtes à partir : les lignes nommées et renseignées, la
- * dernière l'emportant en cas de doublon — comme le ferait l'objet JSON qui
- * traverse le pont.
- *
- * Une valeur vide n'est pas envoyée : vide veut dire « je garde ce que le
- * snippet propose », et l'écrire figerait cette réponse.
+ * The named and filled rows, the last one winning on a duplicate — as the JSON object
+ * crossing the bridge would. An empty value is not sent: it means "I keep what the
+ * snippet offers".
  */
 export function toVariableRecord(variables: readonly Variable[]): Record<string, string> {
   const record: Record<string, string> = {};
@@ -43,7 +33,7 @@ export function toVariableRecord(variables: readonly Variable[]): Record<string,
   return record;
 }
 
-/** Les noms portés par plus d'une ligne : le panneau les signale. */
+/** Names carried by more than one row: the panel flags them. */
 export function duplicateNames(variables: readonly Variable[]): ReadonlySet<string> {
   const seen = new Set<string>();
   const duplicates = new Set<string>();

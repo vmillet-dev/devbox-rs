@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Provider } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppEventTopic, EVENT_SUBSCRIBER, EventSubscriber } from '@core/ipc/app-events.service';
+import { EVENT_SUBSCRIBER, EventSubscriber, GlobalAction } from '@core/ipc/app-events.service';
 import { AppMenuRegistry } from '@core/menu/app-menu.registry';
 import { ErrorNotifier } from '@core/errors/error-notifier.service';
 import { StatusNotifier } from '@core/notifications/status.service';
@@ -10,6 +10,8 @@ import { FILE_DROP_SUBSCRIBER, FileDropSubscriber } from '@core/window/file-drop
 import { Note } from './model/note.model';
 import { Space } from './model/space.model';
 import { AttachmentsStore } from './state/attachments.store';
+import { NoteSelectionStore } from './state/note-selection.store';
+import { NotesQueryStore } from './state/notes-query.store';
 import { NotesStore } from './state/notes.store';
 import { PaletteStore } from './state/palette.store';
 import { SpacesStore } from './state/spaces.store';
@@ -46,6 +48,8 @@ const SPACES: readonly Space[] = [
 describe('NotesPageComponent', () => {
   let fixture: ComponentFixture<NotesPageComponent>;
   let store: NotesStore;
+  let canvas: NotesQueryStore;
+  let selection: NoteSelectionStore;
   let spaces: SpacesStore;
   let repository: FakeNotesRepository;
   let attachmentsRepository: FakeAttachmentsRepository;
@@ -56,7 +60,8 @@ describe('NotesPageComponent', () => {
   let menu: AppMenuRegistry;
 
   /** Native pushes the page subscribes to; the spec fires them by hand. */
-  let fireEvent: (topic: AppEventTopic) => void;
+  let fireAction: (action: GlobalAction) => void;
+  let actionHandler: ((action: GlobalAction) => void) | null;
   /** The window-level file drop, which never reaches the DOM. */
   let dropFiles: (paths: readonly string[]) => void;
 
@@ -80,9 +85,8 @@ describe('NotesPageComponent', () => {
   }
 
   /**
-   * Builds the page over fresh doubles. Both native seams are substituted rather
-   * than left to fail the way they do under jsdom: a global shortcut and a file
-   * drop are only observable by firing them.
+   * Both native seams are substituted rather than left to fail under jsdom: a global
+   * shortcut and a file drop are only observable by firing them.
    */
   async function setUp(notes: readonly Note[] = [createNote({ id: 'note-42' })]): Promise<void> {
     TestBed.resetTestingModule();
@@ -90,15 +94,15 @@ describe('NotesPageComponent', () => {
     attachmentsRepository = new FakeAttachmentsRepository();
     transferRepository = new FakeTransferRepository();
     fileDialog = new FakeFileDialog();
+    actionHandler = null;
     clipboard = new FakeClipboard();
     appWindow = new FakeAppWindow();
 
-    const handlers = new Map<string, () => void>();
-    const subscribe: EventSubscriber = async (topic, handler) => {
-      handlers.set(topic, handler);
-      return () => handlers.delete(topic);
+    const subscribe: EventSubscriber = async (handler) => {
+      actionHandler = handler;
+      return () => (actionHandler = null);
     };
-    fireEvent = (topic) => handlers.get(topic)?.();
+    fireAction = (action) => actionHandler?.(action);
 
     let dropHandler: ((paths: readonly string[]) => void) | null = null;
     const subscribeDrops: FileDropSubscriber = async (handler) => {
@@ -124,12 +128,13 @@ describe('NotesPageComponent', () => {
     TestBed.configureTestingModule({ imports: [NotesPageComponent], providers });
     fixture = TestBed.createComponent(NotesPageComponent);
     store = TestBed.inject(NotesStore);
+    canvas = TestBed.inject(NotesQueryStore);
+    selection = TestBed.inject(NoteSelectionStore);
     spaces = TestBed.inject(SpacesStore);
     menu = TestBed.inject(AppMenuRegistry);
     fixture.autoDetectChanges();
     await vi.waitFor(() => expect(spaces.spaces()).toHaveLength(SPACES.length));
-    // The three subscriptions land a microtask after the constructor asked for them.
-    await vi.waitFor(() => expect(handlers.size).toBe(3));
+    await vi.waitFor(() => expect(actionHandler).not.toBeNull());
   }
 
   beforeEach(async () => {
@@ -137,8 +142,8 @@ describe('NotesPageComponent', () => {
   });
 
   it('renders the toolbar with the store search/filter state and the active space', async () => {
-    store.setSearchQuery('hello');
-    store.setFilter('pinned');
+    canvas.setSearchQuery('hello');
+    canvas.setFilter('pinned');
     spaces.selectSpace('work');
     await fixture.whenStable();
 
@@ -180,7 +185,6 @@ describe('NotesPageComponent', () => {
   });
 
   it('renames a space without touching the canvas', async () => {
-    // A note carries the space id, never its name: there is nothing to reload.
     const queries = repository.queryCount;
 
     child(SpaceSwitcherComponent).spaceRenamed.emit({ id: 'work', name: 'Client work' });
@@ -190,8 +194,6 @@ describe('NotesPageComponent', () => {
   });
 
   it('reloads the canvas once a deleted space has handed its notes over', async () => {
-    // The absorbed notes changed `spaceId` in the database, and nothing would
-    // report it when the current query does not depend on the space that went.
     const queries = repository.queryCount;
 
     child(SpaceSwitcherComponent).spaceDeleted.emit({ id: 'work', targetSpaceId: 'space-1' });
@@ -211,11 +213,10 @@ describe('NotesPageComponent', () => {
   });
 
   it('delegates search, filter and new-note requests to the store', () => {
-    const setSearchQuery = vi.spyOn(store, 'setSearchQuery');
-    const setFilter = vi.spyOn(store, 'setFilter');
+    const setSearchQuery = vi.spyOn(canvas, 'setSearchQuery');
+    const setFilter = vi.spyOn(canvas, 'setFilter');
     const createNoteSpy = vi.spyOn(store, 'createNote').mockResolvedValue();
 
-    // `query` is a model signal: writing it is what emits `queryChange`.
     child(SearchBoxComponent).query.set('term');
     child(FilterChipsComponent).filterChanged.emit('untriaged');
     fixture.debugElement.query(By.css('.new-note-btn')).triggerEventHandler('click');
@@ -226,7 +227,6 @@ describe('NotesPageComponent', () => {
   });
 
   it('disables the search shortcut while the editor overlay is open', async () => {
-    // Otherwise Ctrl+K focuses a field sitting behind the modal.
     expect(child(SearchBoxComponent).shortcutEnabled()).toBe(true);
 
     store.openNote('note-42');
@@ -236,7 +236,7 @@ describe('NotesPageComponent', () => {
   });
 
   it('delegates tag toggling from the tag rail to the store', () => {
-    const toggleTag = vi.spyOn(store, 'toggleTag');
+    const toggleTag = vi.spyOn(canvas, 'toggleTag');
 
     child(TagRailComponent).tagToggled.emit('urgent');
 
@@ -247,13 +247,11 @@ describe('NotesPageComponent', () => {
     beforeEach(async () => {
       repository.setView({
         sections: [
-          // The note must sit in a section: the store resolves an opened note by
-          // looking it up in the view it currently shows.
           createSection('pinned', [createNote({ id: 'note-42' })]),
           createSection('week', [], { showCreateGhost: true }),
         ],
       });
-      store.reload();
+      canvas.reload();
       await vi.waitFor(() => expect(sections()).toHaveLength(2));
     });
 
@@ -277,24 +275,21 @@ describe('NotesPageComponent', () => {
     });
 
     it('checks a note instead of opening it when the card reports a modified click', () => {
-      // Ctrl+click is the file-list convention the canvas took on with multiple
-      // selection: it must not open the editor as well.
       const openNote = vi.spyOn(store, 'openNote');
 
       sections()[0].noteOpened.emit({ noteId: 'note-42', toggleChecked: true, extendRange: false });
 
-      expect(store.checkedIds().has('note-42')).toBe(true);
-      expect(store.focusedNoteId()).toBe('note-42');
+      expect(selection.checkedIds().has('note-42')).toBe(true);
+      expect(selection.focusedNoteId()).toBe('note-42');
       expect(openNote).not.toHaveBeenCalled();
     });
 
     it('extends the checked range when the card reports a shift click', () => {
-      const checkRangeTo = vi.spyOn(store, 'checkRangeTo');
-      const toggleChecked = vi.spyOn(store, 'toggleChecked');
+      const checkRangeTo = vi.spyOn(selection, 'checkRangeTo');
+      const toggleChecked = vi.spyOn(selection, 'toggleChecked');
 
       sections()[0].noteOpened.emit({ noteId: 'note-42', toggleChecked: true, extendRange: true });
 
-      // A range wins over the toggle: both modifiers can be held at once.
       expect(checkRangeTo).toHaveBeenCalledWith('note-42');
       expect(toggleChecked).not.toHaveBeenCalled();
     });
@@ -309,14 +304,12 @@ describe('NotesPageComponent', () => {
 
       expect(moveNote).toHaveBeenCalledWith('note-42', 'work');
       expect(deleteNote).toHaveBeenCalledWith('note-42');
-      expect(store.checkedIds().has('note-42')).toBe(true);
+      expect(selection.checkedIds().has('note-42')).toBe(true);
     });
   });
 
   describe('canvas states', () => {
     it('shows a loading message instead of the sections while loading', async () => {
-      // The store reports loading only until its first view lands, so this
-      // needs its own fixture whose very first query stays in flight.
       TestBed.resetTestingModule();
       const held = new FakeNotesRepository([createNote({ id: 'note-42' })]);
       held.hold();
@@ -335,11 +328,9 @@ describe('NotesPageComponent', () => {
     });
 
     it('shows an empty-search message instead of an empty results section', async () => {
-      // "No results" is the backend's verdict, not something the page recomputes:
-      // it reports a filtered view that matched nothing.
       repository.setView({ sections: [], isFiltering: true, matched: 0 });
 
-      store.setFilter('pinned');
+      canvas.setFilter('pinned');
       await vi.waitFor(() =>
         expect(fixture.nativeElement.textContent).toContain('Aucune note ne correspond'),
       );
@@ -348,10 +339,8 @@ describe('NotesPageComponent', () => {
     });
 
     it('shows the load failure with its detail and offers a retry', async () => {
-      // A failed load empties the whole screen, so it gets its own recovery
-      // path rather than relying on the global banner alone.
       repository.failNext = new Error('database is locked');
-      store.reload();
+      canvas.reload();
       await vi.waitFor(() =>
         expect(fixture.nativeElement.textContent).toContain('Impossible de charger les notes'),
       );
@@ -359,16 +348,14 @@ describe('NotesPageComponent', () => {
       expect(fixture.nativeElement.textContent).toContain('database is locked');
       expect(fixture.nativeElement.querySelector('.canvas-state').getAttribute('role')).toBe('alert');
       expect(sections()).toHaveLength(0);
-      // The error branch comes first in the template: a failed load must not
-      // also read as "still loading".
       expect(fixture.nativeElement.textContent).not.toContain('Chargement des notes');
     });
 
     it('reloads when the retry button is clicked', async () => {
       repository.failNext = new Error('nope');
-      store.reload();
+      canvas.reload();
       await vi.waitFor(() => expect(fixture.nativeElement.querySelector('.canvas-retry')).not.toBeNull());
-      const reload = vi.spyOn(store, 'reload').mockImplementation(() => undefined);
+      const reload = vi.spyOn(canvas, 'reload').mockImplementation(() => undefined);
 
       fixture.debugElement.query(By.css('.canvas-retry')).triggerEventHandler('click');
 
@@ -378,9 +365,6 @@ describe('NotesPageComponent', () => {
 
   describe('editor overlay', () => {
     it('is not rendered until a note is selected', () => {
-      // The overlay never reports which note it holds — the store owns that — so
-      // it simply does not exist while nothing is open, and no stray event can
-      // be applied to whatever note happens to be around.
       expect(maybeChild(NoteEditorOverlayComponent)).toBeNull();
     });
 
@@ -394,79 +378,55 @@ describe('NotesPageComponent', () => {
       expect(closeOverlay).toHaveBeenCalled();
     });
 
-    it('renames the selected note when the editor overlay reports a title change', async () => {
+    /** The page names no field: the editor says what changed, the page on which note. */
+    it('hands every editor change to the store as a patch on the open note', async () => {
       store.openNote('note-42');
       await fixture.whenStable();
-      const renameNote = vi.spyOn(store, 'renameNote').mockResolvedValue();
-
-      child(NoteEditorOverlayComponent).titleChanged.emit('New title');
-
-      expect(renameNote).toHaveBeenCalledWith('note-42', 'New title');
-    });
-
-    it('toggles the pin state of the selected note when the overlay reports pinToggled', async () => {
-      store.openNote('note-42');
-      await fixture.whenStable();
-      const togglePinned = vi.spyOn(store, 'togglePinned').mockResolvedValue();
-
-      child(NoteEditorOverlayComponent).pinToggled.emit();
-
-      expect(togglePinned).toHaveBeenCalledWith('note-42');
-    });
-
-    it('applies the remaining editor changes to the selected note', async () => {
-      store.openNote('note-42');
-      await fixture.whenStable();
-      const updateContent = vi.spyOn(store, 'updateContent').mockResolvedValue();
-      const setLanguage = vi.spyOn(store, 'setLanguage').mockResolvedValue();
-      const setSource = vi.spyOn(store, 'setSource').mockResolvedValue();
-      const setLifecycle = vi.spyOn(store, 'setLifecycle').mockResolvedValue();
-      const addTag = vi.spyOn(store, 'addTag').mockResolvedValue();
-      const removeTag = vi.spyOn(store, 'removeTag').mockResolvedValue();
-      const deleteNote = vi.spyOn(store, 'deleteNote').mockResolvedValue();
+      const applyPatch = vi.spyOn(store, 'applyPatch').mockResolvedValue();
       const overlay = child(NoteEditorOverlayComponent);
       const deadline = { kind: 'expires', at: new Date('2026-03-01T22:59:59.999Z') } as const;
 
-      overlay.contentChanged.emit('new body');
-      overlay.languageChanged.emit('json');
-      overlay.sourceChanged.emit('Handbook / TLS');
-      overlay.lifecycleChanged.emit(deadline);
-      overlay.tagAdded.emit('urgent');
-      overlay.tagRemoved.emit('later');
-      overlay.deleteRequested.emit();
+      overlay.patchRequested.emit({ title: 'New title' });
+      overlay.patchRequested.emit({ content: 'new body', language: 'json' });
+      overlay.patchRequested.emit({ lifecycle: deadline, tags: ['urgent'] });
 
-      expect(updateContent).toHaveBeenCalledWith('note-42', 'new body');
-      expect(setLanguage).toHaveBeenCalledWith('note-42', 'json');
-      expect(setSource).toHaveBeenCalledWith('note-42', 'Handbook / TLS');
-      expect(setLifecycle).toHaveBeenCalledWith('note-42', deadline);
-      expect(addTag).toHaveBeenCalledWith('note-42', 'urgent');
-      expect(removeTag).toHaveBeenCalledWith('note-42', 'later');
+      expect(applyPatch.mock.calls).toEqual([
+        ['note-42', { title: 'New title' }],
+        ['note-42', { content: 'new body', language: 'json' }],
+        ['note-42', { lifecycle: deadline, tags: ['urgent'] }],
+      ]);
+    });
+
+    it('deletes the selected note when the overlay asks', async () => {
+      store.openNote('note-42');
+      await fixture.whenStable();
+      const deleteNote = vi.spyOn(store, 'deleteNote').mockResolvedValue();
+
+      child(NoteEditorOverlayComponent).deleteRequested.emit();
+
       expect(deleteNote).toHaveBeenCalledWith('note-42');
     });
   });
 
   describe('native shortcuts', () => {
     it('captures the clipboard into a saved note when the capture event fires', async () => {
-      // The global shortcut is registered in Rust, which only shows the window
-      // and says so: the note is still created through the ordinary command.
       clipboard.content = 'psql -h localhost';
 
-      fireEvent('devbox:capture');
+      fireAction('capture');
 
       await vi.waitFor(() => expect(store.selectedNote()?.content).toBe('psql -h localhost'));
     });
 
     it('opens an unsaved draft when the new-note event fires', async () => {
-      fireEvent('devbox:new-note');
+      fireAction('new-note');
       await fixture.whenStable();
 
       expect(store.selectedNote()?.content).toBe('');
-      // Nothing is written until the note is worth keeping.
       expect(store.persistedNoteId()).toBeNull();
     });
 
     it('opens the quick palette when the palette event fires', async () => {
-      fireEvent('devbox:palette');
+      fireAction('palette');
 
       await vi.waitFor(() => expect(maybeChild(QuickPaletteComponent)).not.toBeNull());
     });
@@ -491,7 +451,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('takes its entries back when the page goes away', () => {
-      // A tool that is not loaded has no business in the menu.
       fixture.destroy();
 
       expect(menu.entries()).toEqual([]);
@@ -508,12 +467,11 @@ describe('NotesPageComponent', () => {
     });
 
     it('keeps the selection entries unavailable until notes are checked', async () => {
-      // `disabled` is a signal precisely so it follows what is checked right now.
       const ids = ['notes.exportSelection', 'notes.copyMarkdown'];
       const entries = menu.entries().filter((entry) => ids.includes(entry.id));
       expect(entries.map((entry) => entry.disabled!())).toEqual([true, true]);
 
-      store.toggleChecked('note-42');
+      selection.toggleChecked('note-42');
       await fixture.whenStable();
 
       expect(entries.map((entry) => entry.disabled!())).toEqual([false, false]);
@@ -530,8 +488,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('leaves the canvas alone when the import added nothing', async () => {
-      // Exporting then re-importing at once imports zero notes, and that is
-      // correct: every id is already there.
       fileDialog.openPath = 'C:\\bundles\\same-again.json';
       transferRepository.importReport = { spacesCreated: 0, notesImported: 0, notesSkipped: 4 };
       const queries = repository.queryCount;
@@ -560,7 +516,7 @@ describe('NotesPageComponent', () => {
 
     it('exports exactly the checked notes', async () => {
       fileDialog.savePath = 'C:\\out\\selection.json';
-      store.toggleChecked('note-42');
+      selection.toggleChecked('note-42');
       await fixture.whenStable();
 
       run('notes.exportSelection');
@@ -569,7 +525,7 @@ describe('NotesPageComponent', () => {
     });
 
     it('copies the checked notes as markdown rather than sending them anywhere', async () => {
-      store.toggleChecked('note-42');
+      selection.toggleChecked('note-42');
       await fixture.whenStable();
 
       run('notes.copyMarkdown');
@@ -580,7 +536,7 @@ describe('NotesPageComponent', () => {
     });
 
     it('copies the checked notes from the selection bar too', async () => {
-      store.toggleChecked('note-42');
+      selection.toggleChecked('note-42');
       await fixture.whenStable();
 
       child(SelectionBarComponent).copyRequested.emit();
@@ -594,46 +550,43 @@ describe('NotesPageComponent', () => {
 
     beforeEach(async () => {
       await setUp(cards);
-      await vi.waitFor(() => expect(store.visibleNotes()).toHaveLength(4));
+      await vi.waitFor(() => expect(canvas.visibleNotes()).toHaveLength(4));
     });
 
     it('enters the grid on the first card when nothing is focused yet', () => {
       press('ArrowRight');
 
-      expect(store.focusedNoteId()).toBe('n1');
+      expect(selection.focusedNoteId()).toBe('n1');
     });
 
     it('walks the cards with the left and right arrows, stopping at both ends', () => {
-      store.focusNote('n1');
+      selection.focusNote('n1');
 
       press('ArrowRight');
-      expect(store.focusedNoteId()).toBe('n2');
+      expect(selection.focusedNoteId()).toBe('n2');
 
       press('ArrowLeft');
       press('ArrowLeft');
-      // Stopping beats wrapping around, which loses track of where one was.
-      expect(store.focusedNoteId()).toBe('n1');
+      expect(selection.focusedNoteId()).toBe('n1');
     });
 
     it('measures the cards to move between rows', () => {
-      // The column count depends on the window width, so the page reads the
-      // positions off the screen rather than assuming a grid.
       const shells = fixture.nativeElement.querySelectorAll('.card-shell') as NodeListOf<HTMLElement>;
       shells.forEach((shell, index) => {
         const rect = new DOMRect(index % 2 === 0 ? 0 : 300, index < 2 ? 0 : 200, 240, 160);
         vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue(rect);
       });
-      store.focusNote('n2');
+      selection.focusNote('n2');
 
       press('ArrowDown');
-      expect(store.focusedNoteId()).toBe('n4');
+      expect(selection.focusedNoteId()).toBe('n4');
 
       press('ArrowUp');
-      expect(store.focusedNoteId()).toBe('n2');
+      expect(selection.focusedNoteId()).toBe('n2');
     });
 
     it('opens the focused note on Enter', () => {
-      store.focusNote('n3');
+      selection.focusNote('n3');
 
       press('Enter');
 
@@ -641,17 +594,17 @@ describe('NotesPageComponent', () => {
     });
 
     it('checks and unchecks the focused note on x', () => {
-      store.focusNote('n2');
+      selection.focusNote('n2');
 
       press('x');
-      expect(store.checkedIds().has('n2')).toBe(true);
+      expect(selection.checkedIds().has('n2')).toBe(true);
 
       press('X');
-      expect(store.checkedIds().has('n2')).toBe(false);
+      expect(selection.checkedIds().has('n2')).toBe(false);
     });
 
     it('copies the focused note on c', async () => {
-      store.focusNote('n2');
+      selection.focusNote('n2');
 
       press('c');
 
@@ -659,7 +612,7 @@ describe('NotesPageComponent', () => {
     });
 
     it('reports a copy the clipboard refused', async () => {
-      store.focusNote('n2');
+      selection.focusNote('n2');
       clipboard.failNext = new Error('no clipboard');
 
       press('c');
@@ -670,32 +623,30 @@ describe('NotesPageComponent', () => {
     });
 
     it('pins the focused note on p', async () => {
-      store.focusNote('n1');
+      selection.focusNote('n1');
 
       press('p');
 
-      await vi.waitFor(() => expect(store.visibleNotes().find((n) => n.id === 'n1')?.pinned).toBe(true));
+      await vi.waitFor(() => expect(canvas.visibleNotes().find((n) => n.id === 'n1')?.pinned).toBe(true));
     });
 
     it('trashes the focused note on Delete, offering to take it back', async () => {
-      store.focusNote('n1');
+      selection.focusNote('n1');
 
       press('Delete');
 
       await vi.waitFor(() => expect(store.lastDeletion()).toEqual({ ids: ['n1'], count: 1 }));
-      expect(store.visibleNotes().map((note) => note.id)).not.toContain('n1');
+      expect(canvas.visibleNotes().map((note) => note.id)).not.toContain('n1');
     });
 
     it('takes back the last deletion on Ctrl+Z', async () => {
-      // The gesture one makes without looking at the screen, which is why it
-      // reads `lastDeletion` and not the banner.
-      store.focusNote('n1');
+      selection.focusNote('n1');
       press('Backspace');
       await vi.waitFor(() => expect(store.lastDeletion()).not.toBeNull());
 
       press('z', { ctrlKey: true });
 
-      await vi.waitFor(() => expect(store.visibleNotes().map((note) => note.id)).toContain('n1'));
+      await vi.waitFor(() => expect(canvas.visibleNotes().map((note) => note.id)).toContain('n1'));
       expect(store.lastDeletion()).toBeNull();
     });
 
@@ -708,43 +659,41 @@ describe('NotesPageComponent', () => {
     });
 
     it('clears the checked notes on Escape', () => {
-      store.toggleChecked('n1');
-      store.toggleChecked('n2');
+      selection.toggleChecked('n1');
+      selection.toggleChecked('n2');
 
       press('Escape');
 
-      expect(store.checkedIds().size).toBe(0);
+      expect(selection.checkedIds().size).toBe(0);
     });
 
     it('ignores the canvas keys while typing in a field', () => {
-      // The letters are bare on purpose; they must not swallow a keystroke aimed
-      // at the search box.
-      store.focusNote('n1');
+      selection.focusNote('n1');
       const input = document.createElement('input');
       document.body.appendChild(input);
 
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }));
 
-      expect(store.checkedIds().size).toBe(0);
+      expect(selection.checkedIds().size).toBe(0);
       input.remove();
     });
 
     it('ignores the canvas keys while a modal holds the keyboard', async () => {
       store.openNote('n1');
       await fixture.whenStable();
-      store.focusNote('n2');
+      selection.focusNote('n2');
 
       press('x');
 
-      expect(store.checkedIds().size).toBe(0);
+      expect(selection.checkedIds().size).toBe(0);
     });
 
     it('ignores a chord it does not own', () => {
-      store.focusNote('n1');
+      selection.focusNote('n1');
 
       press('x', { altKey: true });
 
-      expect(store.checkedIds().size).toBe(0);
+      expect(selection.checkedIds().size).toBe(0);
     });
   });
 
@@ -777,7 +726,6 @@ describe('NotesPageComponent', () => {
 
       child(NoteEditorOverlayComponent).attachmentAddRequested.emit();
 
-      // A note one attaches a file to is no longer empty.
       await vi.waitFor(() => expect(store.persistedNoteId()).not.toBeNull());
       await vi.waitFor(() =>
         expect(
@@ -789,7 +737,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('attaches every file dropped on the window', async () => {
-      // The WebView never sees the file: only the native side announces the paths.
       dropFiles(['C:\\a.png', 'C:\\b.png']);
 
       await vi.waitFor(() =>
@@ -825,8 +772,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('says so when the pasted clipboard carried no image after all', async () => {
-      // Only the type is read in the editor; the bytes are re-read natively, and
-      // by then the clipboard may hold nothing usable.
       attachmentsRepository.failNext = new Error('no image in clipboard');
 
       child(NoteEditorOverlayComponent).imagePasted.emit();
@@ -870,15 +815,12 @@ describe('NotesPageComponent', () => {
     it('closes the zoomed view along with the preview it shows', async () => {
       fileDialog.openPath = 'C:\\shots\\capture.png';
       child(NoteEditorOverlayComponent).attachmentAddRequested.emit();
-      // An attached image opens its own preview: it is what one wants to see.
       await vi.waitFor(() => expect(TestBed.inject(AttachmentsStore).previewData()).not.toBeNull());
       const id = TestBed.inject(AttachmentsStore).previewId()!;
 
       child(NoteEditorOverlayComponent).imageZoomRequested.emit();
       await vi.waitFor(() => expect(maybeChild(ImageLightboxComponent)).not.toBeNull());
 
-      // The enlarged view shows the bytes the preview loaded: without it there
-      // is nothing left to show.
       child(NoteEditorOverlayComponent).attachmentPreviewToggled.emit(id);
       await vi.waitFor(() => expect(maybeChild(ImageLightboxComponent)).toBeNull());
     });
@@ -924,13 +866,11 @@ describe('NotesPageComponent', () => {
     });
 
     it('keeps what was typed, so the next copy does not ask again', async () => {
-      // Il n'y a qu'un jeu de valeurs par note : celui de la carte, celui de la
-      // palette et celui du panneau de l'éditeur sont le même.
       sections()[0].fillRequested.emit('snippet');
       await fixture.whenStable();
 
       child(PlaceholderFormComponent).submitted.emit({ host: 'db.internal', port: '' });
-      await vi.waitFor(() => expect(store.visibleNotes()[0].placeholders[0].value).toBe('db.internal'));
+      await vi.waitFor(() => expect(canvas.visibleNotes()[0].placeholders[0].value).toBe('db.internal'));
 
       sections()[0].fillRequested.emit('snippet');
       await fixture.whenStable();
@@ -970,8 +910,6 @@ describe('NotesPageComponent', () => {
       });
 
       await vi.waitFor(() => expect(clipboard.content).toBe('psql -h db.internal'));
-      // L'accusé passe par le bandeau : le texte n'existe qu'une fois le pont
-      // traversé, et la coche du bouton mentirait en attendant.
       expect(TestBed.inject(StatusNotifier).status()?.key).toBe('placeholders.copiedFilled');
     });
 
@@ -1024,8 +962,6 @@ describe('NotesPageComponent', () => {
     });
 
     it('turns what was typed on the create row into a saved note', async () => {
-      // The palette captures as much as it retrieves: the shortest path between
-      // an idea and a stored note.
       palette.setQuery('kubectl get pods -A');
       palette.highlight(palette.results().length);
       await fixture.whenStable();
@@ -1040,7 +976,6 @@ describe('NotesPageComponent', () => {
       child(QuickPaletteComponent).chosen.emit();
 
       await vi.waitFor(() => expect(clipboard.content).toBe('line one\nline two'));
-      // The window hides itself: the user goes back to paste where they were.
       await vi.waitFor(() => expect(appWindow.hidden).toBe(1));
       expect(palette.isOpen()).toBe(false);
     });
@@ -1077,7 +1012,7 @@ describe('NotesPageComponent', () => {
   describe('trash and tag management', () => {
     beforeEach(async () => {
       await setUp([createNote({ id: 'n1', tags: ['auth'] }), createNote({ id: 'n2', tags: ['auth'] })]);
-      await vi.waitFor(() => expect(store.visibleNotes()).toHaveLength(2));
+      await vi.waitFor(() => expect(canvas.visibleNotes()).toHaveLength(2));
     });
 
     it('brings a restored note back to the canvas', async () => {
@@ -1087,20 +1022,19 @@ describe('NotesPageComponent', () => {
 
       child(TrashPanelComponent).restoreRequested.emit('n1');
 
-      await vi.waitFor(() => expect(store.visibleNotes().map((note) => note.id)).toContain('n1'));
+      await vi.waitFor(() => expect(canvas.visibleNotes().map((note) => note.id)).toContain('n1'));
     });
 
-    it('reloads the canvas when the trash panel closes', async () => {
-      // Purging behind the panel changes nothing on the canvas, but restoring
-      // does — and closing is the one moment that covers both.
+    it('closes the trash panel without re-querying, since nothing changed', async () => {
       await TestBed.inject(TrashStore).open();
       await fixture.whenStable();
       const queries = repository.queryCount;
 
       child(TrashPanelComponent).closed.emit();
+      await fixture.whenStable();
 
-      await vi.waitFor(() => expect(repository.queryCount).toBeGreaterThan(queries));
       expect(TestBed.inject(TrashStore).isOpen()).toBe(false);
+      expect(repository.queryCount).toBe(queries);
     });
 
     it('renames a tag across the corpus and reloads', async () => {
@@ -1112,7 +1046,7 @@ describe('NotesPageComponent', () => {
       child(TagManagerComponent).renameRequested.emit('authentication');
 
       await vi.waitFor(() => expect(repository.retagged).toEqual({ tags: ['auth'], into: 'authentication' }));
-      await vi.waitFor(() => expect(store.allTags()).toEqual(['authentication']));
+      await vi.waitFor(() => expect(canvas.allTags()).toEqual(['authentication']));
     });
 
     it('drops the selected tags from the corpus and reloads', async () => {
@@ -1124,7 +1058,7 @@ describe('NotesPageComponent', () => {
       child(TagManagerComponent).deleteRequested.emit();
 
       await vi.waitFor(() => expect(repository.deletedTags).toEqual(['auth']));
-      await vi.waitFor(() => expect(store.allTags()).toEqual([]));
+      await vi.waitFor(() => expect(canvas.allTags()).toEqual([]));
     });
 
     it('leaves the canvas alone when the tag action changed nothing', async () => {
@@ -1132,7 +1066,6 @@ describe('NotesPageComponent', () => {
       await vi.waitFor(() => expect(maybeChild(TagManagerComponent)).not.toBeNull());
       const queries = repository.queryCount;
 
-      // Nothing selected: there is no tag to rename.
       child(TagManagerComponent).renameRequested.emit('authentication');
       await fixture.whenStable();
 

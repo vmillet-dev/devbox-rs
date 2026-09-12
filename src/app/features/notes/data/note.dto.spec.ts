@@ -4,7 +4,6 @@ import {
   ContractError,
   NoteDto,
   toAttachment,
-  toImportReport,
   toNote,
   toNoteDraftDto,
   toNotePatchDto,
@@ -27,12 +26,11 @@ const BASE_DTO: NoteDto = {
   expiringSoon: false,
   placeholders: [],
   attachmentCount: 0,
+  copyText: null,
 };
 
 describe('toNote', () => {
   it('parses ISO date strings into Date instances', () => {
-    // JSON has no date type: without this conversion every downstream
-    // `getTime()` would produce NaN.
     const note = toNote(BASE_DTO);
 
     expect(note.createdAt).toBeInstanceOf(Date);
@@ -62,9 +60,6 @@ describe('toNote', () => {
   });
 
   it('takes the language straight from the wire, with no narrowing left to do', () => {
-    // `language` used to be a free string in Rust, narrowed here at runtime. It
-    // is an enum now, so the generated bindings rule an unknown value out at
-    // compile time — `{ ...BASE_DTO, language: 'rust' }` no longer type-checks.
     const note = toNote({ ...BASE_DTO, language: 'sql' });
 
     expect(note.language).toBe('sql');
@@ -98,14 +93,12 @@ describe('toNote', () => {
     });
 
     it('throws a contract error on a footer variant this build does not know', () => {
-      // A newer backend variant must be reported, not rendered as a blank footer.
       const unknown = { ...BASE_DTO, footer: { kind: 'weather', at: '2026-01-01' } } as unknown as NoteDto;
 
       expect(() => toNote(unknown)).toThrow(ContractError);
     });
 
     it('carries the expiry proximity the backend decided', () => {
-      // The threshold lives in Rust only; the front must not recompute it.
       expect(toNote({ ...BASE_DTO, expiringSoon: true }).expiringSoon).toBe(true);
     });
   });
@@ -146,9 +139,16 @@ describe('toNoteDraftDto', () => {
 });
 
 describe('toNotePatchDto', () => {
+  it('isolates the checklist it sends from the array it was given', () => {
+    const outgoing = [{ text: 'Relire', done: true }];
+
+    const dto = toNotePatchDto({ items: outgoing });
+    outgoing[0].text = 'Changed afterwards';
+
+    expect(dto.items).toEqual([{ text: 'Relire', done: true }]);
+  });
+
   it('includes only the fields actually present in the patch', () => {
-    // An explicit `undefined` would serialise to null and overwrite the stored
-    // value instead of leaving it untouched.
     const dto = toNotePatchDto({ pinned: true });
 
     expect(dto).toEqual({ pinned: true });
@@ -201,7 +201,6 @@ describe('toTrashedNote', () => {
   });
 
   it('carries only what the panel shows', () => {
-    // Rien n'y est décoré : une note au rebut n'est ni ouverte ni copiée.
     const note = toTrashedNote(DTO);
 
     expect(note).toEqual({
@@ -213,8 +212,6 @@ describe('toTrashedNote', () => {
       tags: ['auth'],
       deletedAt: new Date('2026-08-27T08:00:00.000Z'),
       purgeAt: new Date('2026-09-26T08:00:00.000Z'),
-      // Le type suffit au panneau : une todolist au rebut affiche un libellé au
-      // lieu d'un aperçu vide. Les items, eux, ne descendent pas jusqu'ici.
       kind: 'snippet',
     });
   });
@@ -244,15 +241,5 @@ describe('toAttachment', () => {
     expect(attachment.createdAt).toBeInstanceOf(Date);
     expect(attachment.fileName).toBe('capture.png');
     expect(attachment.byteSize).toBe(2048);
-  });
-});
-
-describe('toImportReport', () => {
-  it('keeps the three counters apart', () => {
-    expect(toImportReport({ spacesCreated: 1, notesImported: 2, notesSkipped: 3 })).toEqual({
-      spacesCreated: 1,
-      notesImported: 2,
-      notesSkipped: 3,
-    });
   });
 });

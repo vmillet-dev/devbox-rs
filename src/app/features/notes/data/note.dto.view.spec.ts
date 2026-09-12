@@ -31,8 +31,6 @@ describe('toNotesQueryDto', () => {
   });
 
   it('sends an empty list rather than omitting the field', () => {
-    // Rust deserialises `languages` as a required Vec: an absent key would make
-    // the whole query fail to parse.
     expect(toNotesQueryDto({ ...BASE_QUERY, languages: [] }).languages).toEqual([]);
   });
 });

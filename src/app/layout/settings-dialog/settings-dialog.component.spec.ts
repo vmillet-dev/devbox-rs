@@ -41,12 +41,11 @@ describe('SettingsDialogComponent', () => {
     registry = TestBed.inject(SettingsRegistry);
   });
 
-  it('is a modal dialog labelled by its own title', async () => {
+  it('names itself to the dialog shell by its own title', async () => {
     await render();
 
-    const panel = fixture.nativeElement.querySelector('.settings-panel');
-    expect(panel.getAttribute('role')).toBe('dialog');
-    expect(panel.getAttribute('aria-modal')).toBe('true');
+    const panel = fixture.nativeElement.querySelector('.dialog-panel');
+
     expect(panel.getAttribute('aria-labelledby')).toBe('settings-dialog-title');
   });
 
@@ -115,23 +114,20 @@ describe('SettingsDialogComponent', () => {
     optionLabelled('Variables').click();
     await fixture.whenStable();
 
-    // La feature se décharge : sa page part avec elle.
     registry.unregister(['notes.variables']);
     await fixture.whenStable();
 
     expect(optionLabelled('Paramètres').getAttribute('aria-current')).toBe('page');
   });
 
-  it('emits on the close button, on Escape and on a backdrop click', async () => {
+  it('emits on the close button', async () => {
     await render();
     const closed = vi.fn();
     fixture.componentInstance.closed.subscribe(closed);
 
     fixture.nativeElement.querySelector('.settings-close').click();
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    fixture.nativeElement.querySelector('.settings-backdrop').click();
     await fixture.whenStable();
 
-    expect(closed).toHaveBeenCalledTimes(3);
+    expect(closed).toHaveBeenCalledTimes(1);
   });
 });

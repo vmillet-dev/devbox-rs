@@ -39,7 +39,6 @@ describe('WindowBehaviorService', () => {
   });
 
   it('stays silent when there is no bridge to talk to', async () => {
-    // Hors Tauri (jsdom) : la fenêtre du navigateur ne se range nulle part.
     setWindowBehavior.mockRejectedValue(new Error('no bridge'));
 
     expect(() => service.start()).not.toThrow();

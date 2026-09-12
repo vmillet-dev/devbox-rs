@@ -56,8 +56,6 @@ describe('SelectionBarComponent', () => {
     await fixture.whenStable();
 
     expect(emitted).toBe('space-2');
-    // Sinon le sélecteur resterait figé sur la dernière destination et la
-    // rejouer demanderait de repasser par « Déplacer vers ».
     expect(select.value).toBe('');
   });
 

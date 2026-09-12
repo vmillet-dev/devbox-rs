@@ -1,10 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, input, model, viewChild } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-/**
- * Le raccourci diffère selon la plateforme : afficher « ⌘K » sur Windows
- * (où DevBox tourne aussi) désignerait une touche qui n'existe pas.
- */
+/** Showing "⌘K" on Windows would name a key that does not exist there. */
 function platformShortcutHint(): string {
   return /mac/i.test(navigator.userAgent) ? '⌘K' : 'Ctrl+K';
 }
@@ -23,9 +20,8 @@ export class SearchBoxComponent {
   readonly query = model('');
 
   /**
-   * Le raccourci est désactivé tant qu'une modale est ouverte : sinon il
-   * déplacerait le focus vers un champ situé *derrière* la boîte de dialogue,
-   * et l'utilisateur taperait dans un contrôle qu'il ne voit pas.
+   * Disabled while a modal is open: it would otherwise move focus to a field *behind*
+   * the dialog, into a control the user cannot see.
    */
   readonly shortcutEnabled = input(true);
 
@@ -34,9 +30,8 @@ export class SearchBoxComponent {
   private readonly inputRef = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
 
   /**
-   * Le raccourci est porté par le composant qui en affiche l'indice et qui
-   * possède le champ, plutôt que remonté à la page par une chaîne de
-   * `viewChild` traversant deux niveaux de composants.
+   * Carried by the component that shows its hint and owns the field, rather than lifted
+   * to the page through a chain of `viewChild`s crossing two levels.
    */
   protected onDocumentKeydown(event: KeyboardEvent): void {
     if (!this.shortcutEnabled()) return;

@@ -1,8 +1,6 @@
-//! Champs à remplir dans un snippet : `{{host}}`, `{{port=5432}}`.
-//!
-//! Le nom est volontairement restreint à `[A-Za-z0-9_-]` : une note contenant
-//! du template Angular (`{{ user.name }}`) ou du Handlebars ne doit pas se
-//! transformer en formulaire à chaque copie.
+//! ⚠️ A field name is restricted to `[A-Za-z0-9_-]` on purpose: without it a note
+//! holding Angular template code (`{{ user.name }}`) would demand a form on every
+//! copy.
 
 use std::collections::BTreeMap;
 
@@ -16,18 +14,12 @@ const CLOSE: &str = "}}";
 #[serde(rename_all = "camelCase")]
 pub struct Placeholder {
     pub name: String,
-    /// Vide quand le snippet n'en propose pas.
     pub default_value: String,
-    /// Ce que l'utilisateur a déjà saisi pour ce champ, vide s'il n'a rien
-    /// saisi. Rapporté ici plutôt que laissé dans la carte des valeurs pour
-    /// qu'une seule liste réponde à « quels champs, et où en sont-ils » — et
-    /// pour qu'une valeur devenue orpheline (le jeton a été renommé dans le
-    /// texte) reste hors de vue sans être effacée.
+    /// A value gone orphan — its token renamed in the text — stays out of sight
+    /// here without being erased.
     pub value: String,
 }
 
-/// Un nom de champ, et rien d'autre : c'est cette restriction qui empêche
-/// `{{ user.name }}` de réclamer un formulaire.
 fn is_field_name(name: &str) -> bool {
     !name.is_empty()
         && name
@@ -52,9 +44,19 @@ fn parse_token(inner: &str) -> Option<Placeholder> {
     })
 }
 
-/// Chaque `{{…}}` reconnu, dans l'ordre d'apparition et sans doublon : c'est
-/// l'ordre du formulaire de saisie.
-fn scan(content: &str, mut on_token: impl FnMut(&str, Option<Placeholder>)) {
+enum Fragment<'a> {
+    Literal(&'a str),
+    Token {
+        inner: &'a str,
+        /// `None` when it is not a field: part of the text, not of the form.
+        placeholder: Option<Placeholder>,
+    },
+}
+
+/// The single walk is the point: [`parse`] and [`fill`] would otherwise each carry
+/// their own idea of where a token starts and ends. An unterminated `{{` ends the
+/// walk, and the remainder — braces included — comes back as one last literal.
+fn scan(content: &str, mut on_fragment: impl FnMut(Fragment<'_>)) {
     let mut rest = content;
 
     while let Some(start) = rest.find(OPEN) {
@@ -63,38 +65,47 @@ fn scan(content: &str, mut on_token: impl FnMut(&str, Option<Placeholder>)) {
             break;
         };
 
+        on_fragment(Fragment::Literal(&rest[..start]));
+
         let inner = &after_open[..end];
-        on_token(inner, parse_token(inner));
+        on_fragment(Fragment::Token {
+            inner,
+            placeholder: parse_token(inner),
+        });
+
         rest = &after_open[end + CLOSE.len()..];
     }
+
+    on_fragment(Fragment::Literal(rest));
 }
 
-/// Les champs du texte, munis de ce qui a déjà été saisi pour eux.
-///
-/// C'est le **texte** qui dit quels champs existent, jamais la carte des
-/// valeurs : une valeur dont le jeton a disparu du contenu n'est pas un champ,
-/// elle attend simplement qu'il revienne.
+/// The **text** says which fields exist, never the value map: a value whose token
+/// has left the content is not a field, it is waiting for it to come back.
 pub fn parse(content: &str, values: &BTreeMap<String, String>) -> Vec<Placeholder> {
     let mut found: Vec<Placeholder> = Vec::new();
 
-    scan(content, |_, placeholder| {
-        if let Some(mut placeholder) = placeholder
-            && !found.iter().any(|seen| seen.name == placeholder.name)
-        {
-            placeholder.value = values.get(&placeholder.name).cloned().unwrap_or_default();
-            found.push(placeholder);
+    scan(content, |fragment| {
+        let Fragment::Token {
+            placeholder: Some(mut placeholder),
+            ..
+        } = fragment
+        else {
+            return;
+        };
+
+        if found.iter().any(|seen| seen.name == placeholder.name) {
+            return;
         }
+
+        placeholder.value = values.get(&placeholder.name).cloned().unwrap_or_default();
+        found.push(placeholder);
     });
 
     found
 }
 
-/// Ce qui mérite d'être écrit en base.
-///
-/// Une valeur vide est retirée plutôt que stockée : vide veut dire « je garde ce
-/// que le snippet propose », et la ligne figerait cette réponse le jour où la
-/// valeur par défaut du texte change. Un nom qui n'en est pas un ne peut
-/// désigner aucun jeton — l'écrire ne ferait que du remplissage mort.
+/// An empty value is dropped rather than stored: empty means "I keep what the
+/// snippet offers", and a row would freeze that answer the day the default changes.
 pub fn normalize_values(values: BTreeMap<String, String>) -> BTreeMap<String, String> {
     values
         .into_iter()
@@ -102,14 +113,9 @@ pub fn normalize_values(values: BTreeMap<String, String>) -> BTreeMap<String, St
         .collect()
 }
 
-/// Ce qui remplit réellement les jetons : ce qui a été saisi sur la note
-/// d'abord, la **variable globale** ensuite.
-///
-/// Une saisie vide n'écrase pas la variable — vide veut dire « je garde ce
-/// qu'on me propose », exactement comme face à une valeur par défaut écrite
-/// dans le texte. Et c'est la variable qui passe devant cette dernière : elle a
-/// été réglée pour cette machine, là où `{{host=localhost}}` n'était qu'une
-/// suggestion notée le jour où le snippet a été écrit.
+/// What was typed on the note first, the **global variable** next, the default
+/// written in the text last: an empty entry overwrites nothing, empty meaning
+/// "I keep what I am offered".
 pub fn resolve(
     globals: &BTreeMap<String, String>,
     values: &BTreeMap<String, String>,
@@ -125,39 +131,31 @@ pub fn resolve(
     resolved
 }
 
-/// Remplace chaque jeton par la valeur fournie, à défaut par sa valeur par
-/// défaut. Un jeton non reconnu est **laissé tel quel** : il fait partie du
-/// texte, pas du formulaire.
+/// A token that is not a field is **left as it is**.
 pub fn fill(content: &str, values: &BTreeMap<String, String>) -> String {
     let mut filled = String::with_capacity(content.len());
-    let mut rest = content;
 
-    while let Some(start) = rest.find(OPEN) {
-        let after_open = &rest[start + OPEN.len()..];
-        let Some(end) = after_open.find(CLOSE) else {
-            break;
-        };
-
-        filled.push_str(&rest[..start]);
-        let inner = &after_open[..end];
-
-        if let Some(placeholder) = parse_token(inner) {
-            filled.push_str(
-                values
-                    .get(&placeholder.name)
-                    .filter(|value| !value.is_empty())
-                    .unwrap_or(&placeholder.default_value),
-            );
-        } else {
+    scan(content, |fragment| match fragment {
+        Fragment::Literal(text) => filled.push_str(text),
+        Fragment::Token {
+            placeholder: Some(placeholder),
+            ..
+        } => filled.push_str(
+            values
+                .get(&placeholder.name)
+                .filter(|value| !value.is_empty())
+                .unwrap_or(&placeholder.default_value),
+        ),
+        Fragment::Token {
+            inner,
+            placeholder: None,
+        } => {
             filled.push_str(OPEN);
             filled.push_str(inner);
             filled.push_str(CLOSE);
         }
+    });
 
-        rest = &after_open[end + CLOSE.len()..];
-    }
-
-    filled.push_str(rest);
     filled
 }
 
@@ -213,9 +211,6 @@ mod tests {
 
     #[test]
     fn a_value_whose_token_left_the_text_is_not_a_field() {
-        // Le jeton a été renommé dans le corps : la valeur reste en base — elle
-        // revient si le renommage était une faute de frappe — mais le panneau
-        // n'a aucune raison de proposer un champ que le texte ne porte plus.
         let fields = parse("{{hostname}}", &values(&[("host", "db")]));
 
         assert_eq!(names("{{hostname}}"), ["hostname"]);
@@ -227,8 +222,6 @@ mod tests {
         assert_eq!(
             normalize_values(values(&[
                 ("host", "db.internal"),
-                // Vide = « je garde ce que le snippet propose » : l'écrire
-                // figerait cette réponse.
                 ("port", ""),
                 ("user.name", "x"),
             ])),
@@ -238,8 +231,6 @@ mod tests {
 
     #[test]
     fn a_template_expression_is_not_a_field() {
-        // Le cas qui compte : une note de code Angular ne doit pas réclamer un
-        // formulaire à chaque copie.
         assert!(names("<p>{{ user.name }}</p> {{ items[0] }}").is_empty());
     }
 
@@ -273,8 +264,6 @@ mod tests {
 
     #[test]
     fn an_empty_entry_leaves_the_global_variable_in_place() {
-        // Vide = « je garde ce qu'on me propose » : sans ce filtre, ouvrir le
-        // panneau sans rien taper effacerait la variable à la copie suivante.
         let globals = values(&[("host", "db.internal")]);
 
         assert_eq!(
@@ -311,8 +300,6 @@ mod tests {
 
     #[test]
     fn an_empty_value_falls_back_to_the_default_too() {
-        // Le formulaire envoie tous ses champs : un champ laissé vide vaut
-        // « je garde ce que le snippet propose ».
         assert_eq!(fill("{{port=5432}}", &values(&[("port", "")])), "5432");
     }
 

@@ -31,8 +31,6 @@ describe('PlaceholderFieldsComponent', () => {
   });
 
   it('offers the default as a suggestion rather than as a value', () => {
-    // La différence compte : « ce sera 5432 » n'est pas « j'ai tapé 5432 », et
-    // c'est le back qui applique la valeur par défaut au moment de remplir.
     expect(inputs()[1].placeholder).toBe('5432');
     expect(inputs()[1].value).toBe('');
   });

@@ -3,14 +3,14 @@
 @if (store.isEmpty()) {
   <p class="variables-empty">{{ 'settings.variables.empty' | transloco }}</p>
 } @else {
-  <!-- Décoratif : chaque champ porte déjà son propre libellé. -->
+  <!-- Decorative: every field already carries its own label. -->
   <div class="variables-head" aria-hidden="true">
     <span>{{ 'settings.variables.name' | transloco }}</span>
     <span>{{ 'settings.variables.value' | transloco }}</span>
   </div>
 
   <ul class="variables-list">
-    <!-- Suivies par position : le nom est précisément ce qui change à la frappe. -->
+    <!-- Tracked by position: the name is precisely what changes as one types. -->
     @for (variable of store.variables(); track $index) {
       <li class="variable-row">
         <span class="variable-name-field">

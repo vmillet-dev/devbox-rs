@@ -2,14 +2,10 @@ import { NgComponentOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SettingsPage, SettingsRegistry } from '@core/settings/settings-registry';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { SettingsPageComponent } from './settings-page/settings-page.component';
 
-/**
- * Les réglages de l'application elle-même, toujours présents : ils ne dépendent
- * d'aucun outil chargé, contrairement aux pages du registre.
- */
+/** Always present, unlike the registry's pages, which depend on a loaded tool. */
 const GENERAL_PAGE: SettingsPage = {
   id: 'general',
   labelKey: 'settings.pages.general',
@@ -18,27 +14,19 @@ const GENERAL_PAGE: SettingsPage = {
 };
 
 /**
- * Panneau de préférences : un rail de pages à gauche, la page choisie à droite.
+ * It knows one page, its own. The others come from [`SettingsRegistry`], where the
+ * features register them — importing one here would break the rule that deleting a
+ * feature's folder deletes the feature.
  *
- * Il ne connaît qu'une seule page, la sienne. Les autres viennent de
- * [`SettingsRegistry`], où les features les inscrivent — « Variables » édite
- * les valeurs de `{{champs}}`, un sujet qui appartient aux notes, et l'importer
- * ici casserait la règle qui veut que supprimer un dossier de feature supprime
- * la feature.
- *
- * **Pas d'« OK / Annuler / Appliquer ».** Tout s'applique à la frappe : c'est
- * déjà l'idiome de l'application, et un thème qu'on ne voit qu'après validation
- * ne se choisit pas, il se devine.
+ * **No "OK / Cancel / Apply"**: everything applies as it is typed, which is already the
+ * application's idiom.
  */
 @Component({
   selector: 'app-settings-dialog',
-  imports: [DialogBackdropDirective, FocusTrapDirective, NgComponentOutlet, TranslocoPipe],
+  imports: [DialogComponent, NgComponentOutlet, TranslocoPipe],
   templateUrl: './settings-dialog.component.html',
   styleUrl: './settings-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class SettingsDialogComponent {
   private readonly registry = inject(SettingsRegistry);
@@ -52,14 +40,15 @@ export class SettingsDialogComponent {
   private readonly requestedPageId = signal<string | null>(null);
 
   /**
-   * La page affichée. Retombe sur la première quand rien n'a été choisi — ou
-   * quand la feature qui portait la page choisie vient d'être déchargée.
+   * Falls back to the first when nothing was chosen — or when the feature carrying the
+   * chosen page has just been unloaded.
    */
   protected readonly activePage = computed<SettingsPage>(() => {
     const pages = this.pages();
     const requested = pages.find((page) => page.id === this.requestedPageId());
 
-    return requested ?? pages[0];
+    // `GENERAL_PAGE` is always in the list, so the last fallback never fires.
+    return requested ?? pages[0] ?? GENERAL_PAGE;
   });
 
   protected select(id: string): void {

@@ -3,11 +3,8 @@ import { AttachmentsRepository } from '@features/notes/data/attachments.reposito
 import { Attachment } from '@features/notes/model/note.model';
 
 /**
- * In-memory `AttachmentsRepository` test double.
- *
- * `read` returns a stub `data:` URI rather than real bytes: what the front owns
- * is *when* it asks for them, not what they contain. See
- * `fake-notes-repository.ts` for why the implemented type is a `Pick`.
+ * `read` returns a stub `data:` URI rather than real bytes: what the front owns is *when*
+ * it asks for them. See `fake-notes-repository.ts` for why the implemented type is a `Pick`.
  */
 export class FakeAttachmentsRepository implements Pick<AttachmentsRepository, keyof AttachmentsRepository> {
   private attachments: readonly Attachment[];

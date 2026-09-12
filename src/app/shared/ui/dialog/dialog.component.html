@@ -1,0 +1,17 @@
+<div appDialogBackdrop class="dialog-backdrop" [style.z-index]="rung()" (dismissed)="dismiss()">
+  <div
+    appFocusTrap
+    class="dialog-panel"
+    [class.fitted]="variant() === 'fitted'"
+    [class.framed]="variant() === 'framed'"
+    [class.fullscreen]="fullscreen()"
+    [style.width]="panelWidth()"
+    [style.height]="panelHeight()"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-labelledby]="labelledBy() ?? null"
+    [attr.aria-label]="label() ?? null"
+  >
+    <ng-content />
+  </div>
+</div>

@@ -1,26 +1,33 @@
-//! Tray and global shortcuts: Tauri glue, not a feature.
-//!
-//! **Nothing user-visible is written here**: the menu labels arrive from the
-//! front end already translated.
-
 use std::str::FromStr;
 use std::sync::Mutex;
 
 use serde::Deserialize;
 use specta::Type;
+
+use crate::closed_enum::closed_enum;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, Wry};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-/// Mirrors of `core/ipc/app-events.service.ts`: a typo here would produce a
-/// silently inert subscription.
-const CAPTURE_EVENT: &str = "devbox:capture";
-const NEW_NOTE_EVENT: &str = "devbox:new-note";
-const PALETTE_EVENT: &str = "devbox:palette";
+closed_enum! {
+    /// **One** event carrying a closed value, not one topic per action: the topic
+    /// strings used to be mirrored in `app-events.service.ts`, where a typo made a
+    /// subscription silently inert. It crosses as a generated TypeScript union, so
+    /// a variant added here stops the front end compiling until its `switch` handles it.
+    pub enum GlobalAction {
+        /// The clipboard, as a note.
+        #[default]
+        Capture = "capture",
+        NewNote = "new-note",
+        Palette = "palette",
+    }
+}
 
-/// `unminimize` first: a minimised window that is merely shown stays in the
-/// taskbar.
+/// Exported as a constant too, so neither side spells it twice.
+pub(crate) const ACTION_EVENT: &str = "devbox:action";
+
+/// `unminimize` first: a minimised window merely shown stays in the taskbar.
 pub(crate) fn reveal(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -29,20 +36,15 @@ pub(crate) fn reveal(app: &AppHandle) {
     }
 }
 
-/// Shows the window **then** asks the front for the action: the native side
-/// never creates the note itself, which spares it from duplicating language
-/// detection.
-fn reveal_and_emit(app: &AppHandle, topic: &str) {
+/// Shows the window **then** asks the front end for the action: the native side
+/// never creates the note itself, which spares it duplicating language detection.
+fn reveal_and_emit(app: &AppHandle, action: GlobalAction) {
     reveal(app);
-    let _ = app.emit(topic, ());
+    let _ = app.emit(ACTION_EVENT, action);
 }
 
-// --- Shortcuts active outside the window ------------------------------------
-
-/// Les trois raccourcis globaux, tels que le front les règle.
-///
-/// Trois champs plutôt qu'une carte : un raccourci absent serait une action
-/// qu'aucune touche n'atteint plus, et une carte laisserait le compilateur muet.
+/// Three fields rather than a map: a missing shortcut would be an action no key
+/// reaches any more, and a map would leave the compiler silent about it.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ShortcutBindings {
@@ -52,16 +54,12 @@ pub struct ShortcutBindings {
 }
 
 impl ShortcutBindings {
-    /// ⚠️ Miroir de `DEFAULT_SHORTCUTS` (`core/shortcuts/shortcut.model.ts`).
+    /// ⚠️ Mirror of `DEFAULT_SHORTCUTS` (`core/shortcuts/shortcut.model.ts`), and
+    /// deliberately so: these are taken **before** the front end has started, and
+    /// without them `Ctrl+Alt+P` would be dead for the length of the first render.
     ///
-    /// Ce doublon est voulu : ces valeurs servent **avant** que le front ait
-    /// démarré, et sans elles `Ctrl+Alt+P` serait mort le temps du premier
-    /// rendu — précisément la seconde où l'on s'en sert depuis une autre
-    /// application.
-    ///
-    /// ⚠️ Pas `Ctrl+Alt+Espace` pour la palette : ce raccourci est déjà pris par
-    /// des applications très répandues (Claude, entre autres), et le premier
-    /// arrivé gagne — DevBox n'aurait qu'une touche morte.
+    /// ⚠️ Not `Ctrl+Alt+Space` for the palette: widely installed applications hold
+    /// it already, and a global shortcut is first come, first served.
     fn defaults() -> Self {
         Self {
             capture: "Ctrl+Alt+V".to_string(),
@@ -70,26 +68,21 @@ impl ShortcutBindings {
         }
     }
 
-    fn entries(&self) -> [(&str, &'static str); 3] {
+    fn entries(&self) -> [(&str, GlobalAction); 3] {
         [
-            (&self.capture, CAPTURE_EVENT),
-            (&self.new_note, NEW_NOTE_EVENT),
-            (&self.palette, PALETTE_EVENT),
+            (&self.capture, GlobalAction::Capture),
+            (&self.new_note, GlobalAction::NewNote),
+            (&self.palette, GlobalAction::Palette),
         ]
     }
 }
 
-/// Ce qui est enregistré à l'instant, et l'action que chacun déclenche.
-///
-/// Une liste plutôt que trois constantes : les combinaisons changent au gré des
-/// préférences, et le gestionnaire ne peut donc pas les comparer à des valeurs
-/// capturées une fois pour toutes.
-type ActiveShortcuts = Mutex<Vec<(Shortcut, &'static str)>>;
+/// A list rather than three constants: the combinations change with the
+/// preferences, so the handler cannot compare them against captured values.
+type ActiveShortcuts = Mutex<Vec<(Shortcut, GlobalAction)>>;
 
-/// Installe le greffon et prend les raccourcis par défaut.
-///
-/// Un raccourci déjà pris par une autre application est journalisé mais **pas
-/// fatal** : DevBox doit démarrer sans lui.
+/// A shortcut already taken by another application is logged but **not fatal**:
+/// DevBox has to start without it.
 pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
     app.manage(ActiveShortcuts::default());
 
@@ -101,11 +94,11 @@ pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
                     return;
                 }
 
-                let Some(topic) = topic_of(app, shortcut) else {
+                let Some(action) = action_of(app, shortcut) else {
                     return;
                 };
 
-                reveal_and_emit(app, topic);
+                reveal_and_emit(app, action);
             })
             .build(),
     )?;
@@ -121,21 +114,19 @@ pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-fn topic_of(app: &AppHandle, shortcut: &Shortcut) -> Option<&'static str> {
+fn action_of(app: &AppHandle, shortcut: &Shortcut) -> Option<GlobalAction> {
     let active = app.try_state::<ActiveShortcuts>()?;
     let active = active.lock().ok()?;
 
     active
         .iter()
         .find(|(registered, _)| registered == shortcut)
-        .map(|(_, topic)| *topic)
+        .map(|(_, action)| *action)
 }
 
-/// Reprend les trois raccourcis depuis zéro et rend **ce qui n'a pas pu être
-/// pris** : une combinaison illisible comme une combinaison déjà prise.
-///
-/// Tout est relâché d'abord — régler un raccourci en laisse forcément un autre
-/// derrière, et la combinaison abandonnée continuerait sinon de répondre.
+/// Takes the three from scratch and returns **what could not be taken**. Everything
+/// is released first: setting one shortcut necessarily leaves another behind, and
+/// the abandoned combination would otherwise keep firing.
 fn apply_shortcuts(app: &AppHandle, bindings: &ShortcutBindings) -> Vec<String> {
     if let Err(error) = app.global_shortcut().unregister_all() {
         log::warn!("Global shortcuts not released: {error}");
@@ -169,12 +160,8 @@ fn apply_shortcuts(app: &AppHandle, bindings: &ShortcutBindings) -> Vec<String> 
     unavailable
 }
 
-/// Règle les raccourcis globaux et rend ceux qu'une autre application garde.
-///
-/// Le front l'appelle au démarrage puis à chaque changement de préférence, et
-/// **affiche** ce qui revient : le natif ne peut qu'échouer en silence, et une
-/// ligne de journal n'est pas une interface — sans ce retour, presser la touche
-/// ne ferait rien et rien ne dirait pourquoi.
+/// Returns the ones another application keeps: the native side can only fail
+/// silently, and a log line is not an interface — the front end displays this.
 #[tauri::command]
 #[specta::specta]
 #[allow(clippy::needless_pass_by_value)]
@@ -182,11 +169,9 @@ pub fn set_global_shortcuts(bindings: ShortcutBindings, app: AppHandle) -> Vec<S
     apply_shortcuts(&app, &bindings)
 }
 
-// --- What the close and minimise buttons do ----------------------------------
-
-/// Réglé depuis le panneau de préférences et poussé ici, comme les libellés de
-/// la barre système : la préférence vit dans `preferences.json`, côté front, et
-/// la relire depuis Rust ferait une seconde source à tenir en phase.
+/// Set from the preferences panel and pushed here, like the tray labels: the
+/// preference lives in `preferences.json`, and reading it back from Rust would be
+/// a second source to keep in step.
 #[derive(Debug, Clone, Copy, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowBehavior {
@@ -194,9 +179,8 @@ pub struct WindowBehavior {
     pub minimize_to_tray: bool,
 }
 
-/// Ce que fait DevBox tant que le front n'a rien dit : la croix range la fenêtre
-/// dans la barre système — l'application est faite pour rester à portée d'un
-/// raccourci — et « réduire » réduit, comme partout ailleurs.
+/// The close button files the window into the tray — the application is meant to
+/// stay within reach of a shortcut — and "minimise" minimises, as everywhere else.
 impl Default for WindowBehavior {
     fn default() -> Self {
         Self {
@@ -228,19 +212,17 @@ fn window_behavior(app: &AppHandle) -> WindowBehavior {
         .unwrap_or_default()
 }
 
-/// ⚠️ Les deux exigent une barre système : sans elle, cacher la fenêtre
-/// laisserait un processus que plus rien ne peut rappeler.
+/// ⚠️ Both require a tray: without one, hiding the window would leave a process
+/// nothing can call back.
 pub(crate) fn hides_on_close(app: &AppHandle) -> bool {
     window_behavior(app).close_to_tray && tray_exists(app)
 }
 
-/// Tauri n'émet pas d'événement « réduite » : seul `Resized` passe, et c'est à
-/// l'appelant de demander ensuite à la fenêtre où elle en est.
+/// Tauri emits no "minimised" event: only `Resized` comes through, and it is up
+/// to the caller to ask the window where it stands.
 pub(crate) fn hides_on_minimize(app: &AppHandle) -> bool {
     window_behavior(app).minimize_to_tray && tray_exists(app)
 }
-
-// --- System tray: icon, menu, and item actions --------------------------------
 
 const TRAY_ID: &str = "devbox";
 
@@ -250,9 +232,8 @@ const CAPTURE_ITEM: &str = "capture";
 const PALETTE_ITEM: &str = "palette";
 const QUIT_ITEM: &str = "quit";
 
-/// Labels cross the bridge **already translated**: the interface language
-/// is a front-end preference, and keeping a translation table in Rust would
-/// mean maintaining a second one.
+/// Labels cross the bridge **already translated**: the interface language is a
+/// front-end preference, and a translation table in Rust would be a second one.
 #[derive(Debug, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TrayLabels {
@@ -263,18 +244,15 @@ pub struct TrayLabels {
     pub quit: String,
 }
 
-/// Creates the icon, or replaces only its menu if it already exists — a
-/// language change thus re-translates it without making it flicker.
+/// Replaces only the menu when the tray already exists, so a language change does
+/// not make it flicker.
 ///
-/// Does **not** return a `Result`: an absent system tray is not a failure
-/// the front end can handle, and inventing a code for it would add a branch
-/// that nothing would display. The failure is logged on the native side, and
-/// [`tray_exists`] then prevents closing from hiding the window where nothing
+/// No `Result`: an absent tray is not a failure the front end can handle, and
+/// [`tray_exists`] is what then keeps closing from hiding the window where nothing
 /// could call it back.
 #[tauri::command]
 #[specta::specta]
-// A command receives its arguments deserialized from the IPC payload:
-// they arrive owned, whether it consumes them or not.
+// Arguments arrive owned, deserialized from the IPC payload.
 #[allow(clippy::needless_pass_by_value)]
 pub fn sync_tray(labels: TrayLabels, app: AppHandle) {
     let menu = match build_menu(&app, &labels) {
@@ -324,17 +302,15 @@ fn build_tray(app: &AppHandle, menu: &Menu<Wry>) -> tauri::Result<()> {
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .tooltip("DevBox")
-        // Left click shows the window; the menu remains on right click, where
-        // Windows expects it.
+        // The menu stays on right click, where Windows expects it.
         .show_menu_on_left_click(false)
         .menu(menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             OPEN_ITEM => reveal(app),
-            NEW_NOTE_ITEM => reveal_and_emit(app, NEW_NOTE_EVENT),
-            CAPTURE_ITEM => reveal_and_emit(app, CAPTURE_EVENT),
-            PALETTE_ITEM => reveal_and_emit(app, PALETTE_EVENT),
-            // The only path that actually terminates the process: the window's
-            // close button only hides it.
+            NEW_NOTE_ITEM => reveal_and_emit(app, GlobalAction::NewNote),
+            CAPTURE_ITEM => reveal_and_emit(app, GlobalAction::Capture),
+            PALETTE_ITEM => reveal_and_emit(app, GlobalAction::Palette),
+            // The only path that terminates the process: the close button only hides.
             QUIT_ITEM => app.exit(0),
             _ => {}
         })

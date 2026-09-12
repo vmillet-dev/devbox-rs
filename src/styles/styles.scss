@@ -1,19 +1,11 @@
-// Styles globaux de DevBox — c'est le fichier "thème" de l'app : toutes les
-// couleurs et polices vivent ici en variables CSS, et les composants ne font
-// que les consommer via var(--xxx).
-
-// Coloration syntaxique. Globale et non scopée au visualiseur de code : voir
-// l'explication en tête du fichier.
+// Global and not scoped to the code viewer: see the top of that file.
 @use 'code-theme';
 
 /*
- * IMPORTANT : ces variables doivent vivre ICI (fichier global, non scopé),
- * et non dans un *.component.scss. Angular applique une "encapsulation" aux
- * styles de composant (ViewEncapsulation.Emulated) : un sélecteur `:root`
- * écrit dans un fichier *.component.scss est réécrit en `:root[_ngcontent-xxx]`,
- * qui ne correspond jamais à la vraie balise <html>. Les variables seraient
- * alors invalides -> `color: var(--text-0)` retomberait sur le noir par défaut
- * du navigateur, même si le fond (non hérité) reste sombre.
+ * ⚠️ These variables must live HERE, in a global unscoped file, and never in a
+ * *.component.scss: Angular's emulated encapsulation rewrites a `:root` selector into
+ * `:root[_ngcontent-xxx]`, which never matches the real <html>. Every variable would then
+ * be invalid — `color: var(--text-0)` falling back to black on a dark background.
  */
 :root {
   --bg-0: #15171c;
@@ -27,15 +19,14 @@
   --text-2: #6e7488;
   --amber: #e8a33d;
   --amber-dim: #8a662a;
-  --amber-ink: #1a1508; // texte sur fond ambré plein (ex. bouton "nouvelle note")
+  --amber-ink: #1a1508; // text on solid amber (the "new note" button, say)
   --green: #6fbf8b;
   --blue: #6f9bd1;
   --red: #d1706f;
   --purple: #a98fd1;
 
-  // Variantes "triplet RGB" des couleurs ci-dessus, utilisées avec rgba()/rgb()
-  // partout où une teinte translucide est nécessaire (badges, surbrillances...),
-  // pour ne jamais dupliquer un hex derrière une opacité codée en dur.
+  // "RGB triplet" variants of the colours above, so no hex is ever duplicated behind a
+  // hard-coded opacity.
   --text-1-rgb: 170, 176, 192;
   --amber-rgb: 232, 163, 61;
   --green-rgb: 111, 191, 139;
@@ -45,53 +36,42 @@
   --black-rgb: 0, 0, 0;
   --backdrop-rgb: 10, 11, 14;
 
-  // Couleurs "feu tricolore" de la titlebar (décoratif, hors palette sémantique).
+  // The titlebar’s traffic lights: decoration, outside the semantic palette.
   --dot-red: #e5645c;
   --dot-yellow: #e6b450;
   --dot-green: #5fbf6f;
 
-  // Numéros de ligne du visualiseur de code : volontairement plus sourds que
-  // --text-2 pour rester lisibles sans attirer l'oeil.
+  // Deliberately dimmer than --text-2: readable without drawing the eye.
   --line-no: #3f4454;
 
   --shadow-dropdown: 0 10px 30px rgba(var(--black-rgb), 0.35);
   --shadow-overlay: 0 30px 60px rgba(var(--black-rgb), 0.5);
 
-  // Les quatre écarts que la densité resserre : padding d'une carte, grille du
-  // canevas, distance entre deux sections, marge du canevas. Ailleurs les
-  // espacements restent en dur — les resserrer tous rendrait l'interface
-  // illisible sans gagner une ligne de plus à l'écran.
+  // The four gaps density tightens. Everything else stays fixed — tightening it all
+  // would make the interface unreadable without gaining a single line on screen.
   --space-card: 14px;
   --space-grid: 12px;
   --space-section: 28px;
   --space-canvas: 24px;
 
-  // Inter et JetBrains Mono sont embarquées via les paquets @fontsource, déclarés
-  // dans le tableau `styles` d'angular.json. Elles étaient auparavant tirées de
-  // Google Fonts : sur une application de bureau, cela signifiait une typographie
-  // dégradée hors ligne et une CSP impossible à verrouiller.
+  // Shipped with the binary through the @fontsource packages: Google Fonts meant degraded
+  // type offline and a CSP that could not be locked down.
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Dit explicitement au navigateur/WebView (donc à WebView2 sur Windows)
-     que cette appli est sombre par conception. Ça évite que le thème clair/
-     sombre de l'OS ne vienne modifier les couleurs natives des <input>,
-     <select>, la barre de défilement, l'autofill, etc. */
+  /* Tells the browser — WebView2 on Windows — that this application is dark by
+     design, so the OS theme does not repaint the native <input>s, <select>s,
+     scrollbars or autofill behind our backs. */
   color-scheme: dark;
 }
 
 /*
- * Thème clair. `SettingsStore` appose `data-theme` sur <html> ; le bloc
- * `:root` ci-dessus reste la base sombre, ce qui évite un éclair blanc au
- * lancement — la préférence vit dans un fichier, que rien ne peut lire avant
- * qu'Angular ait démarré.
+ * The light theme. `SettingsStore` stamps `data-theme` on <html>; the `:root` block above
+ * stays the dark base, which avoids a white flash at launch: the preference lives in a
+ * file, which nothing can read before Angular starts.
  *
- * Seules les couleurs sont redéfinies : polices, ombres et espacements sont les
- * mêmes dans les deux thèmes.
- *
- * ⚠️ L'ambre du thème sombre (#e8a33d) tombe à 2:1 sur du blanc. L'accent clair
- * est donc une teinte à part, et `--amber-ink` bascule avec elle : c'est le
- * texte posé sur un aplat ambré (le bouton « nouvelle note »).
+ * ⚠️ The dark theme's amber (#e8a33d) falls to 2:1 on white. The light accent is therefore
+ * a hue of its own, and `--amber-ink` flips with it.
  */
 :root[data-theme='light'] {
   --bg-0: #eceef2;
@@ -117,7 +97,7 @@
   --blue-rgb: 42, 93, 153;
   --red-rgb: 176, 58, 57;
   --purple-rgb: 106, 74, 166;
-  // Le voile d'une modale reste sombre : c'est ce qui met le panneau devant.
+  // A modal's scrim stays dark: that is what puts the panel in front.
   --backdrop-rgb: 64, 70, 86;
 
   --line-no: #b7bdca;
@@ -125,18 +105,15 @@
   --shadow-dropdown: 0 10px 26px rgba(var(--black-rgb), 0.14);
   --shadow-overlay: 0 24px 52px rgba(var(--black-rgb), 0.2);
 
-  // Comme `color-scheme: dark` plus haut, mais dans l'autre sens : c'est ce qui
-  // repeint les <select>, les barres de défilement et l'autocomplétion natives.
+  // Like `color-scheme: dark` above, the other way round: this is what repaints the
+  // native <select>s, scrollbars and autocomplete.
   color-scheme: light;
 }
 
 /*
- * Densité compacte : les **espacements** se resserrent, jamais la typographie —
- * réduire le texte serait un zoom arrière, pas une densité.
- *
- * Quatre variables et non un facteur global : ce sont les quatre écarts qui
- * décident du nombre de cartes visibles, et les régler un par un évite de
- * comprimer au passage des marges qui n'y gagneraient rien.
+ * Compact density tightens the **spacing**, never the type — shrinking the text would be a
+ * zoom out, not a density. Four variables rather than one global factor: these four gaps
+ * are what decide how many cards fit.
  */
 :root[data-density='compact'] {
   --space-card: 10px;
@@ -180,10 +157,8 @@ body {
   background: transparent;
 }
 
-// Contenu réservé aux technologies d'assistance : retiré du flux visuel sans
-// être retiré de l'arbre d'accessibilité (ce que feraient `display: none` ou
-// `visibility: hidden`). Sert à exposer une information que le design ne
-// transmet que graphiquement — l'état « épinglée » d'une carte, par exemple.
+// For assistive technology only: taken out of the visual flow without leaving the
+// accessibility tree, which `display: none` and `visibility: hidden` both do.
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -196,7 +171,7 @@ body {
   border: 0;
 }
 
-// L'app s'anime peu, mais ce qu'elle anime doit pouvoir être coupé.
+// The application animates little, but what it animates must be stoppable.
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

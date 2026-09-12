@@ -1,8 +1,7 @@
 @use 'mixins' as *;
 
-// Même couche que l'accusé de réussite, et pour une raison plus forte encore :
-// « impossible d'enregistrer la note » se produit précisément pendant que
-// l'éditeur est ouvert, donc derrière son fond flouté sans ce z-index.
+// The same rung as the success banner: "could not save the note" happens precisely while
+// the editor is open, and so behind its blurred backdrop without this z-index.
 :host {
   position: relative;
   z-index: 80;

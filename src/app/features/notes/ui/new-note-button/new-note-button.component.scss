@@ -5,8 +5,6 @@
   display: flex;
 }
 
-// Les deux moitiés forment une seule pastille ambrée : seuls les coins
-// extérieurs sont arrondis, et ce qui les sépare est une bordure, pas un écart.
 .new-note-btn,
 .new-note-caret {
   @include unstyled-control;
@@ -41,8 +39,7 @@
   outline-offset: 2px;
 }
 
-// Calé à droite, à l'inverse du sélecteur d'espaces : ce bouton est en fin de
-// barre, un panneau aligné à gauche déborderait de la fenêtre.
+// Right-aligned: at the end of the bar, a left-aligned panel would overflow the window.
 .new-note-menu {
   position: absolute;
   top: calc(100% + 6px);

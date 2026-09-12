@@ -13,9 +13,8 @@ describe('LocaleService', () => {
   }
 
   /**
-   * Persistence is asserted through `PreferencesService`, not through whatever
-   * it happens to sit on: the backing store moved from `localStorage` to
-   * `tauri-plugin-store` without this service changing a line.
+   * Persistence is asserted through `PreferencesService`, not through whatever it happens
+   * to sit on: the backing store moved without this service changing a line.
    */
   function preferences(): PreferencesService {
     return TestBed.inject(PreferencesService);

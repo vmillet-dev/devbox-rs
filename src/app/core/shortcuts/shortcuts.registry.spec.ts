@@ -22,7 +22,6 @@ describe('ShortcutsRegistry', () => {
   });
 
   it('lists nothing until a feature contributes', () => {
-    // Keys of a tool that is not loaded would do nothing when pressed.
     expect(registry.groups()).toEqual([]);
   });
 

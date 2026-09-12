@@ -7,7 +7,6 @@ describe('splitHighlightedLines', () => {
   });
 
   it('returns a single empty line for empty content', () => {
-    // Mirrors ''.split('\n'): an empty viewer still shows line 1.
     expect(splitHighlightedLines('')).toEqual(['']);
   });
 
@@ -22,7 +21,6 @@ describe('splitHighlightedLines', () => {
   });
 
   it('closes and reopens a span that straddles a newline', () => {
-    // The naive split would emit "<span>one" and "two</span>", both unbalanced.
     expect(splitHighlightedLines('<span class="hljs-comment">one\ntwo</span>')).toEqual([
       '<span class="hljs-comment">one</span>',
       '<span class="hljs-comment">two</span>',
@@ -39,7 +37,6 @@ describe('splitHighlightedLines', () => {
   });
 
   it('preserves compound scope classes', () => {
-    // highlight.js writes sub-scopes as a second class, e.g. title.function.
     const html = '<span class="hljs-title function_">run\nnext</span>';
 
     expect(splitHighlightedLines(html)).toEqual([
@@ -64,8 +61,6 @@ describe('highlightLines', () => {
   });
 
   it('maps a language tag onto the grammar that describes it', () => {
-    // toml is described by the ini grammar, html by xml: a wrong mapping would
-    // silently degrade to uncoloured output rather than fail.
     expect(highlightLines('key = "value"', 'toml').join('')).toContain('hljs-');
     expect(highlightLines('<p>hi</p>', 'html').join('')).toContain('hljs-');
   });

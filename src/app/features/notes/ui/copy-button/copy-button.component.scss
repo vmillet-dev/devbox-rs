@@ -27,7 +27,6 @@
   color: var(--amber);
 }
 
-// Variante barre d'outils : alignée sur `.toolbar-btn` de l'éditeur.
 .copy-btn.with-label {
   @include surface(var(--bg-2), 7px);
   padding: 5px 10px;

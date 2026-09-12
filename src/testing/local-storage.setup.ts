@@ -1,22 +1,11 @@
 /**
- * `localStorage` for the test environment.
+ * Node ≥ 22 ships a `localStorage` global of its own. It shadows the one jsdom installs
+ * and evaluates to `undefined` unless the process was started with `--localstorage-file`,
+ * which is enough to take down every spec that touches it; reading it also prints an
+ * `ExperimentalWarning` once per worker.
  *
- * Node ≥ 22 ships a `localStorage` global of its own. It shadows the one jsdom
- * installs and evaluates to `undefined` unless the process was started with
- * `--localstorage-file`, which is enough to take down every spec that touches
- * it: the legacy-preferences migration, and the three shells that clear it
- * between tests. Reading it also prints `ExperimentalWarning: localStorage is
- * not available` once per worker.
- *
- * The replacement is therefore installed **unconditionally**, without first
- * checking whether the global works — finding out means reading the accessor,
- * which is exactly what emits that warning. Nothing here depends on what jsdom's
- * implementation adds over this one (quota errors, `storage` events), so one
- * implementation on every Node version is also one less thing that can differ
- * between a laptop and CI.
- *
- * Setup files run once per spec file, so each gets its own empty storage; the
- * specs that care clear it in a `beforeEach` anyway.
+ * The replacement is therefore installed **unconditionally**: finding out whether the
+ * global works means reading the accessor, which is exactly what emits that warning.
  */
 
 function createStorage(): Storage {

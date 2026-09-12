@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { Placeholder } from '@features/notes/model/note.model';
 import {
   PlaceholderFieldsComponent,
@@ -9,29 +8,18 @@ import {
 } from '../placeholder-fields/placeholder-fields.component';
 
 /**
- * Saisie des `{{champs}}` d'un snippet avant copie, depuis une carte ou la
- * palette — là où il n'y a pas d'éditeur ouvert pour porter le panneau.
+ * Seeded with the values **already stored** on the note: there is one set per note, and
+ * what comes out is copied *and* kept. The values leave raw — `notes::placeholder::fill`
+ * decides what an empty field is worth and what is not a field at all.
  *
- * Amorcée par les valeurs **déjà enregistrées** sur la note : il n'y a qu'un jeu
- * de valeurs par note, et le formulaire les propose plutôt que de reposer la
- * question. Ce qui en sort est copié *et* gardé.
- *
- * Les valeurs partent brutes : c'est `notes::placeholder::fill`, côté Rust, qui
- * décide ce qu'un champ vide vaut (sa valeur par défaut) et ce qui n'est pas un
- * champ du tout. Refaire ce choix ici, c'est en avoir deux.
- *
- * « Copier tel quel » existe pour la note qui contient du template sans en être
- * un — le back est prudent, il n'est pas infaillible.
+ * "Copy as is" exists for the note that contains template code without being a snippet.
  */
 @Component({
   selector: 'app-placeholder-form',
-  imports: [DialogBackdropDirective, FocusTrapDirective, PlaceholderFieldsComponent, TranslocoPipe],
+  imports: [DialogComponent, PlaceholderFieldsComponent, TranslocoPipe],
   templateUrl: './placeholder-form.component.html',
   styleUrl: './placeholder-form.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'cancelled.emit()',
-  },
 })
 export class PlaceholderFormComponent {
   readonly placeholders = input.required<readonly Placeholder[]>();
@@ -41,9 +29,8 @@ export class PlaceholderFormComponent {
   readonly cancelled = output<void>();
 
   /**
-   * Saisie en cours. `null` tant que rien n'a été tapé : la note fournit alors
-   * ses propres valeurs, et les recopier ici les figerait le jour où le
-   * formulaire s'ouvre sur une note dont les valeurs ont changé entre-temps.
+   * `null` until something is typed: the note then supplies its own values, and copying
+   * them here would freeze them.
    */
   private readonly typed = signal<Record<string, string> | null>(null);
 

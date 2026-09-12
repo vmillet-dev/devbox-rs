@@ -17,7 +17,6 @@ describe('AppMenuRegistry', () => {
   });
 
   it('offers nothing until a feature contributes', () => {
-    // Une entrée pour un outil qui n'est pas chargé n'aurait rien à exécuter.
     expect(registry.entries()).toEqual([]);
   });
 
@@ -44,7 +43,6 @@ describe('AppMenuRegistry', () => {
   });
 
   it('keeps the disabled state live rather than frozen at registration', () => {
-    // « Exporter la sélection » suit ce qui est coché à l'instant.
     const nothingChecked = signal(true);
     registry.register([entry('exportSelection', 10, { disabled: nothingChecked })]);
 

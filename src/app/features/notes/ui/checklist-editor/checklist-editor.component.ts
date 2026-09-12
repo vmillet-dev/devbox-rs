@@ -13,30 +13,21 @@ import {
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ChecklistItem, checklistProgress } from '@features/notes/model/checklist.model';
 
-/** Ligne en cours de déplacement, et d'où elle est partie. */
 interface Drag {
   readonly from: number;
   readonly to: number;
 }
 
 /**
- * La liste de tâches en édition : ajouter, renommer, cocher, supprimer,
- * réordonner.
+ * ⚠️ **HTML5 drag and drop does not work here.** Tauri's `dragDropEnabled` is `true` —
+ * which is what delivers files dropped on the window to `FileDropService` — so the
+ * WebView never sees `dragstart` or `drop`. Reordering is written in pointer events
+ * instead; turning the flag off would break attachments. `Alt+↑/↓` does the same from
+ * the keyboard, which the linter requires anyway.
  *
- * ⚠️ **Le glisser-déposer HTML5 est inopérant ici.** `dragDropEnabled` de Tauri
- * vaut `true` — c'est ce qui fait remonter les fichiers déposés sur la fenêtre à
- * `FileDropService` — et la WebView ne voit alors jamais passer `dragstart` ni
- * `drop`. Le déplacement est donc écrit en événements de pointeur. Le désactiver
- * casserait les pièces jointes ; ce n'est pas une option.
- *
- * `Alt+↑/↓` fait la même chose au clavier, et ce n'est pas un supplément : le
- * lint refuse une interaction que la souris seule peut déclencher.
- *
- * Comme le titre et le corps dans l'éditeur, la liste est un **brouillon local**
- * calé sur l'identifiant de la note et non sur son objet : chaque sauvegarde en
- * produit un nouveau, qui emporterait la saisie en cours. La coche, l'ajout, la
- * suppression et le déplacement sont validés tout de suite — ce sont des gestes
- * discrets ; seule la frappe attend le `blur`.
+ * Like the title and the body, the list is a **local draft** keyed on the note id and
+ * not on its object. Ticking, adding, removing and moving commit at once — they are
+ * discrete gestures; only typing waits for the `blur`.
  */
 @Component({
   selector: 'app-checklist-editor',
@@ -47,7 +38,6 @@ interface Drag {
 })
 export class ChecklistEditorComponent {
   readonly items = input.required<readonly ChecklistItem[]>();
-  /** Ce sur quoi le brouillon se recale : l'identifiant, jamais l'objet note. */
   readonly noteId = input.required<string>();
 
   readonly itemsChanged = output<readonly ChecklistItem[]>();
@@ -61,10 +51,9 @@ export class ChecklistEditorComponent {
 
   protected readonly progress = computed(() => checklistProgress(this.draft()));
 
-  /** Index de la ligne en cours de déplacement, `null` au repos. */
   protected readonly dragging = signal<Drag | null>(null);
 
-  /** Ligne à focaliser au prochain rendu, posée par l'ajout et la suppression. */
+  /** The row to focus on the next render, set by add and remove. */
   private pendingFocus: number | null = null;
 
   protected toggle(index: number): void {
@@ -74,14 +63,13 @@ export class ChecklistEditorComponent {
     this.commit();
   }
 
-  /** Frappe : purement locale, c'est le `blur` qui décide d'écrire. */
   protected setText(index: number, text: string): void {
     this.draft.update((items) => items.map((item, at) => (at === index ? { ...item, text } : item)));
   }
 
   /**
-   * Insère après la ligne courante et lui donne le focus : taper une liste doit
-   * pouvoir se faire sans jamais quitter le clavier.
+   * Inserts after the current row and focuses it: typing a list must be possible
+   * without ever leaving the keyboard.
    */
   protected insertAfter(index: number): void {
     this.draft.update((items) => [
@@ -101,16 +89,14 @@ export class ChecklistEditorComponent {
 
   protected remove(index: number): void {
     this.draft.update((items) => items.filter((_, at) => at !== index));
-    // La ligne précédente, pas la suivante : c'est là que le curseur était.
+    // The previous row, not the next: that is where the cursor was.
     this.pendingFocus = Math.max(0, index - 1);
     this.commit();
   }
 
   /**
-   * Retour arrière sur une ligne vide : supprime au lieu de ne rien faire.
-   *
-   * `Event` et non `KeyboardEvent` : une liaison à modificateur de touche
-   * (`keydown.backspace`) est typée `Event` par le compilateur de gabarits.
+   * Backspace on an empty row removes it instead of doing nothing. `Event` and not
+   * `KeyboardEvent`: a modifier key binding is typed `Event` by the template compiler.
    */
   protected onBackspace(event: Event, index: number): void {
     const input = event.target as HTMLInputElement;
@@ -126,6 +112,8 @@ export class ChecklistEditorComponent {
 
     const reordered = [...items];
     const [moved] = reordered.splice(from, 1);
+    if (!moved) return;
+
     reordered.splice(to, 0, moved);
 
     this.draft.set(reordered);
@@ -134,13 +122,9 @@ export class ChecklistEditorComponent {
   }
 
   /**
-   * Début d'un déplacement à la souris. `setPointerCapture` est ce qui garde les
-   * événements sur la poignée même quand le curseur sort de la ligne — sans lui,
-   * un geste un peu rapide se perd dès qu'il dépasse la hauteur d'une ligne.
-   *
-   * L'appel est optionnel : la capture rend le geste confortable, elle ne le
-   * conditionne pas, et un environnement qui ne l'implémente pas (jsdom) ne doit
-   * pas faire échouer le déplacement.
+   * `setPointerCapture` keeps the events on the handle even when the cursor leaves the
+   * row — without it a slightly quick gesture is lost. The call is optional: capture
+   * makes the gesture comfortable, and jsdom, which lacks it, must not fail the drag.
    */
   protected onPointerDown(event: PointerEvent, index: number): void {
     if (event.button !== 0) return;
@@ -169,10 +153,7 @@ export class ChecklistEditorComponent {
     this.move(drag.from, drag.to);
   }
 
-  /**
-   * Position d'aperçu d'une ligne pendant un déplacement : elle suit la ligne
-   * saisie, les autres se décalent d'un cran.
-   */
+  /** During a drag: the grabbed row follows the cursor, the others shift by one. */
   protected displayIndex(index: number): number {
     const drag = this.dragging();
     if (!drag) return index;
@@ -185,16 +166,14 @@ export class ChecklistEditorComponent {
   }
 
   /**
-   * Confirme la frappe en cours. Appelée au `blur` d'un champ, et par l'éditeur
-   * avant de se fermer : Échap, le fond et le bouton de fermeture ne produisent
-   * aucun `blur`, la dernière ligne tapée serait sinon perdue.
+   * Called on a field's `blur`, and by the editor before it closes: Escape, the backdrop
+   * and the close button produce no `blur`, so the last line typed would be lost.
    */
   commit(): void {
     this.itemsChanged.emit(this.draft().map((item) => ({ ...item })));
     this.applyPendingFocus();
   }
 
-  /** Ligne survolée, déduite du milieu de chaque rangée. */
   private rowIndexAt(clientY: number): number | null {
     const rows = this.rows();
     for (const [index, row] of rows.entries()) {
@@ -210,8 +189,7 @@ export class ChecklistEditorComponent {
     this.pendingFocus = null;
     if (index === null) return;
 
-    // Après le rendu de la ligne créée ou déplacée, que le signal vient de
-    // déclencher mais qui n'est pas encore dans le DOM.
+    // After the created or moved row renders: the signal has just triggered it.
     queueMicrotask(() => this.rows()[index]?.nativeElement.focus());
   }
 }

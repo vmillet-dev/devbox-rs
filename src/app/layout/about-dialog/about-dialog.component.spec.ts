@@ -21,10 +21,9 @@ describe('AboutDialogComponent', () => {
     fixture.autoDetectChanges();
   });
 
-  it('is a modal dialog labelled by its own title', () => {
-    const panel = fixture.nativeElement.querySelector('.about-panel');
-    expect(panel.getAttribute('role')).toBe('dialog');
-    expect(panel.getAttribute('aria-modal')).toBe('true');
+  it('names itself to the dialog shell by its own title', () => {
+    const panel = fixture.nativeElement.querySelector('.dialog-panel');
+
     expect(panel.getAttribute('aria-labelledby')).toBe('about-dialog-title');
     expect(fixture.nativeElement.querySelector('#about-dialog-title')).not.toBeNull();
   });
@@ -51,19 +50,16 @@ describe('AboutDialogComponent', () => {
     fixture.debugElement.query(By.css('.about-repo')).triggerEventHandler('click');
 
     expect(appInfo.openedRepository).toBe(1);
-    // A real link would have moved the locked-down WebView off the app.
     expect(fixture.nativeElement.querySelector('.about-repo').tagName).toBe('BUTTON');
   });
 
-  it('emits on the close button, on Escape and on a backdrop click', async () => {
+  it('emits on the close button', async () => {
     const closed = vi.fn();
     fixture.componentInstance.closed.subscribe(closed);
 
     fixture.debugElement.query(By.css('.about-close')).triggerEventHandler('click');
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    fixture.nativeElement.querySelector('.about-backdrop').click();
     await fixture.whenStable();
 
-    expect(closed).toHaveBeenCalledTimes(3);
+    expect(closed).toHaveBeenCalledTimes(1);
   });
 });

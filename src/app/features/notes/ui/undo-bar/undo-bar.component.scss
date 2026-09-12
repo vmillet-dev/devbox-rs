@@ -1,7 +1,6 @@
 @use 'mixins' as *;
 
-// Au-dessus du canevas mais sous les modales : une suppression annulable ne
-// doit pas passer devant l'éditeur qu'on vient d'ouvrir.
+// Above the canvas but below the modals: it must not come in front of the editor.
 .undo-bar {
   position: fixed;
   left: 50%;

@@ -1,229 +1,220 @@
 @if (note(); as note) {
-  <div appDialogBackdrop class="overlay-backdrop" (dismissed)="requestClose()">
-    <div
-      appFocusTrap
-      class="overlay-panel"
-      [class.fullscreen]="fullscreen()"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="overlay-title-input"
-    >
-      <div class="overlay-toolbar">
-        <!-- Le titre est confirmé au blur et à la fermeture, pas à chaque
-             frappe : une note enregistrée par caractère, c'est un aller-retour
-             IPC par caractère. -->
-        <input
-          #titleInput
-          id="overlay-title-input"
-          class="overlay-title-input"
-          [attr.aria-label]="'editor.titleLabel' | transloco"
-          [placeholder]="'notes.untitled' | transloco"
-          [value]="draftTitle()"
-          (input)="draftTitle.set(titleInput.value)"
-          (blur)="commitTitle()"
-        />
-
-        <!-- Pas de format pour une todolist : elle n'a pas de corps à colorier,
-             et un sélecteur sans effet vaut moins que pas de sélecteur. -->
-        @if (!isChecklist()) {
-          <select
-            #languageSelect
-            class="overlay-language-select"
-            [attr.aria-label]="'editor.languageLabel' | transloco"
-            [value]="note.language"
-            (change)="onLanguageChange(languageSelect.value)"
-          >
-            @for (option of languageOptions; track option.value) {
-              <option [value]="option.value" [selected]="option.value === note.language">
-                {{ option.label }}
-              </option>
-            }
-          </select>
-        }
-
-        <button
-          type="button"
-          class="toolbar-btn"
-          [class.pinned]="note.pinned"
-          [attr.aria-pressed]="note.pinned"
-          (click)="pinToggled.emit()"
-        >
-          <span aria-hidden="true">📌</span>
-          {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
-        </button>
-        <!-- Une note à champs se copie remplie : c'est la seule forme dont on
-             fasse quelque chose. Le texte est composé au clic, par le back, et
-             « Copier tel quel » reste à portée dans le panneau. -->
-        @if (hasPlaceholders()) {
-          <button type="button" class="toolbar-btn" (click)="requestFilledCopy()">
-            <span aria-hidden="true">⚡</span>
-            {{ 'placeholders.copy' | transloco }}
-          </button>
-        } @else {
-          <app-copy-button [value]="copyText()" [showLabel]="true" />
-        }
-        <button
-          type="button"
-          class="toolbar-btn delete-btn"
-          [class.confirming]="confirmingDelete()"
-          (click)="onDeleteClick()"
-        >
-          <span aria-hidden="true">🗑</span>
-          {{ (confirmingDelete() ? 'editor.deleteConfirm' : 'editor.delete') | transloco }}
-        </button>
-        <button
-          type="button"
-          class="icon-btn"
-          [attr.aria-pressed]="fullscreen()"
-          [attr.aria-label]="(fullscreen() ? 'editor.exitFullscreen' : 'editor.fullscreen') | transloco"
-          (click)="toggleFullscreen()"
-        >
-          <span aria-hidden="true">{{ fullscreen() ? '⤡' : '⤢' }}</span>
-        </button>
-        <button
-          type="button"
-          class="icon-btn close-btn"
-          [attr.aria-label]="'editor.close' | transloco"
-          (click)="requestClose()"
-        >
-          <span aria-hidden="true">✕</span>
-        </button>
-      </div>
-
-      <div class="overlay-meta-row">
-        <!-- Fil d'Ariane libre ("API Gateway / Auth"). C'est lui que le pied
-             d'une carte épinglée affiche à la place de son âge. -->
-        <input
-          #sourceInput
-          class="overlay-source-input"
-          [attr.aria-label]="'editor.sourceLabel' | transloco"
-          [placeholder]="'editor.sourcePlaceholder' | transloco"
-          [value]="draftSource()"
-          (input)="draftSource.set(sourceInput.value)"
-          (blur)="commitSource()"
-        />
-        <span aria-hidden="true">·</span>
-        <div class="overlay-tags">
-          @for (tag of note.tags; track tag) {
-            <span class="editable-tag">
-              <app-tag-pill [label]="tag" [active]="true" [interactive]="false" />
-              <button
-                type="button"
-                class="tag-remove"
-                [attr.aria-label]="'editor.removeTag' | transloco: { tag: tag }"
-                (click)="tagRemoved.emit(tag)"
-              >
-                <span aria-hidden="true">✕</span>
-              </button>
-            </span>
-          }
-          <form class="tag-add-form" (submit)="submitTag($event)">
-            <input
-              #tagInput
-              type="text"
-              class="tag-add-input"
-              [attr.aria-label]="'editor.addTagLabel' | transloco"
-              [placeholder]="'editor.addTagPlaceholder' | transloco"
-              [value]="tagInputValue()"
-              (input)="tagInputValue.set(tagInput.value)"
-            />
-          </form>
-        </div>
-        <!-- Le badge dit l'état, le champ le change. Vider le champ rend la note
-             permanente ; y poser une date la fait entrer dans « À trier ». -->
-        <span class="overlay-expiry">
-          <app-lifecycle-badge [lifecycle]="note.lifecycle" [expiringSoon]="note.expiringSoon" />
-          <input
-            #expiryInput
-            type="date"
-            class="overlay-expiry-input"
-            [attr.aria-label]="'editor.expiryLabel' | transloco"
-            [value]="expiryInputValue()"
-            (change)="onExpiryChange(expiryInput.value)"
-          />
-        </span>
-      </div>
-
-      <app-attachment-strip
-        [attachments]="attachments()"
-        [isBusy]="attachmentsBusy()"
-        [previewId]="attachmentPreviewId()"
-        [previewData]="attachmentPreviewData()"
-        (addRequested)="attachmentAddRequested.emit()"
-        (removeRequested)="attachmentRemoveRequested.emit($event)"
-        (previewToggled)="attachmentPreviewToggled.emit($event)"
-        (openRequested)="attachmentOpenRequested.emit($event)"
-        (saveRequested)="attachmentSaveRequested.emit($event)"
-        (zoomRequested)="imageZoomRequested.emit()"
+  <app-dialog
+    [layer]="'editor'"
+    [variant]="'framed'"
+    [width]="880"
+    [height]="640"
+    [fullscreen]="fullscreen()"
+    labelledBy="overlay-title-input"
+    (closed)="onDismiss()"
+  >
+    <div class="overlay-toolbar">
+      <!-- The title commits on blur and on close: a note saved per character is one IPC
+           round trip per character. -->
+      <input
+        #titleInput
+        id="overlay-title-input"
+        class="overlay-title-input"
+        [attr.aria-label]="'editor.titleLabel' | transloco"
+        [placeholder]="'notes.untitled' | transloco"
+        [value]="draftTitle()"
+        (input)="draftTitle.set(titleInput.value)"
+        (blur)="commitTitle()"
       />
 
-      <!-- Rien pour une note sans jeton : un en-tête toujours là et toujours
-           vide serait une fonction qu'on n'utilise jamais. -->
-      @if (hasPlaceholders()) {
-        <app-placeholder-panel
-          [placeholders]="placeholders()"
-          [noteId]="note.id"
-          [open]="fieldsPanelOpen()"
-          [previewing]="previewingFilled()"
-          [rawContent]="draftContent()"
-          (toggled)="toggleFieldsPanel()"
-          (previewToggled)="togglePreview()"
-          (valuesChanged)="onPlaceholderValuesChanged()"
-          (valuesCommitted)="placeholderValuesChanged.emit($event)"
-        />
+      <!-- No format for a todo list: a picker with no effect is worth less than none. -->
+      @if (!isChecklist()) {
+        <select
+          #languageSelect
+          class="overlay-language-select"
+          [attr.aria-label]="'editor.languageLabel' | transloco"
+          [value]="note.language"
+          (change)="onLanguageChange(languageSelect.value)"
+        >
+          @for (option of languageOptions; track option.value) {
+            <option [value]="option.value" [selected]="option.value === note.language">
+              {{ option.label }}
+            </option>
+          }
+        </select>
       }
 
-      <!-- Deux couches superposées plutôt qu'une bascule aperçu/édition : le
-           visualiseur colorie le brouillon en dessous, le <textarea> reçoit la
-           frappe par-dessus avec un texte transparent et un curseur visible.
-           C'est lui qui porte le texte accessible ; le visualiseur est masqué
-           aux lecteurs d'écran, qui liraient sinon le contenu deux fois. -->
-      <div class="overlay-body" [class.previewing]="showingPreview()">
-        @if (showingPreview()) {
-          <!-- Le corps rempli, en lecture seule : le champ de saisie n'est pas
-               masqué mais absent, sinon la frappe irait dans un texte que
-               personne ne conserve. -->
-          <app-code-viewer [content]="filledContent() ?? ''" [language]="note.language" />
-        } @else if (isChecklist()) {
-          <app-checklist-editor
-            [items]="note.items"
-            [noteId]="note.id"
-            (itemsChanged)="checklistChanged.emit($event)"
-          />
-        } @else {
-          <div class="editor-stack">
-            <app-code-viewer aria-hidden="true" [content]="draftContent()" [language]="note.language" />
-            <textarea
-              #bodyEditor
-              class="overlay-body-editor"
-              spellcheck="false"
-              [attr.aria-label]="'editor.contentLabel' | transloco"
-              [placeholder]="'editor.emptyBody' | transloco"
-              [value]="draftContent()"
-              (input)="onBodyInput($event, bodyEditor.value)"
-              (paste)="onPaste($event)"
-              (blur)="commitContent()"
-            ></textarea>
-          </div>
-        }
-      </div>
-
-      <div class="overlay-footer">
-        <span>
-          @if (isChecklist()) {
-            {{
-              'editor.checklistStats'
-                | transloco: { done: checklistStats().done, total: checklistStats().total }
-            }}
-          } @else {
-            {{ languageLabel() }} ·
-            {{ 'editor.footerStats' | transloco: { lines: lineCount(), bytes: byteSize() } }}
-          }
-        </span>
-        @if (modifiedRef(); as ref) {
-          <span>{{ 'editor.modifiedPrefix' | transloco }} {{ ref.key | transloco: ref.params }}</span>
-        }
-      </div>
+      <button
+        type="button"
+        class="toolbar-btn"
+        [class.pinned]="note.pinned"
+        [attr.aria-pressed]="note.pinned"
+        (click)="togglePin()"
+      >
+        <span aria-hidden="true">📌</span>
+        {{ (note.pinned ? 'editor.pinned' : 'editor.pin') | transloco }}
+      </button>
+      <!-- A note with fields copies filled; "Copy as is" stays within reach in the panel. -->
+      @if (hasPlaceholders()) {
+        <button type="button" class="toolbar-btn" (click)="requestFilledCopy()">
+          <span aria-hidden="true">⚡</span>
+          {{ 'placeholders.copy' | transloco }}
+        </button>
+      } @else {
+        <app-copy-button [value]="copyText()" [showLabel]="true" />
+      }
+      <button
+        type="button"
+        class="toolbar-btn delete-btn"
+        [class.confirming]="confirmingDelete()"
+        (click)="onDeleteClick()"
+      >
+        <span aria-hidden="true">🗑</span>
+        {{ (confirmingDelete() ? 'editor.deleteConfirm' : 'editor.delete') | transloco }}
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        [attr.aria-pressed]="fullscreen()"
+        [attr.aria-label]="(fullscreen() ? 'editor.exitFullscreen' : 'editor.fullscreen') | transloco"
+        (click)="toggleFullscreen()"
+      >
+        <span aria-hidden="true">{{ fullscreen() ? '⤡' : '⤢' }}</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn close-btn"
+        [attr.aria-label]="'editor.close' | transloco"
+        (click)="requestClose()"
+      >
+        <span aria-hidden="true">✕</span>
+      </button>
     </div>
-  </div>
+
+    <div class="overlay-meta-row">
+      <!-- A free-form breadcrumb, which a pinned card's footer shows instead of its age. -->
+      <input
+        #sourceInput
+        class="overlay-source-input"
+        [attr.aria-label]="'editor.sourceLabel' | transloco"
+        [placeholder]="'editor.sourcePlaceholder' | transloco"
+        [value]="draftSource()"
+        (input)="draftSource.set(sourceInput.value)"
+        (blur)="commitSource()"
+      />
+      <span aria-hidden="true">·</span>
+      <div class="overlay-tags">
+        @for (tag of note.tags; track tag) {
+          <span class="editable-tag">
+            <app-tag-pill [label]="tag" [active]="true" [interactive]="false" />
+            <button
+              type="button"
+              class="tag-remove"
+              [attr.aria-label]="'editor.removeTag' | transloco: { tag: tag }"
+              (click)="removeTag(tag)"
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+          </span>
+        }
+        <form class="tag-add-form" (submit)="submitTag($event)">
+          <input
+            #tagInput
+            type="text"
+            class="tag-add-input"
+            [attr.aria-label]="'editor.addTagLabel' | transloco"
+            [placeholder]="'editor.addTagPlaceholder' | transloco"
+            [value]="tagInputValue()"
+            (input)="tagInputValue.set(tagInput.value)"
+          />
+        </form>
+      </div>
+      <!-- Clearing the field makes the note permanent; a date puts it in "untriaged". -->
+      <span class="overlay-expiry">
+        <app-lifecycle-badge [lifecycle]="note.lifecycle" [expiringSoon]="note.expiringSoon" />
+        <input
+          #expiryInput
+          type="date"
+          class="overlay-expiry-input"
+          [attr.aria-label]="'editor.expiryLabel' | transloco"
+          [value]="expiryInputValue()"
+          (change)="onExpiryChange(expiryInput.value)"
+        />
+      </span>
+    </div>
+
+    <app-attachment-strip
+      [attachments]="attachments()"
+      [isBusy]="attachmentsBusy()"
+      [previewId]="attachmentPreviewId()"
+      [previewData]="attachmentPreviewData()"
+      (addRequested)="attachmentAddRequested.emit()"
+      (removeRequested)="attachmentRemoveRequested.emit($event)"
+      (previewToggled)="attachmentPreviewToggled.emit($event)"
+      (openRequested)="attachmentOpenRequested.emit($event)"
+      (saveRequested)="attachmentSaveRequested.emit($event)"
+      (zoomRequested)="imageZoomRequested.emit()"
+    />
+
+    <!-- Nothing for a note with no token: a header always present and always empty
+         would be a feature nobody uses. -->
+    @if (hasPlaceholders()) {
+      <app-placeholder-panel
+        [placeholders]="placeholders()"
+        [noteId]="note.id"
+        [open]="fieldsPanelOpen()"
+        [previewing]="previewingFilled()"
+        [rawContent]="draftContent()"
+        (toggled)="toggleFieldsPanel()"
+        (previewToggled)="togglePreview()"
+        (valuesChanged)="onPlaceholderValuesChanged()"
+        (valuesCommitted)="placeholderValuesChanged.emit($event)"
+      />
+    }
+
+    <!-- Two stacked layers rather than a preview/edit toggle: the viewer colours the
+         draft underneath, the <textarea> takes the typing on top with transparent text.
+         The textarea carries the accessible text; the viewer is hidden from screen
+         readers, which would otherwise read the content twice. -->
+    <div class="overlay-body" [class.previewing]="showingPreview()">
+      @if (showingPreview()) {
+        <!-- The filled body, read-only: the input is absent rather than hidden, or
+             typing would go into text nobody keeps. -->
+        <app-code-viewer [content]="filledContent() ?? ''" [language]="note.language" />
+      } @else if (isChecklist()) {
+        <app-checklist-editor
+          [items]="note.items"
+          [noteId]="note.id"
+          (itemsChanged)="requestPatch({ items: $event })"
+        />
+      } @else {
+        <div class="editor-stack">
+          <app-code-viewer aria-hidden="true" [content]="draftContent()" [language]="note.language" />
+          <textarea
+            #bodyEditor
+            class="overlay-body-editor"
+            spellcheck="false"
+            [attr.aria-label]="'editor.contentLabel' | transloco"
+            [placeholder]="'editor.emptyBody' | transloco"
+            [value]="draftContent()"
+            (input)="onBodyInput($event, bodyEditor.value)"
+            (paste)="onPaste($event)"
+            (blur)="commitContent()"
+          ></textarea>
+        </div>
+      }
+    </div>
+
+    <div class="overlay-footer">
+      <span>
+        @if (isChecklist()) {
+          {{
+            'editor.checklistStats'
+              | transloco: { done: checklistStats().done, total: checklistStats().total }
+          }}
+        } @else {
+          {{ languageLabel() }} ·
+          {{ 'editor.footerStats' | transloco: { lines: lineCount(), bytes: byteSize() } }}
+        }
+      </span>
+      @if (modifiedRef(); as ref) {
+        <span>{{ 'editor.modifiedPrefix' | transloco }} {{ ref.key | transloco: ref.params }}</span>
+      }
+    </div>
+  </app-dialog>
 }

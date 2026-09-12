@@ -38,8 +38,6 @@ describe('UpdateStore', () => {
   });
 
   it('reports a failed check to the console but not to the user', async () => {
-    // Offline or a dev build with a placeholder public key: this fails on every
-    // launch, and a banner would be a daily reproach for nothing actionable.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     updater.checkError = new Error('network unreachable');
 
@@ -162,7 +160,6 @@ describe('UpdateStore', () => {
 
     await store.checkNow();
 
-    // The user clicked and is owed an answer; the banner also outlives the menu.
     expect(notifier.notice()?.ref.key).toBe('errors.updateCheckFailed');
     expect(store.checkState()).toBe('failed');
     warn.mockRestore();

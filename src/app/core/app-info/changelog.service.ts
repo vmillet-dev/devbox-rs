@@ -13,24 +13,19 @@ export type { ChangelogRelease, ChangelogSection };
 export const RELEASES_URL = `${REPOSITORY_URL}/releases`;
 
 /**
- * The changelog shipped with the binary.
+ * A seam, like `UpdaterService` and `AppInfoService`: the dialog stays testable in jsdom,
+ * which has neither a Tauri bridge nor the `opener` plugin.
  *
- * A seam, like `UpdaterService` and `AppInfoService`: the dialog stays testable
- * in jsdom, which has neither a Tauri bridge nor the `opener` plugin.
- *
- * The reading is **not** a `resource` held here. Nothing needs the changelog
- * until someone opens "Nouveautés", and a root service would have fetched it on
- * every launch instead.
+ * Not a `resource` held here: nothing needs the changelog until someone opens the panel.
  */
 @Injectable({ providedIn: 'root' })
 export class ChangelogService {
   /**
-   * Newest release first, as `CHANGELOG.md` lists them. Rejects when there is
-   * no bridge to ask — the dialog says so rather than showing an empty sheet.
+   * Newest release first. Rejects when there is no bridge to ask — the dialog says so
+   * rather than showing an empty sheet.
    */
   async load(): Promise<readonly ChangelogRelease[]> {
-    // A command without a `Result` on the Rust side: reading an embedded string
-    // cannot fail, so there is no error branch to unwrap.
+    // A command without a `Result` on the Rust side: reading an embedded string cannot fail.
     return commands.appChangelog();
   }
 

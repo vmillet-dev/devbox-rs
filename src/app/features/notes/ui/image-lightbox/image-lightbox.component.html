@@ -1,27 +1,24 @@
-<div appDialogBackdrop class="lightbox-backdrop" (dismissed)="closed.emit()">
-  <div
-    appFocusTrap
-    class="lightbox-panel"
-    role="dialog"
-    aria-modal="true"
-    [attr.aria-label]="'attachments.preview' | transloco: { name: fileName() }"
-  >
-    <div class="lightbox-header">
-      <span class="lightbox-name">{{ fileName() }}</span>
-      <button
-        type="button"
-        class="lightbox-close"
-        [attr.aria-label]="'attachments.closeZoom' | transloco"
-        (click)="closed.emit()"
-      >
-        <span aria-hidden="true">✕</span>
-      </button>
-    </div>
-
-    <img
-      class="lightbox-image"
-      [src]="source()"
-      [alt]="'attachments.preview' | transloco: { name: fileName() }"
-    />
+<app-dialog
+  [layer]="'zoom'"
+  [variant]="'bare'"
+  [label]="'attachments.preview' | transloco: { name: fileName() }"
+  (closed)="closed.emit()"
+>
+  <div class="lightbox-header">
+    <span class="lightbox-name">{{ fileName() }}</span>
+    <button
+      type="button"
+      class="lightbox-close"
+      [attr.aria-label]="'attachments.closeZoom' | transloco"
+      (click)="closed.emit()"
+    >
+      <span aria-hidden="true">✕</span>
+    </button>
   </div>
-</div>
+
+  <img
+    class="lightbox-image"
+    [src]="source()"
+    [alt]="'attachments.preview' | transloco: { name: fileName() }"
+  />
+</app-dialog>

@@ -35,8 +35,6 @@ describe('IpcError', () => {
 
   describe('structured causes', () => {
     it('exposes the code and params of an AppError so callers can branch on the cause', () => {
-      // Discriminating on the code is what lets the UI show a translated
-      // message instead of the French string Rust produced.
       const error = new IpcError('create_space', {
         code: 'duplicateSpaceName',
         params: { name: 'Perso' },
@@ -58,8 +56,6 @@ describe('IpcError', () => {
     });
 
     it('reports no code when Tauri itself rejects with a string', () => {
-      // An unknown command or an argument that fails to deserialise never
-      // reaches our AppError, so the code has to stay optional.
       const error = new IpcError('query_notes', 'command not found');
 
       expect(error.code).toBeNull();
@@ -82,8 +78,6 @@ describe('unwrap', () => {
   });
 
   it('throws an IpcError carrying the backend code, so callers keep using try/catch', () => {
-    // The generated bindings return a discriminated result; turning it back into
-    // an exception is what keeps ErrorNotifier the single place that branches.
     const failing = () =>
       unwrap('create_space', {
         status: 'error',

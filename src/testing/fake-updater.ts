@@ -1,9 +1,8 @@
 import { AvailableUpdate, DownloadProgress } from '@core/updates/updater.service';
 
 /**
- * Stand-in for `UpdaterService`, which would otherwise reach for the Tauri
- * bridge — absent under jsdom. Substituted by class token, so its shape only has
- * to cover what `UpdateStore` calls.
+ * Substituted by class token: the real one reaches for the Tauri bridge, absent under
+ * jsdom, and its shape only has to cover what `UpdateStore` calls.
  */
 export class FakeUpdater {
   /** What the next `check()` resolves to. */

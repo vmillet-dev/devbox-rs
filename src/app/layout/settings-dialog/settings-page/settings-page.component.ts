@@ -4,7 +4,7 @@ import { DENSITIES, Density, THEME_CHOICES, ThemeChoice } from '@core/settings/a
 import { SettingsStore } from '@core/settings/settings.store';
 import { DEFAULT_SHORTCUTS, acceleratorFromEvent } from '@core/shortcuts/shortcut.model';
 
-/** Le `value` d'un contrôle natif, sans `$any` dans le template. */
+/** A native control's `value`, without an `$any` in the template. */
 function selectedValue(event: Event): string {
   return (event.target as HTMLSelectElement).value;
 }
@@ -14,12 +14,8 @@ function checkedValue(event: Event): boolean {
 }
 
 /**
- * Les réglages de l'application : apparence, comportement de la fenêtre,
- * collage rapide, accusés de réception.
- *
- * Chaque contrôle écrit directement dans [`SettingsStore`] — il n'y a pas de
- * brouillon à valider, et ce sont les services de `core/` qui portent ensuite
- * chaque changement jusqu'au natif.
+ * Every control writes straight into [`SettingsStore`] — there is no draft to confirm, and
+ * the `core/` services carry each change down to the native side.
  */
 @Component({
   selector: 'app-settings-page',
@@ -64,12 +60,11 @@ export class SettingsPageComponent {
   }
 
   /**
-   * Le champ n'accepte pas de texte : il **écoute une frappe**. Taper
-   * `Ctrl+Alt+P` à la main laisserait passer des combinaisons que le natif ne
-   * sait pas relire, et il n'y aurait rien pour le dire.
+   * The field accepts no text: it **listens for a keystroke**. Typing `Ctrl+Alt+P` by hand
+   * would let through combinations the native side cannot read back.
    *
-   * Une frappe sans modificateur n'est pas une combinaison et repart au
-   * dialogue : c'est ce qui laisse Tab et Échap fonctionner dans le champ.
+   * A keystroke with no modifier is not a combination and goes back to the dialog: that is
+   * what leaves Tab and Escape working inside the field.
    */
   protected onShortcutKeydown(event: KeyboardEvent): void {
     const accelerator = acceleratorFromEvent(event);

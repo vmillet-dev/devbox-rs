@@ -65,8 +65,6 @@ describe('LibraryStore', () => {
     });
 
     it('says so plainly when everything was already there', async () => {
-      // Le geste que fait tout le monde : exporter puis réimporter aussitôt.
-      // Sans message, l'application a l'air de n'avoir rien fait.
       harness.dialog.openPath = 'C:/in.json';
       harness.repository.importReport = { spacesCreated: 0, notesImported: 0, notesSkipped: 4 };
 
@@ -114,7 +112,6 @@ describe('LibraryStore', () => {
     });
 
     it('says how many notes went out, and where', async () => {
-      // Un export réussi dont on ne sait pas où il a atterri ne sert à rien.
       harness.dialog.savePath = 'C:/backups/devbox.json';
 
       await harness.store.export(null, NOW);
@@ -160,7 +157,6 @@ describe('LibraryStore', () => {
     });
 
     it('puts the markdown in the clipboard and goes no further', async () => {
-      // « Partager » s'arrête au presse-papier : rien n'est envoyé nulle part.
       await harness.store.copyAsMarkdown(['note-1', 'note-2']);
 
       expect(harness.repository.sharedIds).toEqual(['note-1', 'note-2']);

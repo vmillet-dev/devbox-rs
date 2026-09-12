@@ -32,7 +32,7 @@ describe('UpdatePromptComponent', () => {
   });
 
   it('renders nothing while no update is available', () => {
-    expect(fixture.debugElement.query(By.css('.update-panel'))).toBeNull();
+    expect(fixture.debugElement.query(By.css('.dialog-panel'))).toBeNull();
   });
 
   it('announces the available version and the one in use', async () => {
@@ -43,12 +43,11 @@ describe('UpdatePromptComponent', () => {
     expect(summary).toContain('0.1.0');
   });
 
-  it('is a modal dialog labelled by its own title', async () => {
+  it('names itself to the dialog shell by its own title', async () => {
     await offerUpdate();
 
-    const panel = fixture.nativeElement.querySelector('.update-panel');
-    expect(panel.getAttribute('role')).toBe('dialog');
-    expect(panel.getAttribute('aria-modal')).toBe('true');
+    const panel = fixture.nativeElement.querySelector('.dialog-panel');
+
     expect(panel.getAttribute('aria-labelledby')).toBe('update-prompt-title');
     expect(fixture.nativeElement.querySelector('#update-prompt-title')).not.toBeNull();
   });
@@ -57,7 +56,6 @@ describe('UpdatePromptComponent', () => {
     await offerUpdate();
     expect(fixture.debugElement.query(By.css('.update-notes'))).toBeNull();
 
-    // Back to idle first: a check is ignored while an offer is already standing.
     await store.dismiss();
     await offerUpdate('Corrige le rail de tags');
     expect(fixture.nativeElement.querySelector('.update-notes-body').textContent).toContain(
@@ -79,7 +77,6 @@ describe('UpdatePromptComponent', () => {
     await fixture.whenStable();
 
     expect(updater.installCalls).toBe(1);
-    // Nothing left to cancel: the installer is already replacing files.
     expect(fixture.debugElement.query(By.css('.update-actions'))).toBeNull();
     expect(fixture.nativeElement.querySelector('.update-status')).not.toBeNull();
 
@@ -118,7 +115,7 @@ describe('UpdatePromptComponent', () => {
     fixture.debugElement.query(By.css('.update-btn:not(.primary)')).triggerEventHandler('click');
     await fixture.whenStable();
 
-    expect(fixture.debugElement.query(By.css('.update-panel'))).toBeNull();
+    expect(fixture.debugElement.query(By.css('.dialog-panel'))).toBeNull();
     expect(updater.discarded).toBe(true);
   });
 
@@ -128,7 +125,7 @@ describe('UpdatePromptComponent', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await fixture.whenStable();
 
-    expect(fixture.debugElement.query(By.css('.update-panel'))).toBeNull();
+    expect(fixture.debugElement.query(By.css('.dialog-panel'))).toBeNull();
   });
 
   it('ignores Escape once the install is under way', async () => {
@@ -140,7 +137,7 @@ describe('UpdatePromptComponent', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await fixture.whenStable();
 
-    expect(fixture.debugElement.query(By.css('.update-panel'))).not.toBeNull();
+    expect(fixture.debugElement.query(By.css('.dialog-panel'))).not.toBeNull();
 
     updater.finishInstall();
   });

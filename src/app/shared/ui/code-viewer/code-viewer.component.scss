@@ -3,8 +3,6 @@
   font-family: var(--font-mono), serif;
 }
 
-// Variante plein écran (aperçu de l'éditeur). Le mode compact n'hérite d'aucune
-// de ces propriétés : dans une carte, c'est la typographie de la carte qui prime.
 :host(:not(.compact)) {
   overflow-y: auto;
   padding: 20px 24px;
@@ -30,5 +28,5 @@
   word-break: break-word;
 }
 
-// Les couleurs des jetons (`.hljs-*`) vivent dans `src/styles/_code-theme.scss` :
-// injectées par [innerHTML], elles échappent à l'encapsulation du composant.
+// ⚠️ The token colours (`.hljs-*`) live in `src/styles/_code-theme.scss`: injected through
+// [innerHTML], they escape the component's encapsulation.

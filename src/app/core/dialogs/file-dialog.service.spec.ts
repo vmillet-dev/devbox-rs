@@ -23,8 +23,6 @@ describe('FileDialogService', () => {
   });
 
   it('reduces the plugin union to a single path', async () => {
-    // Le plugin type son retour en union même avec `multiple: false` : les
-    // appelants ne doivent pas avoir à traiter un tableau.
     adapter.openPath = ['C:/first.png', 'C:/second.png'];
 
     expect(await service.pickAttachment()).toBe('C:/first.png');
@@ -37,8 +35,6 @@ describe('FileDialogService', () => {
   });
 
   it('treats an unavailable plugin as a cancelled dialog', async () => {
-    // Hors Tauri le plugin lève : une exception obligerait chaque appelant à
-    // distinguer deux non-choix.
     adapter.throwOnOpen = new Error('no bridge');
 
     expect(await service.pickBundle()).toBeNull();
@@ -71,8 +67,6 @@ describe('FileDialogService', () => {
     expect(await service.chooseBundleDestination('x.json')).toBeNull();
   });
   it('leaves an attachment destination unfiltered', async () => {
-    // Imposer un filtre renommerait le fichier que l'utilisateur veut
-    // récupérer tel quel.
     adapter.savePath = 'C:/out/capture.png';
 
     const chosen = await service.chooseDestination('capture.png');

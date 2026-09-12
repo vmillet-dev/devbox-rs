@@ -1,13 +1,5 @@
 @use 'mixins' as *;
 
-.guide-backdrop {
-  @include backdrop(55);
-}
-
-.guide-panel {
-  @include help-panel(620px);
-}
-
 .guide-header {
   @include help-header;
 }
@@ -25,8 +17,6 @@
   gap: 16px;
 }
 
-// The number sits in its own column so the paragraphs share one left edge,
-// whatever the width of the step badge.
 .guide-chapter {
   display: grid;
   grid-template-columns: 24px 1fr;

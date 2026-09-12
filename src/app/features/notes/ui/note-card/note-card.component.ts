@@ -21,16 +21,15 @@ import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge
 import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
 
-/** Le libellé du pied de carte est soit du texte brut (nom de source), soit une référence de traduction (temps). */
+/** The footer label is either plain text (a source name) or a translation reference (a time). */
 type FooterLabel = { kind: 'text'; value: string } | { kind: 'ref'; ref: TranslationRef };
 
-/** Déplacement demandé depuis le menu d'une carte. */
 export interface NoteMove {
   readonly noteId: string;
   readonly spaceId: string;
 }
 
-/** Ouverture demandée, et comment : le modificateur décide de la sélection. */
+/** An opening request, and how: the modifier decides the selection. */
 export interface NoteActivation {
   readonly noteId: string;
   readonly toggleChecked: boolean;
@@ -39,13 +38,9 @@ export interface NoteActivation {
 
 const SNIPPET_LINES = 3;
 const MAX_VISIBLE_TAGS = 2;
-/**
- * Ce qui tient entre la barre de progression et le pied, sur une carte haute de
- * 150 px : deux lignes et le compteur du reste.
- */
+/** What fits between the progress bar and the footer on a 150 px card. */
 const MAX_VISIBLE_ITEMS = 2;
 
-/** Une case cochée sur une carte : la note, et la liste telle qu'elle devient. */
 export interface ItemToggle {
   readonly noteId: string;
   readonly items: readonly ChecklistItem[];
@@ -68,28 +63,25 @@ export class NoteCardComponent {
   private readonly clock = inject(ClockService);
 
   readonly note = input.required<Note>();
-  /** La note ouverte dans l'éditeur. */
   readonly selected = input(false);
-  /** La note que la navigation clavier désigne — distincte de la sélection. */
+  /** The note keyboard navigation points at — distinct from the selection. */
   readonly focused = input(false);
   readonly checked = input(false);
-  /** Destinations proposées par le menu ; l'espace de la note en est retiré. */
+  /** Destinations the menu offers; the note's own space is removed from them. */
   readonly spaces = input<readonly Space[]>([]);
 
   readonly opened = output<NoteActivation>();
   readonly checkToggled = output<string>();
   readonly moveRequested = output<NoteMove>();
   readonly deleteRequested = output<string>();
-  /** La note porte des `{{champs}}` : la page ouvre le formulaire de saisie. */
   readonly fillRequested = output<string>();
-  /** Case cochée depuis le canevas, sans passer par l'éditeur. */
   readonly itemToggled = output<ItemToggle>();
 
   private readonly cardButton = viewChild.required<ElementRef<HTMLButtonElement>>('cardButton');
 
   constructor() {
-    // Le focus réel suit l'état, sans quoi la navigation aux flèches
-    // déplacerait un contour sans emmener le clavier avec lui.
+    // Real focus follows the state, or arrow navigation would move an outline without
+    // taking the keyboard with it.
     effect(() => {
       if (this.focused() && document.activeElement !== this.cardButton().nativeElement) {
         this.cardButton().nativeElement.focus({ preventScroll: false });
@@ -110,15 +102,14 @@ export class NoteCardComponent {
     Math.max(0, this.note().items.length - MAX_VISIBLE_ITEMS),
   );
 
-  /** Vide pour un snippet, la liste rendue en Markdown pour une todolist. */
+  /** The body for a snippet, the list rendered as Markdown for a todo list. */
   protected readonly copyText = computed(() => noteCopyText(this.note()));
 
   protected readonly hasPlaceholders = computed(() => this.note().placeholders.length > 0);
 
   /**
-   * Le back a déjà tranché **quoi** afficher ; il ne reste qu'à le rendre. Les
-   * deux variantes datées sont formatées ici pour que le libellé vieillisse à
-   * l'écran, sans nouvelle requête.
+   * The back end has already decided **what** to show. The two dated variants are
+   * formatted here so the label ages on screen without a new query.
    */
   protected readonly footerLabel = computed<FooterLabel>(() => {
     const footer = this.note().footer;
@@ -132,8 +123,8 @@ export class NoteCardComponent {
   });
 
   /**
-   * Ctrl coche, Maj étend la plage, un clic nu ouvre — la convention d'une liste
-   * de fichiers, qui est ce que le canevas est devenu avec la sélection.
+   * Ctrl ticks, Shift extends the range, a bare click opens — the convention of a file
+   * list, which is what the canvas became once it gained a selection.
    */
   protected onOpen(event: MouseEvent): void {
     this.opened.emit({
@@ -143,18 +134,15 @@ export class NoteCardComponent {
     });
   }
 
-  /** La case à cocher est un contrôle à part : elle ne doit pas ouvrir la note. */
+  /** The checkbox is a control of its own: it must not open the note. */
   protected onCheck(event: MouseEvent): void {
     event.stopPropagation();
     this.checkToggled.emit(this.note().id);
   }
 
   /**
-   * Cocher depuis la carte, sans ouvrir la note — c'est le geste réel d'une
-   * liste de tâches, on barre au fil de l'eau.
-   *
-   * La carte émet la liste **entière** telle qu'elle devient : elle ne persiste
-   * rien elle-même, comme tout le reste ici.
+   * Ticking from the card without opening the note. The card emits the **whole** list as
+   * it becomes: it persists nothing itself.
    */
   protected onItemToggle(event: MouseEvent, index: number): void {
     event.stopPropagation();
@@ -171,7 +159,7 @@ export class NoteCardComponent {
     this.fillRequested.emit(this.note().id);
   }
 
-  /** Le menu ne connaît pas la note : c'est la carte qui rattache l'identifiant. */
+  /** The menu does not know the note: the card attaches the id. */
   protected onMove(spaceId: string): void {
     this.moveRequested.emit({ noteId: this.note().id, spaceId });
   }

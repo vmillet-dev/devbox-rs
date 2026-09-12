@@ -1,15 +1,5 @@
 @use 'mixins' as *;
 
-// Same rung as the About card (55): both open from the same menu, and only one
-// of them is ever on screen.
-.sheet-backdrop {
-  @include backdrop(55);
-}
-
-.sheet-panel {
-  @include help-panel(560px);
-}
-
 .sheet-header {
   @include help-header;
 }
@@ -35,8 +25,6 @@
   color: var(--amber);
 }
 
-// Two columns: what it does on the left, what to press on the right, so the
-// caps line up into a column that can be scanned on its own.
 .shortcut-list {
   margin: 0;
   display: grid;

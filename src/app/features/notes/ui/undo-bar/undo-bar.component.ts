@@ -2,11 +2,8 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
- * Bandeau d'annulation d'une suppression.
- *
- * `role="status"` et non `alert` : une suppression demandée par l'utilisateur
- * n'est pas une alerte, et un lecteur d'écran ne doit pas couper la parole pour
- * l'annoncer.
+ * `role="status"` and not `alert`: a deletion the user asked for is not an alert, and a
+ * screen reader must not interrupt to announce it.
  */
 @Component({
   selector: 'app-undo-bar',

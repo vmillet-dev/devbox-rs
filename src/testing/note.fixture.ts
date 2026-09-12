@@ -1,8 +1,9 @@
+import { ChecklistItem } from '@features/notes/model/checklist.model';
 import { Note } from '@features/notes/model/note.model';
 
 /** Builds a fully-populated `Note` for tests, with sensible defaults overridable per test. */
 export function createNote(overrides: Partial<Note> = {}): Note {
-  return {
+  const note: Note = {
     id: 'note-1',
     spaceId: 'space-1',
     title: 'Test note',
@@ -16,13 +17,25 @@ export function createNote(overrides: Partial<Note> = {}): Note {
     lifecycle: { kind: 'permanent' },
     kind: 'snippet',
     items: [],
-    // Derived by the backend (`notes::model::decorate`). The defaults mirror
-    // what it returns for an ordinary note; a spec about footers, `{{fields}}`
-    // or attachments overrides them.
+    // Derived by the back end; a spec about footers, `{{fields}}` or attachments
+    // overrides them.
     footer: { kind: 'age', at: new Date('2026-01-01T10:00:00Z') },
     expiringSoon: false,
     placeholders: [],
     attachmentCount: 0,
+    copyText: null,
     ...overrides,
   };
+
+  return 'copyText' in overrides
+    ? note
+    : { ...note, copyText: note.kind === 'checklist' ? checklistMarkdown(note.items) : null };
+}
+
+/**
+ * The one back-end rule the doubles reproduce, exported so the fake repository does not
+ * write a second copy of it.
+ */
+export function checklistMarkdown(items: readonly ChecklistItem[]): string {
+  return items.map((item) => `- [${item.done ? 'x' : ' '}] ${item.text}`).join('\n');
 }

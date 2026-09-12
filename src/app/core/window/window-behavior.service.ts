@@ -3,16 +3,13 @@ import { commands } from '@core/ipc/bindings';
 import { SettingsStore } from '@core/settings/settings.store';
 
 /**
- * Ce que la croix et le bouton « réduire » de la fenêtre doivent faire.
+ * Pushed to the native side like the tray labels: the preference lives in
+ * `preferences.json` on the front side, and reading it back from Rust would be a second
+ * source to keep in step. The native side still carries a default — the window can be
+ * closed before the front has started.
  *
- * Poussé vers le natif comme les libellés de la barre système : la préférence
- * vit dans `preferences.json`, côté front, et la relire depuis Rust ferait une
- * seconde source à tenir en phase. Le natif porte quand même un défaut — la
- * fenêtre peut être fermée avant que le front ait démarré.
- *
- * ⚠️ Les deux réglages ne valent que s'il y a une barre système : sans elle, le
- * natif refuse de cacher la fenêtre, faute de quoi il resterait un processus que
- * plus rien ne peut rappeler.
+ * ⚠️ Both settings only hold when there is a tray: without one the native side refuses to
+ * hide the window, which would leave a process nothing can call back.
  */
 @Injectable({ providedIn: 'root' })
 export class WindowBehaviorService {
@@ -33,10 +30,10 @@ export class WindowBehaviorService {
 
   private async push(behavior: { closeToTray: boolean; minimizeToTray: boolean }): Promise<void> {
     try {
-      // Commande sans `Result` côté Rust : elle lève si le pont est absent.
+      // A command with no `Result` on the Rust side: it throws if the bridge is absent.
       await commands.setWindowBehavior(behavior);
     } catch {
-      // Hors Tauri (jsdom) : la fenêtre du navigateur ne se range nulle part.
+      // Outside Tauri (jsdom): a browser window files itself nowhere.
     }
   }
 }

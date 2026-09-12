@@ -1,15 +1,12 @@
 import { DestroyRef, Injectable, Signal, inject, signal } from '@angular/core';
 
-/** Assez court pour que « à l'instant » devienne « il y a 1 min » à temps. */
+/** Short enough for "just now" to become "1 min ago" in time. */
 export const CLOCK_TICK_MS = 30_000;
 
 /**
- * Horloge applicative sous forme de signal.
- *
- * ⚠️ Un `new Date()` lu dans un `computed()` le **fige** : il ne dépend alors
- * d'aucun signal représentant le temps et ne se réévalue jamais — une carte
- * afficherait « il y a 4 min » indéfiniment. Injecter `now()` rend ces
- * `computed()` purs et auto-rafraîchissants.
+ * ⚠️ A `new Date()` read inside a `computed()` **freezes** it: it then depends on no
+ * signal representing time and never re-evaluates — a card would show "4 min ago" forever.
+ * Injecting `now()` makes those computeds pure and self-refreshing.
  */
 @Injectable({ providedIn: 'root' })
 export class ClockService {

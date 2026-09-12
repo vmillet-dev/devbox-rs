@@ -84,8 +84,6 @@ describe('CodeViewerComponent', () => {
   });
 
   it('keeps a multi-line comment coloured across every one of its lines', async () => {
-    // The previous line-by-line tokenizer could not represent this: it saw each
-    // line in isolation and lost the comment after the first one.
     fixture.componentRef.setInput('content', '/* one\n   two\n   three */\nconst after = 1;');
     fixture.componentRef.setInput('language', 'js');
     await fixture.whenStable();
@@ -96,12 +94,10 @@ describe('CodeViewerComponent', () => {
       '   two',
       '   three */',
     ]);
-    // And the code after the comment is back to being code.
     expect(scopeOf('const')).toBe('hljs-keyword');
   });
 
   it('does not fail on content its grammar cannot parse', async () => {
-    // A note is free text; a truncated fragment must still render.
     fixture.componentRef.setInput('content', '{"unclosed": ');
     fixture.componentRef.setInput('language', 'json');
     await fixture.whenStable();

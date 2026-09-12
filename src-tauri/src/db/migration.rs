@@ -1,8 +1,5 @@
-//! Applying the embedded migrations, and adopting legacy databases.
-//!
 //! ⚠️ **Append-only.** Evolving the model means adding a
-//! `migrations/YYYY-MM-DD-HHMMSS_name/` directory, never editing a shipped
-//! migration.
+//! `migrations/YYYY-MM-DD-HHMMSS_name/` directory, never editing a shipped one.
 
 use diesel::migration::MigrationSource;
 use diesel::prelude::*;
@@ -14,8 +11,8 @@ use crate::error::StorageError;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
-/// The highest value the old `PRAGMA user_version` ever shipped. It never moves
-/// again: a migration added today never existed under the old scheme.
+/// The highest value the old `PRAGMA user_version` ever shipped; it never moves
+/// again, a migration added today having never existed under the old scheme.
 const LEGACY_MIGRATION_COUNT: usize = 3;
 
 #[derive(QueryableByName)]
@@ -35,12 +32,9 @@ fn embedded_versions() -> Result<Vec<String>, StorageError> {
     Ok(versions)
 }
 
-/// Makes Diesel adopt the history the old `PRAGMA user_version` used to write.
-///
-/// Without it, an already installed database would replay the initial migration
-/// over existing tables. The first `n` are therefore marked as applied without
-/// being executed, and the pragma is zeroed — two sources of truth on the schema
-/// state would end up drifting apart.
+/// Without it an already installed database would replay the initial migration over
+/// existing tables. The first `n` are marked as applied without being executed, and
+/// the pragma is zeroed — two sources of truth on the schema state would drift apart.
 fn adopt_legacy_history(
     connection: &mut SqliteConnection,
     embedded: &[String],
@@ -49,7 +43,6 @@ fn adopt_legacy_history(
         .get_result::<UserVersion>(connection)?
         .user_version;
 
-    // Zero: a fresh database, or one that came through here on an earlier open.
     if legacy <= 0 {
         return Ok(());
     }
@@ -112,9 +105,8 @@ mod tests {
     use crate::db::{DB_FILE_NAME, configure, open, open_in_memory, schema};
     use crate::error::StorageError;
 
-    /// The SQL of the initial migration exactly as it shipped. Replayed by hand,
-    /// it builds a "legacy" database: schema in place, `user_version` set, no
-    /// trace on the Diesel side.
+    /// The initial migration exactly as it shipped: replayed by hand it builds a
+    /// "legacy" database — schema in place, `user_version` set, nothing Diesel-side.
     const LEGACY_SCHEMA: &str = include_str!("../../migrations/2026-07-25-000001_initial/up.sql");
     const LEGACY_FOLD_TAG_CASE: &str =
         include_str!("../../migrations/2026-07-25-000002_fold_tag_case/up.sql");
@@ -139,7 +131,6 @@ mod tests {
             .user_version
     }
 
-    /// A database on the original schema, versioned the way the old code did it.
     fn legacy_database(sql: &[&str], version: i32) -> SqliteConnection {
         let mut connection = SqliteConnection::establish(":memory:").unwrap();
         configure(&mut connection).unwrap();
@@ -160,8 +151,6 @@ mod tests {
         let path = directory.join(DB_FILE_NAME);
 
         open(&path).unwrap();
-        // A second open must find every migration already applied and not
-        // attempt to re-create the tables.
         let mut connection = open(&path).unwrap();
 
         assert!(!connection.has_pending_migration(MIGRATIONS).unwrap());
@@ -193,19 +182,15 @@ mod tests {
             1,
         );
 
-        // Passing at all is half the assertion: replaying the initial migration
-        // on these tables would fail on `CREATE TABLE spaces`.
         run(&mut connection).unwrap();
 
         assert!(!connection.has_pending_migration(MIGRATIONS).unwrap());
 
-        // Both rows survive: the collation folds the facet, it does not drop data.
         assert_eq!(
             count(&mut connection, "SELECT COUNT(*) AS count FROM note_tags"),
             2
         );
 
-        // But the rail now sees one tag where it used to see two.
         assert_eq!(
             count(
                 &mut connection,
@@ -241,7 +226,6 @@ mod tests {
             1
         );
 
-        // The migration is an index, not a rewrite: the note is untouched.
         assert_eq!(
             schema::notes::table
                 .select(schema::notes::language)
@@ -253,9 +237,8 @@ mod tests {
 
     #[test]
     fn an_existing_note_becomes_a_snippet_when_todo_lists_arrive() {
-        // Le vrai chemin de mise à jour : une base déjà peuplée, pas une base
-        // neuve. `ADD COLUMN kind` n'a de valeur pour ces lignes que par son
-        // `DEFAULT`, et sans lui SQLite refuserait la colonne `NOT NULL`.
+        // `ADD COLUMN kind` only gives existing rows a value through its `DEFAULT`,
+        // without which SQLite would refuse a `NOT NULL` column.
         let mut connection = legacy_database(
             &[
                 LEGACY_SCHEMA,
@@ -278,7 +261,6 @@ mod tests {
                 .unwrap(),
             "snippet"
         );
-        // Le contenu n'est pas réécrit : la migration ajoute, elle ne touche à rien.
         assert_eq!(
             schema::notes::table
                 .select(schema::notes::content)
@@ -298,8 +280,6 @@ mod tests {
 
         run(&mut connection).unwrap();
 
-        // Two sources of truth on the schema state would drift apart; the
-        // migrations table is now the only one.
         assert_eq!(user_version(&mut connection), 0);
     }
 
@@ -314,8 +294,6 @@ mod tests {
 
         let error = run(&mut connection).unwrap_err();
 
-        // Reading a newer schema with older code would silently write rows the
-        // newer version cannot make sense of.
         assert!(matches!(error, StorageError::SchemaTooRecent(_)));
     }
 }

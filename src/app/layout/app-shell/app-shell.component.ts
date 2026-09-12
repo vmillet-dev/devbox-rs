@@ -6,10 +6,8 @@ import { UpdatePromptComponent } from '@layout/update-prompt/update-prompt.compo
 import { TitlebarComponent } from '../titlebar/titlebar.component';
 
 /**
- * Cadre persistant de l'application : barre de titre, bandeau d'erreur global,
- * pop-in de mise à jour, et zone de contenu pilotée par le routeur. Les features
- * (notes, et plus tard crypto / formatters) se branchent par l'outlet, pas par
- * un import direct.
+ * The application's persistent frame: the features plug in through the outlet, not through
+ * a direct import.
  */
 @Component({
   selector: 'app-shell',

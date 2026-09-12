@@ -3,11 +3,8 @@ import { FALLBACK_LANGUAGE, LanguageTag } from '@core/language/language.model';
 import { highlightLines } from './highlighter';
 
 /**
- * Aperçu en lecture seule, colorié selon le langage par highlight.js
- * (cf. `highlighter.ts`).
- *
- * Vit dans `shared/ui` parce qu'il ne sait rien des notes : la future feature
- * « formatters » (`format_json`) l'utilisera telle quelle.
+ * A read-only preview, coloured by language through highlight.js. In `shared/ui` because
+ * it knows nothing of the notes.
  */
 @Component({
   selector: 'app-code-viewer',
@@ -20,13 +17,10 @@ export class CodeViewerComponent {
   readonly content = input.required<string>();
   readonly language = input<LanguageTag>(FALLBACK_LANGUAGE);
 
-  /** Numéroter un extrait de trois lignes dans une carte n'apprend rien. */
+  /** Numbering a three-line excerpt on a card teaches nothing. */
   readonly showLineNumbers = input(true);
 
-  /**
-   * Variante intégrée : ni marge, ni défilement, ni taille de police propre —
-   * le visualiseur adopte la typographie de son hôte (l'extrait d'une carte).
-   */
+  /** The embedded variant: no margin, no scrolling, no font size of its own. */
   readonly compact = input(false);
 
   protected readonly lines = computed<readonly string[]>(() =>

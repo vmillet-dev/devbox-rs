@@ -24,7 +24,6 @@ describe('ClockService', () => {
   it('advances on each tick, so relative-time labels age on their own', () => {
     const clock = TestBed.inject(ClockService);
 
-    // `advanceTimersByTime` moves the faked clock along with the timers.
     vi.advanceTimersByTime(CLOCK_TICK_MS);
 
     expect(clock.now()).toEqual(new Date('2026-01-01T12:00:30Z'));

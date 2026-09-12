@@ -1,15 +1,4 @@
-//! "Notes taking" commands.
-//!
-//! Three guarantees the front-end depends on: [`create_note`] and [`update_note`]
-//! return the note **as persisted** (which the editor then adopts);
-//! an unknown identifier returns an `Err`, never a silent `Ok`; and in a
-//! `NotePatch`, an absent field means "do not touch".
-//!
-//! Nothing left to validate here: the language is an enum, so an unknown value
-//! no longer passes deserialization — and no longer compiles on the front-end side.
-
-// A command receives its arguments deserialized from the IPC payload:
-// they arrive owned, whether it consumes them or not.
+// Commands receive their arguments owned, deserialized from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod checklist;
@@ -20,8 +9,8 @@ pub mod store;
 pub mod trash;
 pub mod view;
 
-/// Reference note shared by the feature tests: a field added to
-/// [`model::Note`] is declared here rather than in every module that builds one.
+/// Reference note for the feature tests: a field added to [`model::Note`] is
+/// declared here rather than in every module that builds one.
 #[cfg(test)]
 pub(crate) mod fixtures {
     use std::collections::BTreeMap;
@@ -66,14 +55,14 @@ use diesel::SqliteConnection;
 use tauri::{AppHandle, State};
 
 use crate::attachments;
+use crate::count::saturating_u32 as count;
 use crate::db::{Db, lock};
 use crate::error::{AppError, StorageError};
 use model::{DisplayNote, NoteDraft, NotePatch, TagUsage};
 use trash::TrashedNote;
 use view::{NotesQuery, NotesView};
 
-/// Filtered **and** grouped notes, ready to display. No command returns
-/// the raw list: it would invite re-filtering on the front-end side.
+/// No command returns the raw list: it would invite re-filtering on the front end.
 #[tauri::command]
 #[specta::specta]
 pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, AppError> {
@@ -112,8 +101,8 @@ pub fn update_note(
     Ok(display(&mut connection, note)?)
 }
 
-/// **Met à la corbeille** : la note revient par [`restore_notes`] pendant
-/// [`trash::RETENTION`]. Rien ne supprime définitivement sans passer par là.
+/// **Moves to the trash**: the note comes back through [`restore_notes`] for
+/// [`trash::RETENTION`].
 #[tauri::command]
 #[specta::specta]
 pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
@@ -122,8 +111,6 @@ pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
     Ok(store::delete(&mut connection, &id, Utc::now())?)
 }
 
-/// Renvoie le nombre de notes réellement mises à la corbeille : c'est ce que
-/// l'annulation propose de reprendre.
 #[tauri::command]
 #[specta::specta]
 pub fn delete_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -144,8 +131,8 @@ pub fn restore_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppErro
     Ok(count(store::restore_many(&mut connection, &ids)?))
 }
 
-/// Purge d'abord ce que la rétention a rattrapé : la corbeille ne doit jamais
-/// montrer une note qu'un redémarrage effacerait.
+/// Purges what retention has caught up with **first**: the trash must never
+/// show a note a restart would erase.
 #[tauri::command]
 #[specta::specta]
 pub fn list_trash(app: AppHandle, db: State<'_, Db>) -> Result<Vec<TrashedNote>, AppError> {
@@ -189,9 +176,8 @@ pub fn move_notes(ids: Vec<String>, space_id: String, db: State<'_, Db>) -> Resu
     )?))
 }
 
-/// Ajoute des tags à toute une sélection. Normalisés ici comme partout ailleurs,
-/// sinon un `#urgent` saisi dans la barre d'actions ne rejoindrait pas le
-/// `urgent` déjà en base.
+/// Normalised here as everywhere else, or an `#urgent` typed in the action bar
+/// would not join the `urgent` already stored.
 #[tauri::command]
 #[specta::specta]
 pub fn tag_notes(ids: Vec<String>, tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -216,13 +202,12 @@ pub fn list_tags(db: State<'_, Db>) -> Result<Vec<TagUsage>, AppError> {
         .into_iter()
         .map(|(tag, notes)| TagUsage {
             tag,
-            note_count: u32::try_from(notes).unwrap_or(u32::MAX),
+            note_count: count(notes),
         })
         .collect())
 }
 
-/// Un renommage vers un tag déjà existant **est** une fusion : la base ne peut
-/// pas porter deux fois le même tag sur une note.
+/// Renaming onto an existing tag **is** a merge: a note cannot carry one twice.
 #[tauri::command]
 #[specta::specta]
 pub fn rename_tag(tag: String, into: String, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -243,21 +228,18 @@ pub fn merge_tags(tags: Vec<String>, into: String, db: State<'_, Db>) -> Result<
     Ok(count(store::retag(&mut connection, &tags, &target)?))
 }
 
-/// Retire l'étiquette du corpus ; les notes, elles, restent.
+/// A list rather than one tag at a time: the panel deletes a whole selection, and
+/// one round trip per tag was one lock and one transaction per tag.
 #[tauri::command]
 #[specta::specta]
-pub fn delete_tag(tag: String, db: State<'_, Db>) -> Result<u32, AppError> {
+pub fn delete_tags(tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
 
-    Ok(count(store::drop_tag(&mut connection, &tag)?))
+    Ok(count(store::drop_tags(&mut connection, &tags)?))
 }
 
-/// Enregistre les valeurs des `{{champs}}` d'une note : rouvrir la note les
-/// retrouve, et la carte comme la palette copient avec.
-///
-/// Commande à part plutôt qu'un champ de `NotePatch` : remplir un champ ne
-/// modifie pas la note — `updated_at` reste où il est, faute de quoi le canevas
-/// remonterait la note en tête à chaque valeur tapée.
+/// ⚠️ A command of its own rather than a `NotePatch` field: filling a field is not
+/// editing the note, so `updated_at` stays put — the canvas sorts on it.
 #[tauri::command]
 #[specta::specta]
 pub fn set_placeholder_values(
@@ -273,13 +255,8 @@ pub fn set_placeholder_values(
     Ok(display(&mut connection, note)?)
 }
 
-/// Remplit les `{{champs}}` d'un contenu.
-///
-/// Aucun identifiant de note : la palette remplit aussi bien un brouillon non
-/// enregistré que la note qu'elle vient d'ouvrir. La base n'est lue que pour les
-/// **variables globales**, qui ne dépendent d'aucune note — sans elles, un champ
-/// laissé vide retomberait sur la valeur par défaut du texte alors que
-/// l'utilisateur en a réglé une pour sa machine.
+/// No note identifier: the palette fills an unsaved draft as readily as the note
+/// it just opened. The database is read only for the **global variables**.
 #[tauri::command]
 #[specta::specta]
 pub fn fill_placeholders(
@@ -296,7 +273,6 @@ pub fn fill_placeholders(
     ))
 }
 
-/// Les variables globales, telles que le panneau de préférences les affiche.
 #[tauri::command]
 #[specta::specta]
 pub fn list_global_placeholders(db: State<'_, Db>) -> Result<BTreeMap<String, String>, AppError> {
@@ -305,11 +281,8 @@ pub fn list_global_placeholders(db: State<'_, Db>) -> Result<BTreeMap<String, St
     Ok(store::global_placeholder_values(&mut connection)?)
 }
 
-/// Enregistre le jeu complet de variables : ce qui n'est pas envoyé est ce que
-/// l'utilisateur a retiré.
-///
-/// Aucune note n'est touchée — pas même leur `updated_at` : régler une variable
-/// n'est pas modifier une note, et le canevas trie sur cette colonne.
+/// Stores the **whole** set: what is not sent is what the user removed. No note is
+/// touched, not even its `updated_at`.
 #[tauri::command]
 #[specta::specta]
 pub fn set_global_placeholders(
@@ -324,14 +297,8 @@ pub fn set_global_placeholders(
     Ok(retained)
 }
 
-/// `usize` ne traverse pas le pont (Specta refuse ce que JSON ne rend pas sans
-/// perte) ; ces compteurs plafonnent bien avant `u32`.
-fn count(value: usize) -> u32 {
-    u32::try_from(value).unwrap_or(u32::MAX)
-}
-
-/// Supprime pour de bon, **fichiers joints compris**. Les noms sont relevés
-/// avant le `DELETE` : après, la cascade a effacé les fiches qui les portaient.
+/// ⚠️ The file names are collected before the `DELETE`: afterwards the cascade has
+/// taken the records that carried them.
 fn purge(app: &AppHandle, db: &Db, ids: Vec<String>) -> Result<usize, AppError> {
     if ids.is_empty() {
         return Ok(0);
@@ -360,22 +327,17 @@ fn purge_expired(app: &AppHandle, db: &Db) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Nettoyage au démarrage : la rétention s'applique même si personne n'ouvre la
-/// corbeille. Un échec est journalisé, jamais fatal — l'application doit
-/// démarrer.
+/// Retention applies even if nobody opens the trash. A failure is logged, never
+/// fatal — the application has to start.
 pub fn sweep_trash_at_startup(app: &AppHandle, db: &Db) {
     if let Err(error) = purge_expired(app, db) {
         log::warn!("Expired trash not purged: {}", error.detail);
     }
 }
 
-/// `decorate` ne lit pas la base : le compteur de pièces jointes est posé après
-/// coup, par ce qui tient la connexion.
-/// Décore une note avec ce que seule la base sait : le nombre de pièces
-/// jointes, et les variables globales posées en valeur proposée sur ses champs.
-///
-/// Les deux sont des requêtes à part, d'où leur absence de [`model::decorate`],
-/// qui ne lit rien.
+/// What only the database knows: the attachment count, and the global variables
+/// laid on the fields as proposed values. Both are queries of their own, which is
+/// why neither lives in [`model::decorate`].
 fn display(
     connection: &mut SqliteConnection,
     note: model::Note,

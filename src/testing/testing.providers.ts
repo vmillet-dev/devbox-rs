@@ -37,9 +37,8 @@ interface DataDoubles {
 }
 
 /**
- * Providers for any spec whose component transitively needs a store or the
- * `transloco` pipe. Bundled here so a new data seam doesn't have to be added to
- * a dozen spec files one by one.
+ * Providers for any spec whose component transitively needs a store or the `transloco`
+ * pipe: bundled here so a new data seam is not added to a dozen spec files one by one.
  */
 export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
   return [
@@ -59,9 +58,8 @@ export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
       provide: TransferRepository,
       useValue: doubles.transferRepository ?? new FakeTransferRepository(),
     },
-    // The shell hosts the update prompt and the about menu, so every spec
-    // reaching it transitively pulls these two — and with them the Tauri bridge,
-    // absent under jsdom.
+    // The shell hosts the update prompt and the about menu, so every spec reaching it
+    // pulls the Tauri bridge, absent under jsdom.
     { provide: UpdaterService, useValue: doubles.updater ?? new FakeUpdater() },
     { provide: AppInfoService, useValue: doubles.appInfo ?? new FakeAppInfo() },
     { provide: CLIPBOARD_ADAPTER, useValue: doubles.clipboard ?? new FakeClipboard() },

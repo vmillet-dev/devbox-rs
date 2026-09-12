@@ -20,7 +20,7 @@ describe('PlaceholderPanelComponent', () => {
     return fixture.nativeElement.querySelector('.panel-toggle');
   }
 
-  /** Ce que la bande repliée dit de son contenu, espaces normalisés. */
+  /** What the folded bar says about its content, whitespace normalised. */
   function summary(): string {
     return fixture.nativeElement.querySelector('.panel-summary').textContent.replace(/\s+/g, ' ').trim();
   }
@@ -37,7 +37,7 @@ describe('PlaceholderPanelComponent', () => {
     await fixture.whenStable();
   }
 
-  /** Ce que la sortie d'un champ produit : `focusout` remonte, `blur` non. */
+  /** What leaving a field produces: `focusout` bubbles, `blur` does not. */
   async function leaveField(): Promise<void> {
     fixture.nativeElement
       .querySelector('.panel-body')
@@ -45,11 +45,8 @@ describe('PlaceholderPanelComponent', () => {
     await fixture.whenStable();
   }
 
-  /**
-   * Le brouillon est amorcé à la construction, sur l'identifiant de la note :
-   * un panneau ouvert sur d'autres valeurs est un panneau qu'on remonte, pas un
-   * panneau auquel on repasse une entrée.
-   */
+  /** The draft is seeded at construction, on the note id: a panel opened on other values
+   * is a panel rebuilt. */
   async function open(placeholders: readonly Placeholder[] = FIELDS): Promise<void> {
     fixture = TestBed.createComponent(PlaceholderPanelComponent);
     fixture.componentRef.setInput('placeholders', placeholders);
@@ -95,8 +92,6 @@ describe('PlaceholderPanelComponent', () => {
   });
 
   it('says what the click does while it is collapsed', async () => {
-    // Sans verbe, la bande se lit comme un titre de section : c'est ce qu'elle
-    // était, et personne ne pensait à cliquer dessus.
     fixture.componentRef.setInput('open', false);
     await fixture.whenStable();
 
@@ -111,8 +106,6 @@ describe('PlaceholderPanelComponent', () => {
     fixture.componentRef.setInput('open', false);
     await fixture.whenStable();
 
-    // Un résumé se lit comme quelque chose à ouvrir, et répond sans clic à
-    // « avec quoi je vais copier ? ».
     expect(summary()).toBe('host = db.internal');
   });
 
@@ -126,8 +119,6 @@ describe('PlaceholderPanelComponent', () => {
     fixture.componentRef.setInput('open', false);
     await fixture.whenStable();
 
-    // Au-delà de deux, la bande déborderait au lieu de renseigner. Les
-    // séparateurs sont dessinés en CSS, d'où la lecture ligne par ligne.
     expect(
       [...fixture.nativeElement.querySelectorAll('.panel-pair')].map((pair) =>
         (pair as HTMLElement).textContent?.replace(/\s+/g, ' ').trim(),
@@ -138,7 +129,6 @@ describe('PlaceholderPanelComponent', () => {
   it('summarises nothing while the panel is open', async () => {
     await open([{ name: 'host', defaultValue: '', value: 'db.internal' }]);
 
-    // Les champs eux-mêmes sont à l'écran : le résumé ferait doublon.
     expect(fixture.nativeElement.querySelector('.panel-summary')).toBeNull();
     expect(fixture.nativeElement.querySelector('.panel-verb')).toBeNull();
   });
@@ -158,8 +148,6 @@ describe('PlaceholderPanelComponent', () => {
     toggle().click();
     await fixture.whenStable();
 
-    // La préférence appartient à l'éditeur : elle survit au passage d'une note
-    // à l'autre, ce qu'un état interne au panneau ne ferait pas.
     expect(emitted).toBe(1);
   });
 
@@ -172,7 +160,6 @@ describe('PlaceholderPanelComponent', () => {
     await type(0, 'db');
     await type(0, 'db.internal');
 
-    // L'aperçu suit la frappe ; la base, elle, attend la sortie du champ.
     expect(emitted).toEqual([
       { host: 'db', port: '' },
       { host: 'db.internal', port: '' },
@@ -196,7 +183,6 @@ describe('PlaceholderPanelComponent', () => {
 
     await leaveField();
 
-    // Passer d'un champ à l'autre ne doit pas réécrire ce qui est déjà en base.
     expect(emitted).toBe(0);
   });
 
@@ -259,8 +245,6 @@ describe('PlaceholderPanelComponent', () => {
     fixture.componentRef.setInput('noteId', 'note-2');
     await fixture.whenStable();
 
-    // Le brouillon est amorcé sur l'id, jamais sur la note : chaque
-    // enregistrement en produit un nouvel objet, qui écraserait la saisie.
     expect(inputs()[0].value).toBe('');
   });
 });

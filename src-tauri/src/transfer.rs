@@ -1,16 +1,4 @@
-//! Import, export et partage : faire sortir les notes de la machine, et les y
-//! faire rentrer.
-//!
-//! Le fichier est écrit et lu **ici**, pas côté front : la sérialisation est
-//! celle du domaine, et la faire traverser le pont pour être réassemblée en
-//! TypeScript ajouterait un second format à tenir.
-//!
-//! Les commandes ne font que choisir *quoi* transférer et toucher le disque ;
-//! l'assemblage ([`collect`]) et la fusion ([`merge`]) sont des fonctions sur une
-//! connexion, donc testables contre une base en mémoire sans lancer Tauri.
-
-// Une commande reçoit ses arguments désérialisés depuis la charge utile IPC :
-// ils arrivent possédés, qu'elle les consomme ou non.
+// Commands receive their arguments owned, deserialised from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod model;
@@ -21,6 +9,7 @@ use chrono::Utc;
 use diesel::SqliteConnection;
 use tauri::State;
 
+use crate::count::saturating_u32;
 use crate::db::{Db, lock};
 use crate::error::{AppError, StorageError};
 use crate::notes::model::Note;
@@ -38,10 +27,8 @@ fn space_names(
         .collect())
 }
 
-/// Assemble le fichier autour des notes fournies.
-///
-/// Seuls les espaces **réellement cités** partent avec : exporter un espace ne
-/// doit pas recréer toute l'arborescence chez qui importe.
+/// Only the spaces **actually cited** travel with the notes: exporting one space
+/// must not recreate the whole tree for whoever imports it.
 pub fn collect(
     connection: &mut SqliteConnection,
     exported: Vec<Note>,
@@ -59,19 +46,15 @@ pub fn collect(
     })
 }
 
-/// Fait entrer un fichier dans la base : **fusion, jamais remplacement**.
-///
-/// Les espaces sont rapprochés par leur nom (insensible à la casse), et une note
-/// dont l'identifiant est déjà pris est comptée puis laissée de côté. Réimporter
-/// le même fichier deux fois ne duplique donc rien — et réimporter un fichier
-/// exporté depuis *cette* base n'ajoute rien du tout, ce que le compte rendu dit.
+/// **Merge, never replace**: spaces are matched by name (case-insensitively), and a
+/// note whose id is already taken is counted then set aside. Importing the same file
+/// twice therefore duplicates nothing, which the report says.
 pub fn merge(
     connection: &mut SqliteConnection,
     bundle: Bundle,
 ) -> Result<ImportReport, StorageError> {
     let mut report = ImportReport::default();
 
-    // Identifiant d'espace du fichier → identifiant local.
     let mut mapping: BTreeMap<String, String> = BTreeMap::new();
     let existing = spaces::list(connection)?;
 
@@ -91,8 +74,8 @@ pub fn merge(
 
     for mut note in bundle.notes {
         let Some(space_id) = mapping.get(&note.space_id) else {
-            // Un fichier tronqué à la main : la note n'a pas d'espace où aller,
-            // et en inventer un la rangerait là où personne ne la cherchera.
+            // A file truncated by hand: inventing a space would file the note where
+            // nobody will look.
             report.notes_skipped += 1;
             continue;
         };
@@ -110,8 +93,8 @@ pub fn merge(
 
 fn write(path: &str, bundle: &Bundle) -> Result<ExportReport, AppError> {
     let report = ExportReport {
-        notes: u32::try_from(bundle.notes.len()).unwrap_or(u32::MAX),
-        spaces: u32::try_from(bundle.spaces.len()).unwrap_or(u32::MAX),
+        notes: saturating_u32(bundle.notes.len()),
+        spaces: saturating_u32(bundle.spaces.len()),
     };
 
     let json = serde_json::to_string_pretty(bundle)
@@ -121,8 +104,8 @@ fn write(path: &str, bundle: &Bundle) -> Result<ExportReport, AppError> {
     Ok(report)
 }
 
-/// Tout le corpus, ou le seul espace actif. Les espaces voyagent avec les notes :
-/// sans eux, l'import n'aurait qu'un identifiant à ranger nulle part.
+/// The spaces travel with the notes: without them an import would hold an id with
+/// nowhere to file it.
 #[tauri::command]
 #[specta::specta]
 pub fn export_notes(
@@ -141,8 +124,6 @@ pub fn export_notes(
     write(&path, &bundle)
 }
 
-/// Même fichier, mêmes règles, mais restreint aux notes désignées : c'est ce
-/// qu'on envoie à quelqu'un plutôt que toute sa bibliothèque.
 #[tauri::command]
 #[specta::specta]
 pub fn export_selection(
@@ -175,8 +156,7 @@ pub fn import_notes(path: String, db: State<'_, Db>) -> Result<ImportReport, App
     Ok(merge(&mut connection, bundle)?)
 }
 
-/// Rendu Markdown d'une sélection, que le front pose dans le presse-papier.
-/// Rien n'est envoyé nulle part : « partager » s'arrête au presse-papier.
+/// Nothing is sent anywhere: "share" stops at the clipboard.
 #[tauri::command]
 #[specta::specta]
 pub fn share_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<String, AppError> {

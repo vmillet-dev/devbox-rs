@@ -1,12 +1,8 @@
-//! Pièces jointes : commandes, et le seul endroit qui touche au disque.
-//!
-//! Les octets ne traversent le pont qu'à la lecture, sous forme de `data:` URI —
-//! le `CSP` de la `WebView` interdit de charger un fichier local, et ouvrir le
-//! protocole `asset:` pour afficher une capture d'écran serait une porte bien
-//! large pour un besoin bien étroit.
+//! The bytes cross the bridge only on read, as a `data:` URI: the `WebView`'s CSP
+//! forbids loading a local file, and opening the `asset:` protocol to show a
+//! screenshot would be a wide door for a narrow need.
 
-// Une commande reçoit ses arguments désérialisés depuis la charge utile IPC :
-// ils arrivent possédés, qu'elle les consomme ou non.
+// Commands receive their arguments owned, deserialised from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod model;
@@ -30,8 +26,7 @@ fn file_error(context: &str, error: &std::io::Error) -> StorageError {
     StorageError::File(format!("{context}: {error}"))
 }
 
-/// Créé à la demande : une installation qui n'a jamais rien joint n'a pas de
-/// dossier vide à traîner.
+/// Created on demand, so an installation that never attached anything has none.
 pub(crate) fn directory(app: &AppHandle) -> Result<PathBuf, StorageError> {
     let path = app
         .path()
@@ -43,8 +38,8 @@ pub(crate) fn directory(app: &AppHandle) -> Result<PathBuf, StorageError> {
     Ok(path)
 }
 
-/// Efface sans rien signaler : un fichier déjà absent est le résultat voulu, et
-/// une purge ne doit pas échouer parce que le disque a été nettoyé à la main.
+/// Deletes without reporting: a file already gone is the intended result, and a
+/// purge must not fail because the disk was tidied by hand.
 pub(crate) fn remove_files(directory: &Path, stored_names: &[String]) {
     for name in stored_names {
         let path = directory.join(name);
@@ -83,8 +78,8 @@ pub fn attach_file(
 
     let directory = directory(&app)?;
     let destination = directory.join(attachment.stored_name());
-    // Copie avant écriture en base : une fiche sans fichier afficherait une
-    // vignette cassée, alors qu'un fichier sans fiche est ramassé au démarrage.
+    // Copy before the database write: a record without a file would show a
+    // broken thumbnail, where a file without a record is swept at startup.
     std::fs::copy(&source, &destination).map_err(|error| file_error(&path, &error))?;
 
     let mut connection = lock(&db)?;
@@ -96,8 +91,8 @@ pub fn attach_file(
     Ok(attachment)
 }
 
-/// Chemin sur le disque, après avoir vérifié que la fiche existe : ouvrir ou
-/// recopier un fichier dont plus rien ne parle serait une fuite hors du dossier.
+/// Checks the record exists first: opening or copying a file nothing refers to
+/// would be a leak out of the directory.
 fn locate(id: &str, app: &AppHandle, db: &Db) -> Result<PathBuf, AppError> {
     let stored_name = {
         let mut connection = lock(db)?;
@@ -109,8 +104,6 @@ fn locate(id: &str, app: &AppHandle, db: &Db) -> Result<PathBuf, AppError> {
     Ok(directory(app)?.join(stored_name))
 }
 
-/// Chemin commun de [`attach_file`] et [`attach_clipboard_image`] : les octets
-/// sont déjà là, il reste à les poser puis à les déclarer, dans cet ordre.
 fn write_attachment(
     note_id: String,
     file_name: String,
@@ -151,8 +144,6 @@ pub fn list_attachments(note_id: String, db: State<'_, Db>) -> Result<Vec<Attach
     Ok(store::list(&mut connection, &note_id)?)
 }
 
-/// `data:<mime>;base64,…`, directement affichable dans un `<img>` ou
-/// téléchargeable par le front.
 #[tauri::command]
 #[specta::specta]
 pub fn read_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<String, AppError> {
@@ -172,11 +163,8 @@ pub fn read_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<
     ))
 }
 
-/// Ouvre la pièce jointe avec l'application par défaut du système.
-///
-/// L'appel part du **Rust**, pas de la `WebView` : les capacités contrôlent
-/// l'API que la `WebView` invoque, et ouvrir un chemin depuis le front aurait
-/// demandé d'autoriser `opener:allow-open-path` sur un dossier entier.
+/// The call starts from **Rust**, not the `WebView`: opening a path from the front
+/// end would have meant allowing `opener:allow-open-path` over a whole directory.
 #[tauri::command]
 #[specta::specta]
 pub fn open_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<(), AppError> {
@@ -189,8 +177,8 @@ pub fn open_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<
     Ok(())
 }
 
-/// Recopie la pièce jointe là où l'utilisateur l'a demandé. Le chemin vient d'un
-/// sélecteur natif ; l'écriture reste ici, seul endroit qui connaît le dossier.
+/// The path comes from a native picker; the write stays here, the only place that
+/// knows the directory.
 #[tauri::command]
 #[specta::specta]
 pub fn save_attachment(
@@ -206,12 +194,8 @@ pub fn save_attachment(
     Ok(())
 }
 
-/// Attache l'image du presse-papier.
-///
-/// Les octets ne traversent **pas** le pont : le presse-papier est lu côté
-/// natif, où l'image arrive en RGBA brut, puis encodée en PNG. La faire monter
-/// jusqu'au front pour la redescendre coûterait deux conversions et plusieurs
-/// mégaoctets de JSON.
+/// The bytes do **not** cross the bridge: the clipboard is read natively, where the
+/// image arrives as raw RGBA, then encoded to PNG.
 #[tauri::command]
 #[specta::specta]
 pub fn attach_clipboard_image(
@@ -246,9 +230,8 @@ pub fn delete_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Resul
     Ok(())
 }
 
-/// Fichiers que plus aucune fiche ne réclame : une copie interrompue entre
-/// `fs::copy` et l'insertion en laisse un, et une purge de corbeille qui plante
-/// entre les deux aussi.
+/// Files no record claims any more: a copy interrupted between `fs::copy` and
+/// the insert leaves one, and so does a trash purge that fails in between.
 pub fn sweep_orphan_files(app: &AppHandle, db: &Db) -> Result<usize, StorageError> {
     let directory = directory(app)?;
 

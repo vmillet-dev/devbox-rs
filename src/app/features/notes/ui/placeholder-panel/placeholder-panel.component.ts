@@ -15,10 +15,8 @@ import {
   PlaceholderValue,
 } from '../placeholder-fields/placeholder-fields.component';
 
-/** Combien de valeurs la barre repliée nomme avant de compter le reste. */
 const SUMMARY_LIMIT = 2;
 
-/** Les valeurs telles que la note les porte : le point de départ de la saisie. */
 function storedValues(placeholders: readonly Placeholder[]): Record<string, string> {
   return Object.fromEntries(placeholders.map((placeholder) => [placeholder.name, placeholder.value]));
 }
@@ -29,26 +27,14 @@ function sameValues(a: Record<string, string>, b: Record<string, string>): boole
 }
 
 /**
- * Les `{{champs}}` de la note ouverte, à remplir sur place.
+ * Unfolded it is the form; folded it fits on one line that **summarises what it hides**
+ * — a bare counter read as a section heading nobody thinks to click. Nothing shows for a
+ * note with no field: a header always present and always empty is a box nobody ticks.
  *
- * Déplié, il est le formulaire ; replié, il tient sur une ligne qui **résume ce
- * qu'il cache** — `host = db.internal`, et le compte du reste. Un résumé se lit
- * comme quelque chose à ouvrir, là où un compteur seul se lisait comme un titre
- * de section, ce dont personne ne pense à cliquer. Toute la bande est le bouton,
- * et elle nomme son geste (« Afficher ») : trois indices plutôt qu'un chevron.
+ * It holds a **local draft** of the values, committed on field exit and re-seeded on the
+ * note's **id**, never on the note, whose identity changes on every save.
  *
- * Rien ne s'affiche pour une note qui n'a pas de champ — l'éditeur ne le monte
- * pas —, parce qu'un en-tête toujours présent et toujours vide serait une case à
- * cocher que personne ne coche.
- *
- * Il tient un **brouillon local** des valeurs, comme le corps et le titre :
- * confirmé à la sortie du champ, pas à chaque frappe, faute de quoi il y aurait
- * une écriture en base par caractère. Le brouillon est réamorcé sur l'**id** de
- * la note, jamais sur la note : chaque enregistrement en produit un nouvel objet
- * et écraserait la saisie en cours.
- *
- * Ne mute rien et ne remplit rien : il émet, `NotesStore` persiste et le back
- * substitue.
+ * Mutates nothing and fills nothing: it emits, `NotesStore` persists.
  */
 @Component({
   selector: 'app-placeholder-panel',
@@ -60,23 +46,20 @@ function sameValues(a: Record<string, string>, b: Record<string, string>): boole
 export class PlaceholderPanelComponent {
   readonly placeholders = input.required<readonly Placeholder[]>();
 
-  /** Source du brouillon : voir l'avertissement en tête de classe. */
   readonly noteId = input.required<string>();
 
-  /** Préférence d'affichage, tenue par l'éditeur : elle survit à la note. */
+  /** A display preference, held by the editor: it outlives the note. */
   readonly open = input(true);
 
-  /** L'aperçu appartient à l'éditeur — c'est son corps qu'il remplace. */
   readonly previewing = input(false);
 
-  /** Texte de la note tel quel, pour la copie sans remplissage. */
   readonly rawContent = input('');
 
   readonly toggled = output<void>();
   readonly previewToggled = output<void>();
-  /** À chaque frappe : ce que l'aperçu suit. N'écrit rien. */
+  /** On every keystroke: what the preview follows. Writes nothing. */
   readonly valuesChanged = output<Record<string, string>>();
-  /** À la sortie du champ : ce que la note enregistre. */
+  /** On field exit: what the note stores. */
   readonly valuesCommitted = output<Record<string, string>>();
 
   private readonly draft = linkedSignal({
@@ -84,13 +67,11 @@ export class PlaceholderPanelComponent {
     computation: () => untracked(() => storedValues(this.placeholders())),
   });
 
-  /** Ce que le panneau affiche à l'instant — l'éditeur remplit avec. */
   readonly values = this.draft.asReadonly();
 
   /**
-   * Ce qui est réputé enregistré. Comparé au brouillon plutôt qu'aux valeurs
-   * reçues : entre la confirmation et le retour du back, la note ouverte porte
-   * encore les anciennes, et chaque passage d'un champ à l'autre réécrirait.
+   * Compared against the draft rather than the values received: between the commit and
+   * the back end's answer the open note still carries the old ones.
    */
   private readonly committed = linkedSignal({
     source: this.noteId,
@@ -102,18 +83,13 @@ export class PlaceholderPanelComponent {
     () => this.placeholders().filter((placeholder) => this.draft()[placeholder.name]).length,
   );
 
-  /**
-   * Ce que la barre repliée montre de son contenu. Un résumé se lit comme
-   * quelque chose à ouvrir, là où un compteur seul se lit comme une étiquette —
-   * et il répond sans clic à « avec quoi je vais copier ? ».
-   */
   private readonly summary = computed(() =>
     this.placeholders()
       .map((placeholder) => ({ name: placeholder.name, value: this.draft()[placeholder.name] ?? '' }))
       .filter((entry) => entry.value !== ''),
   );
 
-  /** Deux suffisent : au-delà, la barre déborderait au lieu de renseigner. */
+  /** Two is enough: beyond that the bar would overflow instead of informing. */
   protected readonly visibleSummary = computed(() => this.summary().slice(0, SUMMARY_LIMIT));
   protected readonly hiddenSummary = computed(() => Math.max(0, this.summary().length - SUMMARY_LIMIT));
 
@@ -122,10 +98,7 @@ export class PlaceholderPanelComponent {
     this.valuesChanged.emit(this.draft());
   }
 
-  /**
-   * Vide tous les champs : les valeurs par défaut du texte reprennent la main.
-   * Confirmé tout de suite — c'est un geste, pas une frappe.
-   */
+  /** Clears every field, handing back to the defaults written in the text. */
   protected reset(): void {
     this.draft.set({});
     this.valuesChanged.emit(this.draft());
@@ -133,12 +106,9 @@ export class PlaceholderPanelComponent {
   }
 
   /**
-   * Confirme la saisie. Appelé à la sortie d'un champ **et** par l'éditeur avant
-   * de se fermer : ni Échap, ni le fond, ni la croix ne produisent de `blur`.
-   *
-   * N'envoie que les champs que le texte porte aujourd'hui : une valeur dont le
-   * jeton a disparu du contenu n'a plus de case où s'afficher, et la garder
-   * ferait grossir la base d'un remplissage que personne ne peut plus voir.
+   * Called on a field's exit **and** by the editor before it closes: neither Escape, the
+   * backdrop nor the close button produces a `blur`. Sends only the fields the text
+   * carries today — a value whose token has left the content has no box to show in.
    */
   commit(): void {
     const values = Object.fromEntries(

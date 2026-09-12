@@ -10,8 +10,7 @@
   @if (showLabel()) {
     <span aria-hidden="true">{{ (copied() ? 'notes.copied' : label()) | transloco }}</span>
   }
-  <!-- L'accusé n'existe autrement que sous forme d'icône : sans ce doublon
-       annoncé, un lecteur d'écran ne saurait pas que la copie a eu lieu. -->
+  <!-- Without this announced twin, a screen reader would not know the copy happened. -->
   <span class="visually-hidden" role="status">
     @if (copied()) {
       {{ 'notes.copied' | transloco }}

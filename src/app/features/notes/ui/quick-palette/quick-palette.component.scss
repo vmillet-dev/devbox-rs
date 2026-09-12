@@ -1,19 +1,13 @@
 @use 'mixins' as *;
 
-// Au-dessus de tout ce que le canevas peut ouvrir : la palette arrive par un
-// raccourci global, éventuellement par-dessus un éditeur resté ouvert.
-.palette-backdrop {
-  @include backdrop(65);
-  align-items: flex-start;
-  padding-top: 12vh;
+// Near the top of the window rather than centred: the list grows downwards, and a
+// centred panel would slide under the cursor as it fills.
+app-dialog {
+  --dialog-align: flex-start;
+  --dialog-offset: 12vh;
+  --dialog-padding: 12px;
+  --dialog-gap: 8px;
 }
-
-.palette-panel {
-  @include dialog-panel(560px);
-  padding: 12px;
-  gap: 8px;
-}
-
 .palette-input {
   @include unstyled-control;
   @include surface($radius: 8px);
@@ -97,7 +91,6 @@
   padding-bottom: 0;
 }
 
-// Détachée des résultats : c'est une action, pas un snippet trouvé.
 .palette-create {
   border-top: 1px solid var(--line-soft);
   margin-top: 2px;

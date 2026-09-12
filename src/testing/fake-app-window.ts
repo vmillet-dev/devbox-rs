@@ -1,9 +1,6 @@
 import { AppWindowAdapter } from '@core/window/app-window.service';
 
-/**
- * Stand-in for the native window. Substituted in every spec: a real `exit()`
- * would take the test runner down with the application.
- */
+/** Substituted in every spec: a real `exit()` would take the test runner down. */
 export class FakeAppWindow implements AppWindowAdapter {
   hidden = 0;
   exitedWith: number | null = null;

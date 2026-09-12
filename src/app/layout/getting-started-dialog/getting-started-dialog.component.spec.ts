@@ -31,7 +31,6 @@ describe('GettingStartedDialogComponent', () => {
   });
 
   it('opens on the notes and ends on import/export', () => {
-    // The order is the order one meets the features, not an alphabet.
     expect(titles()).toHaveLength(9);
     expect(titles()[0]).toContain('notes');
     expect(titles().at(-1)).toContain('Entrer et sortir');
@@ -51,7 +50,6 @@ describe('GettingStartedDialogComponent', () => {
       '8',
       '9',
     ]);
-    // The headings already carry the order for a screen reader.
     expect(steps.every((step) => (step as HTMLElement).getAttribute('aria-hidden') === 'true')).toBe(true);
   });
 
@@ -61,27 +59,21 @@ describe('GettingStartedDialogComponent', () => {
     settings.setPaletteShortcut('Ctrl+Shift+K');
     await fixture.whenStable();
 
-    // A guide quoting the combination that shipped would be wrong for anyone
-    // who changed it.
     expect(bodies()).toContain('Ctrl+Shift+K');
     expect(bodies()).not.toContain('Ctrl+Alt+P');
   });
 
   it('leaves no interpolation unfilled', () => {
-    // Transloco replaces an unknown `{{param}}` with nothing, which would eat a
-    // word in the middle of a sentence rather than fail loudly.
     expect(bodies()).not.toContain('{{');
   });
 
-  it('closes from the button, the backdrop and Escape', async () => {
+  it('closes from its button', async () => {
     let closed = 0;
     fixture.componentInstance.closed.subscribe(() => (closed += 1));
 
     (fixture.nativeElement.querySelector('.guide-close') as HTMLButtonElement).click();
-    (fixture.nativeElement.querySelector('.guide-backdrop') as HTMLElement).click();
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await fixture.whenStable();
 
-    expect(closed).toBe(3);
+    expect(closed).toBe(1);
   });
 });

@@ -1,9 +1,8 @@
 import { Routes } from '@angular/router';
 
 /**
- * DevBox est prévu multi-outils (notes, hachage, encodage) : chaque feature est
- * chargée à la demande, pour que l'ajout d'un outil n'alourdisse pas le
- * démarrage des autres.
+ * DevBox is meant to hold several tools: each feature is loaded on demand, so
+ * adding one does not weigh on the others' startup.
  */
 export const routes: Routes = [
   {

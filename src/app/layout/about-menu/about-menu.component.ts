@@ -10,18 +10,14 @@ import { ShortcutsDialogComponent } from '@layout/shortcuts-dialog/shortcuts-dia
 import { WhatsNewDialogComponent } from '@layout/whats-new-dialog/whats-new-dialog.component';
 
 /**
- * What the menu can put on screen. One signal rather than one flag per panel:
- * they share a backdrop rung and only ever appear one at a time, and four
- * booleans would allow a state where two of them are stacked.
+ * One signal rather than one flag per panel: they share a backdrop rung and only ever
+ * appear one at a time, where four booleans would allow a state with two stacked.
  */
 export type AboutPanel = 'whatsNew' | 'gettingStarted' | 'shortcuts' | 'about';
 
 /**
- * The titlebar's "À propos" menu: check for an update, the three help panels,
- * and the card itself.
- *
- * The update check reports **in place** — that is the whole point of a manual
- * check next to the silent one at startup.
+ * The update check reports **in place** — that is the whole point of a manual check next
+ * to the silent one at startup.
  */
 @Component({
   selector: 'app-about-menu',
@@ -50,7 +46,10 @@ export class AboutMenuComponent {
 
   protected readonly checking = computed(() => this.store.checkState() === 'checking');
 
-  /** `null` quand le menu n'a rien à annoncer — voir `CheckState`. */
+  /**
+   * `null` when the menu has nothing to announce. Exhaustive rather than defaulted: a
+   * state added to `CheckState` must break the build here.
+   */
   protected readonly checkStatusRef = computed<TranslationRef | null>(() => {
     switch (this.store.checkState()) {
       case 'checking':
@@ -59,7 +58,7 @@ export class AboutMenuComponent {
         return { key: 'about.upToDate' };
       case 'failed':
         return { key: 'about.checkFailed' };
-      default:
+      case 'idle':
         return null;
     }
   });
@@ -71,14 +70,13 @@ export class AboutMenuComponent {
 
   protected openPanel(panel: AboutPanel): void {
     this.panel.set(panel);
-    // Sans focus rendu : la modale qui s'ouvre le prend elle-même.
+    // No focus restored: the modal opening takes it itself.
     this.menu.close(false);
   }
 
   /**
-   * Le piège à focus de la modale rendrait la main à l'élément actif au moment
-   * de son ouverture — l'entrée de menu, détruite depuis. Le focus repart donc
-   * sur le déclencheur, seul point de repère encore à l'écran.
+   * The modal's focus trap would hand back to the menu entry, destroyed since: focus
+   * returns to the trigger, the only landmark still on screen.
    */
   protected closePanel(): void {
     this.panel.set(null);

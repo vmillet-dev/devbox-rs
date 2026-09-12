@@ -15,16 +15,15 @@ import { Space } from '@features/notes/model/space.model';
 import { MenuPanelDirective } from '@shared/a11y/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/a11y/menu-trigger.directive';
 
-/** Suppression d'un espace : ce qu'il faut savoir pour ne perdre aucune note. */
 export interface SpaceDeletion {
   readonly id: string;
-  /** Espace qui recueille les notes de celui qu'on supprime. */
+  /** The space that takes in the deleted one's notes. */
   readonly targetSpaceId: string;
 }
 
 export interface SpaceRenaming {
   readonly id: string;
-  /** Nom brut : le détourage et l'unicité appartiennent au back. */
+  /** The raw name: trimming and uniqueness belong to the back end. */
   readonly name: string;
 }
 
@@ -38,12 +37,11 @@ export interface SpaceRenaming {
 })
 export class SpaceSwitcherComponent {
   readonly spaces = input.required<readonly Space[]>();
-  /** `null` = « tous les espaces », un choix à part entière et non un état d'attente. */
+  /** `null` = "all spaces", a choice in its own right and not a waiting state. */
   readonly activeSpace = input.required<Space | null>();
 
-  /** `null` pour « tous les espaces ». */
   readonly spaceChanged = output<string | null>();
-  /** Nom brut saisi : la normalisation et la persistance appartiennent au store. */
+  /** The raw name typed: normalisation and persistence belong to the store. */
   readonly spaceCreated = output<string>();
   readonly spaceRenamed = output<SpaceRenaming>();
   readonly spaceDeleted = output<SpaceDeletion>();
@@ -53,23 +51,21 @@ export class SpaceSwitcherComponent {
   protected readonly creating = signal(false);
 
   /**
-   * Espace en cours d'édition. Le panneau **remplace** le menu au lieu de s'y
-   * ajouter, comme le formulaire de création : des champs de saisie dans un
-   * `role="menu"` ne sont ni valides ARIA, ni navigables comme des options.
+   * The panel **replaces** the menu rather than adding to it, like the create form:
+   * input fields inside a `role="menu"` are neither valid ARIA nor navigable as options.
    */
   protected readonly editing = signal<Space | null>(null);
 
-  /** Suppression en deux temps : la WebView bloque tout pendant un `confirm()` natif. */
+  /** Deletion in two steps: the WebView blocks on a native `confirm()`. */
   protected readonly confirmingDelete = signal(false);
 
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
   private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
 
   /**
-   * Refuges possibles pour les notes de l'espace édité. Un espace ne peut pas
-   * être le sien : la cascade emporterait les notes juste après le transfert.
-   * Liste vide ⇒ suppression impossible, et le panneau le dit plutôt que
-   * d'offrir un bouton qui échouerait.
+   * A space cannot be its own refuge: the cascade would take the notes right after the
+   * transfer. An empty list means deletion is impossible, and the panel says so rather
+   * than offering a button that would fail.
    */
   protected readonly moveTargets = computed<readonly Space[]>(() => {
     const edited = this.editing();
@@ -80,8 +76,7 @@ export class SpaceSwitcherComponent {
     this.menu.escaped.subscribe(() => this.onEscape());
     this.menu.closed.subscribe(() => this.resetPanels());
 
-    // Les panneaux remplacent le menu, dont `MenuPanelDirective` gère le focus :
-    // seuls leurs champs de saisie restent à cadrer ici.
+    // The panels replace the menu, whose focus `MenuPanelDirective` handles.
     effect(() => {
       if (!this.menu.open()) return;
       if (this.editing()) {
@@ -111,10 +106,7 @@ export class SpaceSwitcherComponent {
     this.confirmingDelete.set(false);
   }
 
-  /**
-   * `submit` et non `click` : le formulaire répond ainsi aussi à la touche
-   * Entrée, qui est la façon naturelle de valider un champ de texte.
-   */
+  /** `submit` and not `click`: the form then also answers Enter. */
   protected submitNewSpace(event: Event, name: string): void {
     event.preventDefault();
     if (!name.trim()) return;
@@ -144,7 +136,7 @@ export class SpaceSwitcherComponent {
     this.menu.close();
   }
 
-  /** Échap referme d'abord le panneau ouvert, puis le menu lui-même. */
+  /** Escape closes the open panel first, then the menu itself. */
   private onEscape(): void {
     if (this.editing() || this.creating()) {
       this.resetPanels();

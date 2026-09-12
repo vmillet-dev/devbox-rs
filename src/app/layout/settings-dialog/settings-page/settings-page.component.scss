@@ -41,7 +41,6 @@
   gap: 8px;
 }
 
-// Monospace : une combinaison se lit touche par touche.
 .setting-shortcut-input {
   @include setting-field(130px);
   font-family: var(--font-mono), serif;

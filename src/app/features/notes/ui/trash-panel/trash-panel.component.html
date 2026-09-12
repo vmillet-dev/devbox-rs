@@ -1,72 +1,69 @@
-<div appDialogBackdrop class="trash-backdrop" (dismissed)="closed.emit()">
-  <div appFocusTrap class="trash-panel" role="dialog" aria-modal="true" aria-labelledby="trash-panel-title">
-    <div class="trash-header">
-      <h2 id="trash-panel-title" class="trash-title">{{ 'trash.title' | transloco }}</h2>
+<app-dialog [layer]="'editor'" [width]="560" labelledBy="trash-panel-title" (closed)="closed.emit()">
+  <div class="trash-header">
+    <h2 id="trash-panel-title" class="trash-title">{{ 'trash.title' | transloco }}</h2>
+    <button
+      type="button"
+      class="trash-close"
+      [attr.aria-label]="'trash.close' | transloco"
+      (click)="closed.emit()"
+    >
+      <span aria-hidden="true">✕</span>
+    </button>
+  </div>
+
+  <p class="trash-hint">{{ 'trash.retentionHint' | transloco }}</p>
+
+  @if (isLoading()) {
+    <p class="trash-state">{{ 'trash.loading' | transloco }}</p>
+  } @else if (rows().length === 0) {
+    <p class="trash-state">{{ 'trash.empty' | transloco }}</p>
+  } @else {
+    <ul class="trash-list">
+      @for (row of rows(); track row.note.id) {
+        <li class="trash-row">
+          <div class="trash-row-main">
+            <span class="trash-row-title">
+              {{ row.note.title || ('trash.untitled' | transloco) }}
+            </span>
+            @if (row.snippetKey; as key) {
+              <span class="trash-row-kind">{{ key | transloco }}</span>
+            } @else {
+              <pre class="trash-row-snippet">{{ row.snippet }}</pre>
+            }
+            <span class="trash-row-meta">
+              {{
+                'trash.deletedAt' | transloco: { when: row.deletedRef.key | transloco: row.deletedRef.params }
+              }}
+              ·
+              {{ row.purgeRef.key | transloco: row.purgeRef.params }}
+            </span>
+          </div>
+          <div class="trash-row-actions">
+            <button type="button" class="trash-action" (click)="restoreRequested.emit(row.note.id)">
+              {{ 'trash.restore' | transloco }}
+            </button>
+            <button
+              type="button"
+              class="trash-action danger"
+              [class.confirming]="confirmingPurge() === row.note.id"
+              (click)="onPurgeClick(row.note.id)"
+            >
+              {{ (confirmingPurge() === row.note.id ? 'trash.purgeConfirm' : 'trash.purge') | transloco }}
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+
+    <div class="trash-footer">
       <button
         type="button"
-        class="trash-close"
-        [attr.aria-label]="'trash.close' | transloco"
-        (click)="closed.emit()"
+        class="trash-action danger"
+        [class.confirming]="confirmingEmpty()"
+        (click)="onEmptyClick()"
       >
-        <span aria-hidden="true">✕</span>
+        {{ (confirmingEmpty() ? 'trash.emptyTrashConfirm' : 'trash.emptyTrash') | transloco }}
       </button>
     </div>
-
-    <p class="trash-hint">{{ 'trash.retentionHint' | transloco }}</p>
-
-    @if (isLoading()) {
-      <p class="trash-state">{{ 'trash.loading' | transloco }}</p>
-    } @else if (rows().length === 0) {
-      <p class="trash-state">{{ 'trash.empty' | transloco }}</p>
-    } @else {
-      <ul class="trash-list">
-        @for (row of rows(); track row.note.id) {
-          <li class="trash-row">
-            <div class="trash-row-main">
-              <span class="trash-row-title">
-                {{ row.note.title || ('trash.untitled' | transloco) }}
-              </span>
-              @if (row.snippetKey; as key) {
-                <span class="trash-row-kind">{{ key | transloco }}</span>
-              } @else {
-                <pre class="trash-row-snippet">{{ row.snippet }}</pre>
-              }
-              <span class="trash-row-meta">
-                {{
-                  'trash.deletedAt'
-                    | transloco: { when: row.deletedRef.key | transloco: row.deletedRef.params }
-                }}
-                ·
-                {{ row.purgeRef.key | transloco: row.purgeRef.params }}
-              </span>
-            </div>
-            <div class="trash-row-actions">
-              <button type="button" class="trash-action" (click)="restoreRequested.emit(row.note.id)">
-                {{ 'trash.restore' | transloco }}
-              </button>
-              <button
-                type="button"
-                class="trash-action danger"
-                [class.confirming]="confirmingPurge() === row.note.id"
-                (click)="onPurgeClick(row.note.id)"
-              >
-                {{ (confirmingPurge() === row.note.id ? 'trash.purgeConfirm' : 'trash.purge') | transloco }}
-              </button>
-            </div>
-          </li>
-        }
-      </ul>
-
-      <div class="trash-footer">
-        <button
-          type="button"
-          class="trash-action danger"
-          [class.confirming]="confirmingEmpty()"
-          (click)="onEmptyClick()"
-        >
-          {{ (confirmingEmpty() ? 'trash.emptyTrashConfirm' : 'trash.emptyTrash') | transloco }}
-        </button>
-      </div>
-    }
-  </div>
-</div>
+  }
+</app-dialog>

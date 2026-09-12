@@ -2,11 +2,8 @@ import { ClipboardAdapter } from '@core/clipboard/clipboard.service';
 import { FailsNext, guard } from './fail-next';
 
 /**
- * In-memory clipboard.
- *
- * Every spec gets one through `provideAppTesting`, so nothing reaches the real
- * plugin: under jsdom it rejects, which `ClipboardService` swallows — a spec
- * would then be asserting against a silent failure rather than a copy.
+ * Every spec gets one through `provideAppTesting`: under jsdom the real plugin rejects,
+ * which `ClipboardService` swallows — a spec would then assert against a silent failure.
  */
 export class FakeClipboard implements ClipboardAdapter, FailsNext {
   /** What a read hands back, and what the last write left behind. */

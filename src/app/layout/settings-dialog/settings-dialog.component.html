@@ -1,43 +1,41 @@
-<div appDialogBackdrop class="settings-backdrop" (dismissed)="closed.emit()">
-  <div
-    appFocusTrap
-    class="settings-panel"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="settings-dialog-title"
-  >
-    <div class="settings-header">
-      <h2 id="settings-dialog-title" class="settings-title">{{ 'settings.title' | transloco }}</h2>
-    </div>
-
-    <div class="settings-body">
-      <!-- Un rail de navigation, pas une liste d'options : chaque entrée change
-           ce qu'affiche le panneau de droite, d'où `aria-current="page"`. -->
-      <nav class="settings-rail" [attr.aria-label]="'settings.pagesLabel' | transloco">
-        @for (page of pages(); track page.id) {
-          <button
-            type="button"
-            class="settings-rail-option"
-            [class.active]="page.id === activePage().id"
-            [attr.aria-current]="page.id === activePage().id ? 'page' : null"
-            (click)="select(page.id)"
-          >
-            {{ page.labelKey | transloco }}
-          </button>
-        }
-      </nav>
-
-      <section class="settings-content" [attr.aria-label]="activePage().labelKey | transloco">
-        <h3 class="settings-content-title">{{ activePage().labelKey | transloco }}</h3>
-        <ng-container *ngComponentOutlet="activePage().component" />
-      </section>
-    </div>
-
-    <div class="settings-actions">
-      <p class="settings-hint">{{ 'settings.appliedImmediately' | transloco }}</p>
-      <button type="button" class="settings-close" (click)="closed.emit()">
-        {{ 'settings.close' | transloco }}
-      </button>
-    </div>
+<app-dialog
+  [layer]="'settings'"
+  [variant]="'framed'"
+  [width]="760"
+  labelledBy="settings-dialog-title"
+  (closed)="closed.emit()"
+>
+  <div class="settings-header">
+    <h2 id="settings-dialog-title" class="settings-title">{{ 'settings.title' | transloco }}</h2>
   </div>
-</div>
+
+  <div class="settings-body">
+    <!-- A navigation rail, not a list of options: each entry changes what the right-hand
+         panel shows, hence `aria-current="page"`. -->
+    <nav class="settings-rail" [attr.aria-label]="'settings.pagesLabel' | transloco">
+      @for (page of pages(); track page.id) {
+        <button
+          type="button"
+          class="settings-rail-option"
+          [class.active]="page.id === activePage().id"
+          [attr.aria-current]="page.id === activePage().id ? 'page' : null"
+          (click)="select(page.id)"
+        >
+          {{ page.labelKey | transloco }}
+        </button>
+      }
+    </nav>
+
+    <section class="settings-content" [attr.aria-label]="activePage().labelKey | transloco">
+      <h3 class="settings-content-title">{{ activePage().labelKey | transloco }}</h3>
+      <ng-container *ngComponentOutlet="activePage().component" />
+    </section>
+  </div>
+
+  <div class="settings-actions">
+    <p class="settings-hint">{{ 'settings.appliedImmediately' | transloco }}</p>
+    <button type="button" class="settings-close" (click)="closed.emit()">
+      {{ 'settings.close' | transloco }}
+    </button>
+  </div>
+</app-dialog>

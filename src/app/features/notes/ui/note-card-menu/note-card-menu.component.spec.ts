@@ -89,7 +89,6 @@ describe('NoteCardMenuComponent', () => {
 
     await open();
 
-    // Offering an empty "move to" heading would suggest a broken menu.
     expect(moveItems()).toHaveLength(0);
     expect(fixture.nativeElement.querySelector('.card-menu-title')).toBeNull();
     expect(deleteItem()).not.toBeNull();
@@ -103,8 +102,6 @@ describe('NoteCardMenuComponent', () => {
     deleteItem().click();
     await fixture.whenStable();
 
-    // Two steps rather than a native confirm(): a system dialog freezes the
-    // whole WebView, including the IPC bridge.
     expect(deletions).toEqual([]);
     expect(deleteItem().textContent).toContain('Confirmer ?');
 
@@ -127,8 +124,6 @@ describe('NoteCardMenuComponent', () => {
   });
 
   it('does not open the note when the trigger is clicked', async () => {
-    // The card itself is a button wrapping the whole surface: without stopping
-    // propagation, opening the menu would open the editor at the same time.
     let bubbled = false;
     fixture.nativeElement.parentElement?.addEventListener('click', () => (bubbled = true), {
       once: true,
@@ -164,7 +159,6 @@ describe('NoteCardMenuComponent', () => {
     await pressKey('Escape');
 
     expect(items()).toHaveLength(0);
-    // Without this the focus would land on <body> when the menu is destroyed.
     expect(document.activeElement).toBe(trigger());
   });
 

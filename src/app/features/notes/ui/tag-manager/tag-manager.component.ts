@@ -1,25 +1,18 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DialogBackdropDirective } from '@shared/a11y/dialog-backdrop.directive';
-import { FocusTrapDirective } from '@shared/a11y/focus-trap.directive';
+import { DialogComponent } from '@shared/ui/dialog/dialog.component';
 import { TagUsage } from '@features/notes/model/note.model';
 
 /**
- * Gestion globale des tags : cocher, puis renommer, fusionner ou supprimer.
- *
- * Un seul champ de destination pour le renommage **et** la fusion : côté base
- * c'est la même opération, et deux champs feraient croire à deux mécanismes.
- * Le libellé du bouton suit le nombre de tags cochés.
+ * One destination field for both renaming **and** merging: in the database it is the
+ * same operation, and two fields would suggest two mechanisms.
  */
 @Component({
   selector: 'app-tag-manager',
-  imports: [DialogBackdropDirective, FocusTrapDirective, TranslocoPipe],
+  imports: [DialogComponent, TranslocoPipe],
   templateUrl: './tag-manager.component.html',
   styleUrl: './tag-manager.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '(document:keydown.escape)': 'closed.emit()',
-  },
 })
 export class TagManagerComponent {
   readonly tags = input.required<readonly TagUsage[]>();
@@ -37,7 +30,7 @@ export class TagManagerComponent {
   protected readonly selectionCount = computed(() => this.selected().size);
   protected readonly canApply = computed(() => this.selectionCount() > 0);
 
-  /** Un seul tag coché : c'est un renommage. Plusieurs : c'est une fusion. */
+  /** One tag ticked is a rename. Several is a merge. */
   protected readonly applyKey = computed(() =>
     this.selectionCount() > 1 ? 'tagManager.merge' : 'tagManager.rename',
   );

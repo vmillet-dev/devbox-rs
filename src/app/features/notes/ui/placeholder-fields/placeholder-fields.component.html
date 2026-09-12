@@ -2,13 +2,12 @@
   @for (placeholder of placeholders(); track placeholder.name) {
     <li>
       <label class="field">
-        <!-- Les accolades sont dessinées en CSS : elles rattachent la ligne au
-             jeton du texte, mais un lecteur d'écran n'a que faire de la
-             ponctuation d'un gabarit. -->
+        <!-- The braces are drawn in CSS: they tie the row to the token in the
+             text, but a screen reader has no use for template punctuation. -->
         <span class="field-name">{{ placeholder.name }}</span>
-        <!-- La valeur par défaut est une suggestion, pas une saisie : le champ
-             vide vaut « je garde ce que le snippet propose », et c'est le back
-             qui applique cette règle au moment de remplir. -->
+        <!-- The default is a suggestion, not an entry: an empty field means "I
+             keep what the snippet offers", and the back end applies that rule
+             when filling. -->
         <input
           #valueInput
           type="text"

@@ -3,9 +3,8 @@ import { IpcError } from '../ipc/ipc.error';
 import { ErrorNotifier, errorDetail } from './error-notifier.service';
 
 /**
- * Dernier filet : toute exception non rattrapée est journalisée **et** portée à
- * l'écran. Les échecs d'IPC reçoivent leur propre message — c'est le mode de
- * panne attendu en production, il mérite mieux qu'un « erreur est survenue ».
+ * The last net: every uncaught exception is logged **and** put on screen. IPC failures get
+ * their own message — the expected failure mode in production.
  */
 @Injectable()
 export class AppErrorHandler implements ErrorHandler {

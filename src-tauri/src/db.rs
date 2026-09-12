@@ -1,9 +1,3 @@
-//! The database: opening, configuration, migrations, and the shared access the
-//! commands lock.
-//!
-//! **No business rule**: those live in `notes::model`, `notes::view` and
-//! `spaces::model`, which are tested without opening a database.
-
 pub mod migration;
 pub mod schema;
 
@@ -17,8 +11,7 @@ use crate::error::{AppError, StorageError};
 
 pub const DB_FILE_NAME: &str = "devbox.sqlite3";
 
-/// `SqliteConnection` is not `Sync`: two overlapping commands serialise on this
-/// mutex.
+/// `SqliteConnection` is not `Sync`: overlapping commands serialise on this mutex.
 pub type Db = Mutex<SqliteConnection>;
 
 /// A poisoned mutex means a command panicked while holding it: better to say so
@@ -27,7 +20,6 @@ pub(crate) fn lock(db: &Db) -> Result<MutexGuard<'_, SqliteConnection>, AppError
     db.lock().map_err(|_| AppError::storage_unavailable())
 }
 
-/// Opens the database (creating it if needed), configures it, migrates it.
 pub fn open(path: &Path) -> Result<SqliteConnection, StorageError> {
     let mut connection = SqliteConnection::establish(&path.to_string_lossy())
         .map_err(|error| StorageError::Migration(error.to_string()))?;
@@ -37,8 +29,7 @@ pub fn open(path: &Path) -> Result<SqliteConnection, StorageError> {
     Ok(connection)
 }
 
-/// Ephemeral database. Public for the integration tests, which see nothing of
-/// the crate but its API.
+/// Public for the integration tests, which see nothing of the crate but its API.
 pub fn open_in_memory() -> Result<SqliteConnection, StorageError> {
     let mut connection = SqliteConnection::establish(":memory:")
         .map_err(|error| StorageError::Migration(error.to_string()))?;
@@ -49,9 +40,8 @@ pub fn open_in_memory() -> Result<SqliteConnection, StorageError> {
 }
 
 fn configure(connection: &mut SqliteConnection) -> Result<(), StorageError> {
-    // ⚠️ `foreign_keys` is set **per connection** and is off by default: without
-    // it the `ON DELETE CASCADE` clauses are inert and the tags of a deleted
-    // note would be left orphaned. WAL: a reader no longer blocks a writer.
+    // ⚠️ `foreign_keys` is set **per connection** and is off by default: without it
+    // the `ON DELETE CASCADE` clauses are inert. WAL: a reader no longer blocks a writer.
     connection.batch_execute(
         "PRAGMA foreign_keys = ON;
          PRAGMA journal_mode = WAL;",
@@ -60,19 +50,13 @@ fn configure(connection: &mut SqliteConnection) -> Result<(), StorageError> {
     Ok(())
 }
 
-/// The format of **stored** instants, and how they are read back.
-///
-/// ⚠️ Milliseconds are always written, even when zero. `created_at` and
-/// `updated_at` are TEXT columns sorted lexicographically, and the canvas orders
-/// on them: `.` (0x2E) precedes `Z` (0x5A), so `09:00:00.500Z` would sort
-/// **before** `09:00:00Z`. `SecondsFormat::AutoSi`, chrono's default, falls into
-/// exactly that trap.
-///
-/// The wire does not depend on it: the front converts to `Date` at the boundary.
+/// ⚠️ Milliseconds are always written, even when zero. `created_at` and `updated_at`
+/// are TEXT columns sorted lexicographically, and the canvas orders on them: `.`
+/// (0x2E) precedes `Z` (0x5A), so `09:00:00.500Z` would sort **before** `09:00:00Z`
+/// — exactly what chrono's default `SecondsFormat::AutoSi` produces.
 pub mod iso8601 {
     use chrono::{DateTime, SecondsFormat, Utc};
 
-    /// `2026-07-25T09:12:00.000Z`.
     pub fn format(instant: DateTime<Utc>) -> String {
         instant.to_rfc3339_opts(SecondsFormat::Millis, true)
     }
@@ -94,9 +78,6 @@ pub mod iso8601 {
 
         #[test]
         fn the_written_form_sorts_the_way_the_column_does() {
-            // This is the whole point: the canvas orders on a lexicographic TEXT
-            // comparison, so the shorter form would sort *after* a longer one of the
-            // same second.
             let plain = format(parse("2026-07-25T09:00:00Z").unwrap());
             let with_millis = format(parse("2026-07-25T09:00:00.500Z").unwrap());
 
@@ -105,8 +86,6 @@ pub mod iso8601 {
 
         #[test]
         fn an_offset_instant_is_normalised_to_utc() {
-            // A column read as UTC but holding a local time would shift the note by
-            // hours; normalising on the way in is what makes the comparison sound.
             let instant = parse("2026-07-25T11:00:00+02:00").unwrap();
 
             assert_eq!(format(instant), "2026-07-25T09:00:00.000Z");
@@ -162,7 +141,6 @@ mod tests {
         let db = in_memory();
 
         // Poison it the way production would: a panic while the guard is held.
-        // The hook is silenced so a deliberate panic does not look like a crash.
         let hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_| {}));
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -171,9 +149,8 @@ mod tests {
         }));
         std::panic::set_hook(hook);
 
-        // `unwrap_err()` would need the guard to be `Debug`, which
-        // `SqliteConnection` is not; and `unwrap()` in `lock` itself would take
-        // the whole process down on the next command.
+        // `unwrap_err()` would need the guard to be `Debug`, which `SqliteConnection`
+        // is not; and `unwrap()` in `lock` would take the process down on the next command.
         let Err(error) = lock(&db) else {
             panic!("a poisoned mutex must be reported, not returned");
         };

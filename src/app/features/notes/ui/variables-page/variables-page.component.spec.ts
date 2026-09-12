@@ -28,9 +28,8 @@ describe('VariablesPageComponent', () => {
   async function render(): Promise<void> {
     fixture = TestBed.createComponent(VariablesPageComponent);
     fixture.autoDetectChanges();
-    // La page charge dans son constructeur — personne d'autre ne peut le faire
-    // pour elle, elle est rendue par `NgComponentOutlet`. Il faut donc laisser
-    // la lecture se résoudre avant de regarder le DOM.
+    // The page loads in its constructor — `NgComponentOutlet` renders it — so the read
+    // has to settle before looking at the DOM.
     await fixture.whenStable();
     await fixture.whenStable();
   }

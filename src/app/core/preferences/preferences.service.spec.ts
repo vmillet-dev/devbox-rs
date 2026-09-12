@@ -50,8 +50,6 @@ describe('PreferencesService', () => {
 
     await service.hydrate();
 
-    // Reads are synchronous by design: the editor and the locale both read at
-    // construction time, before any promise could have settled.
     expect(service.read('devbox.locale')).toBe('en');
   });
 
@@ -80,10 +78,8 @@ describe('PreferencesService', () => {
 
     await service.hydrate();
 
-    // Without this, updating the app would silently reset the interface language.
     expect(service.read('devbox.locale')).toBe('en');
     expect(store.set).toHaveBeenCalledWith('devbox.locale', 'en');
-    // The old location is cleared so a stale value cannot come back later.
     expect(localStorage.getItem('devbox.locale')).toBeNull();
   });
 
@@ -108,7 +104,6 @@ describe('PreferencesService', () => {
   });
 
   it('degrades to an in-memory cache when the plugin is unavailable', async () => {
-    // This is the case outside Tauri, and the one every other spec runs under.
     loadMock.mockRejectedValue(new Error('plugin not found'));
 
     await expect(service.hydrate()).resolves.toBeUndefined();
@@ -123,8 +118,6 @@ describe('PreferencesService', () => {
     loadMock.mockResolvedValue(store);
     await service.hydrate();
 
-    // The write is fire-and-forget: a failed one must not surface as an
-    // unhandled rejection, and the session must keep the value anyway.
     expect(() => service.write('devbox.test', 'value')).not.toThrow();
     expect(service.read('devbox.test')).toBe('value');
   });

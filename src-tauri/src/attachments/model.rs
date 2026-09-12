@@ -1,18 +1,16 @@
-//! Une pièce jointe : ce que la base retient, et les règles qui décident du
-//! reste.
-//!
-//! Les octets ne sont pas ici. La base ne garde qu'une fiche ; le fichier vit
-//! dans `app_data_dir()/attachments/`, sous un nom **dérivé de l'identifiant** —
-//! deux captures nommées `image.png` ne doivent pas s'écraser, et un nom venu de
-//! l'extérieur n'a pas à décider d'un chemin d'écriture.
+//! ⚠️ The bytes are not here: the database holds a record, and the file lives in
+//! `app_data_dir()/attachments/` under a name **derived from the id** — two captures
+//! called `image.png` must not overwrite each other, and a name from outside has no
+//! business deciding a write path.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use specta::Type;
 
+use crate::count::saturating_u32;
 use crate::error::{StorageError, ValidationError};
 
-/// 10 Mo : au-delà, ce n'est plus une capture d'écran collée à côté d'une note.
+/// 10 MB: past that it is no longer a screenshot pasted next to a note.
 pub const MAX_BYTES: u64 = 10 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -20,17 +18,15 @@ pub const MAX_BYTES: u64 = 10 * 1024 * 1024;
 pub struct Attachment {
     pub id: String,
     pub note_id: String,
-    /// Nom d'origine, celui qu'on affiche. Jamais utilisé comme chemin.
+    /// The original name, the one displayed. Never used as a path.
     pub file_name: String,
     pub mime_type: String,
-    /// `u32` et non `u64` : Specta refuse ce que JSON ne rend pas sans perte, et
-    /// [`MAX_BYTES`] tient largement dedans.
+    /// `u32` and not `u64`: Specta refuses what JSON cannot carry without loss.
     pub byte_size: u32,
     pub created_at: DateTime<Utc>,
 }
 
 impl Attachment {
-    /// Nom du fichier sur le disque.
     pub fn stored_name(&self) -> String {
         stored_name(&self.id, &self.file_name)
     }
@@ -40,8 +36,8 @@ impl Attachment {
     }
 }
 
-/// Extension retenue **en minuscules et purement alphanumérique** : le reste
-/// (séparateurs, `..`, deux-points) sortirait du dossier des pièces jointes.
+/// The extension kept **lowercase and purely alphanumeric**: anything else
+/// (separators, `..`, colons) would escape the attachments directory.
 fn extension_of(file_name: &str) -> Option<String> {
     let candidate = file_name.rsplit_once('.')?.1;
     if candidate.is_empty()
@@ -61,8 +57,7 @@ pub fn stored_name(id: &str, file_name: &str) -> String {
     }
 }
 
-/// Table volontairement courte : ce qu'on sait afficher, plus un repli. Un type
-/// inconnu reste attachable, il n'est simplement pas prévisualisé.
+/// Deliberately short: an unknown type stays attachable, it is simply not previewed.
 pub fn mime_of(file_name: &str) -> String {
     let mime = match extension_of(file_name).as_deref() {
         Some("png") => "image/png",
@@ -82,8 +77,8 @@ pub fn mime_of(file_name: &str) -> String {
     mime.to_string()
 }
 
-/// Le nom d'origine, débarrassé de tout chemin : un import ne doit pas pouvoir
-/// afficher `../../secrets/clé.pem` comme si la note l'avait produit.
+/// The original name, stripped of any path: an import must not be able to show
+/// `../../secrets/key.pem` as though the note had produced it.
 pub fn display_name(path: &str) -> Result<String, ValidationError> {
     let trimmed = path
         .rsplit(['/', '\\'])
@@ -99,9 +94,8 @@ pub fn display_name(path: &str) -> Result<String, ValidationError> {
     Ok(trimmed)
 }
 
-/// Nom donné à une image collée : l'appelant fournit un horodatage lisible, on
-/// garantit l'extension. Sans elle, `mime_of` rendrait `application/octet-stream`
-/// et la capture ne serait pas prévisualisée.
+/// The caller supplies a readable timestamp, this guarantees the extension: without
+/// it `mime_of` would answer `application/octet-stream` and skip the preview.
 pub fn png_name(base: &str) -> String {
     let trimmed = base.trim();
     let stem = if trimmed.is_empty() {
@@ -117,10 +111,8 @@ pub fn png_name(base: &str) -> String {
     }
 }
 
-/// Encode du RGBA brut — ce que le presse-papier système rend — en PNG.
-///
-/// Le presse-papier ne donne pas de fichier : sans cet encodage il faudrait
-/// stocker des octets qu'aucun visualiseur ne saurait ouvrir.
+/// Encodes raw RGBA — what the system clipboard hands over — into PNG: without it
+/// we would store bytes no viewer could open.
 pub fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, StorageError> {
     let expected = (width as usize)
         .saturating_mul(height as usize)
@@ -156,8 +148,7 @@ pub fn validate_size(byte_size: u64) -> Result<u32, ValidationError> {
         ));
     }
 
-    // La borne au-dessus garantit la conversion.
-    Ok(u32::try_from(byte_size).unwrap_or(u32::MAX))
+    Ok(saturating_u32(byte_size))
 }
 
 #[cfg(test)]
@@ -166,7 +157,6 @@ mod tests {
 
     #[test]
     fn the_stored_name_comes_from_the_identifier_not_from_the_user() {
-        // Deux « capture.png » collées à deux notes ne doivent pas s'écraser.
         assert_eq!(stored_name("a-1", "capture.png"), "a-1.png");
         assert_eq!(stored_name("a-2", "capture.png"), "a-2.png");
     }
@@ -207,8 +197,6 @@ mod tests {
 
     #[test]
     fn a_pasted_image_always_ends_up_with_its_extension() {
-        // Sans elle, `mime_of` rendrait `application/octet-stream` et la capture
-        // ne serait jamais prévisualisée.
         assert_eq!(png_name("capture-2026"), "capture-2026.png");
         assert_eq!(png_name("capture.PNG"), "capture.PNG");
         assert_eq!(png_name("   "), "capture.png");
@@ -220,16 +208,12 @@ mod tests {
 
         let png = encode_png(2, 2, &rgba).unwrap();
 
-        // La signature PNG : ce que le fichier doit porter pour qu'un
-        // visualiseur — le nôtre compris — accepte de l'ouvrir.
         assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
         assert_eq!(mime_of(&png_name("capture")), "image/png");
     }
 
     #[test]
     fn a_truncated_clipboard_image_is_refused_rather_than_written() {
-        // Le presse-papier peut rendre une image vide ou incohérente ; écrire un
-        // fichier illisible serait pire que ne rien attacher.
         assert!(encode_png(2, 2, &[0u8; 4]).is_err());
         assert!(encode_png(0, 0, &[]).is_err());
     }

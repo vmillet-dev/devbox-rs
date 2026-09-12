@@ -2,7 +2,7 @@ import { Injectable, Signal, computed, effect, inject } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { PreferencesService } from '../preferences/preferences.service';
 
-/** Langues d'affichage de l'interface — sans rapport avec `LanguageTag` (langage de coloration des notes). */
+/** The UI display languages — unrelated to `LanguageTag`, which colours notes. */
 export const APP_LOCALES = ['fr', 'en'] as const;
 export type AppLocale = (typeof APP_LOCALES)[number];
 
@@ -14,7 +14,7 @@ function isAppLocale(value: string | null): value is AppLocale {
   return (APP_LOCALES as readonly string[]).includes(value ?? '');
 }
 
-/** Langue active de l'UI : source de vérité déléguée à Transloco, persistée en local. */
+/** The active UI language: the source of truth is Transloco's, persisted locally. */
 @Injectable({ providedIn: 'root' })
 export class LocaleService {
   private readonly transloco = inject(TranslocoService);
@@ -26,17 +26,15 @@ export class LocaleService {
   });
 
   constructor() {
-    // `<html lang>` doit suivre la langue affichée : c'est ce qui pilote la
-    // prononciation des lecteurs d'écran et les règles typographiques du moteur de rendu.
+    // `<html lang>` drives screen-reader pronunciation and typographic rules.
     effect(() => {
       document.documentElement.lang = this.activeLocale();
     });
   }
 
   /**
-   * Restaure la langue choisie lors d'une précédente session.
-   * Invoquée depuis un `provideAppInitializer`, donc avant le premier rendu :
-   * sinon l'interface apparaîtrait brièvement dans la langue par défaut.
+   * Called from a `provideAppInitializer`, so before the first render: otherwise the
+   * interface would briefly appear in the default language.
    */
   restore(): void {
     const stored = this.preferences.read(STORAGE_KEY);

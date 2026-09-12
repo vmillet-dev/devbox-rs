@@ -1,11 +1,7 @@
-//! A typed mirror of the schema that `migrations/` builds.
-//!
 //! Hand-written rather than produced by `diesel print-schema`, which would make
-//! `cargo check` depend on an up-to-date database outside the repository. The
-//! price is keeping it in step; `check_for_backend` on `NoteRow` turns a
-//! divergence into a compile error.
+//! `cargo check` depend on an up-to-date database outside the repository.
 //!
-//! The `CHECK`s, the `ON DELETE CASCADE`s and the `NOCASE` collation do **not**
+//! The `CHECK`s, the `ON DELETE CASCADE`s and the `NOCASE` collations do **not**
 //! appear here: Diesel does not model them, it simply obeys them.
 
 diesel::table! {
@@ -40,8 +36,7 @@ diesel::table! {
     }
 }
 
-// The order *is* the list: `position` is part of the key, and a write rewrites
-// the whole sequence rather than shifting rows one by one.
+// The order *is* the list: `position` is part of the key.
 diesel::table! {
     note_items (note_id, position) {
         note_id -> Text,
@@ -51,9 +46,8 @@ diesel::table! {
     }
 }
 
-// The name *is* the identity, and it is compared byte for byte: `notes::placeholder`
-// tells `{{Host}}` from `{{host}}`, so this key stays case-sensitive where
-// `note_tags` folds case.
+// The name *is* the identity and is compared byte for byte: `{{Host}}` is not
+// `{{host}}`, so this key stays case-sensitive where `note_tags` folds case.
 diesel::table! {
     note_placeholders (note_id, name) {
         note_id -> Text,
@@ -62,9 +56,8 @@ diesel::table! {
     }
 }
 
-// Les variables globales : mêmes valeurs de `{{champs}}`, mais sans note pour
-// les porter — d'où une table à part plutôt qu'un `note_id` nullable, qui
-// aurait vidé la clé primaire de `note_placeholders` de son sens.
+// A table of their own rather than a nullable `note_id`, which would have emptied
+// the `note_placeholders` primary key of its meaning.
 diesel::table! {
     global_placeholders (name) {
         name -> Text,

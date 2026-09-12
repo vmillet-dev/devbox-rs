@@ -3,7 +3,11 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
-    "types": []
+    "types": [],
+    // Relaxed for specs only, like the ESLint overrides: indexing into a
+    // queried NodeList and asserting on the result is the idiom here, and
+    // guarding every one of them would add noise without adding safety.
+    "noUncheckedIndexedAccess": false
   },
   // `src/testing` is otherwise only reachable through the specs that import it;
   // a setup file, which nothing imports, would be bundled without being

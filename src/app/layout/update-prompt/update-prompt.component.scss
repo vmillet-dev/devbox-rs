@@ -1,14 +1,7 @@
 @use 'mixins' as *;
 
-// z-index au-dessus de l'éditeur de note (50) : une mise à jour proposée pendant
-// l'édition doit rester atteignable, sinon la modale se retrouve derrière.
-.update-backdrop {
-  @include backdrop(60);
-}
-
-.update-panel {
-  @include dialog-panel(460px);
-  gap: 14px;
+app-dialog {
+  --dialog-gap: 14px;
 }
 
 .update-title {
@@ -46,8 +39,8 @@
   outline-offset: 2px;
 }
 
-// Les notes viennent du manifeste et peuvent être longues : hauteur bornée et
-// défilement, pour que les boutons restent visibles sans faire défiler la modale.
+// The notes come from the manifest and can be long: bounded and scrolling, so the buttons
+// stay visible.
 .update-notes-body {
   margin: 8px 0 0;
   max-height: 160px;
@@ -69,9 +62,8 @@
   font-family: var(--font-mono), serif;
 }
 
-// `appearance: none` retire le rendu natif ; le fond de la piste et celui de la
-// barre se règlent ensuite par pseudo-éléments, que Chromium comme WebKit
-// exposent sous le préfixe -webkit-.
+// `appearance: none` strips the native rendering; the track and the bar are then coloured
+// through the -webkit- pseudo-elements.
 .update-progress {
   appearance: none;
   width: 100%;

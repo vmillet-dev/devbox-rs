@@ -21,8 +21,6 @@ describe('AppErrorHandler', () => {
   });
 
   it('reports an IPC failure with the failing command name', () => {
-    // Backend unavailable is the expected production failure mode and deserves
-    // more than a generic "something went wrong".
     handler.handleError(new IpcError('query_notes', 'no such command'));
 
     expect(notifier.notice()?.ref).toEqual({ key: 'errors.ipcFailed', params: { command: 'query_notes' } });

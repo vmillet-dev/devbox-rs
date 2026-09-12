@@ -1,7 +1,5 @@
 @use 'mixins' as *;
 
-// Un tiroir entre les métadonnées et le corps : il appartient au texte qu'il
-// remplit, et se referme sur une seule ligne quand on n'en a pas besoin.
 .panel {
   flex-shrink: 0;
   border-bottom: 1px solid var(--line-soft);
@@ -14,8 +12,7 @@
   padding: 7px 20px;
 }
 
-// Toute la bande libre, pas seulement le libellé : une cible de la taille de la
-// ligne est ce qui fait la différence entre un contrôle et une étiquette.
+// The whole band is the target: a row-sized one tells a control from a caption.
 .panel-toggle {
   @include unstyled-control;
   display: flex;
@@ -42,8 +39,6 @@
   color: var(--amber);
 }
 
-// Un seul glyphe, qui pivote : le mouvement se remarque là où deux caractères
-// interchangés passent inaperçus.
 .panel-caret {
   display: inline-block;
   width: 10px;
@@ -57,8 +52,6 @@
   transform: rotate(90deg);
 }
 
-// Casse normale et police d'interface : les petites capitales monospace sont le
-// vocabulaire des étiquettes inertes dans cette application.
 .panel-title {
   font-size: 12px;
   font-weight: 600;
@@ -66,8 +59,6 @@
   white-space: nowrap;
 }
 
-// Ce que la barre repliée cache. Tronqué plutôt que replié sur deux lignes : la
-// hauteur de la bande est ce qui la garde discrète.
 .panel-summary {
   min-width: 0;
   overflow: hidden;
@@ -87,8 +78,6 @@
   color: var(--amber-dim);
 }
 
-// Poussé au bout de la bande : le verbe est la dernière chose à lire, et il ne
-// laisse plus de doute sur ce que le clic va faire.
 .panel-verb {
   margin-left: auto;
   padding-left: 8px;
@@ -97,9 +86,7 @@
   white-space: nowrap;
 }
 
-// Le seul chiffre du panneau : combien de champs portent une valeur. Ambré
-// quand ils y sont tous, parce que c'est là que la copie devient utilisable
-// sans rien retaper.
+// Amber once every field carries a value: that is when the copy becomes usable.
 .panel-count {
   @include surface(var(--bg-2), 999px);
   flex-shrink: 0;
@@ -121,7 +108,6 @@
   margin-left: auto;
 }
 
-// Alignés sur `.copy-btn.with-label`, qui se tient à côté d'eux.
 .panel-action {
   @include unstyled-control;
   @include surface(var(--bg-2), 7px);
@@ -143,13 +129,11 @@
   border-color: var(--amber-dim);
 }
 
-// Creusé par rapport au panneau de l'éditeur : c'est ce décrochage qui fait
-// lire la zone comme un tiroir et non comme une bande de plus.
 .panel-body {
   padding: 10px 20px 12px;
   background: var(--bg-0);
   border-top: 1px solid var(--line-soft);
-  // Borné : dix champs ne doivent pas repousser le corps hors de l'écran.
+  // Bounded: ten fields must not push the body off screen.
   max-height: 30vh;
   overflow-y: auto;
 }

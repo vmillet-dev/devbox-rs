@@ -33,8 +33,6 @@ describe('TagPillComponent', () => {
   });
 
   it('renders a plain label rather than a button when not interactive', async () => {
-    // A non-interactive pill announced as a button would advertise an action
-    // that does not exist, and would be keyboard-reachable for nothing.
     fixture.componentRef.setInput('interactive', false);
     await fixture.whenStable();
 

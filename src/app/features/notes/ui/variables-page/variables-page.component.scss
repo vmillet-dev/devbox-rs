@@ -32,8 +32,7 @@
   align-items: center;
 }
 
-// Les accolades sont décoratives : elles rattachent la ligne au jeton du texte,
-// mais un lecteur d'écran n'a que faire de la ponctuation d'un gabarit.
+// The braces are decoration: a screen reader has no use for a template's punctuation.
 .variable-name-field {
   display: flex;
   align-items: center;

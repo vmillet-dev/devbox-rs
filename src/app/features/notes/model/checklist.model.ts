@@ -1,15 +1,6 @@
 /**
- * Le vocabulaire des notes todolist.
- *
- * Les fonctions sont pures et sans injection : elles présentent une donnée que
- * le front tient déjà. C'est la même exception assumée que le formatage du
- * temps relatif — un aller-retour IPC pour compter un tableau reçu avec la note
- * serait absurde.
- *
- * Les deux types sont de simples alias des unions **générées**, comme
- * `LanguageTag` l'est de `Language` : un `import type` s'efface à la
- * compilation, et la frontière de valeurs (`commands`) reste dans `data/`.
- * Une variante ajoutée en Rust apparaît ici à la régénération.
+ * Plain aliases of the **generated** unions, like `LanguageTag`: an `import type` is
+ * erased at compile time, and the value boundary (`commands`) stays in `data/`.
  */
 import type { ChecklistItem, NoteKind } from '@core/ipc/bindings';
 
@@ -18,7 +9,7 @@ export type { ChecklistItem, NoteKind };
 export interface ChecklistProgress {
   readonly done: number;
   readonly total: number;
-  /** 0 à 100. Une liste vide vaut 0 : rien à faire n'est pas « tout fait ». */
+  /** 0 to 100. An empty list is 0: nothing to do is not "all done". */
   readonly percent: number;
 }
 
@@ -30,18 +21,10 @@ export function checklistProgress(items: readonly ChecklistItem[]): ChecklistPro
 }
 
 /**
- * Rendu Markdown, pour le presse-papier. Même forme que `notes::checklist::to_markdown`
- * côté Rust, qui sert au partage : deux usages, deux chemins, une seule syntaxe.
+ * A todo list's Markdown is **not** rendered here: `copyText` carries what
+ * `notes::checklist::to_markdown` produced, which is also what sharing and exporting
+ * emit. The front end used to hold a second copy of the `- [x] ` syntax.
  */
-export function checklistToText(items: readonly ChecklistItem[]): string {
-  return items.map((item) => `- [${item.done ? 'x' : ' '}] ${item.text}`).join('\n');
-}
-
-/** Ce qu'une note met dans le presse-papier, selon ce qu'elle est. */
-export function noteCopyText(note: {
-  readonly kind: NoteKind;
-  readonly content: string;
-  readonly items: readonly ChecklistItem[];
-}): string {
-  return note.kind === 'checklist' ? checklistToText(note.items) : note.content;
+export function noteCopyText(note: { readonly content: string; readonly copyText: string | null }): string {
+  return note.copyText ?? note.content;
 }

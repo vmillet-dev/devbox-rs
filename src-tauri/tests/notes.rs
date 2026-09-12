@@ -1,9 +1,3 @@
-//! Notes lues et écrites contre une vraie base : le chemin complet
-//! `storage::notes` puis `domain::view`, tel que `query_notes` l'assemble.
-//!
-//! Les règles ont leurs tests unitaires dans `domain/` ; ici on vérifie
-//! qu'elles s'appliquent à ce que la base a réellement rendu.
-
 use std::collections::BTreeMap;
 
 use diesel::SqliteConnection;
@@ -26,8 +20,8 @@ use devbox_lib::notes::store::{
 use devbox_lib::notes::view::{self, NoteFilter, NotesQuery, NotesView};
 use devbox_lib::spaces::store as spaces;
 
-/// Un tel raccourci n'existe pas dans le code de production : il inviterait à
-/// refiltrer côté front.
+/// No such shortcut exists in production code: it would invite re-filtering on the
+/// front end.
 fn list(connection: &mut SqliteConnection) -> Result<Vec<Note>, StorageError> {
     fetch(
         connection,
@@ -153,8 +147,6 @@ fn dropping_an_expiry_clears_the_stored_date() {
     };
     update(&mut connection, &created.id, &patch, t1()).unwrap();
 
-    // The schema's CHECK ties the two columns together: leaving the date
-    // behind would make the write fail outright.
     assert!(matches!(
         list(&mut connection).unwrap()[0].lifecycle,
         NoteLifecycle::Permanent
@@ -221,9 +213,6 @@ fn updating_refreshes_updated_at_but_not_created_at() {
 
 #[test]
 fn pasting_into_a_freshly_created_note_settles_its_language() {
-    // End to end for the ordinary gesture: create empty, then paste. The
-    // rule is tested in `domain::detect`; here we check it actually reaches
-    // the stored row.
     let mut connection = open_in_memory().unwrap();
     let space_id = space(&mut connection, "Perso");
     let empty = NoteDraft {
@@ -266,7 +255,6 @@ fn a_later_edit_does_not_move_the_language_again() {
     };
     let updated = update(&mut connection, &created.id, &second, t1()).unwrap();
 
-    // The note had an identity by then; only the first content decides.
     assert_eq!(updated.language, Language::Sql);
 }
 
@@ -306,7 +294,6 @@ fn a_checklist_is_read_back_in_the_order_it_was_written() {
         created.items,
         [item("Relire", true), item("Déployer", false)]
     );
-    // La position porte l'ordre : une relecture ne doit pas le retrier.
     assert_eq!(list(&mut connection).unwrap()[0].items, created.items);
 }
 
@@ -410,8 +397,6 @@ fn purging_removes_the_note_and_its_items_for_good() {
 
     purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
 
-    // Le `ON DELETE CASCADE` ne s'applique que si `PRAGMA foreign_keys` est posé
-    // sur la connexion — c'est ce que ce compte vérifie réellement.
     assert_eq!(
         note_items::table
             .count()
@@ -448,9 +433,6 @@ fn mixed_case_tags_come_back_in_the_same_order_a_reload_gives() {
     };
     let updated = update(&mut connection, &created.id, &patch, t1()).unwrap();
 
-    // The column is COLLATE NOCASE, so a read orders "auth" before "Urgent";
-    // a byte-wise sort on the write path would answer the other way round and
-    // the editor's tags would shuffle on the next reload.
     assert_eq!(updated.tags, ["auth", "Urgent"]);
     assert_eq!(list(&mut connection).unwrap()[0].tags, updated.tags);
 }
@@ -524,7 +506,6 @@ fn deleting_takes_the_note_off_the_canvas_without_destroying_it() {
     delete(&mut connection, &created.id, t1()).unwrap();
 
     assert!(list(&mut connection).unwrap().is_empty());
-    // Les tags survivent : ils reviendront avec la note si elle est restaurée.
     let kept_tags = note_tags::table
         .count()
         .get_result::<i64>(&mut connection)
@@ -552,7 +533,6 @@ fn a_restored_note_comes_back_whole() {
     let listed = list(&mut connection).unwrap();
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].tags, ["api", "auth"]);
-    // `updated_at` intact : restaurer ne fait pas remonter la note en tête.
     assert_eq!(listed[0].updated_at, t0());
 }
 
@@ -594,7 +574,6 @@ fn a_note_still_on_the_canvas_cannot_be_purged() {
     let space_id = space(&mut connection, "Perso");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    // Le sursis de 30 jours ne doit pas pouvoir être court-circuité.
     assert_eq!(
         purge(&mut connection, std::slice::from_ref(&created.id)).unwrap(),
         0
@@ -637,10 +616,7 @@ fn deleting_the_same_note_twice_reports_an_error_rather_than_a_silent_ok() {
     assert!(matches!(error, StorageError::NoteNotFound(_)));
 }
 
-// --- Valeurs des champs `{{…}}` ---------------------------------------------
-
-/// Le snippet de référence de cette section : deux champs, dont un à valeur
-/// par défaut.
+/// This section's reference snippet: two fields, one of them with a default.
 fn templated(space_id: &str) -> NoteDraft {
     NoteDraft {
         content: "psql -h {{host}} -p {{port=5432}}".to_string(),
@@ -669,8 +645,6 @@ fn a_filled_field_is_read_back_on_the_next_opening() {
 
 #[test]
 fn filling_a_field_does_not_touch_updated_at() {
-    // Le canevas trie sur cette colonne : une valeur tapée dans le panneau
-    // ferait sinon remonter la note en tête sans que rien de la note n'ait bougé.
     let mut connection = open_in_memory().unwrap();
     let space_id = space(&mut connection, "Perso");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
@@ -694,8 +668,6 @@ fn writing_the_values_replaces_the_whole_set() {
     )
     .unwrap();
 
-    // Ce qui n'est plus envoyé est ce que l'utilisateur a effacé : le laisser
-    // en base continuerait de remplir le texte avec.
     set_placeholder_values(&mut connection, &created.id, &values(&[("host", "db")])).unwrap();
 
     assert_eq!(
@@ -722,8 +694,6 @@ fn a_value_whose_token_left_the_content_stays_stored_but_out_of_the_fields() {
     )
     .unwrap();
 
-    // La valeur survit — le renommage peut être une faute de frappe — mais
-    // c'est le texte qui dit quels champs existent.
     assert_eq!(renamed.placeholder_values, values(&[("host", "db")]));
     let fields = decorate(renamed, t1()).placeholders;
     assert_eq!(fields.len(), 1);
@@ -754,8 +724,6 @@ fn purging_removes_the_note_and_its_values_for_good() {
 
     purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
 
-    // Comme pour les items : le `ON DELETE CASCADE` n'agit que si
-    // `PRAGMA foreign_keys` est posé sur la connexion.
     assert_eq!(
         note_placeholders::table
             .count()
@@ -764,8 +732,6 @@ fn purging_removes_the_note_and_its_values_for_good() {
         0
     );
 }
-
-// --- Variables globales -----------------------------------------------------
 
 #[test]
 fn global_variables_read_back_what_was_written() {
@@ -782,8 +748,6 @@ fn global_variables_read_back_what_was_written() {
 
 #[test]
 fn writing_the_set_again_drops_what_is_no_longer_sent() {
-    // Ce qui n'est plus envoyé est ce que l'utilisateur a retiré : une écriture
-    // partielle laisserait une variable effacée continuer à remplir les jetons.
     let mut connection = open_in_memory().unwrap();
     replace_global_placeholder_values(
         &mut connection,
@@ -810,7 +774,6 @@ fn a_global_variable_belongs_to_no_note_and_survives_a_purge() {
 
     purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
 
-    // Aucune cascade ne les atteint : elles n'ont pas de `note_id`.
     assert_eq!(
         global_placeholder_values(&mut connection).unwrap(),
         values(&[("host", "db.internal")])
@@ -827,8 +790,6 @@ fn a_global_variable_shows_up_as_the_suggested_value_of_a_field() {
     let mut display = decorate(created, t1());
     devbox_lib::notes::model::apply_global_defaults(&mut display, &globals);
 
-    // Proposée, pas saisie : la recopier dans `value` figerait la variable le
-    // jour où elle change.
     let field = display
         .placeholders
         .iter()
@@ -837,8 +798,6 @@ fn a_global_variable_shows_up_as_the_suggested_value_of_a_field() {
     assert_eq!(field.default_value, "db.internal");
     assert!(field.value.is_empty());
 }
-
-// --- Actions en masse -------------------------------------------------------
 
 #[test]
 fn moving_a_selection_leaves_the_notes_already_there_untouched() {
@@ -856,7 +815,6 @@ fn moving_a_selection_leaves_the_notes_already_there_untouched() {
     )
     .unwrap();
 
-    // Celle qui y était déjà n'est pas comptée, et son `updated_at` ne bouge pas.
     assert_eq!(count, 1);
     let listed = list(&mut connection).unwrap();
     assert!(listed.iter().all(|note| note.space_id == target));
@@ -909,7 +867,6 @@ fn tagging_twice_does_not_duplicate_the_tag() {
     let space_id = space(&mut connection, "Perso");
     let note = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    // La clé primaire de `note_tags` est NOCASE : la seconde pose est ignorée.
     tag_many(
         &mut connection,
         std::slice::from_ref(&note.id),
@@ -920,8 +877,6 @@ fn tagging_twice_does_not_duplicate_the_tag() {
 
     assert_eq!(list(&mut connection).unwrap()[0].tags, ["api", "auth"]);
 }
-
-// --- Gestion globale des tags -----------------------------------------------
 
 #[test]
 fn every_tag_is_listed_with_the_number_of_notes_carrying_it() {
@@ -956,7 +911,6 @@ fn renaming_a_tag_onto_an_existing_one_merges_them() {
     let space_id = space(&mut connection, "Perso");
     let note = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    // La note porte déjà « auth » : un `UPDATE` violerait la clé primaire.
     let touched = retag(&mut connection, &["api".to_string()], "auth").unwrap();
 
     assert_eq!(touched, 1);
@@ -986,8 +940,6 @@ fn correcting_the_case_of_a_tag_does_not_erase_it() {
     let space_id = space(&mut connection, "Perso");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    // La cible figure parmi les sources : supprimer « auth » après avoir écrit
-    // « Auth » effacerait les deux, la collation étant NOCASE.
     retag(&mut connection, &["auth".to_string()], "Auth").unwrap();
 
     assert_eq!(list(&mut connection).unwrap()[0].tags, ["api", "Auth"]);
@@ -1014,12 +966,8 @@ fn a_global_retag_does_not_float_the_corpus_to_the_top_of_the_canvas() {
 
     retag(&mut connection, &["auth".to_string()], "identity").unwrap();
 
-    // Le canevas trie sur `updated_at` : le toucher remonterait toutes les
-    // notes que personne n'a rouvertes.
     assert_eq!(list(&mut connection).unwrap()[0].updated_at, t0());
 }
-
-// --- Export et import -------------------------------------------------------
 
 #[test]
 fn an_export_reads_every_live_note_of_a_space() {
@@ -1069,8 +1017,6 @@ fn importing_the_same_note_twice_leaves_the_first_one_alone() {
     let mut note = create(&mut connection, draft(&space_id), t0()).unwrap();
     note.title = "Écrasé ?".to_string();
 
-    // Même identifiant : l'import doit compter la note comme ignorée, pas
-    // remplacer ce que la machine contient déjà.
     assert!(!insert_imported(&mut connection, &note).unwrap());
     assert_eq!(list(&mut connection).unwrap()[0].title, "Titre");
 }
@@ -1089,8 +1035,8 @@ fn sharing_a_selection_reads_the_notes_it_names() {
     assert!(by_ids(&mut connection, &[]).unwrap().is_empty());
 }
 
-/// Neutral query: everything, no search, no tags. Tests override one field
-/// at a time so each one states exactly what it exercises.
+/// Neutral query: tests override one field at a time, so each states exactly what
+/// it exercises.
 fn all_notes() -> NotesQuery {
     NotesQuery {
         space_id: None,
@@ -1241,8 +1187,6 @@ fn a_quick_filter_alone_does_not_switch_to_results_mode() {
     )
     .unwrap();
 
-    // Pinned/untriaged narrow a view that stays chronological; only a search
-    // or a tag selection collapses it into a flat result list.
     assert!(!view.is_filtering);
 }
 
@@ -1309,8 +1253,6 @@ fn the_search_ignores_case_beyond_ascii() {
     )
     .unwrap();
 
-    // SQLite's LOWER() only folds ASCII, so "É" would never match "é" if the
-    // search were pushed into SQL. This is why it is done in Rust.
     let view = query(
         &mut connection,
         &NotesQuery {
@@ -1359,8 +1301,6 @@ fn a_note_matches_when_it_carries_at_least_one_selected_tag() {
     )
     .unwrap();
 
-    // A facet rail is a union, not an intersection: requiring every tag
-    // would make a second selection almost always empty.
     let ids = matched_ids(&view);
     assert_eq!(ids.len(), 2);
     assert!(ids.contains(&one.id) && ids.contains(&two.id));
@@ -1400,8 +1340,6 @@ fn a_selected_tag_matches_a_stored_one_of_a_different_case() {
     )
     .unwrap();
 
-    // Without COLLATE NOCASE on note_tags.tag the IN (…) comparison runs in
-    // BINARY and misses: the rail would offer a facet selecting nothing.
     assert_eq!(view.matched, 1);
 }
 
@@ -1414,8 +1352,6 @@ fn the_rail_offers_one_facet_for_tags_differing_only_in_case() {
 
     let view = query(&mut connection, &all_notes()).unwrap();
 
-    // normalize_tags folds case within one note; the collation extends that
-    // to the whole corpus, which is what the rail reads.
     assert_eq!(view.available_tags.len(), 1);
 }
 
@@ -1436,7 +1372,6 @@ fn criteria_combine_rather_than_replace_each_other() {
         t0(),
     )
     .unwrap();
-    // Each of these fails exactly one criterion.
     create(
         &mut connection,
         NoteDraft {
@@ -1514,8 +1449,6 @@ fn a_note_matches_when_it_is_written_in_one_of_the_selected_languages() {
     )
     .unwrap();
 
-    // A union like the tag rail, not an intersection: a note has exactly one
-    // language, so requiring all of them would always match nothing.
     let ids = matched_ids(&view);
     assert_eq!(ids.len(), 2);
     assert!(ids.contains(&json.id) && ids.contains(&yml.id));
@@ -1589,7 +1522,6 @@ fn available_languages_are_scoped_to_the_active_space() {
     )
     .unwrap();
 
-    // Offering a language that filters nothing in the current space is noise.
     assert_eq!(view.available_languages, [Language::Json]);
 }
 
@@ -1609,8 +1541,6 @@ fn available_languages_ignore_the_current_selection() {
     )
     .unwrap();
 
-    // Narrowing the rail to the current results would make a second selection
-    // impossible.
     assert_eq!(view.available_languages, [Language::Json, Language::Yml]);
     assert_eq!(view.matched, 1);
 }
@@ -1687,8 +1617,6 @@ fn a_search_matching_nothing_reports_filtering_with_zero_matches() {
     )
     .unwrap();
 
-    // The pair (is_filtering, matched) is what lets the UI say "no results"
-    // rather than "this space is empty".
     assert!(view.is_filtering);
     assert_eq!(view.matched, 0);
 }
@@ -1728,8 +1656,6 @@ fn a_normalised_write_returns_what_a_read_would_return() {
 
     let created = create(&mut connection, tagged(&space_id, &["zeta", "alpha"]), t0()).unwrap();
 
-    // The front adopts the returned note; a different order here would make
-    // the tags jump around on the next reload.
     assert_eq!(created.tags, list(&mut connection).unwrap()[0].tags);
 }
 
@@ -1743,15 +1669,11 @@ fn deleting_a_space_takes_its_notes_with_it() {
         .execute(&mut connection)
         .unwrap();
 
-    // No command exposes this yet, but the cascade must already hold:
-    // a note whose space is gone would be invisible and unreachable.
     assert!(list(&mut connection).unwrap().is_empty());
 }
 
 #[test]
 fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
-    // Les branches « date illisible » du domaine ont disparu avec le typage :
-    // la faillibilité a migré ici, où elle est signalée au lieu d'être devinée.
     let mut connection = open_in_memory().unwrap();
     let space_id = space(&mut connection, "Perso");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
@@ -1774,8 +1696,6 @@ fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
 
 #[test]
 fn a_stored_date_always_carries_its_milliseconds() {
-    // Le canevas trie sur cette colonne TEXT : sans millisecondes, deux notes de
-    // la même seconde s'ordonnent à l'envers (voir `domain::iso8601`).
     let mut connection = open_in_memory().unwrap();
     let space_id = space(&mut connection, "Perso");
     let round_second = at("2026-07-25T09:00:00Z");

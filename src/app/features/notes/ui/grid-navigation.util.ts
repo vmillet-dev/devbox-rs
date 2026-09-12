@@ -1,11 +1,7 @@
 /**
- * Déplacement du focus dans une grille dont le nombre de colonnes n'est connu
- * qu'à l'écran : il dépend de la largeur de la fenêtre, et les sections n'ont
- * pas toutes le même nombre de cartes.
- *
- * D'où des **positions mesurées** plutôt qu'un nombre de colonnes : les lignes
- * se déduisent des `top` identiques, et la colonne la plus proche se choisit sur
- * `left`. Fonction pure, donc testable sans DOM.
+ * The column count is only known on screen: it depends on the window width, and sections
+ * do not all hold the same number of cards. Hence **measured positions** — rows are
+ * deduced from equal `top`s, and the nearest column is picked on `left`.
  */
 export interface CardBox {
   readonly top: number;
@@ -14,52 +10,58 @@ export interface CardBox {
 
 export type FocusDirection = 'prev' | 'next' | 'up' | 'down';
 
-/** Deux cartes de la même ligne peuvent différer de quelques pixels. */
+/** Two cards of the same row can differ by a few pixels. */
 const ROW_TOLERANCE = 4;
 
-function rowsOf(boxes: readonly CardBox[]): number[][] {
-  const rows: number[][] = [];
+interface PositionedCard {
+  readonly index: number;
+  readonly box: CardBox;
+}
+
+interface Row {
+  readonly top: number;
+  readonly cards: PositionedCard[];
+}
+
+function rowsOf(boxes: readonly CardBox[]): readonly Row[] {
+  const rows: Row[] = [];
 
   boxes.forEach((box, index) => {
-    const row = rows.find((candidate) => {
-      const first = boxes[candidate[0]];
-      return Math.abs(first.top - box.top) <= ROW_TOLERANCE;
-    });
-
+    const row = rows.find((candidate) => Math.abs(candidate.top - box.top) <= ROW_TOLERANCE);
     if (row) {
-      row.push(index);
+      row.cards.push({ index, box });
     } else {
-      rows.push([index]);
+      rows.push({ top: box.top, cards: [{ index, box }] });
     }
   });
 
   return rows;
 }
 
-/**
- * Renvoie l'index à focaliser, ou `current` quand le déplacement sort de la
- * grille — buter en silence vaut mieux que de reboucler, qui ferait perdre de
- * vue où on en est.
- */
+/** `current` when the move leaves the grid: stopping silently beats wrapping around. */
 export function nextFocusIndex(
   boxes: readonly CardBox[],
   current: number,
   direction: FocusDirection,
 ): number {
   if (boxes.length === 0) return -1;
-  if (current < 0 || current >= boxes.length) return 0;
+
+  const currentBox = boxes[current];
+  if (!currentBox) return 0;
 
   if (direction === 'prev') return Math.max(0, current - 1);
   if (direction === 'next') return Math.min(boxes.length - 1, current + 1);
 
   const rows = rowsOf(boxes);
-  const rowIndex = rows.findIndex((row) => row.includes(current));
+  const rowIndex = rows.findIndex((row) => row.cards.some((card) => card.index === current));
   const targetRow = rows[rowIndex + (direction === 'down' ? 1 : -1)];
   if (!targetRow) return current;
 
-  const { left } = boxes[current];
-
-  return targetRow.reduce((closest, candidate) =>
-    Math.abs(boxes[candidate].left - left) < Math.abs(boxes[closest].left - left) ? candidate : closest,
+  const nearest = targetRow.cards.reduce((closest, candidate) =>
+    Math.abs(candidate.box.left - currentBox.left) < Math.abs(closest.box.left - currentBox.left)
+      ? candidate
+      : closest,
   );
+
+  return nearest.index;
 }

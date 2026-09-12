@@ -35,8 +35,8 @@ describe('TrashStore', () => {
   });
 
   it('loads nothing until the panel is opened', () => {
-    // La corbeille ne s'affiche nulle part ailleurs : une ressource permanente
-    // relancerait une requête à chaque suppression.
+    // The trash is displayed nowhere else: a permanent resource would re-query on
+    // every deletion.
     expect(harness.store.notes()).toEqual([]);
     expect(harness.store.isOpen()).toBe(false);
   });

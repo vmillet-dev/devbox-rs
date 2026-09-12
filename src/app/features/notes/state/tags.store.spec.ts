@@ -62,8 +62,8 @@ describe('TagsStore', () => {
   });
 
   it('merges when several tags are selected', async () => {
-    // Renommer vers un tag existant *est* une fusion côté base : le store ne
-    // fait que choisir la commande dont le nom le dit.
+    // Renaming onto an existing tag *is* a merge in the database: the store only
+    // picks the command whose name says so.
     await harness.store.open();
     harness.store.toggle('auth');
     harness.store.toggle('api');

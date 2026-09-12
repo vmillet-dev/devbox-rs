@@ -1,13 +1,5 @@
 @use 'mixins' as *;
 
-.news-backdrop {
-  @include backdrop(55);
-}
-
-.news-panel {
-  @include help-panel(600px);
-}
-
 .news-header {
   @include help-header;
 }

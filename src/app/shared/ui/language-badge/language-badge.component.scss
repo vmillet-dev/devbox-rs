@@ -9,11 +9,9 @@
   letter-spacing: 0.4px;
 }
 
-// La palette du thème n'offre que six teintes, pour treize langages : elles sont
-// donc partagées par familles. Ce n'est pas une perte d'information — le libellé
-// du badge nomme le langage ; la couleur ne fait que le regrouper à l'oeil.
+// Six hues for thirteen languages, shared by family: the label names the language, the
+// colour only groups it at a glance.
 
-// Formats de données.
 .lang-json,
 .lang-ts,
 .lang-xml {

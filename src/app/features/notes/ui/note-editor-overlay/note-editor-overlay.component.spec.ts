@@ -5,6 +5,7 @@ import { PreferencesService } from '@core/preferences/preferences.service';
 import { CodeViewerComponent } from '@shared/ui/code-viewer/code-viewer.component';
 import { LifecycleBadgeComponent } from '../lifecycle-badge/lifecycle-badge.component';
 import { TagPillComponent } from '@shared/ui/tag-pill/tag-pill.component';
+import { NotePatch } from '@features/notes/model/note.model';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
 import { NoteEditorOverlayComponent } from './note-editor-overlay.component';
@@ -37,6 +38,19 @@ describe('NoteEditorOverlayComponent', () => {
     return fixture.nativeElement.querySelector(selector).textContent.replace(/\s+/g, ' ').trim();
   }
 
+  /**
+   * What successive patches carried for one field: the editor emits one patch for
+   * everything it changes.
+   */
+  function patched<K extends keyof NotePatch>(field: K): NonNullable<NotePatch[K]>[] {
+    const values: NonNullable<NotePatch[K]>[] = [];
+    fixture.componentInstance.patchRequested.subscribe((patch) => {
+      const value = patch[field];
+      if (value !== undefined) values.push(value as NonNullable<NotePatch[K]>);
+    });
+    return values;
+  }
+
   async function type(element: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> {
     element.value = value;
     element.dispatchEvent(new Event('input'));
@@ -50,9 +64,8 @@ describe('NoteEditorOverlayComponent', () => {
   }
 
   /**
-   * The seam the fullscreen preference goes through. TestBed hands out a fresh
-   * instance per test, so nothing leaks between them; `recreateOverlay` keeps
-   * the same one, which is exactly what "stored in a previous session" means here.
+   * The seam the fullscreen preference goes through: `recreateOverlay` keeps the same
+   * instance, which is what "stored in a previous session" means here.
    */
   function preferences(): PreferencesService {
     return TestBed.inject(PreferencesService);
@@ -83,7 +96,7 @@ describe('NoteEditorOverlayComponent', () => {
   });
 
   it('renders nothing when there is no note', () => {
-    expect(fixture.debugElement.query(By.css('.overlay-backdrop'))).toBeNull();
+    expect(fixture.debugElement.query(By.css('.dialog-backdrop'))).toBeNull();
   });
 
   it('falls back to sensible defaults for the footer computed values when there is no note', () => {
@@ -128,7 +141,6 @@ describe('NoteEditorOverlayComponent', () => {
   });
 
   it('invites the user to write when the note is empty', async () => {
-    // An empty body looks like a rendering bug rather than an empty note.
     fixture.componentRef.setInput('note', createNote({ content: '' }));
     await fixture.whenStable();
 
@@ -149,7 +161,7 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('declares itself a modal dialog named by its title field', () => {
-      const panel = fixture.nativeElement.querySelector('.overlay-panel');
+      const panel = fixture.nativeElement.querySelector('.dialog-panel');
 
       expect(panel.getAttribute('role')).toBe('dialog');
       expect(panel.getAttribute('aria-modal')).toBe('true');
@@ -157,9 +169,7 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('moves focus into the dialog when it opens', () => {
-      // Otherwise focus stays on the card behind and Tab wanders through
-      // content hidden by the overlay.
-      expect(fixture.nativeElement.querySelector('.overlay-panel').contains(document.activeElement)).toBe(
+      expect(fixture.nativeElement.querySelector('.dialog-panel').contains(document.activeElement)).toBe(
         true,
       );
     });
@@ -188,11 +198,9 @@ describe('NoteEditorOverlayComponent', () => {
 
   describe('title editing', () => {
     it('emits the new title on blur rather than on every keystroke', async () => {
-      // Persisting per keystroke means one IPC round-trip per character.
       fixture.componentRef.setInput('note', createNote({ title: 'Before' }));
       await fixture.whenStable();
-      const emitted: string[] = [];
-      fixture.componentInstance.titleChanged.subscribe((title) => emitted.push(title));
+      const emitted = patched('title');
 
       await type(titleInput(), 'After');
       expect(emitted).toEqual([]);
@@ -200,17 +208,6 @@ describe('NoteEditorOverlayComponent', () => {
       titleInput().dispatchEvent(new Event('blur'));
 
       expect(emitted).toEqual(['After']);
-    });
-
-    it('stays silent when the title comes back to its original value', async () => {
-      fixture.componentRef.setInput('note', createNote({ title: 'Same' }));
-      await fixture.whenStable();
-      let emitted = false;
-      fixture.componentInstance.titleChanged.subscribe(() => (emitted = true));
-
-      titleInput().dispatchEvent(new Event('blur'));
-
-      expect(emitted).toBe(false);
     });
 
     it('resets the draft when another note is opened', async () => {
@@ -234,7 +231,6 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('keeps the highlighted layer in sync with the draft as the user types', async () => {
-      // The whole point of the overlaid textarea: colours must not vanish mid-edit.
       fixture.componentRef.setInput('note', createNote({ content: '{"a":1}', language: 'json' }));
       await fixture.whenStable();
 
@@ -255,8 +251,7 @@ describe('NoteEditorOverlayComponent', () => {
     it('emits the new content on blur', async () => {
       fixture.componentRef.setInput('note', createNote({ content: 'before' }));
       await fixture.whenStable();
-      const emitted: string[] = [];
-      fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
+      const emitted = patched('content');
 
       await type(bodyEditor(), 'after');
       expect(emitted).toEqual([]);
@@ -277,13 +272,9 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('confirms a paste immediately instead of waiting for the blur', async () => {
-      // The paste is what gives an empty note its language, and the language is
-      // only known once the content is persisted: waiting would leave the badge
-      // on TXT, which reads as "nothing was recognised".
       fixture.componentRef.setInput('note', createNote({ content: '' }));
       await fixture.whenStable();
-      const emitted: string[] = [];
-      fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
+      const emitted = patched('content');
 
       bodyEditor().value = 'interface Note { id: string }';
       bodyEditor().dispatchEvent(new InputEvent('input', { inputType: 'insertFromPaste' }));
@@ -293,11 +284,9 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('still defers plain typing to the blur', async () => {
-      // One IPC round-trip per character is exactly what the draft avoids.
       fixture.componentRef.setInput('note', createNote({ content: '' }));
       await fixture.whenStable();
-      const emitted: string[] = [];
-      fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
+      const emitted = patched('content');
 
       bodyEditor().value = 'a';
       bodyEditor().dispatchEvent(new InputEvent('input', { inputType: 'insertText' }));
@@ -310,9 +299,8 @@ describe('NoteEditorOverlayComponent', () => {
       fixture.componentRef.setInput('note', createNote({ content: 'before' }));
       await fixture.whenStable();
       let closed = false;
-      const emitted: string[] = [];
       fixture.componentInstance.closed.subscribe(() => (closed = true));
-      fixture.componentInstance.contentChanged.subscribe((content) => emitted.push(content));
+      const emitted = patched('content');
 
       bodyEditor().focus();
       await type(bodyEditor(), 'after');
@@ -326,11 +314,6 @@ describe('NoteEditorOverlayComponent', () => {
   });
 
   describe('pasting an image', () => {
-    /**
-     * Only the *types* are populated: the component reads nothing else, and the
-     * bytes are re-read natively, where the system clipboard hands them over
-     * already decoded.
-     */
     function pasteEvent(types: string[], files: File[] = []): Event {
       const event = new Event('paste', { bubbles: true, cancelable: true });
       Object.defineProperty(event, 'clipboardData', { value: { types, files } });
@@ -353,7 +336,6 @@ describe('NoteEditorOverlayComponent', () => {
       await fixture.whenStable();
 
       expect(pasted).toEqual(['image']);
-      // Letting the paste through would drop it on the floor: the field is text.
       expect(event.defaultPrevented).toBe(true);
     });
 
@@ -368,7 +350,6 @@ describe('NoteEditorOverlayComponent', () => {
 
     it('leaves a paste carrying text to the field, which handles it natively', async () => {
       const pasted = await openNote();
-      // A screenshot copied from a browser carries both: the text wins.
       const event = pasteEvent(['text/plain', 'image/png']);
 
       bodyEditor().dispatchEvent(event);
@@ -396,8 +377,7 @@ describe('NoteEditorOverlayComponent', () => {
     it('shows the stored context and emits the new one on blur', async () => {
       fixture.componentRef.setInput('note', createNote({ source: 'Before' }));
       await fixture.whenStable();
-      const emitted: string[] = [];
-      fixture.componentInstance.sourceChanged.subscribe((source) => emitted.push(source));
+      const emitted = patched('source');
 
       expect(sourceInput().value).toBe('Before');
 
@@ -410,11 +390,9 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('confirms the pending context before closing', async () => {
-      // Escape, the backdrop and the close button all skip `blur`.
       fixture.componentRef.setInput('note', createNote({ source: '' }));
       await fixture.whenStable();
-      const emitted: string[] = [];
-      fixture.componentInstance.sourceChanged.subscribe((source) => emitted.push(source));
+      const emitted = patched('source');
 
       await type(sourceInput(), 'API');
       fixture.debugElement.query(By.css('.close-btn')).triggerEventHandler('click');
@@ -423,8 +401,6 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('resets the draft when another note is opened', async () => {
-      // Keyed on the id, not on the note: every save produces a new object and
-      // would otherwise wipe what is being typed.
       fixture.componentRef.setInput('note', createNote({ id: 'a', source: 'First' }));
       await fixture.whenStable();
       await type(sourceInput(), 'Edited');
@@ -438,12 +414,9 @@ describe('NoteEditorOverlayComponent', () => {
 
   describe('closing', () => {
     it('confirms the pending title before closing', async () => {
-      // Escape, the backdrop and the close button all skip `blur`: without this
-      // the last edit would be silently dropped.
       fixture.componentRef.setInput('note', createNote({ title: 'Before' }));
       await fixture.whenStable();
-      const titles: string[] = [];
-      fixture.componentInstance.titleChanged.subscribe((title) => titles.push(title));
+      const titles = patched('title');
 
       await type(titleInput(), 'After');
       fixture.debugElement.query(By.css('.close-btn')).triggerEventHandler('click');
@@ -454,8 +427,7 @@ describe('NoteEditorOverlayComponent', () => {
     it('confirms the pending body before closing', async () => {
       fixture.componentRef.setInput('note', createNote({ content: 'before' }));
       await fixture.whenStable();
-      const contents: string[] = [];
-      fixture.componentInstance.contentChanged.subscribe((content) => contents.push(content));
+      const contents = patched('content');
 
       await type(bodyEditor(), 'after');
       fixture.debugElement.query(By.css('.close-btn')).triggerEventHandler('click');
@@ -501,7 +473,7 @@ describe('NoteEditorOverlayComponent', () => {
       fixture.componentInstance.closed.subscribe(() => (emitted = true));
 
       fixture.nativeElement
-        .querySelector('.overlay-backdrop')
+        .querySelector('.dialog-backdrop')
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
       expect(emitted).toBe(true);
@@ -514,7 +486,7 @@ describe('NoteEditorOverlayComponent', () => {
       fixture.componentInstance.closed.subscribe(() => (emitted = true));
 
       fixture.nativeElement
-        .querySelector('.overlay-panel')
+        .querySelector('.dialog-panel')
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
       expect(emitted).toBe(false);
@@ -548,66 +520,61 @@ describe('NoteEditorOverlayComponent', () => {
     it('emits the picked language', async () => {
       fixture.componentRef.setInput('note', createNote({ language: 'txt' }));
       await fixture.whenStable();
-      let emitted: string | undefined;
-      fixture.componentInstance.languageChanged.subscribe((language) => (emitted = language));
+      const emitted = patched('language');
 
       const select = fixture.nativeElement.querySelector('.overlay-language-select') as HTMLSelectElement;
       select.value = 'json';
       select.dispatchEvent(new Event('change'));
 
-      expect(emitted).toBe('json');
+      expect(emitted).toEqual(['json']);
     });
   });
 
   describe('tags', () => {
-    it('emits the tag to remove', async () => {
+    it('sends the list without the tag that was removed', async () => {
       fixture.componentRef.setInput('note', createNote({ tags: ['keep', 'drop'] }));
       await fixture.whenStable();
-      let emitted: string | undefined;
-      fixture.componentInstance.tagRemoved.subscribe((tag) => (emitted = tag));
+      const emitted = patched('tags');
 
       const removeButtons = fixture.nativeElement.querySelectorAll('.tag-remove');
       (removeButtons[1] as HTMLButtonElement).click();
 
-      expect(emitted).toBe('drop');
+      expect(emitted).toEqual([['keep']]);
     });
 
-    it('emits the typed tag on submit and clears the field', async () => {
-      fixture.componentRef.setInput('note', createNote({ tags: [] }));
+    it('sends the list with the typed tag appended, and clears the field', async () => {
+      fixture.componentRef.setInput('note', createNote({ tags: ['keep'] }));
       await fixture.whenStable();
-      let emitted: string | undefined;
-      fixture.componentInstance.tagAdded.subscribe((tag) => (emitted = tag));
+      const emitted = patched('tags');
 
       const input = fixture.nativeElement.querySelector('.tag-add-input') as HTMLInputElement;
       await type(input, 'urgent');
       input.form?.dispatchEvent(new Event('submit', { cancelable: true }));
       await fixture.whenStable();
 
-      expect(emitted).toBe('urgent');
+      expect(emitted).toEqual([['keep', 'urgent']]);
       expect(input.value).toBe('');
     });
 
     it('ignores a blank tag submission', async () => {
       fixture.componentRef.setInput('note', createNote({ tags: [] }));
       await fixture.whenStable();
-      let emitted = false;
-      fixture.componentInstance.tagAdded.subscribe(() => (emitted = true));
+      const emitted = patched('tags');
 
       const input = fixture.nativeElement.querySelector('.tag-add-input') as HTMLInputElement;
       await type(input, '   ');
       input.form?.dispatchEvent(new Event('submit', { cancelable: true }));
       await fixture.whenStable();
 
-      expect(emitted).toBe(false);
+      expect(emitted).toEqual([]);
     });
   });
 
   describe('pinning and deletion', () => {
-    it('emits pinToggled when the pin button is clicked, and reflects the pinned state', async () => {
+    it('asks for the opposite pin state, and reflects the current one', async () => {
       fixture.componentRef.setInput('note', createNote({ pinned: false }));
       await fixture.whenStable();
-      let emitted = false;
-      fixture.componentInstance.pinToggled.subscribe(() => (emitted = true));
+      const emitted = patched('pinned');
 
       const pinButton = fixture.debugElement.query(By.css('.toolbar-btn'));
       expect(text('.toolbar-btn')).toBe('📌 Épingler');
@@ -615,7 +582,7 @@ describe('NoteEditorOverlayComponent', () => {
 
       pinButton.triggerEventHandler('click');
 
-      expect(emitted).toBe(true);
+      expect(emitted).toEqual([true]);
     });
 
     it('shows the pinned label and class when the note is pinned', async () => {
@@ -627,8 +594,6 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('asks for confirmation before emitting a deletion', async () => {
-      // A single click on a destructive action is too easy to hit by accident,
-      // and a native confirm() would freeze the whole WebView.
       fixture.componentRef.setInput('note', createNote());
       await fixture.whenStable();
       let emitted = false;
@@ -677,8 +642,6 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('shows an existing deadline in the local timezone', async () => {
-      // Built from local parts on purpose: a UTC-based conversion would show
-      // the previous day west of Greenwich.
       const at = new Date(2026, 7, 1, 23, 59, 59, 999);
       fixture.componentRef.setInput('note', createNote({ lifecycle: { kind: 'expires', at } }));
       await fixture.whenStable();
@@ -687,23 +650,17 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('emits a deadline at the end of the chosen local day', async () => {
-      const emitted: { kind: string; at?: Date }[] = [];
-      fixture.componentInstance.lifecycleChanged.subscribe((lifecycle) => emitted.push(lifecycle));
+      const emitted = patched('lifecycle');
       fixture.componentRef.setInput('note', createNote());
       await fixture.whenStable();
 
       await pick('2026-08-01');
 
-      // Midnight would make a note dated today already expired the moment it
-      // is set; the end of the day is what the user means by "until then".
-      expect(emitted).toHaveLength(1);
-      expect(emitted[0].kind).toBe('expires');
-      expect(emitted[0].at).toEqual(new Date(2026, 7, 1, 23, 59, 59, 999));
+      expect(emitted).toEqual([{ kind: 'expires', at: new Date(2026, 7, 1, 23, 59, 59, 999) }]);
     });
 
     it('makes the note permanent again when the field is cleared', async () => {
-      const emitted: { kind: string }[] = [];
-      fixture.componentInstance.lifecycleChanged.subscribe((lifecycle) => emitted.push(lifecycle));
+      const emitted = patched('lifecycle');
       fixture.componentRef.setInput(
         'note',
         createNote({
@@ -718,15 +675,12 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('ignores an unparseable value rather than emitting an invalid date', async () => {
-      const emitted: unknown[] = [];
-      fixture.componentInstance.lifecycleChanged.subscribe(() => emitted.push(true));
+      const emitted = patched('lifecycle');
       fixture.componentRef.setInput('note', createNote());
       await fixture.whenStable();
 
-      // Driven through the handler and not the field: a date input sanitizes
-      // anything malformed to "", so the guard is unreachable from the DOM. It
-      // still matters — an `Invalid Date` would only blow up later, at the
-      // serialisation boundary, with no field name attached.
+      // Driven through the handler and not the field: a date input sanitizes anything
+      // malformed to "", so the guard is unreachable from the DOM.
       (fixture.componentInstance as unknown as { onExpiryChange: (v: string) => void }).onExpiryChange(
         'pas-une-date',
       );
@@ -745,7 +699,7 @@ describe('NoteEditorOverlayComponent', () => {
 
   describe('fullscreen', () => {
     function panel(): HTMLElement {
-      return fixture.nativeElement.querySelector('.overlay-panel');
+      return fixture.nativeElement.querySelector('.dialog-panel');
     }
 
     async function openNote(): Promise<void> {
@@ -780,7 +734,6 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('keeps the choice while another note is opened', async () => {
-      // A display preference, not note state: switching notes must not reset it.
       fullscreenButton().click();
       await fixture.whenStable();
 
@@ -842,8 +795,6 @@ describe('NoteEditorOverlayComponent', () => {
     }
 
     it('shows no panel for a note without a single token', async () => {
-      // Un en-tête toujours présent et toujours vide serait une fonction que
-      // personne n'utilise.
       fixture.componentRef.setInput('note', createNote());
       await fixture.whenStable();
 
@@ -872,8 +823,6 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('confirms the pending values before closing', async () => {
-      // Ni la croix, ni Échap, ni le fond ne produisent de blur : sans ce
-      // rattrapage, la dernière valeur tapée serait perdue.
       await openTemplated();
       let emitted: Record<string, string> | undefined;
       fixture.componentInstance.placeholderValuesChanged.subscribe((values) => (emitted = values));
@@ -908,8 +857,6 @@ describe('NoteEditorOverlayComponent', () => {
       copyButton.click();
       await fixture.whenStable();
 
-      // Le corps en cours de frappe et les valeurs en cours de saisie : rien de
-      // tout cela n'est encore enregistré, et la copie doit rendre ce qu'on voit.
       expect(requests).toEqual([
         {
           content: 'psql -h {{host}} -p {{port}} -d app',
@@ -949,8 +896,6 @@ describe('NoteEditorOverlayComponent', () => {
       panelAction('Aperçu')?.click();
       await fixture.whenStable();
 
-      // Rien n'est encore revenu du back : mieux vaut le texte qu'on édite
-      // qu'un corps vide le temps d'un aller-retour.
       expect(bodyEditor()).not.toBeNull();
     });
 
@@ -963,8 +908,6 @@ describe('NoteEditorOverlayComponent', () => {
       fixture.nativeElement.querySelector('.panel-toggle').click();
       await fixture.whenStable();
 
-      // La bascule vit dans le panneau : la replier en laissant le corps en
-      // lecture seule enfermerait l'utilisateur dans un mode sans issue.
       expect(bodyEditor()).not.toBeNull();
     });
   });

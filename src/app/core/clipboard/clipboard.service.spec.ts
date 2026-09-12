@@ -38,7 +38,6 @@ describe('ClipboardService', () => {
   });
 
   it('reports failure rather than throwing when the plugin is unavailable', async () => {
-    // This is the case outside Tauri, and the one every other spec runs under.
     setUp(fakeAdapter({ writeText: vi.fn(async () => Promise.reject(new Error('no plugin'))) }));
 
     await expect(service.copy('x')).resolves.toBe(false);

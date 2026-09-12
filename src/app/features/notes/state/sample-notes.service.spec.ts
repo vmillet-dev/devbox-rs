@@ -48,7 +48,6 @@ describe('SampleNotesService', () => {
   });
 
   it('files a space and its samples into a database that has never been written to', async () => {
-    // An empty canvas has no space, so not even a note can be created.
     expect(await service.seedIfFirstRun()).toBe(true);
 
     expect((await spaces.loadAll()).map((space) => space.name)).toEqual(['Découverte']);
@@ -60,10 +59,7 @@ describe('SampleNotesService', () => {
     await service.seedIfFirstRun();
     const [welcome, snippet, checklist, code] = drafts();
 
-    // Pinned, so the first screen is not an empty "pinned" heading.
     expect(welcome.pinned).toBe(true);
-    // The fields have to come from the code: Transloco reads `{{name}}` as an
-    // interpolation and would blank them out of a translation.
     expect(snippet.content).toContain('{{host}}');
     expect(snippet.content).toContain('{{port=5432}}');
     expect(checklist.kind).toBe('checklist');

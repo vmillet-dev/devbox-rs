@@ -3,9 +3,8 @@ import { TransferRepository } from '@features/notes/data/transfer.repository';
 import { ExportReport, ImportReport } from '@features/notes/model/note.model';
 
 /**
- * In-memory `TransferRepository` test double. It writes and reads nothing: the
- * file is the backend's business, so the double records the arguments and hands
- * back the report the spec asked for.
+ * It writes and reads nothing: the file is the back end's business, so the double records
+ * the arguments and hands back the report the spec asked for.
  */
 export class FakeTransferRepository implements Pick<TransferRepository, keyof TransferRepository> {
   /** When set, the next call to any method rejects with this error, then clears. */

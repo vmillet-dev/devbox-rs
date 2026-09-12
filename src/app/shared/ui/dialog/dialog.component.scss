@@ -1,0 +1,48 @@
+@use 'mixins' as *;
+
+// `contents` and not a block: the host would otherwise leave an inline box in the flow.
+:host {
+  display: contents;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(var(--backdrop-rgb), var(--dialog-scrim, 0.6));
+  backdrop-filter: blur(2px);
+  display: flex;
+  justify-content: center;
+  align-items: var(--dialog-align, center);
+  padding-top: var(--dialog-offset, 0);
+}
+
+.dialog-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dialog-gap, 12px);
+  max-width: 92vw;
+  max-height: 92vh;
+}
+
+.dialog-panel.fitted,
+.dialog-panel.framed {
+  @include surface(var(--bg-1), 14px, var(--line));
+  box-shadow: var(--shadow-overlay);
+}
+
+.dialog-panel.fitted {
+  padding: var(--dialog-padding, 22px 24px);
+  max-height: 88vh;
+}
+
+// The middle scrolls, so the panel itself must not: its sections carry their own padding.
+.dialog-panel.framed {
+  overflow: hidden;
+  gap: var(--dialog-gap, 0);
+}
+
+.dialog-panel.fullscreen {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}

@@ -5,7 +5,7 @@ import { FakeClipboard } from '@testing/fake-clipboard';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
-import { SEARCH_DEBOUNCE_MS } from './notes.store';
+import { SEARCH_DEBOUNCE_MS } from './notes-query.store';
 import { PaletteStore } from './palette.store';
 
 interface Harness {
@@ -39,8 +39,8 @@ describe('PaletteStore', () => {
   let harness: Harness;
 
   beforeEach(async () => {
-    // Seuls les timers de la temporisation : `requestAnimationFrame` truqué
-    // bloquerait l'ordonnanceur zoneless d'Angular.
+    // Only the debounce timers: a faked `requestAnimationFrame` would hang Angular's
+    // zoneless scheduler.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     harness = createStore();
     await harness.store.open();
@@ -51,7 +51,6 @@ describe('PaletteStore', () => {
   });
 
   it('searches every space, ignoring the canvas filters', async () => {
-    // On ne se souvient pas de l'espace où un snippet a été rangé.
     expect(harness.repository.lastQuery?.spaceId).toBeNull();
     expect(harness.repository.lastQuery?.filter).toBe('all');
     expect(harness.repository.lastQuery?.tags).toEqual([]);
@@ -86,7 +85,6 @@ describe('PaletteStore', () => {
 
     expect(harness.clipboard.content).toBe('plain body');
     expect(harness.store.isOpen()).toBe(false);
-    // La fenêtre s'efface : l'utilisateur repart coller là où il était.
     expect(harness.window.hidden).toBe(1);
   });
 
@@ -119,15 +117,11 @@ describe('PaletteStore', () => {
   });
   describe('creating from what was typed', () => {
     it('offers nothing to create on an empty query', () => {
-      // Rouvrir la palette sans taper doit montrer les notes récentes, pas
-      // proposer de créer une note vide.
       expect(harness.store.canCreate()).toBe(false);
       expect(harness.store.optionCount()).toBe(2);
     });
 
     it('appends the create row after the results', async () => {
-      // Retrouver un snippet reste le geste le plus fréquent : il garde la
-      // première place.
       harness.store.setQuery('psql');
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
 
@@ -157,7 +151,6 @@ describe('PaletteStore', () => {
     });
 
     it('hands the typed text over and closes', async () => {
-      // Le store ne crée pas lui-même : il ne connaît pas `NotesStore`.
       harness.repository.setView({ sections: [] });
       harness.store.setQuery('  penser à migrer la base  ');
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);

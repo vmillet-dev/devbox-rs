@@ -1,29 +1,5 @@
 @use 'mixins' as *;
 
-.overlay-backdrop {
-  @include backdrop(50);
-}
-
-.overlay-panel {
-  width: min(880px, 90vw);
-  height: min(640px, 85vh);
-  @include surface(var(--bg-1), 14px, var(--line));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: var(--shadow-overlay);
-}
-
-// Le fond est déjà `position: fixed; inset: 0` : 100 % le remplit exactement,
-// sans les pièges de 100vw/100vh face à une barre de défilement.
-.overlay-panel.fullscreen {
-  width: 100%;
-  height: 100%;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-}
-
 .overlay-toolbar {
   padding: 14px 20px;
   border-bottom: 1px solid var(--line-soft);
@@ -63,8 +39,6 @@
   border-color: var(--amber-dim);
 }
 
-// Bouton réduit à son glyphe, sans surface ni bordure — la croix et la bascule
-// plein écran, par opposition aux `.toolbar-btn` qui portent un libellé.
 .icon-btn {
   @include unstyled-control;
   color: var(--text-2);
@@ -110,8 +84,7 @@
   flex-wrap: wrap;
 }
 
-// Le badge et son champ forment un bloc : c'est l'ensemble qui est poussé à
-// droite, pas le badge seul, sinon le champ resterait collé aux tags.
+// The pair is pushed right, not the badge alone, or the field would stick to the tags.
 .overlay-expiry {
   margin-left: auto;
   display: flex;
@@ -135,8 +108,8 @@
   outline-offset: 2px;
 }
 
-// Le sélecteur de date natif est blanc sur fond sombre : sans ce filtre,
-// l'icône disparaît complètement sur le thème du produit.
+// The native date picker icon is white on a dark ground: without this filter it
+// vanishes entirely against the theme.
 .overlay-expiry-input::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
   cursor: pointer;
@@ -191,25 +164,22 @@
   font-family: var(--font-mono), serif;
 }
 
-// Seul élément qui défile : les deux couches se déplacent donc ensemble, sans
-// synchronisation de `scrollTop` à écrire.
+// The only thing that scrolls, so both layers move together with no `scrollTop` to sync.
 .overlay-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
 
-// Aperçu : le liseré dit que ce qui est à l'écran est le **résultat**, pas le
-// texte qu'on modifie. Sans lui, un corps sans jeton se lit comme une note dont
-// les champs auraient disparu.
+// The border is what says the screen is showing the **result** and not the text being
+// edited.
 .overlay-body.previewing {
   border-left: 2px solid var(--amber-dim);
   background: rgba(var(--amber-rgb), 0.02);
 }
 
-// C'est le visualiseur, dans le flux, qui donne sa hauteur à la pile ; le
-// <textarea> s'y cale en absolu. `min-height: 100%` pour que le clic dans la
-// zone vide sous le texte atteigne quand même le champ.
+// The viewer, in the flow, gives the stack its height; the <textarea> sits over it
+// absolutely. `min-height: 100%` so a click below the text still reaches the field.
 .editor-stack {
   position: relative;
   min-height: 100%;
@@ -220,13 +190,10 @@
   pointer-events: none;
 }
 
-// Métriques recopiées à l'identique sur celles du visualiseur, sans quoi le
-// curseur se décale du texte colorié : même police, même interlignage, même
-// césure, et un retrait à gauche qui ajoute au padding la gouttière des numéros
-// de ligne. Cette gouttière fait 32px au total, pas 32 + 16 : le `box-sizing:
-// border-box` global fait que le `padding-right` de `.line-no` tient dans sa
-// `width`. Se tromper ici décale la frappe de deux caractères sans rien décaler
-// visuellement — le curseur tombe à côté du glyphe qu'il prétend viser.
+// ⚠️ Metrics copied exactly from the viewer's, or the caret drifts away from the
+// coloured text: same font, same line height, same wrapping, and a left inset that adds
+// the line-number gutter to the padding — 32px in total, not 32 + 16, the global
+// `box-sizing: border-box` keeping `.line-no`'s `padding-right` inside its `width`.
 .overlay-body-editor {
   @include unstyled-control;
   position: absolute;
@@ -245,8 +212,8 @@
   caret-color: var(--text-0);
 }
 
-// Texte transparent : la sélection ne se voit que par son fond, et le
-// placeholder doit reprendre une couleur explicite.
+// Transparent text: the selection shows through its background alone, so the
+// placeholder needs an explicit colour back.
 .overlay-body-editor::selection {
   background: rgba(var(--amber-rgb), 0.3);
 }

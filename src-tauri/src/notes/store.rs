@@ -1,9 +1,3 @@
-//! Reading and writing notes: **SQL, and nothing else**.
-//!
-//! Only what SQLite indexes goes down into the `WHERE` clause. Text search,
-//! sections and tag normalization are rules: `super::view` and
-//! `super::model`.
-
 use std::collections::{BTreeMap, HashMap};
 
 use diesel::prelude::*;
@@ -21,9 +15,6 @@ use crate::db::schema::{global_placeholders, note_items, note_placeholders, note
 use crate::error::StorageError;
 use crate::spaces::store as spaces;
 
-/// `lifecycle` is split into two columns here; tags, checklist items and filled
-/// fields are absent: they live in `note_tags`, `note_items` and
-/// `note_placeholders`, then get attached in a single query for the whole list.
 #[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = notes)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -42,14 +33,9 @@ struct NoteRow {
     kind: String,
 }
 
-/// An unreadable date makes the **read fail**: these columns are only written
-/// by [`iso8601::format`], so an out-of-format value signals a corrupted
-/// database, and guessing would place the note at an arbitrary date without saying anything.
-///
-/// The language, however, falls back to its default: `notes.language` carries no
-/// `CHECK` (migration 3), a newer version may have written a legitimate language
-/// that this one ignores. The note remains readable, without its highlighting.
-/// `kind` follows the same rule, and for the same reason.
+/// An unreadable date fails the read: these columns are only ever written by
+/// [`iso8601::format`]. Language and `kind` fall back to their default instead —
+/// a newer version may have written a value this build does not know.
 impl TryFrom<NoteRow> for Note {
     type Error = StorageError;
 
@@ -112,18 +98,35 @@ impl From<&Note> for NoteRow {
     }
 }
 
-/// One query for the whole list: one per note would be expensive from a few
-/// hundred onwards.
+fn notes_of_space(
+    space_id: &str,
+) -> diesel::helper_types::Filter<
+    diesel::helper_types::Select<notes::table, notes::id>,
+    diesel::dsl::Eq<notes::space_id, String>,
+> {
+    notes::table
+        .select(notes::id)
+        .filter(notes::space_id.eq(space_id.to_string()))
+}
+
+/// ⚠️ Narrowed by **subquery**, not by a list of bound ids: binding one
+/// parameter per note costs more than the read itself past a few thousand notes.
+/// Reading a superset is harmless — `attach_related` only looks up what it holds.
 fn all_tags(
     connection: &mut SqliteConnection,
+    space_id: Option<&str>,
 ) -> Result<HashMap<String, Vec<String>>, StorageError> {
-    let rows = note_tags::table
+    let mut query = note_tags::table
         .select((note_tags::note_id, note_tags::tag))
         .order(note_tags::tag.asc())
-        .load::<(String, String)>(connection)?;
+        .into_boxed();
+
+    if let Some(space_id) = space_id {
+        query = query.filter(note_tags::note_id.eq_any(notes_of_space(space_id)));
+    }
 
     let mut grouped: HashMap<String, Vec<String>> = HashMap::new();
-    for (note_id, tag) in rows {
+    for (note_id, tag) in query.load::<(String, String)>(connection)? {
         grouped.entry(note_id).or_default().push(tag);
     }
 
@@ -138,12 +141,8 @@ fn tags_of(connection: &mut SqliteConnection, note_id: &str) -> Result<Vec<Strin
         .load::<String>(connection)?)
 }
 
-/// Écrit les tags **déjà normalisés** par le domaine, et renvoie ce que la
-/// relecture donne.
-///
-/// ⚠️ Relus plutôt que triés ici : `note_tags.tag` est `COLLATE NOCASE` et la
-/// lecture ordonne dans cette collation, qu'un `sort()` en octets ne reproduit
-/// pas — `Urgent` passerait avant `auth` à l'écriture et après au rechargement.
+/// ⚠️ Re-read rather than sorted: `note_tags.tag` is `COLLATE NOCASE` and a read
+/// orders in that collation, which a byte-wise `sort()` does not reproduce.
 fn replace_tags(
     connection: &mut SqliteConnection,
     note_id: &str,
@@ -164,17 +163,21 @@ fn replace_tags(
     tags_of(connection, note_id)
 }
 
-/// Une requête pour toute la liste, comme `all_tags`.
 fn all_items(
     connection: &mut SqliteConnection,
+    space_id: Option<&str>,
 ) -> Result<HashMap<String, Vec<ChecklistItem>>, StorageError> {
-    let rows = note_items::table
+    let mut query = note_items::table
         .select((note_items::note_id, note_items::text, note_items::done))
         .order((note_items::note_id.asc(), note_items::position.asc()))
-        .load::<(String, String, bool)>(connection)?;
+        .into_boxed();
+
+    if let Some(space_id) = space_id {
+        query = query.filter(note_items::note_id.eq_any(notes_of_space(space_id)));
+    }
 
     let mut grouped: HashMap<String, Vec<ChecklistItem>> = HashMap::new();
-    for (note_id, text, done) in rows {
+    for (note_id, text, done) in query.load::<(String, String, bool)>(connection)? {
         grouped
             .entry(note_id)
             .or_default()
@@ -198,14 +201,8 @@ fn items_of(
         .collect())
 }
 
-/// Écrit les items **déjà normalisés** par le domaine.
-///
-/// Table rasée puis réinsérée, comme les tags : la position fait partie de la
-/// clé, et réordonner reviendrait sinon à déplacer des lignes une à une sous
-/// une clé primaire qui refuse les doublons en cours de route.
-///
-/// Pas de relecture ici, contrairement aux tags : `position` ordonne en
-/// numérique, ce que l'ordre d'insertion reproduit exactement.
+/// Wiped then reinserted: the position is part of the key, so reordering would
+/// otherwise move rows one at a time under a key that refuses duplicates.
 fn replace_items(
     connection: &mut SqliteConnection,
     note_id: &str,
@@ -234,20 +231,18 @@ fn replace_items(
 
     Ok(())
 }
-
-/// Rattache à chaque note ce qui vit dans les tables voisines : une requête par
-/// table pour toute la liste, jamais une par note.
-///
-/// Les trois comptent : la recherche du domaine porte sur les items — seul
-/// contenu d'une todolist — et la carte d'un snippet à champs propose de les
-/// remplir, ce qu'elle ne peut pas faire sans les valeurs déjà saisies.
 fn attach_related(
     connection: &mut SqliteConnection,
     notes: &mut [Note],
+    space_id: Option<&str>,
 ) -> Result<(), StorageError> {
-    let mut tags = all_tags(connection)?;
-    let mut items = all_items(connection)?;
-    let mut values = all_placeholder_values(connection)?;
+    if notes.is_empty() {
+        return Ok(());
+    }
+
+    let mut tags = all_tags(connection, space_id)?;
+    let mut items = all_items(connection, space_id)?;
+    let mut values = all_placeholder_values(connection, space_id)?;
 
     for note in notes {
         note.tags = tags.remove(&note.id).unwrap_or_default();
@@ -258,20 +253,24 @@ fn attach_related(
     Ok(())
 }
 
-/// Une requête pour toute la liste, comme `all_tags`.
 fn all_placeholder_values(
     connection: &mut SqliteConnection,
+    space_id: Option<&str>,
 ) -> Result<HashMap<String, BTreeMap<String, String>>, StorageError> {
-    let rows = note_placeholders::table
+    let mut query = note_placeholders::table
         .select((
             note_placeholders::note_id,
             note_placeholders::name,
             note_placeholders::value,
         ))
-        .load::<(String, String, String)>(connection)?;
+        .into_boxed();
+
+    if let Some(space_id) = space_id {
+        query = query.filter(note_placeholders::note_id.eq_any(notes_of_space(space_id)));
+    }
 
     let mut grouped: HashMap<String, BTreeMap<String, String>> = HashMap::new();
-    for (note_id, name, value) in rows {
+    for (note_id, name, value) in query.load::<(String, String, String)>(connection)? {
         grouped.entry(note_id).or_default().insert(name, value);
     }
 
@@ -290,11 +289,6 @@ fn placeholder_values_of(
         .collect())
 }
 
-/// Écrit les valeurs **déjà normalisées** par le domaine.
-///
-/// Table rasée puis réinsérée, comme les tags : ce qui n'est plus envoyé est ce
-/// que l'utilisateur a effacé, et une écriture partielle laisserait une valeur
-/// vidée continuer à remplir le texte.
 fn replace_placeholder_values(
     connection: &mut SqliteConnection,
     note_id: &str,
@@ -322,12 +316,6 @@ fn replace_placeholder_values(
     Ok(())
 }
 
-/// Les **variables globales** : des valeurs de `{{champs}}` sans note pour les
-/// porter, valables pour tout le corpus.
-///
-/// Triées par nom : c'est l'ordre du panneau de préférences, et le `BTreeMap`
-/// le tiendrait de toute façon — l'`ORDER BY` dit simplement que cet ordre est
-/// voulu plutôt que subi.
 pub fn global_placeholder_values(
     connection: &mut SqliteConnection,
 ) -> Result<BTreeMap<String, String>, StorageError> {
@@ -339,11 +327,6 @@ pub fn global_placeholder_values(
         .collect())
 }
 
-/// Écrit les variables **déjà normalisées** par le domaine.
-///
-/// Table rasée puis réinsérée, comme les tags et les valeurs d'une note : ce qui
-/// n'est plus envoyé est ce que l'utilisateur a retiré, et une écriture
-/// partielle laisserait une variable effacée continuer à remplir les jetons.
 pub fn replace_global_placeholder_values(
     connection: &mut SqliteConnection,
     values: &BTreeMap<String, String>,
@@ -370,11 +353,7 @@ pub fn replace_global_placeholder_values(
     })
 }
 
-/// Portées à l'espace et non au filtre courant — voir [`NotesView`].
-///
-/// La jointure sur `notes` est inconditionnelle : toute ligne de `note_tags`
-/// pointe une note existante, elle n'ajoute ni ne retire donc rien quand aucun
-/// espace n'est actif.
+/// Scoped to the space and not to the current filter — see [`NotesView`].
 fn facets(
     connection: &mut SqliteConnection,
     space_id: Option<&str>,
@@ -400,8 +379,7 @@ fn facets(
 
     Ok(Facets {
         tags: tags.load::<String>(connection)?,
-        // Un langage stocké qu'on ne connaît pas n'a pas de facette à proposer :
-        // le rail ne peut pas offrir un filtre que le front ne sait pas nommer.
+        // A stored language this build does not know has no facet to offer.
         languages: languages
             .load::<String>(connection)?
             .iter()
@@ -410,14 +388,11 @@ fn facets(
     })
 }
 
-/// Critères **grossiers** seulement ; `view::build` prend le relais pour
-/// la recherche texte et les sections.
+/// **Coarse** criteria only; `view::build` takes over for search and sections.
 pub fn fetch(
     connection: &mut SqliteConnection,
     request: &NotesQuery,
 ) -> Result<(Vec<Note>, Facets), StorageError> {
-    // La corbeille n'est visible que par `list_trashed` : une note supprimée qui
-    // ressortirait ici serait éditable sans jamais dire qu'elle est en sursis.
     let mut query = notes::table
         .filter(notes::deleted_at.is_null())
         .select(NoteRow::as_select())
@@ -434,16 +409,13 @@ pub fn fetch(
     }
 
     if !request.languages.is_empty() {
-        // Union, comme les tags : sélectionner JSON puis YAML montre les deux.
         let selected: Vec<String> = request.languages.iter().map(ToString::to_string).collect();
         query = query.filter(notes::language.eq_any(selected));
     }
 
-    // Même normalisation qu'à l'écriture, sinon un `#urgent` saisi au clavier ne
-    // retrouverait pas le `urgent` stocké.
+    // Same normalisation as on write, or a typed `#urgent` misses `urgent`.
     let selected_tags = model::normalize_tags(&request.tags);
     if !selected_tags.is_empty() {
-        // « au moins un tag », pas « tous » : comportement d'un rail de facettes.
         query = query.filter(
             notes::id.eq_any(
                 note_tags::table
@@ -453,9 +425,8 @@ pub fn fetch(
         );
     }
 
-    // Sur `updated_at` alors que les sections regroupent sur `created_at` : la
-    // section dit quand la note est née, l'ordre interne laquelle a bougé en
-    // dernier. Le front conserve l'ordre reçu.
+    // On `updated_at` although the sections group on `created_at`: the section
+    // says when a note was born, the order within it which one moved last.
     let mut notes = query
         .order((notes::updated_at.desc(), notes::id.asc()))
         .load::<NoteRow>(connection)?
@@ -463,7 +434,7 @@ pub fn fetch(
         .map(Note::try_from)
         .collect::<Result<Vec<_>, _>>()?;
 
-    attach_related(connection, &mut notes)?;
+    attach_related(connection, &mut notes, request.space_id.as_deref())?;
 
     Ok((notes, facets(connection, request.space_id.as_deref())?))
 }
@@ -487,8 +458,6 @@ fn find(connection: &mut SqliteConnection, id: &str) -> Result<Option<Note>, Sto
     }))
 }
 
-/// Renvoie la version persistée — identifiant et horodatages compris. Le front
-/// adopte cette valeur telle quelle.
 pub fn create(
     connection: &mut SqliteConnection,
     draft: NoteDraft,
@@ -512,10 +481,6 @@ pub fn create(
     })
 }
 
-/// Lit, applique le patch, réécrit — en transaction pour qu'aucune commande ne
-/// s'intercale. La fusion est une règle et vit dans [`NotePatch::apply`].
-///
-/// Identifiant inconnu ⇒ `Err` : le front croirait sinon avoir enregistré.
 pub fn update(
     connection: &mut SqliteConnection,
     id: &str,
@@ -527,7 +492,6 @@ pub fn update(
             return Err(StorageError::NoteNotFound(id.to_string()));
         };
 
-        // Seule vérification que le domaine ne peut pas faire : elle demande la base.
         if let Some(space_id) = &patch.space_id
             && !spaces::exists(connection, space_id)?
         {
@@ -536,8 +500,8 @@ pub fn update(
 
         patch.apply(&mut note, now);
 
-        // Colonnes énumérées plutôt qu'un `AsChangeset` : celui-ci réécrirait
-        // aussi `created_at`, que rien ici n'a le droit de bouger.
+        // Columns listed rather than an `AsChangeset`, which would also rewrite
+        // `created_at`.
         let row = NoteRow::from(&note);
         diesel::update(notes::table.find(&note.id))
             .set((
@@ -567,14 +531,8 @@ pub fn update(
     })
 }
 
-/// Enregistre ce qui a été saisi dans les `{{champs}}` de la note.
-///
-/// ⚠️ **`updated_at` n'est pas touché**, et c'est le cœur du geste : remplir un
-/// champ n'est pas modifier la note. Le canevas trie sur cette colonne, et une
-/// valeur tapée dans le panneau ferait sinon remonter la note en tête pour rien.
-///
-/// Identifiant inconnu — ou en corbeille — ⇒ `Err`, comme partout ailleurs : le
-/// front croirait sinon avoir enregistré.
+/// ⚠️ **`updated_at` is not touched**: filling a field is not editing the note,
+/// and the canvas sorts on that column.
 pub fn set_placeholder_values(
     connection: &mut SqliteConnection,
     id: &str,
@@ -592,11 +550,6 @@ pub fn set_placeholder_values(
     })
 }
 
-/// **Ne supprime pas** : date la note, qui rejoint la corbeille. La suppression
-/// définitive est [`purge`], et la rétention est une règle de `super::trash`.
-///
-/// Identifiant inconnu — ou déjà en corbeille — ⇒ `Err` : le front croirait
-/// sinon avoir supprimé.
 pub fn delete(
     connection: &mut SqliteConnection,
     id: &str,
@@ -609,9 +562,8 @@ pub fn delete(
     Ok(())
 }
 
-/// Renvoie le nombre de notes effectivement déplacées : une sélection peut
-/// contenir un identifiant devenu obsolète, et refuser tout le lot pour un seul
-/// disparu serait pire que le résultat partiel.
+/// Returns what was actually moved: a selection can hold an id gone stale, and
+/// failing the whole batch for one of them would be worse than a partial result.
 pub fn delete_many(
     connection: &mut SqliteConnection,
     ids: &[String],
@@ -630,8 +582,7 @@ pub fn delete_many(
     .execute(connection)?)
 }
 
-/// Sortie de corbeille. `updated_at` n'est pas touché : la note revient là où
-/// elle était, pas en tête du canevas.
+/// `updated_at` is not touched: the note comes back where it was.
 pub fn restore_many(
     connection: &mut SqliteConnection,
     ids: &[String],
@@ -649,7 +600,6 @@ pub fn restore_many(
     .execute(connection)?)
 }
 
-/// Les notes en corbeille, la plus récemment supprimée en tête.
 pub fn list_trashed(
     connection: &mut SqliteConnection,
 ) -> Result<Vec<(Note, DateTime<Utc>)>, StorageError> {
@@ -659,7 +609,7 @@ pub fn list_trashed(
         .order((notes::deleted_at.desc(), notes::id.asc()))
         .load::<(NoteRow, Option<String>)>(connection)?;
 
-    let mut grouped = all_tags(connection)?;
+    let mut grouped = all_tags(connection, None)?;
     rows.into_iter()
         .map(|(row, deleted_at)| {
             let id = row.id.clone();
@@ -680,8 +630,7 @@ pub fn list_trashed(
         .collect()
 }
 
-/// Identifiants des notes dont la rétention est écoulée. Séparé de [`purge`]
-/// pour que l'appelant récupère d'abord les fichiers joints à effacer.
+/// Separate from [`purge`] so the caller can erase the attached files first.
 pub fn expired_ids(
     connection: &mut SqliteConnection,
     now: DateTime<Utc>,
@@ -707,12 +656,9 @@ pub fn trashed_ids(connection: &mut SqliteConnection) -> Result<Vec<String>, Sto
         .load::<String>(connection)?)
 }
 
-/// Suppression **définitive**. Tags et pièces jointes partent par cascade —
-/// d'où le `PRAGMA foreign_keys` de `db::configure` ; les fichiers sur le disque,
-/// eux, sont l'affaire de l'appelant.
-///
-/// Restreinte aux notes en corbeille : rien ne doit pouvoir court-circuiter le
-/// sursis de 30 jours.
+/// **Permanent**. Tags and attachments leave by cascade — hence the
+/// `PRAGMA foreign_keys` in `db::configure`; the files on disk are the caller's.
+/// Restricted to trashed notes: nothing may short-circuit the 30-day reprieve.
 pub fn purge(connection: &mut SqliteConnection, ids: &[String]) -> Result<usize, StorageError> {
     if ids.is_empty() {
         return Ok(0);
@@ -726,8 +672,6 @@ pub fn purge(connection: &mut SqliteConnection, ids: &[String]) -> Result<usize,
     .execute(connection)?)
 }
 
-/// Déplacement en masse. L'espace de destination est vérifié une fois pour tout
-/// le lot.
 pub fn move_many(
     connection: &mut SqliteConnection,
     ids: &[String],
@@ -757,8 +701,6 @@ pub fn move_many(
     })
 }
 
-/// Ajoute des tags **déjà normalisés** sans toucher à ceux déjà posés : une
-/// action de masse enrichit, elle ne remplace pas.
 pub fn tag_many(
     connection: &mut SqliteConnection,
     ids: &[String],
@@ -784,8 +726,7 @@ pub fn tag_many(
             })
             .collect();
 
-        // `insert_or_ignore` : la clé primaire `(note_id, tag)` est `NOCASE`,
-        // donc reposer un tag déjà présent ne fait rien plutôt que d'échouer.
+        // `(note_id, tag)` is `NOCASE`: re-adding a tag already there is a no-op.
         diesel::insert_or_ignore_into(note_tags::table)
             .values(rows)
             .execute(connection)?;
@@ -798,7 +739,6 @@ pub fn tag_many(
     })
 }
 
-/// Chaque tag du corpus et le nombre de notes vivantes qui le portent.
 pub fn tag_usage(connection: &mut SqliteConnection) -> Result<Vec<(String, i64)>, StorageError> {
     Ok(note_tags::table
         .inner_join(notes::table)
@@ -809,11 +749,10 @@ pub fn tag_usage(connection: &mut SqliteConnection) -> Result<Vec<(String, i64)>
         .load::<(String, i64)>(connection)?)
 }
 
-/// Renomme ou fusionne : `sources` deviennent `target` partout.
+/// Renames or merges: `sources` become `target` everywhere.
 ///
-/// ⚠️ `updated_at` reste intact. Un renommage global toucherait sinon tout le
-/// corpus, et le canevas — qui trie dessus — remonterait des notes que personne
-/// n'a rouvertes.
+/// ⚠️ `updated_at` stays intact — the canvas sorts on it, and a corpus-wide
+/// rename would float up notes nobody reopened.
 pub fn retag(
     connection: &mut SqliteConnection,
     sources: &[String],
@@ -830,10 +769,8 @@ pub fn retag(
             .distinct()
             .load::<String>(connection)?;
 
-        // La cible est balayée avec les sources, puis réécrite : c'est ce qui
-        // rend une simple correction de casse effective. `INSERT OR IGNORE`
-        // seul ne changerait rien — la clé primaire est `NOCASE`, donc « Auth »
-        // et « auth » y sont la même ligne.
+        // The target is swept along with the sources then rewritten: the key is
+        // `NOCASE`, so a pure case correction (`auth` → `Auth`) would be a no-op.
         let mut holders = renamed.clone();
         holders.extend(
             note_tags::table
@@ -861,13 +798,23 @@ pub fn retag(
     })
 }
 
-/// Retire un tag du corpus. Les notes restent, seul l'étiquetage disparaît.
-pub fn drop_tag(connection: &mut SqliteConnection, tag: &str) -> Result<usize, StorageError> {
-    Ok(diesel::delete(note_tags::table.filter(note_tags::tag.eq(tag))).execute(connection)?)
+pub fn drop_tags(
+    connection: &mut SqliteConnection,
+    tags: &[String],
+) -> Result<usize, StorageError> {
+    if tags.is_empty() {
+        return Ok(0);
+    }
+
+    Ok(diesel::delete(note_tags::table.filter(note_tags::tag.eq_any(tags))).execute(connection)?)
 }
 
-/// Toutes les notes vivantes d'un espace — ou du corpus. Réservé à l'export :
-/// aucune commande ne rend cette liste au front, qui serait tenté de refiltrer.
+pub fn drop_tag(connection: &mut SqliteConnection, tag: &str) -> Result<usize, StorageError> {
+    drop_tags(connection, std::slice::from_ref(&tag.to_string()))
+}
+
+/// Export only: no command hands this list to the front, which would be tempted
+/// to re-filter it.
 pub fn all(
     connection: &mut SqliteConnection,
     space_id: Option<&str>,
@@ -888,13 +835,11 @@ pub fn all(
         .map(Note::try_from)
         .collect::<Result<Vec<_>, _>>()?;
 
-    attach_related(connection, &mut notes)?;
+    attach_related(connection, &mut notes, space_id)?;
 
     Ok(notes)
 }
 
-/// Notes désignées par leur identifiant, dans l'ordre de la base. Sert au
-/// partage d'une sélection.
 pub fn by_ids(
     connection: &mut SqliteConnection,
     ids: &[String],
@@ -913,14 +858,11 @@ pub fn by_ids(
         .map(Note::try_from)
         .collect::<Result<Vec<_>, _>>()?;
 
-    attach_related(connection, &mut notes)?;
+    attach_related(connection, &mut notes, None)?;
 
     Ok(notes)
 }
 
-/// Écrit une note venue d'un import, **avec son identifiant et ses dates**.
-/// Un identifiant déjà présent n'est pas écrasé : le retour dit s'il y a eu
-/// écriture, et l'import compte les ignorées.
 pub fn insert_imported(
     connection: &mut SqliteConnection,
     note: &Note,

@@ -1,67 +1,33 @@
-// Patterns partagés entre les composants, pour éviter que chaque composant
-// ne réécrive sa propre variante de "bouton sans style", "carte" ou "badge
-// teinté". À utiliser via `@use 'mixins' as *;` (résolu grâce à
-// stylePreprocessorOptions.includePaths dans angular.json).
+// Patterns shared between components, used through `@use 'mixins' as *;`.
+//
+// The modal frame is **not** here: backdrop, panel and stacking order belong to
+// `shared/ui/dialog/`, where one component owns them.
 
-// Neutralise le rendu natif d'un <button>/<input> utilisé comme brique de
-// base pour un contrôle custom (chip, carte, champ de recherche...).
+// Strips the native rendering of a <button>/<input> used as a custom control.
 @mixin unstyled-control {
   all: unset;
   box-sizing: border-box;
 }
 
-// Surface "carte" : fond + bordure + arrondi. Sert aux cartes, dropdowns,
-// panneaux d'overlay, barres de recherche, boutons de toolbar...
+// The "card" surface: background, border, radius.
 @mixin surface($bg: var(--bg-2), $radius: 8px, $border-color: var(--line-soft)) {
   background: $bg;
   border: 1px solid $border-color;
   border-radius: $radius;
 }
 
-// État "accent" (survol/actif/sélectionné) partagé par chips, tags, options
-// de menu et carte fantôme : bordure ambrée + texte ambré.
+// The "accent" state (hover, active, selected): amber border, amber text.
 @mixin accent-state($color: var(--amber), $border: var(--amber-dim)) {
   border-color: $border;
   color: $color;
 }
 
-// Fond d'une modale. Le z-index reste à l'appelant : c'est la seule chose qui
-// distingue les modales entre elles, et leur ordre d'empilement est une décision
-// (l'éditeur et ses panneaux 50, la fiche À propos 55, les préférences 56, la
-// mise à jour 60, la palette 65, le formulaire de champs 70, la vue agrandie 75).
+// --- Preferences panel ---
 //
-// ⚠️ **80 est réservé aux bandeaux** de `layout/` (accusé de réussite, erreur) :
-// ils vivent dans le flux, sous la barre de titre, et un fond flouté les
-// recouvrirait — or c'est précisément depuis une modale qu'ils sont déclenchés.
-// Une nouvelle modale se range donc en dessous, pas au-dessus.
-@mixin backdrop($z-index) {
-  position: fixed;
-  inset: 0;
-  background: rgba(var(--backdrop-rgb), 0.6);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: $z-index;
-}
+// Shared rather than written inside `layout/settings-dialog/`: the "Variables" page lives
+// in `features/notes/`, out of reach of a neighbour component's SCSS.
 
-// Panneau posé sur un `backdrop`, dimensionné par son contenu.
-@mixin dialog-panel($width) {
-  width: min($width, 88vw);
-  @include surface(var(--bg-1), 14px, var(--line));
-  box-shadow: var(--shadow-overlay);
-  padding: 22px 24px;
-  display: flex;
-  flex-direction: column;
-}
-
-// --- Panneau de préférences -------------------------------------------------
-//
-// Partagés, et non écrits dans `layout/settings-dialog/` : la page « Variables »
-// vit dans `features/notes/`, hors de portée du SCSS d'un composant voisin, et
-// deux panneaux qui ne se ressemblent pas feraient deux panneaux.
-
-// Une ligne de réglage : intitulé à gauche, contrôle à droite.
+// One setting row: label on the left, control on the right.
 @mixin setting-row {
   display: flex;
   align-items: center;
@@ -81,7 +47,7 @@
   cursor: pointer;
 }
 
-// Champ ou liste déroulante d'un réglage.
+// A setting's field or dropdown.
 @mixin setting-field($width: 150px) {
   @include surface($radius: 6px);
   width: $width;
@@ -97,8 +63,8 @@
   }
 }
 
-// Interrupteur : une vraie case à cocher repeinte, qui garde le clavier, le
-// libellé cliquable et l'état annoncé sans un seul attribut ARIA.
+// A switch: a real checkbox repainted, which keeps the keyboard, the clickable
+// label and the announced state without a single ARIA attribute.
 @mixin setting-switch {
   appearance: none;
   position: relative;
@@ -144,7 +110,7 @@
   }
 }
 
-// Précision sous un groupe : ce que le réglage ne dit pas de lui-même.
+// A note under a group: what the setting does not say about itself.
 @mixin setting-note {
   margin: 6px 0 0;
   font-size: 11px;
@@ -152,9 +118,8 @@
   color: var(--text-2);
 }
 
-// Badge teinté façon "pill" (lifecycle badge, tag de langage) : fond
-// translucide + texte plein dans la même teinte, à partir d'une variable
-// CSS RGB (ex. --amber-rgb) pour ne pas dupliquer chaque couleur en hex.
+// A tinted "pill" badge: translucent background and solid text in the same hue, from an
+// RGB CSS variable so no colour is duplicated in hex.
 @mixin tint-badge($rgb-var, $bg-alpha: 0.15, $border-alpha: null) {
   background: rgba(var(#{$rgb-var}), $bg-alpha);
   color: rgb(var(#{$rgb-var}));
@@ -164,23 +129,11 @@
   }
 }
 
-// --- Help dialogs ------------------------------------------------------------
+// --- Help dialogs ---
 //
-// "Nouveautés", "Prise en main" and "Raccourcis clavier" are three views on the
-// same object: a fixed frame, a scrolling middle, one "Fermer" at the bottom.
-// Written here rather than in one of them because a component's SCSS is out of
-// reach of its neighbours, and three panels that do not look alike would read
-// as three unrelated windows.
-
-// A fixed height rather than one fitted to the content: the middle scrolls, and
-// a panel that resized with its chapter would jump under the cursor.
-@mixin help-panel($width) {
-  @include dialog-panel($width);
-  height: min(560px, 86vh);
-  padding: 0;
-  gap: 0;
-  overflow: hidden;
-}
+// Three views on the same object: a fixed frame, a scrolling middle, one "Fermer" at the
+// bottom. Written here rather than in one of them because a component's SCSS is out of
+// reach of its neighbours.
 
 @mixin help-header {
   padding: 16px 20px 12px;
@@ -245,8 +198,7 @@
   }
 }
 
-// A key cap. Same look as the hint in the search field, which is the only other
-// place a key is drawn.
+// A key cap. Same look as the hint in the search field.
 @mixin key-cap {
   font-family: var(--font-mono), serif;
   background: var(--bg-3);

@@ -1,5 +1,5 @@
-<!-- Groupe de boutons bascule plutôt que radiogroup : `aria-pressed` transmet
-     l'état sans imposer la navigation aux flèches qu'un vrai groupe radio exige. -->
+<!-- Toggle buttons rather than a radiogroup: `aria-pressed` carries the state without
+     imposing the arrow navigation a real radio group needs. -->
 <div class="filter-chips" role="group" [attr.aria-label]="'filters.groupLabel' | transloco">
   @for (filter of filters; track filter.key) {
     <button

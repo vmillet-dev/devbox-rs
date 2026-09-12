@@ -1,45 +1,43 @@
-<div appDialogBackdrop class="sheet-backdrop" (dismissed)="closed.emit()">
-  <div
-    appFocusTrap
-    class="sheet-panel"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="shortcuts-dialog-title"
-  >
-    <div class="sheet-header">
-      <h2 id="shortcuts-dialog-title" class="sheet-title">{{ 'shortcuts.title' | transloco }}</h2>
-      <p class="sheet-subtitle">{{ 'shortcuts.subtitle' | transloco }}</p>
-    </div>
-
-    <div class="sheet-body">
-      @for (group of groups(); track group.id) {
-        <section class="shortcut-group">
-          <h3 class="shortcut-group-title">{{ group.labelKey | transloco }}</h3>
-
-          <dl class="shortcut-list">
-            @for (shortcut of group.shortcuts; track shortcut.labelKey) {
-              <dt class="shortcut-label">{{ shortcut.labelKey | transloco }}</dt>
-              <dd class="shortcut-keys">
-                @for (key of shortcut.keys; track $index) {
-                  <!-- The separators are drawn, not written: a "+" between two
-                       caps would be read out as a key of its own. -->
-                  @if (!$first) {
-                    <span class="shortcut-plus" aria-hidden="true">+</span>
-                  }
-                  <kbd>{{ key }}</kbd>
-                }
-              </dd>
-            }
-          </dl>
-        </section>
-      }
-    </div>
-
-    <div class="sheet-actions">
-      <p class="sheet-hint">{{ 'shortcuts.editHint' | transloco }}</p>
-      <button type="button" class="sheet-close" (click)="closed.emit()">
-        {{ 'shortcuts.close' | transloco }}
-      </button>
-    </div>
+<app-dialog
+  [layer]="'app'"
+  [variant]="'framed'"
+  [width]="560"
+  labelledBy="shortcuts-dialog-title"
+  (closed)="closed.emit()"
+>
+  <div class="sheet-header">
+    <h2 id="shortcuts-dialog-title" class="sheet-title">{{ 'shortcuts.title' | transloco }}</h2>
+    <p class="sheet-subtitle">{{ 'shortcuts.subtitle' | transloco }}</p>
   </div>
-</div>
+
+  <div class="sheet-body">
+    @for (group of groups(); track group.id) {
+      <section class="shortcut-group">
+        <h3 class="shortcut-group-title">{{ group.labelKey | transloco }}</h3>
+
+        <dl class="shortcut-list">
+          @for (shortcut of group.shortcuts; track shortcut.labelKey) {
+            <dt class="shortcut-label">{{ shortcut.labelKey | transloco }}</dt>
+            <dd class="shortcut-keys">
+              @for (key of shortcut.keys; track $index) {
+                <!-- The separators are drawn, not written: a "+" between two caps would
+                     be read out as a key of its own. -->
+                @if (!$first) {
+                  <span class="shortcut-plus" aria-hidden="true">+</span>
+                }
+                <kbd>{{ key }}</kbd>
+              }
+            </dd>
+          }
+        </dl>
+      </section>
+    }
+  </div>
+
+  <div class="sheet-actions">
+    <p class="sheet-hint">{{ 'shortcuts.editHint' | transloco }}</p>
+    <button type="button" class="sheet-close" (click)="closed.emit()">
+      {{ 'shortcuts.close' | transloco }}
+    </button>
+  </div>
+</app-dialog>

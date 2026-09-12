@@ -2,29 +2,27 @@ import { Injectable, inject } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { commands, type TrayLabels as WireTrayLabels } from '@core/ipc/bindings';
 
-/**
- * Libellés du menu de la barre système, **déjà traduits**. Le natif n'écrit
- * aucun texte visible : la langue est une préférence du front, et une table de
- * traductions en Rust serait une seconde source à tenir en phase.
- *
- * Réexporté depuis les bindings : un libellé ajouté au menu côté Rust manque
- * ici à la compilation.
- */
 export type TrayLabels = WireTrayLabels;
 
-const LABEL_KEYS = ['tray.open', 'tray.newNote', 'tray.capture', 'tray.palette', 'tray.quit'];
+/**
+ * Keyed by field: `satisfies` makes a label added to `TrayLabels` in Rust a compile
+ * error here.
+ */
+const LABEL_KEYS = {
+  open: 'tray.open',
+  newNote: 'tray.newNote',
+  capture: 'tray.capture',
+  palette: 'tray.palette',
+  quit: 'tray.quit',
+} as const satisfies Record<keyof TrayLabels, string>;
 
 /**
- * Icône de la zone de notification : DevBox y reste résidente, à portée des
- * raccourcis globaux, et la croix de la fenêtre ne fait plus que la cacher.
+ * This service **creates** the tray rather than the native startup: the native side
+ * writes no user-facing text, so without translated labels there would be nothing to
+ * show. The subscription re-emits on every language change, which re-translates the menu.
  *
- * C'est ce service qui la **crée**, pas le démarrage natif : sans libellés il
- * n'y aurait rien à afficher. Le menu se retraduit ensuite tout seul, la
- * souscription réémettant à chaque changement de langue.
- *
- * Les actions, elles, ne passent pas par ici — le menu émet les mêmes
- * `devbox:new-note` et `devbox:capture` que les raccourcis globaux, déjà écoutés
- * par `NotesPageComponent`.
+ * The actions do not go through here — the menu emits the same `GlobalAction` as the
+ * global shortcuts.
  */
 @Injectable({ providedIn: 'root' })
 export class TrayService {
@@ -32,25 +30,22 @@ export class TrayService {
 
   start(): void {
     this.transloco
-      .selectTranslate<string[]>(LABEL_KEYS)
-      .subscribe(([open, newNote, capture, palette, quit]) => {
+      .selectTranslate<string[]>(Object.values(LABEL_KEYS))
+      .subscribe(([open = '', newNote = '', capture = '', palette = '', quit = '']) => {
         void this.push({ open, newNote, capture, palette, quit });
       });
   }
 
   /**
-   * Un échec ne remonte pas : hors Tauri (jsdom) le pont est absent, et sur un
-   * bureau sans zone de notification le natif refuse déjà silencieusement. Dans
-   * les deux cas la fenêtre reste utilisable et fermable — il n'y a rien à
-   * demander à l'utilisateur.
+   * A failure does not surface: outside Tauri the bridge is absent, and on a desktop
+   * without a tray the native side already declines silently.
    */
   private async push(labels: TrayLabels): Promise<void> {
     try {
-      // Seule commande sans `Result` côté Rust, donc sans `unwrap` : elle lève
-      // directement si le pont est absent.
+      // The one command with no `Result` on the Rust side, hence no `unwrap`.
       await commands.syncTray(labels);
     } catch {
-      // Sans barre système, l'application vit dans sa fenêtre.
+      // Without a tray, the application lives in its window.
     }
   }
 }

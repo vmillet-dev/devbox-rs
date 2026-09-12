@@ -49,7 +49,7 @@ describe('VariablesStore', () => {
     await store.commit();
 
     expect(await repository.loadVariables()).toEqual({ host: 'db.internal' });
-    // La ligne inachevée reste à l'écran : elle attend d'être terminée.
+    // The unfinished row stays on screen: it is waiting to be finished.
     expect(store.variables()).toHaveLength(2);
   });
 

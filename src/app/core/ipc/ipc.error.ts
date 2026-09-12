@@ -1,29 +1,25 @@
 import type { AppError, ErrorCode } from './bindings';
 
 /**
- * Causes d'échec que le backend sait nommer. Simple alias de l'union **générée**
- * depuis `ErrorCode` (`src-tauri/src/error.rs`) : ce n'est plus un
- * miroir tenu à la main, une variante ajoutée en Rust apparaît ici dès la
- * régénération et casse la compilation partout où elle n'est pas traitée.
+ * A plain alias of the union **generated** from `ErrorCode`, so a variant added in Rust
+ * appears here on regeneration and breaks the build everywhere it is not handled.
  *
- * Ce sont des **codes**, jamais du texte : c'est ce qui permet de réagir à une
- * cause précise et d'afficher un message traduit, là où une chaîne rédigée en
- * Rust imposerait sa langue à toute l'interface.
+ * These are **codes**, never text: a sentence written in Rust would impose its language
+ * on the whole interface.
  */
 export type IpcErrorCode = ErrorCode;
 
 /**
- * Forme d'un `Result` Rust vue du TypeScript, telle que `bindings.ts` la rend.
- * Redéclarée plutôt qu'importée : le générateur l'écrit en ligne dans chaque
- * signature, sans jamais la nommer.
+ * Redeclared rather than imported: the generator writes it inline in every signature
+ * without ever naming it.
  */
 export type IpcResult<T> = { status: 'ok'; data: T } | { status: 'error'; error: AppError };
 
 /**
- * Exhaustif par construction : ajouter une variante à `ErrorCode` en Rust rend
- * cet objet incomplet, donc la compilation échoue ici. Nécessaire malgré le
- * typage parce que `bindings.ts` **annonce** un `AppError` là où Tauri peut
- * avoir rejeté avec autre chose (voir [`IpcError`]).
+ * Exhaustive by construction: a variant added to `ErrorCode` fails the build here.
+ *
+ * ⚠️ Needed despite the typing, because `bindings.ts` **declares** an `AppError` where
+ * Tauri may have rejected with something else (see [`IpcError`]).
  */
 const IPC_ERROR_CODES: Record<IpcErrorCode, true> = {
   noteNotFound: true,
@@ -54,17 +50,14 @@ function describeCause(cause: unknown): string {
 }
 
 /**
- * Échec d'une commande.
- *
- * `code` vaut `null` quand le rejet ne vient pas de nos commandes : Tauri
- * rejette lui-même avec une **chaîne** si la commande est inconnue ou si un
- * argument ne se désérialise pas, et `bindings.ts` la range dans la branche
- * `error` en la typant `AppError` qu'elle n'est pas. Ce cas doit rester lisible,
- * d'où le repli sur `describeCause`.
+ * ⚠️ `code` is `null` when the rejection does not come from our commands: Tauri rejects
+ * with a plain **string** for an unknown command or an argument that fails to
+ * deserialise, and `bindings.ts` files that in the `error` branch typed as an `AppError`
+ * it is not. Hence the fallback to `describeCause`.
  */
 export class IpcError extends Error {
   readonly code: IpcErrorCode | null;
-  /** Valeurs à interpoler dans le message traduit, ex. `{ name }`. */
+  /** Values to interpolate into the translated message, e.g. `{ name }`. */
   readonly params: Record<string, string>;
 
   constructor(
@@ -72,7 +65,7 @@ export class IpcError extends Error {
     override readonly cause: unknown,
   ) {
     const structured = isAppError(cause) ? cause : null;
-    super(`La commande Tauri « ${command} » a échoué : ${structured?.detail ?? describeCause(cause)}`);
+    super(`Tauri command "${command}" failed: ${structured?.detail ?? describeCause(cause)}`);
     this.name = 'IpcError';
     this.code = structured?.code ?? null;
     this.params = structured?.params ?? {};
@@ -80,12 +73,8 @@ export class IpcError extends Error {
 }
 
 /**
- * Convertit le `Result` discriminé des bindings en valeur ou en exception.
- *
- * Les dépôts lèvent plutôt que de propager le `status` : les stores et les
- * composants réagissent déjà à un `catch`, et faire remonter le discriminant
- * jusqu'aux appelants leur ferait porter une branche que `ErrorNotifier` traite
- * en un seul endroit.
+ * The repositories throw rather than propagate the `status`: carrying the discriminant
+ * up would make every caller hold a branch `ErrorNotifier` handles once.
  */
 export function unwrap<T>(command: string, result: IpcResult<T>): T {
   if (result.status === 'error') {
