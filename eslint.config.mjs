@@ -55,6 +55,21 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
 
+      // One `../` is a neighbour; two is a path through the tree, and the tree is the
+      // interface. The alias per area is what keeps an import readable from anywhere.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../../*'],
+              message:
+                'Reach across the tree with an alias (@notes, @core, @shared, @titlebar, @banners), not with ../../',
+            },
+          ],
+        },
+      ],
+
       // A `switch` over a generated union must stay exhaustive: a variant added
       // in Rust has to break the build, not fall through to a default.
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
