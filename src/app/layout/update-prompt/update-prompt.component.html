@@ -1,11 +1,5 @@
 @if (store.update(); as update) {
-  <app-dialog
-    [layer]="'update'"
-    [width]="460"
-    [dismissible]="!busy()"
-    labelledBy="update-prompt-title"
-    (closed)="later()"
-  >
+  <app-dialog [layer]="'update'" [dismissible]="!busy()" labelledBy="update-prompt-title" (closed)="later()">
     <h2 id="update-prompt-title" class="update-title">
       <span class="update-icon" aria-hidden="true">⬆</span>
       {{ 'update.title' | transloco }}

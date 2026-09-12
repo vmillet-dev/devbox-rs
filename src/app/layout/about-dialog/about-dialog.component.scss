@@ -1,6 +1,7 @@
 @use 'mixins' as *;
 
 app-dialog {
+  --dialog-width: 420px;
   --dialog-gap: 14px;
 }
 

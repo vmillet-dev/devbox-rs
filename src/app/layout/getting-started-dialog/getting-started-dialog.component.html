@@ -1,10 +1,4 @@
-<app-dialog
-  [layer]="'app'"
-  [variant]="'framed'"
-  [width]="620"
-  labelledBy="getting-started-title"
-  (closed)="closed.emit()"
->
+<app-dialog [layer]="'app'" [variant]="'framed'" labelledBy="getting-started-title" (closed)="closed.emit()">
   <div class="guide-header">
     <h2 id="getting-started-title" class="guide-title">{{ 'gettingStarted.title' | transloco }}</h2>
     <p class="guide-subtitle">{{ 'gettingStarted.subtitle' | transloco }}</p>

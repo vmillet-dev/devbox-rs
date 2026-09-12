@@ -3,6 +3,7 @@
 // Near the top of the window rather than centred: the list grows downwards, and a
 // centred panel would slide under the cursor as it fills.
 app-dialog {
+  --dialog-width: 560px;
   --dialog-align: flex-start;
   --dialog-offset: 12vh;
   --dialog-padding: 12px;

@@ -1,4 +1,4 @@
-<app-dialog [layer]="'fields'" [width]="420" labelledBy="placeholder-form-title" (closed)="cancelled.emit()">
+<app-dialog [layer]="'fields'" labelledBy="placeholder-form-title" (closed)="cancelled.emit()">
   <form class="fields-form" (submit)="submit($event)">
     <h2 id="placeholder-form-title" class="fields-title">
       {{ 'placeholders.title' | transloco }}

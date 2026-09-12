@@ -24,8 +24,11 @@
   max-height: 92vh;
 }
 
+// `bare` is left out on purpose: it is sized by what it shows — an image, which the
+// panel only bounds.
 .dialog-panel.fitted,
 .dialog-panel.framed {
+  width: min(var(--dialog-width, 480px), 90vw);
   @include surface(var(--bg-1), 14px, var(--line));
   box-shadow: var(--shadow-overlay);
 }
@@ -36,12 +39,17 @@
 }
 
 // The middle scrolls, so the panel itself must not: its sections carry their own padding.
+// A height that does not move is the whole point of the variant.
 .dialog-panel.framed {
+  height: min(var(--dialog-height, 560px), 86vh);
   overflow: hidden;
   gap: var(--dialog-gap, 0);
 }
 
+// Last, so it wins over both variants above.
 .dialog-panel.fullscreen {
+  width: 100%;
+  height: 100%;
   border: none;
   border-radius: 0;
   box-shadow: none;

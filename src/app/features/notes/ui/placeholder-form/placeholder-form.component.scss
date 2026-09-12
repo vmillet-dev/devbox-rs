@@ -1,5 +1,9 @@
 @use 'mixins' as *;
 
+app-dialog {
+  --dialog-width: 420px;
+}
+
 .fields-form {
   display: flex;
   flex-direction: column;

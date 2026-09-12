@@ -1,10 +1,4 @@
-<app-dialog
-  [layer]="'app'"
-  [variant]="'framed'"
-  [width]="600"
-  labelledBy="whats-new-title"
-  (closed)="closed.emit()"
->
+<app-dialog [layer]="'app'" [variant]="'framed'" labelledBy="whats-new-title" (closed)="closed.emit()">
   <div class="news-header">
     <h2 id="whats-new-title" class="news-title">{{ 'whatsNew.title' | transloco }}</h2>
     <p class="news-subtitle">{{ 'whatsNew.subtitle' | transloco }}</p>

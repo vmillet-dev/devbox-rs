@@ -1,5 +1,9 @@
 @use 'mixins' as *;
 
+app-dialog {
+  --dialog-width: 620px;
+}
+
 .guide-header {
   @include help-header;
 }

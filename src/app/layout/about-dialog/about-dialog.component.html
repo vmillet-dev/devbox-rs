@@ -1,4 +1,4 @@
-<app-dialog [layer]="'app'" [width]="420" labelledBy="about-dialog-title" (closed)="closed.emit()">
+<app-dialog [layer]="'app'" labelledBy="about-dialog-title" (closed)="closed.emit()">
   <div class="about-header">
     <h2 id="about-dialog-title" class="about-name">{{ 'about.title' | transloco }}</h2>
     <!-- Absent outside the Tauri runtime: a dash rather than a made-up number. -->

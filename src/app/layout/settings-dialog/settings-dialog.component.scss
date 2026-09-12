@@ -1,5 +1,9 @@
 @use 'mixins' as *;
 
+app-dialog {
+  --dialog-width: 760px;
+}
+
 .settings-header {
   padding: 16px 20px 12px;
   border-bottom: 1px solid var(--line-soft);
