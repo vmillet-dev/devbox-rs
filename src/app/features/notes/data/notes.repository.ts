@@ -12,12 +12,12 @@ import {
 } from '../model/note.model';
 import {
   toNote,
-  toNoteDraftDto,
-  toNotePatchDto,
-  toNotesQueryDto,
+  toWireNoteDraft,
+  toWireNotePatch,
+  toWireNotesQuery,
   toNotesView,
   toTrashedNote,
-} from './note.dto';
+} from './note.mapper';
 
 /**
  * The way in to the notes: no component or store touches a data source otherwise.
@@ -28,15 +28,15 @@ import {
 @Injectable({ providedIn: 'root' })
 export class NotesRepository {
   async query(query: NotesQuery): Promise<NotesView> {
-    return toNotesView(unwrap('query_notes', await commands.queryNotes(toNotesQueryDto(query))));
+    return toNotesView(unwrap('query_notes', await commands.queryNotes(toWireNotesQuery(query))));
   }
 
   async create(draft: NoteDraft): Promise<Note> {
-    return toNote(unwrap('create_note', await commands.createNote(toNoteDraftDto(draft))));
+    return toNote(unwrap('create_note', await commands.createNote(toWireNoteDraft(draft))));
   }
 
   async update(id: string, patch: NotePatch): Promise<Note> {
-    return toNote(unwrap('update_note', await commands.updateNote(id, toNotePatchDto(patch))));
+    return toNote(unwrap('update_note', await commands.updateNote(id, toWireNotePatch(patch))));
   }
 
   /** Moves to the trash: the note is recoverable for 30 days. */

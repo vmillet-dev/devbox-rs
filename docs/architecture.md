@@ -1141,9 +1141,9 @@ in `lib.rs` is now the single list: it both registers the commands with Tauri an
 what `bindings.ts` contains. Tauri matches arguments **by name** and renames them to
 camelCase; nobody spells `targetSpaceId` by hand any more.
 
-Only `features/notes/data/` and `core/ipc/` import `bindings.ts`. Everything else keeps
-importing the DTO aliases from `note.dto.ts`, so the generated file stays behind the same
-boundary the hand-written types were behind.
+Only `features/notes/data/` and `core/ipc/` import `bindings.ts`: everything above the
+boundary speaks the **model**, which `note.mapper.ts` converts to and from. The generated
+file stays behind the same boundary the hand-written types were behind.
 
 ### Calling a command
 
@@ -1199,15 +1199,15 @@ different thing to tell the user, and only `importFormat` means "choose another 
 **The wire types are generated; the conversion is not.** `model/` is the vocabulary the
 application reasons in — what stores, components and templates manipulate; `data/` is the
 boundary — the shape that crosses the bridge, the repository that crosses it, and the
-conversion between the two. What used to be hand-written wire interfaces are now aliases of
-generated types (`export type NoteDto = DisplayNote`), kept in `note.dto.ts` so that callers
-import the boundary vocabulary from the boundary, not from `bindings.ts`.
+conversion between the two. There are **two** shapes and not three: the wire types are the
+generated ones, imported under a `Wire*` name where a model type carries the same name, and
+`note.mapper.ts` holds the conversion. Nothing re-declares a wire shape by hand.
 
 Where the two shapes coincide, the model type travels as it is: a space still has no mapper.
 An identity mapper is not symmetry, it is one more name for one type.
 
-What generation does **not** remove, and why `features/notes/data/note.dto.ts` is still the
-biggest file in `data/`:
+What generation does **not** remove, and why `features/notes/data/note.mapper.ts` is still
+the biggest file in `data/`:
 
 - **JSON has no date type.** Rust types every timestamp as a `String`, so the bindings do too.
   The mapper parses it into a `Date` and throws a `ContractError` on an unparseable value,

@@ -1,6 +1,14 @@
+/**
+ * Between the **generated** wire types and the model the app reasons in. Nothing is
+ * redeclared here: the `Wire*` imports below are the structs tauri-specta wrote from the
+ * Rust side, and this file is only what generation cannot cover — **JSON has no date
+ * type**, so every `Date` arrives and leaves as an ISO 8601 string. The conversions
+ * spread the wire object and override only the dates, so a scalar added on the Rust side
+ * costs nothing here.
+ */
 import type {
   Attachment as WireAttachment,
-  DisplayNote,
+  DisplayNote as WireNote,
   NoteDraft as WireNoteDraft,
   NoteFooter as WireNoteFooter,
   NoteLifecycle as WireNoteLifecycle,
@@ -22,20 +30,6 @@ import {
   NotesView,
   TrashedNote,
 } from '../model/note.model';
-
-/**
- * The shape carried over the Tauri bridge, **generated** from the Rust structs by
- * tauri-specta. What generation cannot cover, and what this file exists for: **JSON
- * has no date type**, so every `Date` arrives and leaves as an ISO 8601 string. The
- * conversions below spread the wire object and override only the dates, so a scalar
- * added on the Rust side costs nothing here.
- */
-export type NoteDto = DisplayNote;
-
-export type NoteDraftDto = WireNoteDraft;
-export type NotePatchDto = WireNotePatch;
-export type NotesQueryDto = WireNotesQuery;
-export type NotesViewDto = WireNotesView;
 
 /** A break between what the bridge delivers and what the front can read. */
 export class ContractError extends Error {
@@ -85,7 +79,7 @@ function toLifecycle(dto: WireNoteLifecycle): NoteLifecycle {
     : { kind: 'permanent' };
 }
 
-function toLifecycleDto(lifecycle: NoteLifecycle): WireNoteLifecycle {
+function toWireLifecycle(lifecycle: NoteLifecycle): WireNoteLifecycle {
   return lifecycle.kind === 'expires'
     ? { kind: 'expires', at: toIsoString(lifecycle.at, 'lifecycle.at') }
     : { kind: 'permanent' };
@@ -114,7 +108,7 @@ function toFooter(dto: WireNoteFooter): NoteFooter {
  * The arrays are aliased rather than copied: this runs for every note of every view on
  * every keystroke, and the model types are `readonly`.
  */
-export function toNote({ placeholderValues: _stored, ...dto }: NoteDto): Note {
+export function toNote({ placeholderValues: _stored, ...dto }: WireNote): Note {
   return {
     ...dto,
     createdAt: parseIsoDate(dto.createdAt, 'createdAt'),
@@ -151,12 +145,12 @@ export function toAttachment(dto: WireAttachment): Attachment {
 }
 
 /** The wire draft wants mutable arrays; the model holds `readonly` ones. */
-export function toNoteDraftDto(draft: NoteDraft): NoteDraftDto {
+export function toWireNoteDraft(draft: NoteDraft): WireNoteDraft {
   return {
     ...draft,
     tags: [...draft.tags],
     items: [...draft.items],
-    lifecycle: toLifecycleDto(draft.lifecycle),
+    lifecycle: toWireLifecycle(draft.lifecycle),
   };
 }
 
@@ -164,11 +158,11 @@ export function toNoteDraftDto(draft: NoteDraft): NoteDraftDto {
  * A key left out is a field the patch does not touch; a key sent as `null` would
  * overwrite it — hence the filtering, and hence `#[specta(optional)]` on the Rust side.
  */
-export function toNotePatchDto(patch: NotePatch): NotePatchDto {
+export function toWireNotePatch(patch: NotePatch): WireNotePatch {
   const { lifecycle, tags, items, ...scalars } = patch;
-  const dto: NotePatchDto = withoutUndefined(scalars);
+  const dto: WireNotePatch = withoutUndefined(scalars);
 
-  if (lifecycle !== undefined) dto.lifecycle = toLifecycleDto(lifecycle);
+  if (lifecycle !== undefined) dto.lifecycle = toWireLifecycle(lifecycle);
   if (tags !== undefined) dto.tags = [...tags];
   // Copied item by item: a patch is the last thing to hold these objects.
   if (items !== undefined) dto.items = items.map((item) => ({ ...item }));
@@ -176,7 +170,7 @@ export function toNotePatchDto(patch: NotePatch): NotePatchDto {
   return dto;
 }
 
-export function toNotesQueryDto(query: NotesQuery): NotesQueryDto {
+export function toWireNotesQuery(query: NotesQuery): WireNotesQuery {
   return {
     ...query,
     tags: [...query.tags],
@@ -189,6 +183,6 @@ function toSection(dto: WireNoteSection): NoteSection {
   return { ...dto, notes: dto.notes.map(toNote) };
 }
 
-export function toNotesView(dto: NotesViewDto): NotesView {
+export function toNotesView(dto: WireNotesView): NotesView {
   return { ...dto, sections: dto.sections.map(toSection) };
 }

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import type { NotesView as WireNotesView } from '@core/ipc/bindings';
 import { NotesQuery } from '../model/note.model';
-import { NotesViewDto, toNotesQueryDto, toNotesView } from './note.dto';
+import { toNotesView, toWireNotesQuery } from './note.mapper';
 
-const BASE_VIEW: NotesViewDto = {
+const BASE_VIEW: WireNotesView = {
   sections: [],
   availableTags: ['api'],
   availableLanguages: ['json', 'yml'],
@@ -21,17 +22,17 @@ const BASE_QUERY: NotesQuery = {
   pinnedFirst: true,
 };
 
-describe('toNotesQueryDto', () => {
+describe('toWireNotesQuery', () => {
   it('sends the selected languages across the bridge', () => {
-    expect(toNotesQueryDto(BASE_QUERY).languages).toEqual(['json']);
+    expect(toWireNotesQuery(BASE_QUERY).languages).toEqual(['json']);
   });
 
   it('carries the pinned-first flag, which the palette alone turns off', () => {
-    expect(toNotesQueryDto({ ...BASE_QUERY, pinnedFirst: false }).pinnedFirst).toBe(false);
+    expect(toWireNotesQuery({ ...BASE_QUERY, pinnedFirst: false }).pinnedFirst).toBe(false);
   });
 
   it('sends an empty list rather than omitting the field', () => {
-    expect(toNotesQueryDto({ ...BASE_QUERY, languages: [] }).languages).toEqual([]);
+    expect(toWireNotesQuery({ ...BASE_QUERY, languages: [] }).languages).toEqual([]);
   });
 });
 
