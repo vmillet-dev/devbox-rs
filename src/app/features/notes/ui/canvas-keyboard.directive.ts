@@ -1,5 +1,5 @@
 import { Directive, ElementRef, inject } from '@angular/core';
-import { ShortcutGroup } from '@core/shortcuts/shortcuts.registry';
+import { ShortcutGroup } from '@core/shortcuts/shortcut.model';
 import { DialogStack } from '@shared/ui/dialog/dialog-stack';
 import { Note } from '../model/note.model';
 import { NoteCopyService } from '../state/note-copy.service';
@@ -120,7 +120,6 @@ const CANVAS_KEYS: readonly CanvasKey[] = [
 export const CANVAS_SHORTCUT_GROUP: ShortcutGroup = {
   id: 'notes.canvas',
   labelKey: 'shortcuts.groups.canvas',
-  order: 10,
   shortcuts: CANVAS_KEYS.map(({ keys, labelKey }) => ({ keys, labelKey })),
 };
 

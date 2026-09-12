@@ -13,7 +13,7 @@
 
   @if (menu.open()) {
     <div appMenuPanel class="file-dropdown">
-      @for (entry of registry.entries(); track entry.id) {
+      @for (entry of entries; track entry.id) {
         <button
           appMenuItem
           type="button"
@@ -26,9 +26,7 @@
         </button>
       }
 
-      @if (registry.entries().length > 0) {
-        <hr class="file-separator" />
-      }
+      <hr class="file-separator" />
 
       <button appMenuItem type="button" role="menuitem" class="file-option" (click)="openSettings()">
         {{ 'file.preferences' | transloco }}

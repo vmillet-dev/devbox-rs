@@ -1,13 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SettingsStore } from '@core/settings/settings.store';
-import { ShortcutsRegistry } from '@core/shortcuts/shortcuts.registry';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { ShortcutsDialogComponent } from './shortcuts-dialog.component';
 
 describe('ShortcutsDialogComponent', () => {
   let fixture: ComponentFixture<ShortcutsDialogComponent>;
-  let registry: ShortcutsRegistry;
   let settings: SettingsStore;
 
   const groupTitles = (): string[] =>
@@ -31,15 +29,14 @@ describe('ShortcutsDialogComponent', () => {
       imports: [ShortcutsDialogComponent],
       providers: [provideTranslocoTesting()],
     });
-    registry = TestBed.inject(ShortcutsRegistry);
     settings = TestBed.inject(SettingsStore);
     fixture = TestBed.createComponent(ShortcutsDialogComponent);
     fixture.autoDetectChanges();
     await fixture.whenStable();
   });
 
-  it('lists the global shortcuts even when no feature has contributed', async () => {
-    expect(groupTitles()).toEqual(['Globaux (même fenêtre fermée)']);
+  it('opens on the global shortcuts, which work with the window closed', async () => {
+    expect(groupTitles()[0]).toBe('Globaux (même fenêtre fermée)');
     expect(keysFor('palette de collage rapide')).toEqual(['Ctrl', 'Alt', 'P']);
     expect(keysFor('Capturer le presse-papier')).toEqual(['Ctrl', 'Alt', 'V']);
   });
@@ -51,24 +48,8 @@ describe('ShortcutsDialogComponent', () => {
     expect(keysFor('palette de collage rapide')).toEqual(['Ctrl', 'Shift', 'K']);
   });
 
-  it('renders the contributed groups after the global one, in their declared order', async () => {
-    registry.register([
-      {
-        id: 'notes.palette',
-        labelKey: 'shortcuts.groups.palette',
-        order: 30,
-        shortcuts: [{ keys: ['Enter'], labelKey: 'shortcuts.palette.paste' }],
-      },
-      {
-        id: 'notes.canvas',
-        labelKey: 'shortcuts.groups.canvas',
-        order: 10,
-        shortcuts: [{ keys: ['Ctrl', 'K'], labelKey: 'shortcuts.canvas.search' }],
-      },
-    ]);
-    await fixture.whenStable();
-
-    expect(groupTitles()).toEqual(['Globaux (même fenêtre fermée)', 'Canevas', 'Collage rapide']);
+  it('lists the groups of the notes after the global one, in their declared order', async () => {
+    expect(groupTitles()).toEqual(['Globaux (même fenêtre fermée)', 'Canevas', 'Éditeur', 'Collage rapide']);
     expect(keysFor('champ de recherche')).toEqual(['Ctrl', 'K']);
   });
 
