@@ -29,6 +29,15 @@ describe('TitlebarComponent', () => {
     expect(fixture.nativeElement.querySelector('.dots').getAttribute('aria-hidden')).toBe('true');
   });
 
+  it('groups the menus on the left, ahead of the title', () => {
+    const menus = fixture.nativeElement.querySelector('.titlebar-menus');
+    const title = fixture.nativeElement.querySelector('.titlebar-title');
+
+    expect(menus.querySelector('app-file-menu')).not.toBeNull();
+    expect(menus.querySelector('app-about-menu')).not.toBeNull();
+    expect(menus.compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it('renders a locale option per available locale, marking French active by default', () => {
     expect(localeOptions().map((option) => option.textContent?.trim())).toEqual(['FR', 'EN']);
     expect(localeOptions()[0].classList.contains('active')).toBe(true);

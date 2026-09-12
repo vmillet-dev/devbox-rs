@@ -35,7 +35,7 @@
 .about-dropdown {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  left: 0;
   min-width: 210px;
   @include surface;
   padding: 4px;
