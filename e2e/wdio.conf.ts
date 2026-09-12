@@ -6,6 +6,23 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, '..');
 
 /**
+ * ⚠️ A port collision, and the reason the suite passed here and failed on CI.
+ *
+ * `tauri-plugin-wdio-webdriver` listens on **4445** by default, and `tauri-driver`
+ * puts **msedgedriver** on that same 4445 — what it calls its native port. Both bind
+ * it and the loser says nothing: the plugin's bind has no error path. Which one wins
+ * depends on start order, so on the machine. Locally msedgedriver took it and every
+ * spec passed; on a runner the application took it, `tauri-driver` had no driver left
+ * to talk to, and each session died on `DevToolsActivePort file doesn't exist` — an
+ * error naming neither the port nor the culprit.
+ *
+ * Moving the plugin off 4445 removes the race rather than winning it. Set here and
+ * not in the workflow so both environments are configured the same way, and left
+ * overridable so a machine that already uses 4455 can say so.
+ */
+process.env['TAURI_WEBDRIVER_PORT'] ??= '4455';
+
+/**
  * Built by `npm run e2e:build`, which links the `e2e` Cargo feature and merges
  * `tauri.e2e.conf.json`. A release binary carries neither and cannot be driven.
  */

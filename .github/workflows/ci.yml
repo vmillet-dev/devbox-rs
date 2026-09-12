@@ -232,6 +232,12 @@ jobs:
           ls "/c/Program Files (x86)/Microsoft/EdgeWebView/Application/" 2>/dev/null \
             || echo "::warning::WebView2 Runtime introuvable — cause probable à elle seule"
 
+          # ⚠️ Sur un port à elle, jamais 4445 : c'est celui où `tauri-driver` place
+          # msedgedriver, et le plugin WebDriver de l'application s'y lie aussi. Un
+          # binaire lancé ici qui survivrait garderait 4445 pour tout le reste du job
+          # et condamnerait chaque session — le diagnostic deviendrait la panne.
+          export TAURI_WEBDRIVER_PORT=4465
+
           log="$RUNNER_TEMP/app-start.log"
           ./src-tauri/target/debug/devbox.exe > "$log" 2>&1 &
           pid=$!
@@ -239,7 +245,9 @@ jobs:
 
           if kill -0 "$pid" 2>/dev/null; then
             echo "Vivant après 15 s : le binaire démarre seul, la cause est le bac à sable ou le driver."
-            kill "$pid" 2>/dev/null
+            # `kill` ne termine pas de façon fiable un processus GUI natif depuis Git
+            # Bash : `taskkill //F` sur l'arbre complet, sinon il survit à l'étape.
+            taskkill //F //T //PID "$(cat /proc/$pid/winpid 2>/dev/null || echo "$pid")" >/dev/null 2>&1 || kill -9 "$pid" 2>/dev/null
           else
             wait "$pid"
             code=$?
