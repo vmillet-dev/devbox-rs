@@ -172,8 +172,8 @@ State lives in signals and every component is `OnPush` — enforced by the
 
 ### Routing
 
-`AppComponent` renders `AppShellComponent`, which holds the persistent chrome (titlebar,
-global error banner) and a `<router-outlet>`. Features are lazy-loaded with
+`AppComponent` _is_ the persistent chrome — titlebar, global error banner, status toast and
+update prompt — around a `<router-outlet>`. Features are lazy-loaded with
 `loadComponent`, so adding the planned crypto and formatters tools will not weigh on the
 initial bundle.
 

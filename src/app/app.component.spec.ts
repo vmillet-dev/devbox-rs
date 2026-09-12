@@ -1,9 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { provideRouter } from '@angular/router';
+import { RouterOutlet, provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { ErrorBannerComponent } from '@layout/error-banner/error-banner.component';
+import { TitlebarComponent } from '@layout/titlebar/titlebar.component';
+import { UpdatePromptComponent } from '@layout/update-prompt/update-prompt.component';
 import { provideAppTesting } from '@testing/testing.providers';
-import { AppShellComponent } from '@layout/app-shell/app-shell.component';
 import { AppComponent } from './app.component';
 
 describe('AppComponent', () => {
@@ -20,7 +22,13 @@ describe('AppComponent', () => {
     fixture.autoDetectChanges();
   });
 
-  it('renders the app shell', () => {
-    expect(fixture.debugElement.query(By.directive(AppShellComponent))).not.toBeNull();
+  it('renders the persistent chrome: titlebar, global error banner and update prompt', () => {
+    expect(fixture.debugElement.query(By.directive(TitlebarComponent))).not.toBeNull();
+    expect(fixture.debugElement.query(By.directive(ErrorBannerComponent))).not.toBeNull();
+    expect(fixture.debugElement.query(By.directive(UpdatePromptComponent))).not.toBeNull();
+  });
+
+  it('hosts features through the router outlet rather than importing them directly', () => {
+    expect(fixture.debugElement.query(By.directive(RouterOutlet))).not.toBeNull();
   });
 });
