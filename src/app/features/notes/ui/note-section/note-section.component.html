@@ -7,22 +7,10 @@
   </h2>
   <div class="card-grid">
     @for (note of section().notes; track note.id) {
-      <app-note-card
-        [note]="note"
-        [selected]="note.id === selectedNoteId()"
-        [focused]="note.id === focusedNoteId()"
-        [checked]="checkedIds().has(note.id)"
-        [spaces]="spaces()"
-        (opened)="noteOpened.emit($event)"
-        (checkToggled)="noteChecked.emit($event)"
-        (moveRequested)="noteMoved.emit($event)"
-        (deleteRequested)="noteDeleted.emit($event)"
-        (fillRequested)="fillRequested.emit($event)"
-        (itemToggled)="itemToggled.emit($event)"
-      />
+      <app-note-card [note]="note" (opened)="noteActivated.emit($event)" />
     }
     @if (section().showCreateGhost) {
-      <button type="button" class="card ghost" (click)="createRequested.emit()">
+      <button type="button" class="card ghost" (click)="createNote()">
         <span class="ghost-plus" aria-hidden="true">+</span>
         <span>{{ 'notes.createOrPaste' | transloco }}</span>
       </button>

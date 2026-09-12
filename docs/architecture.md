@@ -207,7 +207,17 @@ which also renders the hint, rather than travelling down a chain of `viewChild` 
 A component that only relays inputs and outputs is not a component. The page composes
 `SpaceSwitcher`, `SearchBox`, `FilterChips` and `NoteSection` directly rather than through a
 topbar and a canvas wrapper, which added two files and eleven declarations without a single
-decision between them.
+decision between them. The same rule applied to `NoteSectionComponent`, which used to forward
+eleven bindings to the card without reading one of them: the section now takes `[section]`,
+the card takes `[note]` and reads selection, focus and ticks off the stores, and the whole
+binding list is
+
+```html
+<app-note-section [section]="section" (noteActivated)="onNoteActivated($event)" />
+```
+
+`noteActivated` stays an output because **the card cannot decide what its own click means**:
+ticking, extending a range or opening depends on the visible list, which is the canvas's.
 
 ### Shared behaviour lives in one place, not in copies
 

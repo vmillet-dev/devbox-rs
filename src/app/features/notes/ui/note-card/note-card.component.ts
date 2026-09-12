@@ -10,9 +10,12 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ChecklistItem, checklistProgress, noteCopyText } from '@features/notes/model/checklist.model';
+import { checklistProgress, noteCopyText } from '@features/notes/model/checklist.model';
 import { Note } from '@features/notes/model/note.model';
-import { Space } from '@features/notes/model/space.model';
+import { NoteSelectionStore } from '@features/notes/state/note-selection.store';
+import { NotesStore } from '@features/notes/state/notes.store';
+import { PlaceholderFillStore } from '@features/notes/state/placeholder-fill.store';
+import { SpacesStore } from '@features/notes/state/spaces.store';
 import { TranslationRef } from '@core/i18n/translation-ref.model';
 import { ClockService } from '@core/time/clock.service';
 import { expiryRef, relativeTimeRef } from '@core/time/relative-time.util';
@@ -23,11 +26,6 @@ import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.componen
 
 /** The footer label is either plain text (a source name) or a translation reference (a time). */
 type FooterLabel = { kind: 'text'; value: string } | { kind: 'ref'; ref: TranslationRef };
-
-export interface NoteMove {
-  readonly noteId: string;
-  readonly spaceId: string;
-}
 
 /** An opening request, and how: the modifier decides the selection. */
 export interface NoteActivation {
@@ -40,11 +38,6 @@ const SNIPPET_LINES = 3;
 const MAX_VISIBLE_TAGS = 2;
 /** What fits between the progress bar and the footer on a 150 px card. */
 const MAX_VISIBLE_ITEMS = 2;
-
-export interface ItemToggle {
-  readonly noteId: string;
-  readonly items: readonly ChecklistItem[];
-}
 
 @Component({
   selector: 'app-note-card',
@@ -61,21 +54,25 @@ export interface ItemToggle {
 })
 export class NoteCardComponent {
   private readonly clock = inject(ClockService);
+  private readonly notes = inject(NotesStore);
+  private readonly selection = inject(NoteSelectionStore);
+  private readonly fill = inject(PlaceholderFillStore);
+
+  /** Read by the card menu, which removes the note's own space from the destinations. */
+  protected readonly spaces = inject(SpacesStore);
 
   readonly note = input.required<Note>();
-  readonly selected = input(false);
-  /** The note keyboard navigation points at — distinct from the selection. */
-  readonly focused = input(false);
-  readonly checked = input(false);
-  /** Destinations the menu offers; the note's own space is removed from them. */
-  readonly spaces = input<readonly Space[]>([]);
 
+  /**
+   * Only the click stays an output: which of opening, ticking and extending a range it
+   * means is the canvas's to arbitrate, and the card does not know the visible list.
+   */
   readonly opened = output<NoteActivation>();
-  readonly checkToggled = output<string>();
-  readonly moveRequested = output<NoteMove>();
-  readonly deleteRequested = output<string>();
-  readonly fillRequested = output<string>();
-  readonly itemToggled = output<ItemToggle>();
+
+  protected readonly selected = computed(() => this.notes.selectedNoteId() === this.note().id);
+  /** The note keyboard navigation points at — distinct from the selection. */
+  protected readonly focused = computed(() => this.selection.focusedNoteId() === this.note().id);
+  protected readonly checked = computed(() => this.selection.checkedIds().has(this.note().id));
 
   private readonly cardButton = viewChild.required<ElementRef<HTMLButtonElement>>('cardButton');
 
@@ -137,34 +134,29 @@ export class NoteCardComponent {
   /** The checkbox is a control of its own: it must not open the note. */
   protected onCheck(event: MouseEvent): void {
     event.stopPropagation();
-    this.checkToggled.emit(this.note().id);
+    this.selection.toggleChecked(this.note().id);
   }
 
-  /**
-   * Ticking from the card without opening the note. The card emits the **whole** list as
-   * it becomes: it persists nothing itself.
-   */
+  /** Ticking from the card without opening the note: the whole list is written back. */
   protected onItemToggle(event: MouseEvent, index: number): void {
     event.stopPropagation();
-    this.itemToggled.emit({
-      noteId: this.note().id,
-      items: this.note().items.map((item, at) =>
-        at === index ? { ...item, done: !item.done } : { ...item },
-      ),
-    });
+    void this.notes.setChecklist(
+      this.note().id,
+      this.note().items.map((item, at) => (at === index ? { ...item, done: !item.done } : { ...item })),
+    );
   }
 
   protected onFill(event: MouseEvent): void {
     event.stopPropagation();
-    this.fillRequested.emit(this.note().id);
+    this.fill.openFor(this.note().id);
   }
 
   /** The menu does not know the note: the card attaches the id. */
   protected onMove(spaceId: string): void {
-    this.moveRequested.emit({ noteId: this.note().id, spaceId });
+    void this.notes.moveNote(this.note().id, spaceId);
   }
 
   protected onDelete(): void {
-    this.deleteRequested.emit(this.note().id);
+    void this.notes.deleteNote(this.note().id);
   }
 }

@@ -3,14 +3,23 @@ import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Space } from '@features/notes/model/space.model';
 import { LanguageBadgeComponent } from '@shared/ui/language-badge/language-badge.component';
+import { NoteSelectionStore } from '@features/notes/state/note-selection.store';
+import { NotesQueryStore } from '@features/notes/state/notes-query.store';
+import { NotesStore } from '@features/notes/state/notes.store';
+import { PlaceholderFillStore } from '@features/notes/state/placeholder-fill.store';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
 import { CopyButtonComponent } from '../copy-button/copy-button.component';
 import { NoteCardMenuComponent } from '../note-card-menu/note-card-menu.component';
-import { ItemToggle, NoteActivation, NoteCardComponent, NoteMove } from './note-card.component';
+import { NoteActivation, NoteCardComponent } from './note-card.component';
 
 /** A literal, so the expected strings stay on one line. */
 const NEWLINE = String.fromCharCode(10);
+
+const SPACES: readonly Space[] = [
+  { id: 'work', name: 'Work' },
+  { id: 'personal', name: 'Personal' },
+];
 
 describe('NoteCardComponent', () => {
   let fixture: ComponentFixture<NoteCardComponent>;
@@ -24,7 +33,11 @@ describe('NoteCardComponent', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
 
-    TestBed.configureTestingModule({ imports: [NoteCardComponent], providers: [provideAppTesting()] });
+    TestBed.configureTestingModule({
+      imports: [NoteCardComponent],
+      // The store answers about notes the canvas holds, so the card's own note is one.
+      providers: [provideAppTesting({ spaces: SPACES, notes: [createNote({ id: 'note-42' })] })],
+    });
     fixture = TestBed.createComponent(NoteCardComponent);
     fixture.componentRef.setInput('note', createNote());
     fixture.autoDetectChanges();
@@ -129,9 +142,11 @@ describe('NoteCardComponent', () => {
     expect(fixture.nativeElement.querySelector('.visually-hidden').textContent).toBe('Note épinglée');
   });
 
-  it('applies the pinned and selected classes based on inputs', async () => {
-    fixture.componentRef.setInput('note', createNote({ pinned: true }));
-    fixture.componentRef.setInput('selected', true);
+  it('marks itself pinned from the note, and selected from the store', async () => {
+    fixture.componentRef.setInput('note', createNote({ id: 'note-42', pinned: true }));
+    await vi.waitFor(() => expect(TestBed.inject(NotesQueryStore).visibleNotes()).toHaveLength(1));
+
+    TestBed.inject(NotesStore).openNote('note-42');
     await fixture.whenStable();
 
     const card = fixture.debugElement.query(By.css('.card'));
@@ -173,14 +188,12 @@ describe('NoteCardComponent', () => {
   it('checks the note without opening it', async () => {
     fixture.componentRef.setInput('note', createNote({ id: 'note-42' }));
     await fixture.whenStable();
-    let checked: string | undefined;
     let opened = 0;
-    fixture.componentInstance.checkToggled.subscribe((id) => (checked = id));
     fixture.componentInstance.opened.subscribe(() => (opened += 1));
 
     fixture.debugElement.query(By.css('.card-check')).triggerEventHandler('click', new MouseEvent('click'));
 
-    expect(checked).toBe('note-42');
+    expect(TestBed.inject(NoteSelectionStore).checkedIds().has('note-42')).toBe(true);
     expect(opened).toBe(0);
   });
 
@@ -191,13 +204,12 @@ describe('NoteCardComponent', () => {
         createNote({ id: 'note-42', placeholders: [{ name: 'host', defaultValue: '', value: '' }] }),
       );
       await fixture.whenStable();
-      let filled: string | undefined;
-      fixture.componentInstance.fillRequested.subscribe((id) => (filled = id));
+      const openFor = vi.spyOn(TestBed.inject(PlaceholderFillStore), 'openFor');
 
       expect(fixture.debugElement.query(By.directive(CopyButtonComponent))).toBeNull();
       fixture.debugElement.query(By.css('.card-fill')).triggerEventHandler('click', new MouseEvent('click'));
 
-      expect(filled).toBe('note-42');
+      expect(openFor).toHaveBeenCalledWith('note-42');
     });
 
     it('falls back to a plain copy button for a note without fields', () => {
@@ -213,16 +225,10 @@ describe('NoteCardComponent', () => {
     }
 
     it('hands the menu the note space so it can be excluded from the targets', async () => {
-      const spaces: Space[] = [
-        { id: 'work', name: 'Work' },
-        { id: 'personal', name: 'Personal' },
-      ];
       fixture.componentRef.setInput('note', createNote({ spaceId: 'work' }));
-      fixture.componentRef.setInput('spaces', spaces);
-      await fixture.whenStable();
+      await vi.waitFor(() => expect(menu().spaces()).toEqual(SPACES));
 
       expect(menu().currentSpaceId()).toBe('work');
-      expect(menu().spaces()).toEqual(spaces);
     });
 
     it('gives the menu the placeholder title the card itself shows', async () => {
@@ -235,23 +241,21 @@ describe('NoteCardComponent', () => {
     it('attaches the note id to a move, which the menu does not know', async () => {
       fixture.componentRef.setInput('note', createNote({ id: 'note-42', spaceId: 'work' }));
       await fixture.whenStable();
-      const moves: NoteMove[] = [];
-      fixture.componentInstance.moveRequested.subscribe((move) => moves.push(move));
+      const moveNote = vi.spyOn(TestBed.inject(NotesStore), 'moveNote').mockResolvedValue();
 
       menu().moveRequested.emit('personal');
 
-      expect(moves).toEqual([{ noteId: 'note-42', spaceId: 'personal' }]);
+      expect(moveNote).toHaveBeenCalledWith('note-42', 'personal');
     });
 
     it('attaches the note id to a deletion', async () => {
       fixture.componentRef.setInput('note', createNote({ id: 'note-42' }));
       await fixture.whenStable();
-      let deleted: string | undefined;
-      fixture.componentInstance.deleteRequested.subscribe((id) => (deleted = id));
+      const deleteNote = vi.spyOn(TestBed.inject(NotesStore), 'deleteNote').mockResolvedValue();
 
       menu().deleteRequested.emit();
 
-      expect(deleted).toBe('note-42');
+      expect(deleteNote).toHaveBeenCalledWith('note-42');
     });
   });
 
@@ -300,20 +304,14 @@ describe('NoteCardComponent', () => {
       expect(fixture.debugElement.query(By.directive(LanguageBadgeComponent))).toBeNull();
     });
 
-    it('emits the whole list with the ticked item flipped', () => {
-      const toggles: ItemToggle[] = [];
-      fixture.componentInstance.itemToggled.subscribe((toggle) => toggles.push(toggle));
+    it('saves the whole list with the ticked item flipped', () => {
+      const setChecklist = vi.spyOn(TestBed.inject(NotesStore), 'setChecklist').mockResolvedValue();
 
       fixture.nativeElement.querySelectorAll('.card-item')[1].click();
 
-      expect(toggles).toEqual([
-        {
-          noteId: 'note-42',
-          items: [
-            { text: 'Relire', done: true },
-            { text: 'Déployer', done: true },
-          ],
-        },
+      expect(setChecklist).toHaveBeenCalledWith('note-42', [
+        { text: 'Relire', done: true },
+        { text: 'Déployer', done: true },
       ]);
     });
 

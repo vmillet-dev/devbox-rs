@@ -64,20 +64,7 @@
     <p class="canvas-state-text">{{ 'notes.noResults' | transloco }}</p>
   } @else {
     @for (section of canvas.sections(); track section.key) {
-      <app-note-section
-        [section]="section"
-        [selectedNoteId]="store.selectedNoteId()"
-        [focusedNoteId]="selection.focusedNoteId()"
-        [checkedIds]="selection.checkedIds()"
-        [spaces]="spaces.spaces()"
-        (noteOpened)="onNoteActivated($event)"
-        (noteChecked)="selection.toggleChecked($event)"
-        (noteMoved)="store.moveNote($event.noteId, $event.spaceId)"
-        (noteDeleted)="store.deleteNote($event)"
-        (fillRequested)="fill.openFor($event)"
-        (createRequested)="store.createNote()"
-        (itemToggled)="store.setChecklist($event.noteId, $event.items)"
-      />
+      <app-note-section [section]="section" (noteActivated)="onNoteActivated($event)" />
     }
     <p class="canvas-keyboard-hint">{{ 'notes.keyboardHint' | transloco }}</p>
   }

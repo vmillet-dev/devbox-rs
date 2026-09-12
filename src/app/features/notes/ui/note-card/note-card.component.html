@@ -140,7 +140,7 @@
 
   <app-note-card-menu
     [noteTitle]="menuTitle"
-    [spaces]="spaces()"
+    [spaces]="spaces.spaces()"
     [currentSpaceId]="note().spaceId"
     (moveRequested)="onMove($event)"
     (deleteRequested)="onDelete()"

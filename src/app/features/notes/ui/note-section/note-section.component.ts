@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteSection } from '@features/notes/model/note.model';
-import { Space } from '@features/notes/model/space.model';
-import { ItemToggle, NoteActivation, NoteCardComponent, NoteMove } from '../note-card/note-card.component';
+import { NotesStore } from '@features/notes/state/notes.store';
+import { NoteActivation, NoteCardComponent } from '../note-card/note-card.component';
 
 @Component({
   selector: 'app-note-section',
@@ -12,23 +12,19 @@ import { ItemToggle, NoteActivation, NoteCardComponent, NoteMove } from '../note
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NoteSectionComponent {
-  readonly section = input.required<NoteSection>();
-  readonly selectedNoteId = input<string | null>(null);
-  readonly focusedNoteId = input<string | null>(null);
-  readonly checkedIds = input<ReadonlySet<string>>(new Set());
-  readonly spaces = input<readonly Space[]>([]);
+  private readonly notes = inject(NotesStore);
 
-  readonly noteOpened = output<NoteActivation>();
-  readonly noteChecked = output<string>();
-  readonly noteMoved = output<NoteMove>();
-  readonly noteDeleted = output<string>();
-  readonly fillRequested = output<string>();
-  readonly createRequested = output<void>();
-  readonly itemToggled = output<ItemToggle>();
+  readonly section = input.required<NoteSection>();
+
+  readonly noteActivated = output<NoteActivation>();
 
   /** The section key *is* the translation key: no label kept in two places. */
   protected readonly titleKey = computed(() => `sections.${this.section().key}`);
 
   /** Ties the region to its heading, for screen-reader region navigation. */
   protected readonly headingId = computed(() => `section-heading-${this.section().key}`);
+
+  protected createNote(): void {
+    this.notes.createNote();
+  }
 }
