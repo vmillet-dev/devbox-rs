@@ -65,7 +65,8 @@ For Rust-only iteration, `cargo check` from `src-tauri/` is much faster than a f
 ## Layout
 
 ```
-src/              Angular front-end (core/ state & data, features/ screens, layout/, shared/)
+src/              Angular front-end, filed as the interface is laid out:
+                  titlebar/, banners/, notes/, plus core/ and shared/
 src-tauri/src/
   notes/          The notes feature: model.rs, language.rs, view.rs, placeholder.rs,
                   trash.rs, store.rs
@@ -95,8 +96,8 @@ owns its model, its SQL and the commands that expose it: `<feature>.rs` holds th
 - [x] Notes UI: spaces, search, filters, tag rail, pinned/today/week sections, editor
       overlay with code viewer
 - [x] French/English localization with persisted locale
-- [x] Front-end IPC seam: typed `invoke()` wrapper, DTOs/mappers and Tauri repositories,
-      wired as the app's only data source in `core/data/data.providers.ts`
+- [x] Front-end IPC seam: generated bindings, mappers and repositories in `notes/data/`,
+      the app's only data source
 - [x] Full note editing: content, format, tags, pin, deletion
 - [x] Spaces: notes carry a `spaceId`, the switcher filters on it and can create a space
 - [x] ESLint + Prettier, with template accessibility rules

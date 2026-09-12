@@ -30,14 +30,17 @@ yet — a round trip per keystroke), and plain UI concerns like keyboard shortcu
 ```
 src/                Angular front-end
 ├── app/
+│   ├── app.component.*   the frame: titlebar, banners, <router-outlet>
+│   ├── titlebar/   titlebar.component, then file-menu/ and about-menu/ with the panels
+│   │               each of them opens, nested where they open from
+│   ├── banners/    error banner, status toast, update prompt — siblings of the outlet
+│   ├── notes/      the page, its components nested as they are on screen, plus the
+│   │               flat state/, data/ and model/ the whole page shares
 │   ├── core/       cross-cutting infrastructure, one folder per subject: IPC, i18n,
-│   │               errors, time, preferences, settings, updates, app-info, language,
+│   │               errors, time, preferences, settings, updates, app-info,
 │   │               clipboard, dialogs (native file picker), window (hide / quit /
 │   │               close-to-tray), shortcuts, autostart
-│   ├── features/   one folder per tool, owning its data/, model/, state/ and ui/
-│   ├── layout/     the app chrome: shell, titlebar, about, preferences, error banner,
-│   │               update prompt
-│   └── shared/     presentation kit — a11y directives and components that inject nothing
+│   └── shared/     what crosses two areas of the screen: the modal frame, a11y directives
 ├── assets/         static images
 ├── styles/         global theme (styles.scss) and SCSS partials
 └── testing/        test doubles, fixtures and shared providers
@@ -117,52 +120,64 @@ also derives `specta::Type`, which is what lets tauri-specta generate the front-
 
 ### Where a file goes
 
-> A feature owns its data, its model, its state and its components. `core/` is cross-cutting
-> infrastructure — one folder per subject, a service and its store together. `shared/` is a
-> presentation kit: nothing in it injects. `layout/` is the chrome around the tools.
+> **A folder's path is its address in the interface.** A component lives in the folder of its
+> parent on screen; one with two parents rises to their nearest common ancestor. `core/` is
+> cross-cutting infrastructure, one folder per subject. `shared/` is what crosses two areas of
+> the screen.
 
-The axis is the **subject**, never the technical nature. There is no `stores/` folder holding
-every store, because that files one domain under four addresses; `UpdateStore` sits beside
-`UpdaterService` in `core/updates/`, and `NotesStore` sits in `features/notes/state/`. State
-lives beside what it manages.
+The tree used to answer a question nobody asks. Every path said what _technical kind_ a file
+was — `state/`, `data/`, `ui/`, `layout/` — which you know before you open the tree. What you
+do not know, and what you are actually looking for, is **where the thing is on screen**: you
+see a button, you want the code behind it. `titlebar/about-menu/whats-new-dialog/` says
+exactly where to click. Walking down the tree is walking down the screen.
 
-The payoff is the second tool: `features/hashing/` will hold `{data,model,state,ui}` and its
-page, the slots it does not need simply will not exist, and **nothing in `core/` moves**. The
-inverse test is just as useful — deleting `features/notes/` deletes the notes feature and
-leaves nothing dangling.
+**But state is not a component.** A `providedIn: 'root'` store has no place on screen — it has
+consumers, and `SpacesStore`, `NoteSelectionStore` and `LibraryStore` are read by the File menu
+in the titlebar as much as by the canvas. Filing a singleton under one of its consumers would
+claim a containment that does not exist. So the tree mirrors the interface **where there is
+interface**, and stays flat where there is state: `notes/state/`, `notes/data/` and
+`notes/model/` are one folder each. Only a store with exactly one consumer travels with it.
 
 Membership is decidable, not a matter of taste:
 
-| Folder      | Test                                                          |
-| ----------- | ------------------------------------------------------------- |
-| `features/` | does one tool need it, and no other?                          |
-| `core/`     | would a second, unrelated tool inject it verbatim?            |
-| `shared/`   | does it take everything through `input()` and inject nothing? |
-| `layout/`   | is it the frame around a tool rather than part of one?        |
+| Question                                    | Answer                                       |
+| ------------------------------------------- | -------------------------------------------- |
+| Where does this component appear on screen? | in the folder of the component that shows it |
+| Two or more parents show it?                | their nearest common ancestor                |
+| Is it state rather than a component?        | the flat `state/` of the page that shares it |
+| Would an unrelated tool inject it verbatim? | `core/`                                      |
+| Does it cross two areas of the screen?      | `shared/`                                    |
 
-That last rule is why `ErrorBannerComponent`, `UpdatePromptComponent` and
-`AboutDialogComponent` live in `layout/` and not in `shared/ui/`: they inject. And why
-`LifecycleBadgeComponent`, which reads `NoteLifecycle`, lives under `features/notes/ui/`.
+Two consequences worth stating. **Rendering something is not owning it:** the preferences
+panel hosts the variables page through `NgComponentOutlet`, and the shortcuts sheet imports
+the notes' key groups — neither moves those files into `titlebar/`, because the notes own
+them. And **deletion became local**: the trash is one folder, where it used to be a panel in
+`ui/` and a store adrift among twenty-four others in `state/`.
 
-There is **one** exception, and it is deliberate: `DialogComponent` (`shared/ui/dialog/`)
+There is **one** exception, and it is deliberate: `DialogComponent` (`shared/dialog/`)
 injects `DialogStack`, its own neighbour in the same folder. What the rule forbids is a shared
 component knowing a feature or an application store; a modal has to know which modal is in
 front, and that knowledge cannot be handed down an `input()` from twelve callers.
 
 ### Imports
 
-Path aliases rather than deep relative paths: `@core/*`, `@shared/*`, `@features/*`,
-`@layout/*`, `@testing/*` (declared in `tsconfig.json`). The rule is **relative when a single
-`../` reaches the target, alias otherwise** — so `features/notes/state/notes.store.ts` reads
-`../data/notes.repository`, while `features/notes/ui/note-card/` reaches the model through
-`@features/notes/model/note.model`. There is no `../../` anywhere in `src/`, and that is worth
-keeping: it is the property that makes an import line readable without opening a file tree.
+**One alias per area of the screen**: `@notes/*`, `@titlebar/*`, `@banners/*`, plus `@core/*`,
+`@shared/*` and `@testing/*` (declared in `tsconfig.json`, and nowhere else). An import says
+which part of the interface it reaches into before it says which file.
 
-**No `index.ts` barrels.** Three reasons, in order of weight: a barrel at
-`features/notes/index.ts` would pull `data/`, `state/` and every `ui/` component into the lazy
-chunk _while hiding that it does_ — the explicit `loadComponent` path is what keeps the chunk
-honest; barrels re-close import cycles by construction, and this codebase has one deliberate
-cycle broken by hand (`core/ipc` ↔ `features/notes/data`, see below); and with five aliases the
+The rule is **relative when a single `../` reaches the target, alias otherwise** — so
+`notes/state/notes.store.ts` reads `../data/notes.repository`, while
+`notes/note-section/note-card/` reaches the model through `@notes/model/note.model`. There is
+no `../../` anywhere in `src/`, and since this reorganisation that is **enforced**:
+`no-restricted-imports` in `eslint.config.mjs` refuses the pattern. The aliases are what make
+it possible — the tree is four levels deep in places, and without them a card reaching the
+model would write `../../../`.
+
+**No `index.ts` barrels.** Three reasons, in order of weight: a barrel at `notes/index.ts`
+would pull `data/`, `state/` and every component into the lazy chunk _while hiding that it
+does_ — the explicit `loadComponent` path is what keeps the chunk honest; barrels re-close
+import cycles by construction, and this codebase has one deliberate cycle broken by hand
+(`core/ipc` ↔ `notes/data`, see below); and with six aliases the
 import lines are already short. The tree has zero barrels — keep it that way.
 
 The app bootstraps standalone components (`src/main.ts` → `bootstrapApplication`); there
@@ -195,7 +210,7 @@ and routing them through the page cost seventeen bindings and made adding one a 
 change. What stays an output is what the **page** has to arbitrate: closing the overlay, a
 patch (only `NotesStore` knows whether the note exists yet), a deletion.
 
-**`shared/ui/` is the exception that injects nothing at all** — it is a presentation kit, and
+**`shared/` is the exception that injects nothing at all** — it is a presentation kit, and
 a component there takes everything through `input()`. `CodeViewerComponent` knows nothing
 about notes. Components specific to the notes live under their own `ui/` folder, and are free
 to reach for the feature's stores.
@@ -244,7 +259,7 @@ Escape, and the template no longer declares a bare `(click)` for the linter to f
 
 #### The modal frame
 
-The twelve modals do **not** each carry a frame. `DialogComponent` (`shared/ui/dialog/`) owns
+The twelve modals do **not** each carry a frame. `DialogComponent` (`shared/dialog/`) owns
 the scrim, the panel, `role="dialog"`, `aria-modal`, the focus trap, Escape and the backdrop
 click; a dialog projects its content into it and says which rung it sits on:
 
@@ -285,9 +300,9 @@ shared one signal so two could never stack). The stack orders by rung and not by
 because a dialog opened _by_ another one — the fields form, from the palette — is created
 second but drawn in front. It also answers `hasOpenDialog()`, which is how the notes page
 knows to keep its hands off the keyboard: the page used to name its five modals one by one and
-could not see the ones `layout/` opens at all.
+could not see the ones the titlebar opens at all.
 
-**80 is reserved for the two banners** in `layout/` — `StatusToastComponent` and
+**80 is reserved for the two banners** in `banners/` — `StatusToastComponent` and
 `ErrorBannerComponent`. They sit in the flow under the titlebar, so without it a modal's fixed,
 blurred backdrop covers them; and it is precisely from a modal that they get raised ("copied
 with your field values" from the editor, "could not save the note" while editing). A new rung
@@ -296,7 +311,7 @@ therefore goes **below** that line, never above it.
 ### Syntax highlighting
 
 `CodeViewerComponent` renders read-only coloured code — a card excerpt, or the layer under the
-editor's textarea. It delegates to `shared/ui/code-viewer/highlighter.ts`, the **only** module
+editor's textarea. It delegates to `notes/ui/code-viewer/highlighter.ts`, the **only** module
 that imports highlight.js.
 
 - **Grammars are imported one by one** from `highlight.js/lib/`, never the default bundle,
@@ -689,7 +704,7 @@ canvas shortcut: it is the one gesture people make without looking at the screen
 
 ### Keyboard navigation of the canvas
 
-`CanvasKeyboardDirective` (`features/notes/ui/`) drives the canvas from the keyboard whenever
+`CanvasKeyboardDirective` (`notes/`) drives the canvas from the keyboard whenever
 the focus is neither in a field nor behind a modal (`DialogStack.hasOpenDialog()`, which also
 disables the `Ctrl+K` search shortcut). Arrows move, `Enter` opens, `C` copies, `P` pins, `X`
 checks, `Delete` trashes, `Escape` clears the selection. The keys are deliberately bare
@@ -900,7 +915,7 @@ a `Signal` because "Exporter la sélection" follows what is checked at that inst
 order on screen is the order in the array.
 
 There used to be a contribution registry here — three of them, in fact, one per extension
-point — so `layout/` could stay ignorant of a feature it might not have. That indirection had
+point — so the chrome could stay ignorant of a feature it might not have. That indirection had
 exactly one purpose, a second tool, and [#23](https://github.com/vmillet-dev/devbox-rs/issues/23)
 decided there would not be one. With a single feature it protected nothing and cost a real
 detour: reading what a menu entry did meant opening the notes page. They are gone.
@@ -915,7 +930,7 @@ not operations on a file:
 
 ### Preferences
 
-"Préférences…" opens `SettingsDialogComponent` (`layout/settings-dialog/`): a rail of pages on
+"Préférences…" opens `SettingsDialogComponent` (`titlebar/file-menu/settings-dialog/`): a rail of pages on
 the left, the chosen page on the right, one "Fermer" at the bottom.
 
 **No "OK / Cancel / Apply".** Every control writes straight into `SettingsStore`, and the
@@ -1004,7 +1019,7 @@ the loser keeps the keyboard.
   keep in step.
 
 The groups of the notes — the canvas arrows, `X` to check a card, `Alt+↑` to reorder a
-checklist item — come from `features/notes/ui/notes-shortcuts.ts`, which the sheet imports.
+checklist item — come from `notes/notes-shortcuts.ts`, which the sheet imports.
 They live with the notes rather than in the sheet because the canvas group is **derived from
 the key table that binds them** (`CANVAS_SHORTCUT_GROUP`, from `CanvasKeyboardDirective`): a
 key documented but not bound, or the reverse, is not possible.
@@ -1025,7 +1040,7 @@ not look alike would read as three unrelated windows.
 ### The first launch
 
 A brand-new installation opens on **sample notes**, in a space of their own
-(`SampleNotesService`, `features/notes/state/`). This is not decoration: a virgin database has
+(`SampleNotesService`, `notes/state/`). This is not decoration: a virgin database has
 no space, and creating a note with nowhere to file it is refused on purpose — so without them
 the first screen is empty, silent, and offers a "+ Nouvelle note" button that does nothing.
 
@@ -1160,7 +1175,7 @@ in `lib.rs` is now the single list: it both registers the commands with Tauri an
 what `bindings.ts` contains. Tauri matches arguments **by name** and renames them to
 camelCase; nobody spells `targetSpaceId` by hand any more.
 
-Only `features/notes/data/` and `core/ipc/` call a generated **command**: everything above the
+Only `notes/data/` and `core/ipc/` call a generated **command**: everything above the
 boundary speaks the **model**, which `note.mapper.ts` converts to and from. The generated file
 stays behind the same boundary the hand-written types were behind. `core/app-info/` is the
 third and last file to import `bindings.ts`, and it reads a **constant** and not a command —
@@ -1227,7 +1242,7 @@ generated ones, imported under a `Wire*` name where a model type carries the sam
 Where the two shapes coincide, the model type travels as it is: a space still has no mapper.
 An identity mapper is not symmetry, it is one more name for one type.
 
-What generation does **not** remove, and why `features/notes/data/note.mapper.ts` is still
+What generation does **not** remove, and why `notes/data/note.mapper.ts` is still
 the biggest file in `data/`:
 
 - **JSON has no date type.** Rust types every timestamp as a `String`, so the bindings do too.
@@ -1654,7 +1669,7 @@ Treated as part of the definition of done, and partly enforced by
   announcing a button would advertise an action that does not exist.
 - **Every modal is a real dialog**: `role="dialog"`, `aria-modal`, `aria-labelledby` and a
   focus trap that confines Tab and restores focus on close. All of it comes from
-  `DialogComponent` (`shared/ui/dialog/`), written once — an accessibility fix here used to be
+  `DialogComponent` (`shared/dialog/`), written once — an accessibility fix here used to be
   a twelve-file change. Written by hand rather than pulling in `@angular/cdk` for it.
 - **The space switcher is a real menu**: `aria-expanded`, `aria-haspopup`, focus moved into
   the menu on open, arrow/Home/End navigation, Escape closing and restoring focus. Creating a
