@@ -25,6 +25,13 @@
         <span aria-hidden="true">↗</span>
       </button>
     </dd>
+
+    <dt>{{ 'about.builtWith' | transloco }}</dt>
+    <dd class="about-stack">
+      @for (part of builtWith(); track part) {
+        <span>{{ part }}</span>
+      }
+    </dd>
   </dl>
 
   <div class="about-actions">

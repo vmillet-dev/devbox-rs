@@ -1,4 +1,5 @@
 // Public: `tests/` is a separate crate, and sees nothing of the binary but its API.
+pub mod app_info;
 pub mod attachments;
 pub mod changelog;
 pub(crate) mod closed_enum;
@@ -92,6 +93,9 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         // travels on, which neither side then spells twice.
         .typ::<desktop::GlobalAction>()
         .constant("GLOBAL_ACTION_EVENT", desktop::ACTION_EVENT)
+        // From `Cargo.toml`, so the front does not keep a second copy of the name,
+        // the author and the repository URL.
+        .constant("APP_METADATA", app_info::METADATA)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -121,6 +125,12 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            // `tauri.conf.json` carries the product name, which is the crate's and is
+            // lowercase; the window wears the name the user is shown everywhere else.
+            if let Some(window) = app.get_webview_window("main") {
+                window.set_title(app_info::METADATA.name)?;
+            }
+
             // Absent from the mobile targets (see Cargo.toml).
             #[cfg(desktop)]
             app.handle()

@@ -184,7 +184,7 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --locked
           echo "\`test-rust\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
-  # Rien ne synchronise les trois fichiers de version. Job court et sans dépendance :
+  # Rien ne synchronise package.json et Cargo.toml. Job court et sans dépendance :
   # sur un tag qui a dérivé, la CI casse en quelques secondes plutôt qu'après la matrice.
   check-version:
     name: Cohérence des versions
@@ -194,14 +194,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Le tag doit correspondre à package.json, tauri.conf.json et Cargo.toml
+      - name: Le tag doit correspondre à package.json et Cargo.toml
         run: |
           tag="${GITHUB_REF_NAME#v}"
           pkg=$(node -p "require('./package.json').version")
-          conf=$(node -p "require('./src-tauri/tauri.conf.json').version")
           cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
-          echo "tag=$tag package.json=$pkg tauri.conf.json=$conf Cargo.toml=$cargo"
-          for found in "$pkg" "$conf" "$cargo"; do
+          echo "tag=$tag package.json=$pkg Cargo.toml=$cargo"
+          for found in "$pkg" "$cargo"; do
             if [ "$found" != "$tag" ]; then
               echo "::error::version $found ne correspond pas au tag $tag"
               exit 1

@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { commands } from '@core/ipc/bindings';
 import type { ChangelogRelease, ChangelogSection } from '@core/ipc/bindings';
-import { REPOSITORY_URL } from './app-info.service';
+import { APP_INFO } from './app-info.service';
 
 export type { ChangelogRelease, ChangelogSection };
 
@@ -10,7 +10,7 @@ export type { ChangelogRelease, ChangelogSection };
  * ⚠️ Must stay covered by the scope declared for `opener:allow-open-url` in
  * `src-tauri/capabilities/default.json`, or opening is refused at runtime.
  */
-export const RELEASES_URL = `${REPOSITORY_URL}/releases`;
+export const RELEASES_URL = `${APP_INFO.repository}/releases`;
 
 /**
  * A seam, like `UpdaterService` and `AppInfoService`: the dialog stays testable in jsdom,

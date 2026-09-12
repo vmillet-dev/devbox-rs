@@ -26,6 +26,8 @@ rendered. It is deliberately untranslated, like the release notes the updater ha
   Anglais. `Système` follows the display language of the machine — English when it speaks
   neither — and keeps following it until you pick one yourself. The `FR` / `EN` buttons in the
   titlebar are still there and set an explicit language.
+- **The About card says what DevBox is**, and names the Angular, Rust and Tauri versions it
+  was built with.
 - **The Fichier and À propos menus moved to the left** of the titlebar, where a menu bar
   belongs on Windows and Linux.
 

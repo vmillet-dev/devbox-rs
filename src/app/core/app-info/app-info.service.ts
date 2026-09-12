@@ -1,18 +1,10 @@
 import { Injectable, Signal, computed, resource } from '@angular/core';
-import { getVersion } from '@tauri-apps/api/app';
+import { getTauriVersion, getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { APP_METADATA } from '@core/ipc/bindings';
 
-/**
- * ⚠️ Must stay covered by the scope declared for `opener:allow-open-url` in
- * `src-tauri/capabilities/default.json`, or opening is refused at runtime.
- */
-export const REPOSITORY_URL = 'https://github.com/vmillet-dev/devbox-rs';
-
-export const AUTHOR_NAME = 'Valentin MILLET';
-export const AUTHOR_HANDLE = '@vmillet-dev';
-
-/** The name shown in the titlebar. */
-export const APP_NAME = 'DevBox';
+/** The application's own details, generated from `Cargo.toml` at compile time. */
+export const APP_INFO = APP_METADATA;
 
 /**
  * The seam to the Tauri APIs that describe the application: core and plugin commands,
@@ -21,6 +13,7 @@ export const APP_NAME = 'DevBox';
 @Injectable({ providedIn: 'root' })
 export class AppInfoService {
   private readonly versionResource = resource({ loader: () => getVersion() });
+  private readonly tauriResource = resource({ loader: () => getTauriVersion() });
 
   /**
    * `null` outside the Tauri runtime (`ng serve` alone): the card then shows a dash rather
@@ -30,8 +23,13 @@ export class AppInfoService {
     this.versionResource.hasValue() ? this.versionResource.value() : null,
   );
 
+  /** Asked of the running framework rather than baked in, for the same reason. */
+  readonly tauriVersion: Signal<string | null> = computed(() =>
+    this.tauriResource.hasValue() ? this.tauriResource.value() : null,
+  );
+
   /** Opens the repository in the system browser, outside the WebView. */
   async openRepository(): Promise<void> {
-    await openUrl(REPOSITORY_URL);
+    await openUrl(APP_INFO.repository);
   }
 }

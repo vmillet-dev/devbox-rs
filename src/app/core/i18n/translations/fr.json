@@ -44,9 +44,9 @@
     "samples": {
       "space": "Découverte",
       "welcome": {
-        "title": "Bienvenue dans DevBox",
-        "source": "DevBox / Prise en main",
-        "content": "DevBox garde vos notes, vos snippets et vos listes à portée de raccourci.\n\n- Les cartes se rangent seules : épinglées, aujourd'hui, cette semaine, plus ancien.\n- Cliquez une carte pour l'ouvrir, ou copiez-la sans l'ouvrir.\n- Tout est local : la base vit dans votre dossier utilisateur, rien ne part sur le réseau.\n\nCes quatre notes sont des exemples. Modifiez-les, ou mettez-les à la corbeille : le menu « À propos → Prise en main » raconte la même chose et ne s'efface pas."
+        "title": "Bienvenue dans {{app}}",
+        "source": "{{app}} / Prise en main",
+        "content": "{{app}} garde vos notes, vos snippets et vos listes à portée de raccourci.\n\n- Les cartes se rangent seules : épinglées, aujourd'hui, cette semaine, plus ancien.\n- Cliquez une carte pour l'ouvrir, ou copiez-la sans l'ouvrir.\n- Tout est local : la base vit dans votre dossier utilisateur, rien ne part sur le réseau.\n\nCes quatre notes sont des exemples. Modifiez-les, ou mettez-les à la corbeille : le menu « À propos → Prise en main » raconte la même chose et ne s'efface pas."
       },
       "snippet": {
         "title": "Connexion psql",
@@ -143,12 +143,12 @@
     "noteGone": "Cette note n'existe plus.",
     "spaceGone": "Cet espace n'existe plus.",
     "invalidInput": "Valeur refusée par le moteur : {{field}}.",
-    "storageUnavailable": "Le stockage est indisponible. Redémarrez DevBox.",
-    "updateFailed": "La mise à jour a échoué. DevBox reste utilisable dans sa version actuelle.",
+    "storageUnavailable": "Le stockage est indisponible. Redémarrez {{app}}.",
+    "updateFailed": "La mise à jour a échoué. {{app}} reste utilisable dans sa version actuelle.",
     "updateCheckFailed": "La recherche de mise à jour a échoué. Réessayez plus tard.",
     "attachmentGone": "Cette pièce jointe n'existe plus.",
     "fileAccess": "Le fichier est inaccessible.",
-    "importFormat": "Ce fichier n'est pas un export DevBox lisible par cette version.",
+    "importFormat": "Ce fichier n'est pas un export {{app}} lisible par cette version.",
     "trashLoadFailed": "Impossible de charger la corbeille.",
     "trashActionFailed": "L'opération sur la corbeille a échoué.",
     "tagsLoadFailed": "Impossible de charger les tags.",
@@ -167,10 +167,10 @@
     "variablesSaveFailed": "Impossible d'enregistrer les variables."
   },
   "tray": {
-    "open": "Ouvrir DevBox",
+    "open": "Ouvrir {{app}}",
     "newNote": "Nouvelle note",
     "capture": "Coller le presse-papier",
-    "quit": "Quitter DevBox",
+    "quit": "Quitter {{app}}",
     "palette": "Collage rapide"
   },
   "locale": {
@@ -181,28 +181,29 @@
   },
   "update": {
     "title": "Mise à jour disponible",
-    "summary": "DevBox {{version}} est disponible. Vous utilisez actuellement la version {{current}}.",
+    "summary": "{{app}} {{version}} est disponible. Vous utilisez actuellement la version {{current}}.",
     "notesLabel": "Notes de version",
     "install": "Installer maintenant",
     "later": "Plus tard",
     "downloading": "Téléchargement…",
     "downloadingPercent": "Téléchargement… {{percent}} %",
-    "restarting": "Redémarrage de DevBox…",
+    "restarting": "Redémarrage de {{app}}…",
     "progressLabel": "Avancement du téléchargement"
   },
   "about": {
     "menuLabel": "À propos",
     "checkUpdates": "Rechercher les mises à jour",
     "checking": "Recherche…",
-    "upToDate": "✓ DevBox est à jour",
+    "upToDate": "✓ {{app}} est à jour",
     "checkFailed": "✕ Recherche impossible",
-    "openAbout": "À propos de DevBox",
-    "title": "DevBox",
-    "description": "Couteau suisse du développeur : prise de notes et de snippets, hachage et encodage à venir. Angular 22 côté interface, Rust et Tauri v2 pour le moteur natif.",
+    "openAbout": "À propos de {{app}}",
+    "title": "{{app}}",
+    "description": "Vos notes, vos snippets et vos listes de tâches, à portée de raccourci. Tout reste local.",
     "versionLabel": "Version",
     "versionUnknown": "inconnue",
     "developedBy": "Développé par",
     "repository": "Dépôt",
+    "builtWith": "Construit avec",
     "close": "Fermer",
     "whatsNew": "Nouveautés",
     "gettingStarted": "Prise en main",
@@ -307,7 +308,7 @@
     "exportSpace": "Exporter l'espace actif…",
     "exportSelection": "Exporter la sélection…",
     "copyMarkdown": "Copier la sélection en Markdown",
-    "quit": "Quitter DevBox",
+    "quit": "Quitter {{app}}",
     "quitConfirm": "Confirmer ?",
     "imported": "{{notes}} note(s) importée(s) depuis {{path}}, {{skipped}} ignorée(s).",
     "importedNothing": "Rien à importer : ces {{skipped}} note(s) sont déjà dans votre bibliothèque.",
@@ -390,7 +391,7 @@
       "startWithSystem": "Démarrer avec le système",
       "minimizeToTray": "Réduire dans la barre système",
       "closeToTray": "Fermer dans la barre système",
-      "trayNote": "Sans barre système, la fenêtre se réduit et se ferme normalement : DevBox refuse de se cacher là où plus rien ne pourrait la rappeler."
+      "trayNote": "Sans barre système, la fenêtre se réduit et se ferme normalement : {{app}} refuse de se cacher là où plus rien ne pourrait la rappeler."
     },
     "quickPaste": {
       "title": "Collage rapide",
@@ -418,7 +419,7 @@
   },
   "gettingStarted": {
     "title": "Prise en main",
-    "subtitle": "Ce que DevBox sait faire, dans l'ordre où on le rencontre.",
+    "subtitle": "Ce que {{app}} sait faire, dans l'ordre où on le rencontre.",
     "hint": "Les notes d'exemple du premier lancement montrent tout cela pour de vrai.",
     "close": "Fermer",
     "chapters": {
@@ -436,7 +437,7 @@
       },
       "fields": {
         "title": "Des champs à remplir",
-        "body": "Écrivez un champ entre doubles accolades dans un snippet — nom seul, ou nom et valeur par défaut — et DevBox vous le demande au moment de copier. Ce que vous saisissez est conservé avec la note, et les variables globales (Fichier → Préférences → Variables) proposent une valeur pour tout le corpus, affichée en gris tant que vous ne la remplacez pas."
+        "body": "Écrivez un champ entre doubles accolades dans un snippet — nom seul, ou nom et valeur par défaut — et {{app}} vous le demande au moment de copier. Ce que vous saisissez est conservé avec la note, et les variables globales (Fichier → Préférences → Variables) proposent une valeur pour tout le corpus, affichée en gris tant que vous ne la remplacez pas."
       },
       "checklists": {
         "title": "Des listes à cocher",
@@ -444,7 +445,7 @@
       },
       "palette": {
         "title": "Coller sans quitter ce que vous faites",
-        "body": "{{palette}} ouvre la palette de collage rapide par-dessus n'importe quelle application : tapez, choisissez, le contenu part dans le presse-papier. {{capture}} fait l'inverse et range le presse-papier dans une note neuve, {{newNote}} en ouvre une vide. Ces trois touches marchent fenêtre fermée, DevBox restant dans la barre système."
+        "body": "{{palette}} ouvre la palette de collage rapide par-dessus n'importe quelle application : tapez, choisissez, le contenu part dans le presse-papier. {{capture}} fait l'inverse et range le presse-papier dans une note neuve, {{newNote}} en ouvre une vide. Ces trois touches marchent fenêtre fermée, {{app}} restant dans la barre système."
       },
       "attachments": {
         "title": "Des pièces jointes",
@@ -456,7 +457,7 @@
       },
       "transfer": {
         "title": "Entrer et sortir",
-        "body": "Le menu Fichier exporte tout, un espace ou la sélection dans un fichier relisible par DevBox, et réimporte sans jamais créer de doublon. « Copier en Markdown » met la sélection dans le presse-papier, prête à coller dans un ticket ou un message."
+        "body": "Le menu Fichier exporte tout, un espace ou la sélection dans un fichier relisible par {{app}}, et réimporte sans jamais créer de doublon. « Copier en Markdown » met la sélection dans le presse-papier, prête à coller dans un ticket ou un message."
       }
     }
   },
