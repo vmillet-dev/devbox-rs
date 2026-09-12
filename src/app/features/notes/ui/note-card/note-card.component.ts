@@ -58,7 +58,7 @@ export class NoteCardComponent {
   private readonly selection = inject(NoteSelectionStore);
   private readonly fill = inject(PlaceholderFillStore);
 
-  /** Destinations the menu offers; the note's own space is removed from them. */
+  /** Read by the card menu, which removes the note's own space from the destinations. */
   protected readonly spaces = inject(SpacesStore);
 
   readonly note = input.required<Note>();
@@ -137,10 +137,7 @@ export class NoteCardComponent {
     this.selection.toggleChecked(this.note().id);
   }
 
-  /**
-   * Ticking from the card without opening the note. The card emits the **whole** list as
-   * it becomes: it persists nothing itself.
-   */
+  /** Ticking from the card without opening the note: the whole list is written back. */
   protected onItemToggle(event: MouseEvent, index: number): void {
     event.stopPropagation();
     void this.notes.setChecklist(
