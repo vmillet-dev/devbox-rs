@@ -1,6 +1,13 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DENSITIES, Density, THEME_CHOICES, ThemeChoice } from '@core/settings/app-settings.model';
+import {
+  DENSITIES,
+  Density,
+  LOCALE_CHOICES,
+  LocaleChoice,
+  THEME_CHOICES,
+  ThemeChoice,
+} from '@core/settings/app-settings.model';
 import { SettingsStore } from '@core/settings/settings.store';
 import { DEFAULT_SHORTCUTS, acceleratorFromEvent } from '@core/shortcuts/shortcut.model';
 
@@ -27,9 +34,14 @@ function checkedValue(event: Event): boolean {
 export class SettingsPageComponent {
   protected readonly settings = inject(SettingsStore);
 
+  protected readonly locales = LOCALE_CHOICES;
   protected readonly themes = THEME_CHOICES;
   protected readonly densities = DENSITIES;
   protected readonly defaultShortcut = DEFAULT_SHORTCUTS.palette;
+
+  protected onLocale(event: Event): void {
+    this.settings.setLocale(selectedValue(event) as LocaleChoice);
+  }
 
   protected onTheme(event: Event): void {
     this.settings.setTheme(selectedValue(event) as ThemeChoice);

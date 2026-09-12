@@ -1,3 +1,4 @@
+import { APP_LOCALES } from '@core/i18n/locale.model';
 import { DEFAULT_SHORTCUTS } from '@core/shortcuts/shortcut.model';
 
 /**
@@ -5,6 +6,10 @@ import { DEFAULT_SHORTCUTS } from '@core/shortcuts/shortcut.model';
  * Tauri. A preference is stored **per key** rather than as one serialised object, so a
  * setting added later cannot make a file written by the previous version unreadable.
  */
+
+/** `system` follows the OS display language, falling back to English. */
+export const LOCALE_CHOICES = ['system', ...APP_LOCALES] as const;
+export type LocaleChoice = (typeof LOCALE_CHOICES)[number];
 
 /** `system` follows `prefers-color-scheme`, which the WebView gets from the OS. */
 export const THEME_CHOICES = ['system', 'dark', 'light'] as const;
@@ -21,6 +26,7 @@ export const DENSITIES = ['comfortable', 'compact'] as const;
 export type Density = (typeof DENSITIES)[number];
 
 export interface AppSettings {
+  readonly locale: LocaleChoice;
   readonly theme: ThemeChoice;
   readonly density: Density;
   /** Start with the session: the system holds the register. */
@@ -41,6 +47,7 @@ export interface AppSettings {
  * the same default.
  */
 export const DEFAULT_SETTINGS: AppSettings = {
+  locale: 'system',
   theme: 'system',
   density: 'comfortable',
   startWithSystem: false,

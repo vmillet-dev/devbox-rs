@@ -906,7 +906,8 @@ contributes "Variables" on construction and takes it back on destruction, and
 vocabulary; importing it from `layout/` would break the rule that deleting a feature folder
 deletes the feature.
 
-`SettingsStore` holds one signal per setting, backed by `PreferencesService` — one key per
+`SettingsStore` holds one signal per setting — the interface language, the theme, the density,
+the tray behaviour, the palette accelerator — backed by `PreferencesService`: one key per
 setting, not one serialised object, so a setting added later cannot make a file written by the
 previous version unreadable. `restore()` runs from the app initializer, after
 `PreferencesService.hydrate()` and before the first render.
@@ -1563,16 +1564,27 @@ installed or shipped alongside the executable. The database file lives in Tauri'
 ## i18n
 
 UI strings live in `src/app/core/i18n/translations/{fr,en}.json` and render through
-Transloco's `transloco` pipe. French is the default locale.
+Transloco's `transloco` pipe. French is the fallback locale.
 
 - Translations are `import`ed and bundled at build time rather than fetched over HTTP — a
   small desktop binary with two locales gains nothing from `HttpClient` and a round-trip.
   They deliberately sit **outside** `src/assets`, where the assets glob would copy them into
   `dist` a second time, never to be read.
-- `LocaleService` wraps `TranslocoService`, persists the choice through `PreferencesService`
-  and keeps `<html lang>` in sync (it drives screen-reader pronunciation and typography).
-  `restore()` runs from an app initializer so the stored locale applies before the first
-  render, avoiding a flash of the default language.
+- **The choice belongs to `SettingsStore`** (`locale`: `system` / `fr` / `en`, default
+  `system`), exactly like the theme. `LocaleService` is what _resolves_ it and pushes it to
+  Transloco and `<html lang>` — the same shape as the three services that carry a preference
+  down to the native side. Two controls write that one setting: the preferences panel and the
+  `FR` / `EN` buttons in the titlebar, which set an explicit language.
+- `system` resolves through `resolveSystemLocale()` (`core/i18n/locale.model.ts`), which reads
+  `navigator.languages` — the WebView takes it from the OS — and falls back to
+  `SYSTEM_FALLBACK_LOCALE` (English) when the machine speaks neither language. Nothing is
+  persisted while the preference stays on `system`, so DevBox keeps following the OS.
+- ⚠️ `DEFAULT_LOCALE` is a different thing: Transloco's fallback _bundle_, the file that
+  answers when a key is missing from the other one.
+- `LocaleService.restore()` runs from the app initializer, **after** `SettingsStore.restore()`
+  and before `TrayService.start()`, which builds the tray with translated labels. The effect
+  alone would only flush after the first render, showing the interface in one language then
+  the other.
 - Code that produces user-visible text returns a **`TranslationRef`** (`{ key, params }`)
   instead of a formatted string, so translation always happens in the template. This applies
   to error messages too.

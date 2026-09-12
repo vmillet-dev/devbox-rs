@@ -11,7 +11,8 @@ import { provideTransloco } from '@jsverse/transloco';
 
 import { routes } from './app.routes';
 import { AppErrorHandler } from '@core/errors/app-error-handler';
-import { APP_LOCALES, DEFAULT_LOCALE, LocaleService } from '@core/i18n/locale.service';
+import { APP_LOCALES, DEFAULT_LOCALE } from '@core/i18n/locale.model';
+import { LocaleService } from '@core/i18n/locale.service';
 import { AppTranslocoLoader } from '@core/i18n/transloco-loader';
 import { AutostartService } from '@core/autostart/autostart.service';
 import { PreferencesService } from '@core/preferences/preferences.service';
@@ -56,10 +57,11 @@ export const appConfig: ApplicationConfig = {
       const autostart = inject(AutostartService);
 
       await preferences.hydrate();
-      locale.restore();
       // Before the first render: reading later would show the interface in one
-      // theme then the other.
+      // theme then the other. Before `locale.restore()` too, which reads the
+      // language out of it.
       settings.restore();
+      locale.restore();
       // After `restore()`: the front creates the tray by giving it its labels, and
       // creating it earlier would have shown the default language for a round trip.
       tray.start();

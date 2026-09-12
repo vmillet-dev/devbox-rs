@@ -20,6 +20,15 @@ rendered. It is deliberately untranslated, like the release notes the updater ha
 - **Help in the About menu:** "Nouveautés" (this file), "Prise en main" and "Raccourcis clavier".
 - **Sample notes on first launch**, in their own space, to show what a note can carry.
 
+### Changed
+
+- **The interface language is a preference**, in Préférences → Apparence: Système, Français or
+  Anglais. `Système` follows the display language of the machine — English when it speaks
+  neither — and keeps following it until you pick one yourself. The `FR` / `EN` buttons in the
+  titlebar are still there and set an explicit language.
+- **The Fichier and À propos menus moved to the left** of the titlebar, where a menu bar
+  belongs on Windows and Linux.
+
 ## [0.1.1] - 2026-08-27
 
 ### Fixed

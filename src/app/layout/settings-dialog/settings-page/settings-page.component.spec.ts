@@ -46,6 +46,21 @@ describe('SettingsPageComponent', () => {
     expect(titles).toEqual(['Apparence', 'Comportement', 'Collage rapide', 'Notifications']);
   });
 
+  it('offers the language alongside the titlebar buttons, system included', () => {
+    const options = [...select('setting-locale').options].map((option) => option.value);
+
+    expect(options).toEqual(['system', 'fr', 'en']);
+    expect(select('setting-locale').value).toBe('system');
+  });
+
+  it('writes a chosen language straight through', async () => {
+    select('setting-locale').value = 'en';
+    select('setting-locale').dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    expect(settings.locale()).toBe('en');
+  });
+
   it('shows the active theme as the selected option', () => {
     expect(select('setting-theme').value).toBe('system');
   });

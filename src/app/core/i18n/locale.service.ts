@@ -1,50 +1,53 @@
 import { Injectable, Signal, computed, effect, inject } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { PreferencesService } from '../preferences/preferences.service';
+import { LocaleChoice } from '@core/settings/app-settings.model';
+import { SettingsStore } from '@core/settings/settings.store';
+import { AppLocale, DEFAULT_LOCALE, isAppLocale, resolveSystemLocale } from './locale.model';
 
-/** The UI display languages — unrelated to `LanguageTag`, which colours notes. */
-export const APP_LOCALES = ['fr', 'en'] as const;
-export type AppLocale = (typeof APP_LOCALES)[number];
-
-export const DEFAULT_LOCALE: AppLocale = 'fr';
-
-const STORAGE_KEY = 'devbox.locale';
-
-function isAppLocale(value: string | null): value is AppLocale {
-  return (APP_LOCALES as readonly string[]).includes(value ?? '');
-}
-
-/** The active UI language: the source of truth is Transloco's, persisted locally. */
+/**
+ * The active UI language: the choice belongs to [`SettingsStore`], this resolves it and
+ * pushes it to Transloco — the same shape as the services that carry a preference down to
+ * the native side.
+ */
 @Injectable({ providedIn: 'root' })
 export class LocaleService {
   private readonly transloco = inject(TranslocoService);
-  private readonly preferences = inject(PreferencesService);
+  private readonly settings = inject(SettingsStore);
 
+  /** What is on screen, `system` already resolved. */
   readonly activeLocale: Signal<AppLocale> = computed(() => {
     const active = this.transloco.activeLang();
     return isAppLocale(active) ? active : DEFAULT_LOCALE;
   });
+
+  /** What the user picked, which the preferences panel shows back. */
+  readonly preference: Signal<LocaleChoice> = this.settings.locale;
 
   constructor() {
     // `<html lang>` drives screen-reader pronunciation and typographic rules.
     effect(() => {
       document.documentElement.lang = this.activeLocale();
     });
+
+    effect(() => {
+      this.apply(this.settings.locale());
+    });
   }
 
   /**
-   * Called from a `provideAppInitializer`, so before the first render: otherwise the
-   * interface would briefly appear in the default language.
+   * Called from a `provideAppInitializer`, **after** `SettingsStore.restore()`: the effect
+   * above would only flush after the first render, showing the interface in one language
+   * then the other.
    */
   restore(): void {
-    const stored = this.preferences.read(STORAGE_KEY);
-    if (isAppLocale(stored)) {
-      this.transloco.setActiveLang(stored);
-    }
+    this.apply(this.settings.locale());
   }
 
-  setLocale(locale: AppLocale): void {
-    this.transloco.setActiveLang(locale);
-    this.preferences.write(STORAGE_KEY, locale);
+  setLocale(choice: LocaleChoice): void {
+    this.settings.setLocale(choice);
+  }
+
+  private apply(choice: LocaleChoice): void {
+    this.transloco.setActiveLang(choice === 'system' ? resolveSystemLocale() : choice);
   }
 }

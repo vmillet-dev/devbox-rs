@@ -175,6 +175,7 @@
   },
   "locale": {
     "groupLabel": "Interface language",
+    "system": "System",
     "fr": "French",
     "en": "English"
   },
@@ -371,6 +372,7 @@
     "copied": "Copied to the clipboard.",
     "appearance": {
       "title": "Appearance",
+      "language": "Language",
       "theme": "Theme",
       "density": "Density"
     },
