@@ -39,8 +39,9 @@ src/                Angular front-end
 │   │   └── services/   one folder per subject: i18n, errors, time, preferences,
 │   │                   settings, updates, app-info, clipboard, dialogs, window,
 │   │                   shortcuts, autostart, tray, notifications
-│   ├── notes/      the interface, nested as it is on screen: notes-page/, topbar/,
-│   │               note-section/note-card/…, overlays/ for the five modals
+│   ├── notes/      the interface, in the page's three zones: header/ (above the
+│   │               canvas), canvas/ (the cards), overlays/ (drawn over the page),
+│   │               plus notes-page/, variables-page/ and ui/
 │   ├── titlebar/   titlebar.component, then file-menu/ and about-menu/ with the panels
 │   │               each of them opens, nested where they open from
 │   ├── banners/    error banner, status toast, update prompt — siblings of the outlet
@@ -157,6 +158,14 @@ Membership is decidable, not a matter of taste:
 | Is it a cross-cutting service?              | `core/services/<subject>/`                   |
 | Does it cross two areas of the screen?      | `shared/`                                    |
 
+**The zones come from the template, not from taste.** `notes/` used to hold eleven entries
+that mixed screen zones with invented categories — `tag-rail` sat outside `topbar/` while
+`search-box` sat inside, `image-lightbox` outside `overlays/` while the palette sat inside, and
+nothing said why. The page's template has exactly three zones: what sits above the canvas, the
+canvas, and what is drawn over the page. `header/`, `canvas/` and `overlays/` are those three,
+so finding a component is one question with three answers — above the notes, among them, or
+over them.
+
 Two consequences worth stating. **Rendering something is not owning it:** the preferences
 panel hosts the variables page through `NgComponentOutlet`, and the shortcuts sheet imports
 the notes' key groups — neither moves those files into `titlebar/`, because the notes own
@@ -176,7 +185,7 @@ which part of the interface it reaches into before it says which file.
 
 The rule is **relative when a single `../` reaches the target, alias otherwise** — so
 `core/state/notes.store.ts` reads `../data/notes.repository`, while
-`notes/note-section/note-card/` reaches the model through `@core/model/note.model`. There is
+`notes/canvas/note-section/note-card/` reaches the model through `@core/model/note.model`. There is
 no `../../` anywhere in `src/`, and since this reorganisation that is **enforced**:
 `no-restricted-imports` in `eslint.config.mjs` refuses the pattern. The aliases are what make
 it possible — the tree is four levels deep in places, and without them a card reaching the
