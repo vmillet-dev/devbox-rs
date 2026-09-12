@@ -1,5 +1,9 @@
 @use 'mixins' as *;
 
+app-dialog {
+  --dialog-width: 560px;
+}
+
 .trash-header {
   display: flex;
   align-items: baseline;

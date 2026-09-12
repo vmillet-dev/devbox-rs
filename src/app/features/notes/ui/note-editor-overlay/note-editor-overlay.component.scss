@@ -1,5 +1,10 @@
 @use 'mixins' as *;
 
+app-dialog {
+  --dialog-width: 880px;
+  --dialog-height: 640px;
+}
+
 .overlay-toolbar {
   padding: 14px 20px;
   border-bottom: 1px solid var(--line-soft);

@@ -232,7 +232,7 @@ the scrim, the panel, `role="dialog"`, `aria-modal`, the focus trap, Escape and 
 click; a dialog projects its content into it and says which rung it sits on:
 
 ```html
-<app-dialog [layer]="'app'" [width]="420" labelledBy="about-dialog-title" (closed)="closed.emit()">
+<app-dialog [layer]="'app'" labelledBy="about-dialog-title" (closed)="closed.emit()">
   …the panel's content…
 </app-dialog>
 ```
@@ -241,15 +241,20 @@ click; a dialog projects its content into it and says which rung it sits on:
 | ---------------------- | --------------------------------------------------------------------------------- |
 | `layer` (required)     | the rung: `editor`, `app`, `settings`, `update`, `palette`, `fields`, `zoom`      |
 | `variant`              | `fitted` (height follows the content), `framed` (fixed, scrolling middle), `bare` |
-| `width` / `height`     | the panel's size in px, capped at 90vw / 86vh                                     |
 | `fullscreen`           | fills the window — the editor's toggle                                            |
 | `dismissible`          | `false` refuses Escape and the backdrop click (an update being installed)         |
 | `labelledBy` / `label` | what names it to assistive technology                                             |
 
-What a shell cannot guess — the gap between a panel's blocks, its padding, where it sits on
-the scrim — comes from CSS custom properties the consumer sets on the `app-dialog` element
-from its own stylesheet: `--dialog-gap`, `--dialog-padding`, `--dialog-align`,
-`--dialog-offset`, `--dialog-scrim`.
+What a shell cannot guess — how wide the panel is, the gap between its blocks, its padding,
+where it sits on the scrim — comes from CSS custom properties the consumer sets on the
+`app-dialog` element from its own stylesheet: `--dialog-width`, `--dialog-height`,
+`--dialog-gap`, `--dialog-padding`, `--dialog-align`, `--dialog-offset`, `--dialog-scrim`.
+
+**No measurement travels through an `input()`**, and none is spelled in a template. The
+clamps stay in `dialog.component.scss` — `min(var(--dialog-width, 480px), 90vw)` on both
+surfaced variants, `min(var(--dialog-height, 560px), 86vh)` on `framed` alone, and
+`fullscreen` last so it wins over either. `bare` is deliberately left unsized: it is
+whatever it shows, an image the panel only bounds.
 
 **The stacking order is a list, not a set of magic numbers.** `dialog.model.ts` holds
 `LAYERS` in back-to-front order, and its index _is_ both the `z-index` and the priority

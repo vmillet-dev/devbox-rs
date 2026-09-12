@@ -1,10 +1,4 @@
-<app-dialog
-  [layer]="'app'"
-  [variant]="'framed'"
-  [width]="560"
-  labelledBy="shortcuts-dialog-title"
-  (closed)="closed.emit()"
->
+<app-dialog [layer]="'app'" [variant]="'framed'" labelledBy="shortcuts-dialog-title" (closed)="closed.emit()">
   <div class="sheet-header">
     <h2 id="shortcuts-dialog-title" class="sheet-title">{{ 'shortcuts.title' | transloco }}</h2>
     <p class="sheet-subtitle">{{ 'shortcuts.subtitle' | transloco }}</p>

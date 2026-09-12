@@ -18,8 +18,9 @@ import { FocusTrapDirective } from './focus-trap.directive';
  * backdrop click. Each dialog used to recopy all six, which made an accessibility fix a
  * twelve-file change and let two open dialogs answer the same Escape.
  *
- * The two measurements a panel cannot guess — the gap between its blocks and its padding
- * — are CSS custom properties a consumer sets on the `app-dialog` element.
+ * What a shell cannot guess — how wide the panel is, the gap between its blocks, its
+ * padding — are CSS custom properties a consumer sets on the `app-dialog` element. No
+ * measurement travels through an `input()`, and none is spelled in a template.
  */
 @Component({
   selector: 'app-dialog',
@@ -36,9 +37,6 @@ export class DialogComponent implements OnInit {
 
   readonly layer = input.required<DialogLayer>();
   readonly variant = input<DialogVariant>('fitted');
-  readonly width = input(480);
-  /** Only read by `framed`, whose whole point is a height that does not move. */
-  readonly height = input(560);
   /** Fills the window: the same panel, without the frame that bounds it. */
   readonly fullscreen = input(false);
 
@@ -54,20 +52,6 @@ export class DialogComponent implements OnInit {
   readonly closed = output<void>();
 
   protected readonly rung = computed(() => dialogRung(this.layer()));
-
-  /** Inline rather than a class: `fullscreen` has to win over both. */
-  protected readonly panelWidth = computed(() => {
-    if (this.fullscreen()) return '100%';
-
-    // `bare` is sized by what it shows — an image, which the panel only bounds.
-    return this.variant() === 'bare' ? null : `min(${this.width()}px, 90vw)`;
-  });
-
-  protected readonly panelHeight = computed(() => {
-    if (this.fullscreen()) return '100%';
-
-    return this.variant() === 'framed' ? `min(${this.height()}px, 86vh)` : null;
-  });
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.stack.remove(this));

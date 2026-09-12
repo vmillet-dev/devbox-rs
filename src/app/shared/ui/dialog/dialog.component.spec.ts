@@ -15,7 +15,6 @@ import { DialogComponent } from './dialog.component';
     @if (backOpen()) {
       <app-dialog
         [layer]="'editor'"
-        [width]="400"
         [dismissible]="dismissible()"
         labelledBy="back-title"
         (closed)="backClosed = backClosed + 1"
