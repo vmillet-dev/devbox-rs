@@ -557,6 +557,26 @@ Both fields carry `#[serde(default)]`. `transfer::Bundle` deserialises `Note` it
 required key would have made every export file written before todo lists unreadable —
 `FORMAT_VERSION` stays at 1 precisely because old files still read.
 
+**A bundle from a newer version degrades, it does not fail.** `Note` carries two closed
+enums, `language` and `kind`, so a file written once `Language` has grown a `rust` variant
+used to fail serde outright and take the other 499 notes with it. `read_bundle` now walks
+the raw JSON first and brings any value this build cannot name down to the default, counting
+the notes it touched; `ImportReport.notes_degraded` reports them, and `merge` counts only
+those actually inserted, so re-importing the same file says nothing a second time.
+
+That settles an inconsistency the two read paths had by accident. The **database** read has
+always degraded (`notes::store`, `TryFrom<NoteRow>`: `row.language.parse().unwrap_or_default()`);
+the bundle read refused. A bundle is the same data through another door, so it degrades too.
+Degrading also loses less than skipping the note would: the title, body, tags and deadline
+all arrive, only the colouring is dropped. What stays strict is the **bridge** — a `language`
+the front end cannot name is still a deserialisation failure there, which is what lets the
+generated union be trusted.
+
+⚠️ Consequences for `FORMAT_VERSION`: an added enum variant **does not** bump it. It is not a
+format break, since the file still parses. It is bumped when a file written today would stop
+being readable — and it is read off the raw JSON before the bundle is built, so a genuinely
+future format answers with the designed message rather than with a serde error about a field.
+
 Progress (`done`/`total`) is **not** on the wire. The items already travel with the note, and
 a counter beside them would be the identity mapper this codebase refuses elsewhere; the card
 and the editor each count in a `computed()`. That is the same line as relative-time

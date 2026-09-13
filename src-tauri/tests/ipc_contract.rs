@@ -421,12 +421,14 @@ fn an_import_report_names_what_it_skipped() {
         spaces_created: 1,
         notes_imported: 2,
         notes_skipped: 3,
+        notes_degraded: 4,
     })
     .unwrap();
 
     assert_eq!(json["spacesCreated"], 1);
     assert_eq!(json["notesImported"], 2);
     assert_eq!(json["notesSkipped"], 3);
+    assert_eq!(json["notesDegraded"], 4);
 }
 
 #[test]
@@ -446,7 +448,7 @@ fn an_export_bundle_reads_back_the_notes_it_wrote() {
 
     assert!(json.contains("\"exportedAt\""));
     let read = transfer::model::read_bundle(&json).unwrap();
-    assert_eq!(read.notes[0].id, "n-1");
+    assert_eq!(read.bundle.notes[0].id, "n-1");
 }
 
 #[test]
@@ -501,9 +503,9 @@ fn an_export_written_before_todo_lists_existed_still_reads() {
 
     let read = transfer::model::read_bundle(&json).unwrap();
 
-    assert_eq!(read.notes[0].kind, NoteKind::Snippet);
-    assert!(read.notes[0].items.is_empty());
-    assert!(read.notes[0].placeholder_values.is_empty());
+    assert_eq!(read.bundle.notes[0].kind, NoteKind::Snippet);
+    assert!(read.bundle.notes[0].items.is_empty());
+    assert!(read.bundle.notes[0].placeholder_values.is_empty());
 }
 
 #[test]

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use uuid::Uuid;
 
-use super::model::{Bundle, ExportReport};
+use super::model::{Bundle, ExportReport, IncomingBundle};
 use crate::count::saturating_u32;
 use crate::error::{AppError, StorageError};
 
@@ -32,7 +32,7 @@ pub fn write(path: &str, bundle: &Bundle) -> Result<ExportReport, AppError> {
     Ok(report)
 }
 
-pub fn read(path: &str) -> Result<Bundle, AppError> {
+pub fn read(path: &str) -> Result<IncomingBundle, AppError> {
     let json = std::fs::read_to_string(path)
         .map_err(|error| StorageError::File(format!("{path}: {error}")))?;
 
@@ -147,8 +147,8 @@ mod tests {
         write(&target.to_string_lossy(), &bundle()).unwrap();
         let read_back = read(&target.to_string_lossy()).unwrap();
 
-        assert_eq!(read_back.notes.len(), 1);
-        assert_eq!(read_back.spaces[0].name, "Personal");
+        assert_eq!(read_back.bundle.notes.len(), 1);
+        assert_eq!(read_back.bundle.spaces[0].name, "Personal");
         std::fs::remove_dir_all(&directory).ok();
     }
 }

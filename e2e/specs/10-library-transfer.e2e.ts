@@ -1,5 +1,5 @@
 import { browser, expect } from '@wdio/globals';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -101,6 +101,41 @@ describe('Import, export and share', () => {
 
     const view = await bridge.queryNotes(query({ search: 'Worth exporting' }));
     expect(view.sections[0]?.notes[0]?.spaceId).toBe(homeId);
+  });
+
+  /**
+   * `language` and `kind` are closed enums on both sides, so one note written by a
+   * newer DevBox used to fail the **whole** file on a serde message about a variant.
+   * It now arrives with that field brought down to the default, and the report is what
+   * says the colouring was lost.
+   */
+  it('imports a bundle from a newer version instead of refusing it whole', async () => {
+    const source = JSON.parse(readFileSync(bundlePath, 'utf8')) as {
+      notes: Record<string, unknown>[];
+    };
+    const newerPath = join(directory, 'newer.json').replaceAll('\\', '/');
+    writeFileSync(
+      newerPath,
+      JSON.stringify({
+        ...source,
+        notes: [
+          {
+            ...source.notes[0],
+            id: 'written-by-a-newer-devbox',
+            title: 'Ahead of this build',
+            language: 'rust',
+          },
+        ],
+      }),
+      'utf8',
+    );
+
+    const report = await bridge.importNotes(newerPath);
+    expect(report.notesImported).toBe(1);
+    expect(report.notesDegraded).toBe(1);
+
+    const view = await bridge.queryNotes(query({ search: 'Ahead of this build' }));
+    expect(view.sections[0]?.notes[0]?.language).toBe('txt');
   });
 
   it('greys out the menu entries that have nothing to act on', async () => {

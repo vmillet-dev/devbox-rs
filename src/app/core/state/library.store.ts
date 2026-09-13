@@ -3,12 +3,25 @@ import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { FileDialogService } from '@core/services/dialogs/file-dialog.service';
 import { StatusNotifier } from '@core/services/notifications/status.service';
+import { ImportReport } from '@core/model/note.model';
 import { TransferRepository } from '../data/transfer.repository';
 import { NotesRevision } from './notes-revision';
 
 /** The name offered to the picker: dated, so two exports do not overlap. */
 function defaultFileName(now: Date): string {
   return `devbox-${now.toISOString().slice(0, 10)}.json`;
+}
+
+/**
+ * The most common gesture — export then re-import at once — adds nothing at all, and
+ * saying so explicitly stops it looking like a breakdown. A note whose language or kind
+ * came from a newer version arrived all the same, brought down to what this build knows;
+ * the report is the only place that says so.
+ */
+function importedKey(report: ImportReport): string {
+  if (report.notesImported === 0) return 'file.importedNothing';
+
+  return report.notesDegraded > 0 ? 'file.importedFromNewerVersion' : 'file.imported';
 }
 
 function fileNameOf(path: string): string {
@@ -43,15 +56,11 @@ export class LibraryStore {
       const params = {
         notes: String(report.notesImported),
         skipped: String(report.notesSkipped),
+        degraded: String(report.notesDegraded),
         path: fileNameOf(path),
       };
 
-      // The most common gesture — export then re-import at once — adds nothing at
-      // all. Saying so explicitly stops it looking like a breakdown.
-      this.status.notify({
-        key: report.notesImported === 0 ? 'file.importedNothing' : 'file.imported',
-        params,
-      });
+      this.status.notify({ key: importedKey(report), params });
 
       const changed = report.notesImported > 0 || report.spacesCreated > 0;
       if (changed) this.revision.bump();

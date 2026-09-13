@@ -8,7 +8,7 @@ use devbox_lib::notes::model::{NoteDraft, NoteLifecycle};
 use devbox_lib::notes::store as notes;
 use devbox_lib::spaces::store as spaces;
 use devbox_lib::transfer::bundle::{collect, merge};
-use devbox_lib::transfer::model::{self, Bundle};
+use devbox_lib::transfer::model::{self, Bundle, IncomingBundle};
 
 fn t0() -> DateTime<Utc> {
     iso8601::parse("2026-07-25T09:00:00.000Z").unwrap()
@@ -46,8 +46,17 @@ fn exported(connection: &mut SqliteConnection) -> Bundle {
 }
 
 /// The file as it is really written and read back, serialization included.
-fn round_tripped(bundle: &Bundle) -> Bundle {
+fn round_tripped(bundle: &Bundle) -> IncomingBundle {
     model::read_bundle(&serde_json::to_string(bundle).unwrap()).unwrap()
+}
+
+/// The file a newer DevBox would write: the same bundle, with a value in `field`
+/// that this build has never heard of.
+fn written_by_a_newer_version(bundle: &Bundle, field: &str, value: &str) -> IncomingBundle {
+    let mut json: serde_json::Value = serde_json::to_value(bundle).unwrap();
+    json["notes"][0][field] = serde_json::Value::String(value.to_string());
+
+    model::read_bundle(&json.to_string()).unwrap()
 }
 
 #[test]
@@ -87,11 +96,11 @@ fn only_the_spaces_actually_cited_travel() {
 #[test]
 fn importing_the_same_file_twice_adds_nothing_the_second_time() {
     let mut source = library();
-    let bundle = round_tripped(&exported(&mut source));
+    let file = exported(&mut source);
 
     let mut target = open_in_memory().unwrap();
-    merge(&mut target, round_tripped(&bundle)).unwrap();
-    let second = merge(&mut target, bundle).unwrap();
+    merge(&mut target, round_tripped(&file)).unwrap();
+    let second = merge(&mut target, round_tripped(&file)).unwrap();
 
     assert_eq!(second.notes_imported, 0);
     assert_eq!(second.notes_skipped, 2);
@@ -128,11 +137,11 @@ fn a_space_of_the_same_name_is_reused_rather_than_duplicated() {
 #[test]
 fn a_note_whose_space_is_missing_from_the_file_is_skipped_not_misfiled() {
     let mut source = library();
-    let mut bundle = round_tripped(&exported(&mut source));
-    bundle.spaces.clear();
+    let mut incoming = round_tripped(&exported(&mut source));
+    incoming.bundle.spaces.clear();
 
     let mut target = open_in_memory().unwrap();
-    let report = merge(&mut target, bundle).unwrap();
+    let report = merge(&mut target, incoming).unwrap();
 
     assert_eq!(report.notes_imported, 0);
     assert_eq!(report.notes_skipped, 2);
@@ -147,4 +156,76 @@ fn a_trashed_note_does_not_leave_with_the_export() {
     let bundle = exported(&mut source);
 
     assert_eq!(bundle.notes.len(), 1);
+}
+
+/// The case the whole guard exists for: one note in an unknown language must not
+/// cost the other 499.
+#[test]
+fn a_note_in_an_unknown_language_arrives_without_taking_the_file_down() {
+    let mut source = library();
+    let file = exported(&mut source);
+
+    let mut target = open_in_memory().unwrap();
+    let report = merge(
+        &mut target,
+        written_by_a_newer_version(&file, "language", "rust"),
+    )
+    .unwrap();
+
+    assert_eq!(report.notes_imported, 2);
+    assert_eq!(report.notes_degraded, 1);
+
+    let arrived = notes::all(&mut target, None).unwrap();
+    assert_eq!(arrived.len(), 2);
+    assert!(
+        arrived
+            .iter()
+            .any(|note| note.language == Language::default())
+    );
+}
+
+#[test]
+fn a_note_of_an_unknown_kind_is_degraded_the_same_way() {
+    let mut source = library();
+    let file = exported(&mut source);
+
+    let mut target = open_in_memory().unwrap();
+    let report = merge(
+        &mut target,
+        written_by_a_newer_version(&file, "kind", "table"),
+    )
+    .unwrap();
+
+    assert_eq!(report.notes_imported, 2);
+    assert_eq!(report.notes_degraded, 1);
+    assert!(
+        notes::all(&mut target, None)
+            .unwrap()
+            .iter()
+            .all(|note| note.kind == NoteKind::default())
+    );
+}
+
+/// The count follows what came in, not what the file carried: the second import
+/// adds nothing, so it has nothing to report as degraded either.
+#[test]
+fn a_degraded_note_is_counted_once_and_not_again_on_a_second_import() {
+    let mut source = library();
+    let file = exported(&mut source);
+
+    let mut target = open_in_memory().unwrap();
+    merge(
+        &mut target,
+        written_by_a_newer_version(&file, "language", "rust"),
+    )
+    .unwrap();
+
+    let second = merge(
+        &mut target,
+        written_by_a_newer_version(&file, "language", "rust"),
+    )
+    .unwrap();
+
+    assert_eq!(second.notes_imported, 0);
+    assert_eq!(second.notes_degraded, 0);
 }

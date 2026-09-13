@@ -50,9 +50,6 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-log = "2"
 log = "0.4"
 thiserror = "2.0.20"
-# Search folds accents, which means decomposing before dropping the marks: `etape`
-# has to find `Étape` on a French corpus. Hand-rolling a Latin table instead would
-# be a list that goes stale the first time someone writes Polish or Vietnamese.
 unicode-normalization = "0.1.25"
 # Pulled in only by the `e2e` feature, and not optional in practice: the runner
 # waits on `window.wdioTauri` before it will open a session, so a binary without

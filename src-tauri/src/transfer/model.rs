@@ -2,8 +2,9 @@
 //! to `Note` is exported without anyone thinking about it, and an older file stays
 //! readable as long as serde can fill the gap.
 
-use std::collections::BTreeMap;
-use std::fmt::Write;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{Display, Write};
+use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -11,11 +12,17 @@ use specta::Type;
 
 use crate::error::{StorageError, ValidationError};
 use crate::notes::checklist::{self, NoteKind};
+use crate::notes::language::Language;
 use crate::notes::model::Note;
 use crate::spaces::model::Space;
 
 /// Bumped when a file written today would stop being readable. Refusing a newer
 /// version beats importing half of it.
+///
+/// ⚠️ An **added enum variant does not bump this**. It is not a format break: the
+/// file still parses, one field just names something this build has never heard of,
+/// and [`read_bundle`] brings that field down to the default. Bumping here instead
+/// would refuse a 500-note file over one note's `"rust"`.
 pub const FORMAT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -42,20 +49,94 @@ pub struct ImportReport {
     pub spaces_created: u32,
     pub notes_imported: u32,
     pub notes_skipped: u32,
+    /// Imported, but with a `language` or a `kind` this build does not know brought
+    /// down to the default. Counted so the loss is said rather than discovered.
+    pub notes_degraded: u32,
 }
 
-pub fn read_bundle(json: &str) -> Result<Bundle, StorageError> {
-    let bundle: Bundle = serde_json::from_str(json)
+/// A bundle read from a file, and the ids [`read_bundle`] had to bring down to a
+/// shape this build knows.
+#[derive(Debug)]
+pub struct IncomingBundle {
+    pub bundle: Bundle,
+    pub degraded: BTreeSet<String>,
+}
+
+/// ⚠️ The version is read off the raw JSON, before the bundle is built: a file from
+/// a future format may not deserialise at all, and the designed message beats serde's.
+pub fn read_bundle(json: &str) -> Result<IncomingBundle, StorageError> {
+    let mut value: serde_json::Value = serde_json::from_str(json)
         .map_err(|error| StorageError::ImportFormat(error.to_string()))?;
 
-    if bundle.version > FORMAT_VERSION {
+    let version = value
+        .get("version")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or_default();
+
+    if version > u64::from(FORMAT_VERSION) {
         return Err(StorageError::ImportFormat(format!(
-            "format version {}, this version of DevBox reads up to {FORMAT_VERSION}",
-            bundle.version
+            "format version {version}, this version of DevBox reads up to {FORMAT_VERSION}"
         )));
     }
 
-    Ok(bundle)
+    let degraded = degrade_unknown_values(&mut value);
+
+    let bundle: Bundle = serde_json::from_value(value)
+        .map_err(|error| StorageError::ImportFormat(error.to_string()))?;
+
+    Ok(IncomingBundle { bundle, degraded })
+}
+
+/// A newer DevBox may have written a `language` or a `kind` this build never heard of,
+/// and `Note` deserialises both as closed enums — so one `"rust"` in a 500-note file
+/// failed the whole import with a serde message about a variant.
+///
+/// **It degrades, like the database read already does** (`notes::store`,
+/// `TryFrom<NoteRow>`): a bundle is the same data through another door, and that is the
+/// one place the two disagreed. Degrading loses less than skipping the note — the title,
+/// the body, the tags and the deadline all still arrive, only the colouring is dropped —
+/// and the report says how many, so it is not silent. What stays strict is the
+/// **bridge**: a value the front end cannot name has no business being written.
+fn degrade_unknown_values(bundle: &mut serde_json::Value) -> BTreeSet<String> {
+    let mut degraded = BTreeSet::new();
+
+    let Some(notes) = bundle
+        .get_mut("notes")
+        .and_then(serde_json::Value::as_array_mut)
+    else {
+        return degraded;
+    };
+
+    for note in notes {
+        let language = degrade_field::<Language>(note, "language");
+        let kind = degrade_field::<NoteKind>(note, "kind");
+
+        if (language || kind)
+            && let Some(id) = note.get("id").and_then(serde_json::Value::as_str)
+        {
+            degraded.insert(id.to_string());
+        }
+    }
+
+    degraded
+}
+
+/// A field that is absent, or holds something other than a string, is left for serde
+/// to judge: a malformed file is malformed, not a file from a newer version.
+fn degrade_field<T: FromStr + Default + Display>(
+    note: &mut serde_json::Value,
+    field: &str,
+) -> bool {
+    let Some(current) = note.get(field).and_then(serde_json::Value::as_str) else {
+        return false;
+    };
+
+    if current.parse::<T>().is_ok() {
+        return false;
+    }
+
+    note[field] = serde_json::Value::String(T::default().to_string());
+    true
 }
 
 pub fn validate_path(path: &str) -> Result<(), ValidationError> {
@@ -194,17 +275,69 @@ mod tests {
 
     #[test]
     fn a_bundle_from_a_newer_version_is_refused_rather_than_half_read() {
+        // Notes this build could not deserialise at all: the version is read off the
+        // raw JSON first, so the answer names the version and not a serde field.
         let json = serde_json::json!({
             "version": FORMAT_VERSION + 1,
             "exportedAt": "2026-07-25T09:00:00.000Z",
             "spaces": [],
-            "notes": [],
+            "notes": [{ "shape": "from the future" }],
         })
         .to_string();
 
-        let error = read_bundle(&json).unwrap_err();
+        let StorageError::ImportFormat(message) = read_bundle(&json).unwrap_err() else {
+            panic!("expected a format error");
+        };
 
-        assert!(matches!(error, StorageError::ImportFormat(_)));
+        assert!(message.contains("format version"));
+    }
+
+    /// The file a newer DevBox writes once its `Language` has grown a variant.
+    fn bundle_with(field: &str, value: serde_json::Value) -> String {
+        let mut json = serde_json::json!({
+            "version": FORMAT_VERSION,
+            "exportedAt": "2026-07-25T09:00:00.000Z",
+            "spaces": [{ "id": "s-1", "name": "Personal" }],
+            "notes": [serde_json::to_value(sample()).unwrap()],
+        });
+        json["notes"][0][field] = value;
+
+        json.to_string()
+    }
+
+    #[test]
+    fn an_unknown_language_is_brought_down_to_the_default_rather_than_refused() {
+        let read = read_bundle(&bundle_with("language", "rust".into())).unwrap();
+
+        assert_eq!(read.bundle.notes[0].language, Language::default());
+        assert_eq!(read.degraded.len(), 1);
+        assert!(read.degraded.contains(&read.bundle.notes[0].id));
+    }
+
+    #[test]
+    fn an_unknown_kind_is_brought_down_the_same_way() {
+        let read = read_bundle(&bundle_with("kind", "table".into())).unwrap();
+
+        assert_eq!(read.bundle.notes[0].kind, NoteKind::default());
+        assert_eq!(read.degraded.len(), 1);
+    }
+
+    #[test]
+    fn a_known_value_is_left_exactly_as_written() {
+        let read = read_bundle(&bundle_with("language", "sql".into())).unwrap();
+
+        assert_eq!(read.bundle.notes[0].language.to_string(), "sql");
+        assert!(read.degraded.is_empty());
+    }
+
+    /// A malformed file is malformed, not a file from a newer version: only a string
+    /// this build cannot name is degraded.
+    #[test]
+    fn a_language_that_is_not_a_string_is_still_a_format_error() {
+        assert!(matches!(
+            read_bundle(&bundle_with("language", 42.into())).unwrap_err(),
+            StorageError::ImportFormat(_)
+        ));
     }
 
     #[test]
@@ -229,8 +362,9 @@ mod tests {
 
         let read = read_bundle(&serde_json::to_string(&bundle).unwrap()).unwrap();
 
-        assert_eq!(read.notes.len(), 1);
-        assert_eq!(read.notes[0].title, "Title");
-        assert_eq!(read.spaces[0].name, "Personal");
+        assert_eq!(read.bundle.notes.len(), 1);
+        assert_eq!(read.bundle.notes[0].title, "Title");
+        assert_eq!(read.bundle.spaces[0].name, "Personal");
+        assert!(read.degraded.is_empty());
     }
 }
