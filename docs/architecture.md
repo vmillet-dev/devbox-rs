@@ -1458,6 +1458,37 @@ would keep answering.
   lands a tick later; a component destroyed in between would otherwise stay subscribed for the
   whole session.
 
+### Window geometry
+
+`tauri-plugin-window-state` remembers the size, the position and whether the window was
+maximized, in `.window-state.json` beside the database. `tauri.conf.json` still declares a
+size, and it is only a **first** launch: 1100×720, with a 640×480 floor so a window cannot be
+restored — or dragged — to something nothing fits in.
+
+⚠️ The flags are explicit (`WINDOW_STATE_FLAGS`, `lib.rs`) and that is the whole subtlety.
+The plugin's default is `all()`, which includes `VISIBLE`; quitting from the tray saves a
+window that is **hidden**, and the next launch would restore it hidden — an application that
+starts with nothing on screen and only a tray icon to be found by. A unit test holds the flag
+out. `DECORATIONS` and `FULLSCREEN` are left out for the opposite reason: nothing here
+changes either, so saving them stores noise.
+
+A minimized window needs no guard of ours — the plugin's `Moved` and `Resized` handlers
+both skip one, which on Windows reports itself at -32000. And the file is written on
+`RunEvent::Exit`, not on every move: the tray's "Quitter" is `app.exit(0)`, so it goes
+through, while a force-kill saves nothing and leaves the previous geometry standing.
+
+⚠️ **The window is declared `"visible": false` and shown from `setup`.** The plugin restores
+the geometry from `on_webview_ready`, which runs _after_ the window is on screen: created
+visible, the window appeared at the config's size and then jumped to the remembered one.
+Measured by polling the window rectangle through startup — 1116×759 at +172 ms, 900×600 at
++359 ms, so nearly 200 ms of the wrong window. Created hidden, there is one rectangle and no
+jump. `setup` is also the right place rather than the front end: a front end that fails to
+boot would otherwise leave a process with no window at all.
+
+`backgroundColor` is the dark `--bg-0`, for the same reason the dark palette is the base
+one — the WebView paints white before the first frame, and the theme preference cannot be
+read before Angular boots.
+
 ### System tray
 
 DevBox stays resident in the notification area, and **the window's close button only hides it**
