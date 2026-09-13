@@ -1024,7 +1024,11 @@ the loser keeps the keyboard.
   pull in, no `innerHTML`, nothing for the CSP to forbid. The grammar is deliberately thin —
   `## ` a release, `### ` a category, `- ` an entry, an indented line continues the one above —
   and the file is written to match it; a shipped file that no longer parses fails a test rather
-  than emptying the panel in silence. The changelog is **not translated**, on purpose and like
+  than emptying the panel in silence. The newest section is **generated** by the release
+  workflow from the pull requests merged since the last tag (see "Releasing"), which is also
+  where a category's icon comes from: `### ✨ Added` is the heading in the file, so nothing on
+  the front end decides what a category looks like and a new one needs no code. The changelog
+  is **not translated**, on purpose and like
   the release notes the updater hands over: one changelog, written once, rather than two that
   drift apart. The panel marks the release the running binary is, and its footer opens the
   repository's releases page through the `opener` plugin.
@@ -1358,8 +1362,10 @@ re-exports it once as `APP_INFO`, so nothing else imports `bindings.ts` for it.
 
 ⚠️ The **version** is not in it. It is read from the running binary with `getVersion()`, which
 cannot go stale the way a committed `bindings.ts` can, and `tauri.conf.json` no longer declares
-one either — without the key, Tauri takes the version from `Cargo.toml`. A CI job checks the
-tag against `package.json` and `Cargo.toml` on a release.
+one either — without the key, Tauri takes the version from `Cargo.toml`. The release workflow's
+`prepare` job reads that version and refuses to go on unless `package.json`, `package-lock.json`
+and `Cargo.lock` say the same thing — **before** the tag exists, so it prevents the drift rather
+than reporting it afterwards.
 
 That is deliberately **not** `collect_events![…]`: it would generate a `listen` call per event,
 imported straight from `@tauri-apps/api/event`, and the `EVENT_SUBSCRIBER` token every spec
@@ -1780,12 +1786,60 @@ update.
   rather than by `tauri-action`, which only writes one when it creates the release itself —
   something the build matrix deliberately avoids. Windows is the one platform whose absence
   fails the job; a missing Linux artifact only logs a warning, so a Linux bundling problem
-  cannot hold back an otherwise sound Windows release. Since the release is created as a
-  **draft**, `releases/latest/download/latest.json` stays unreachable until it is published
-  by hand.
+  cannot hold back an otherwise sound Windows release. The release is published straight
+  away, which is what keeps `releases/latest/download/latest.json` — the endpoint compiled
+  into the binary — resolvable.
 - Building a bundle now requires `TAURI_SIGNING_PRIVATE_KEY` (and its password) in the
   environment. Without it `tauri build` fails, instead of shipping binaries the updater would
-  later refuse.
+  later refuse. Both secrets live in the `release` **environment** rather than in the
+  repository, so no other workflow and no other branch can reach them.
+
+## Releasing
+
+One button: **Actions → Release → Run workflow**, with a `dry_run` checkbox. `release.yml`
+carries the whole path — `prepare`, `release-build`, `publish` — and `ci.yml` is only CI.
+
+Two facts shape that, and neither is negotiable:
+
+- **`CHANGELOG.md` is baked in at compile time.** `include_str!` reads it when the crate is
+  built, so the section for the release being cut has to be written, committed **and tagged
+  before** `release-build` starts. A workflow that generated notes after the tag would ship a
+  binary whose "Nouveautés" panel does not know its own version.
+- **A tag pushed with the default `GITHUB_TOKEN` triggers no workflow.** GitHub's anti-loop
+  guard means the tag `prepare` creates cannot wake a second run, so the build and the
+  publication have to live in the same one. That is the whole reason the release jobs moved
+  out of `ci.yml` — not a taste for tidiness.
+
+The same property has a price worth stating: **the changelog commit is never seen by the CI**.
+`prepare` is therefore its own gate — it runs `npm run test:scripts` and `prettier --check` on
+the file it just wrote, and `scripts/release-notes.mjs` mirrors, in `assertRenderable`, the
+three invariants `changelog::tests::the_shipped_file_parses_into_something_to_show` asserts.
+
+What `prepare` does **not** do is rerun the suites. It checks that `ci.yml` concluded `success`
+on the very commit being released and stops if it did not; the work was already done, and a
+release that replayed it would pay for it twice.
+
+- **The notes come from the merged pull requests.** `scripts/release-notes.mjs` reads the
+  squash subjects between the last tag and `HEAD`, pulls the `(#NN)` out of each, then asks
+  GraphQL for the title, the labels **and the labels of the issues the pull request closes**
+  (`closingIssuesReferences`, which REST does not expose). GitHub propagates nothing from an
+  issue to its pull request, and in this repository the issues are the labelled half — hence
+  the chain: label on the pull request, then label on the closed ticket, then the `(feat)` /
+  `(fix)` prefix of the title, then "Under the hood". Nothing is dropped for want of a class,
+  and the dry run prints which link of the chain filed each entry.
+- **Asked by number, never listed.** Several pull requests here were merged into intermediate
+  branches and never landed as a commit on `main`; any listing by date reports work the
+  release does not carry.
+- **The body of the GitHub release is re-extracted from the committed file** at the tag, rather
+  than passed along as a job output. The file baked into the binary and the page on github.com
+  then cannot say two different things.
+- **Restricted to `main` by an environment, not by an `if`.** The branch selector of "Run
+  workflow" cannot be filtered, so the three jobs declare `environment: release`, whose
+  deployment branch policy refuses to start them from any other ref. The `if` on the first
+  step stays as a readable fallback.
+- **`prepare` is deliberately not idempotent.** After a failure, use "Re-run failed jobs":
+  successful jobs are not replayed and their outputs survive. "Re-run all jobs" will stop on
+  the "tag already exists" guard — safe, but surprising.
 
 ## Tauri configuration
 

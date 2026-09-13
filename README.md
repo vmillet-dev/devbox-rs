@@ -56,6 +56,7 @@ retry screen. Use it for pure styling work, `npm run tauri dev` for anything els
 | `npm test`              | Unit tests (Vitest, jsdom — no browser required)   |
 | `npm run test:watch`    | Tests, re-running on change                        |
 | `npm run test:coverage` | Tests with a v8 coverage report (80% thresholds)   |
+| `npm run test:scripts`  | `node --test` on the release-notes generator       |
 | `npm run e2e:build`     | Builds the binary the end-to-end suite drives      |
 | `npm run test:e2e`      | End-to-end scenarios against that binary           |
 | `npm run lint`          | ESLint + Prettier check                            |
@@ -118,6 +119,24 @@ owns its model, its SQL and the commands that expose it: `<feature>.rs` holds th
 - [x] Global tag management: rename, merge, drop across the library
 - [x] `{{fields}}` in snippets, and a quick-paste palette on a global shortcut
 - [x] Attachments (drop, paste, open, save), and import / export / share
+
+## Releasing
+
+1. **Bump the version** — `npm version <x.y.z> --no-git-tag-version` for the two npm files,
+   `src-tauri/Cargo.toml` by hand, then `cargo update -p devbox` for the lock. Merge to `main`
+   and wait for CI to go green: the release refuses to start on a commit CI has not passed.
+2. **Actions → Release → Run workflow**, with **`dry_run` checked**. It prints the notes it
+   would write to the run summary, and changes nothing.
+3. **Run it again unchecked.** It writes the `CHANGELOG.md` section, commits it, tags, builds
+   the bundles and publishes the release — all in one run.
+
+**Label your issues.** That is what sorts the entries: a pull request inherits the labels of
+the issue it closes (`Closes #42`), because GitHub itself propagates nothing. A label on the
+pull request overrides that ticket for one entry; with neither, the `(feat)` / `(fix)` prefix
+of the title decides; with none of the three, the entry lands under "Under the hood". Nothing
+is ever dropped for want of a label, and the dry run says which rule filed each entry.
+
+`change`, `security` and `removal` are the labels to reach for beyond GitHub's defaults.
 
 ## Conventions
 

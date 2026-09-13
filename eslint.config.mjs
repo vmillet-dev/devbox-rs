@@ -76,6 +76,15 @@ export default tseslint.config(
     },
   },
   {
+    // The release scripts are neither Angular nor TypeScript: plain Node ESM, so the base
+    // rules and the globals they reach for. Without this block a `.mjs` is linted with none.
+    files: ['scripts/**/*.mjs'],
+    extends: [eslint.configs.recommended],
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly', URL: 'readonly' },
+    },
+  },
+  {
     files: ['**/*.html'],
     extends: [...angular.configs.templateRecommended, ...angular.configs.templateAccessibility],
     rules: {
