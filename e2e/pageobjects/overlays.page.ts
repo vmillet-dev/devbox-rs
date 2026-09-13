@@ -1,6 +1,6 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { setNativeValue, submitFormOf, testid } from '../support/app.js';
+import { confirmTwice, setField, setNativeValue, submitFormOf, testid } from '../support/app.js';
 
 /** The space switcher, which is a menu, a create form and an edit panel in one. */
 export const spaces = {
@@ -35,15 +35,14 @@ export const spaces = {
 
   async create(name: string): Promise<void> {
     await $(testid('space-create-open')).click();
-    await $(testid('space-create-input')).setValue(name);
+    // The form is revealed by that click: the field does not exist until it lands.
+    await setField(testid('space-create-input'), name);
     await $(testid('space-create-submit')).click();
   },
 
   async rename(id: string, into: string): Promise<void> {
     await $(`${testid('space-edit')}[data-space-id="${id}"]`).click();
-    const field = $(testid('space-rename-input'));
-    await field.click();
-    await field.setValue(into);
+    await setField(testid('space-rename-input'), into);
     await $(testid('space-rename-submit')).click();
   },
 
@@ -58,9 +57,7 @@ export const spaces = {
   async remove(id: string, refugeId: string): Promise<void> {
     await $(`${testid('space-edit')}[data-space-id="${id}"]`).click();
     await setNativeValue(testid('space-move-target'), refugeId);
-    const remove = $(testid('space-delete'));
-    await remove.click();
-    await remove.click();
+    await confirmTwice($(testid('space-delete')));
   },
 
   deleteBlocked: () => $(testid('space-delete-blocked')),
@@ -89,16 +86,12 @@ export const trash = {
 
   async purge(title: string): Promise<void> {
     const row = await trash.rowWithTitle(title);
-    const button = row.$(testid('trash-purge'));
-    await button.click();
-    await button.click();
+    await confirmTwice(row.$(testid('trash-purge')));
   },
 
   /** Confirms on a second click, like every destructive control in the application. */
   async empty(): Promise<void> {
-    const button = $(testid('trash-empty'));
-    await button.click();
-    await button.click();
+    await confirmTwice($(testid('trash-empty')));
   },
 
   async rowWithTitle(title: string) {

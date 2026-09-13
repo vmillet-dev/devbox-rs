@@ -1,4 +1,4 @@
-import { browser, expect } from '@wdio/globals';
+import { expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { cursorOf, reloadCanvas, testid } from '../support/app.js';
@@ -98,31 +98,25 @@ describe('Search, filters and facets', () => {
   });
 
   it('filters on a tag from the rail', async () => {
-    await canvas.tagPill('ops').click();
-    await browser.pause(500);
+    await canvas.toggleTag('ops');
     expect((await canvas.titles()).sort()).toEqual(['Docker compose', 'Pinned reference']);
-    await canvas.tagPill('ops').click();
-    await browser.pause(500);
+    await canvas.toggleTag('ops');
   });
 
   it('filters on a language from the rail', async () => {
-    await canvas.languageChip('sql').click();
-    await browser.pause(500);
+    await canvas.toggleLanguage('sql');
     expect(await canvas.titles()).toEqual(['Étape de migration']);
-    await canvas.languageChip('sql').click();
-    await browser.pause(500);
+    await canvas.toggleLanguage('sql');
   });
 
   it('keeps the quick filters chronological, unlike a facet', async () => {
-    await canvas.filter('pinned').click();
-    await browser.pause(500);
+    await canvas.applyFilter('pinned');
 
     const titles = await canvas.titles();
     expect(titles).toContain('Pinned reference');
     expect(titles).not.toContain('Docker compose');
     // A quick filter keeps the chronological shape; only a search or a facet flattens it.
     expect(await canvas.sectionKeys()).not.toContain('results');
-    await canvas.filter('all').click();
-    await browser.pause(500);
+    await canvas.applyFilter('all');
   });
 });

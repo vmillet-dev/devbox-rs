@@ -1,6 +1,6 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { testid, waitForCanvas } from '../support/app.js';
+import { setField, testid, waitForCanvas } from '../support/app.js';
 
 /**
  * The notes page: the header above the cards, and the cards themselves. Every selector
@@ -96,24 +96,41 @@ export const canvas = {
    * straight after typing reads the previous view.
    */
   async search(text: string): Promise<void> {
-    const field = $(testid('search-input'));
-    await field.click();
-    await field.setValue(text);
-    await browser.pause(400);
+    await setField(testid('search-input'), text);
+    // The condition rather than a guess at how long the debounce plus the round trip
+    // takes: a sleep is either too short, which is a flake, or too long, which is a tax.
+    await waitForCanvas();
   },
 
   async clearSearch(): Promise<void> {
-    const field = $(testid('search-input'));
-    await field.click();
     // `setValue('')` rather than select-all-then-Backspace: it goes through the element
     // endpoint, which the embedded driver implements, where key actions are dropped.
-    await field.setValue('');
-    await browser.pause(400);
+    await setField(testid('search-input'), '');
+    await waitForCanvas();
   },
 
   filter: (key: 'all' | 'pinned' | 'untriaged') => $(`${testid('filter-chip')}[data-filter="${key}"]`),
   tagPill: (tag: string) => $(`${testid('tag-pill')}[data-tag="${tag}"]`),
   languageChip: (language: string) => $(`${testid('language-chip')}[data-language="${language}"]`),
+
+  /**
+   * The three controls that re-run the query. Clicking them and sleeping is the bet the
+   * flaky failures lost — too short and the spec asserts on the view it replaced.
+   */
+  async applyFilter(key: 'all' | 'pinned' | 'untriaged'): Promise<void> {
+    await canvas.filter(key).click();
+    await waitForCanvas();
+  },
+
+  async toggleTag(tag: string): Promise<void> {
+    await canvas.tagPill(tag).click();
+    await waitForCanvas();
+  },
+
+  async toggleLanguage(language: string): Promise<void> {
+    await canvas.languageChip(language).click();
+    await waitForCanvas();
+  },
   sections: () => $$(testid('note-section')),
 
   async sectionKeys(): Promise<string[]> {

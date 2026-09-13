@@ -1,6 +1,6 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { blur, setNativeValue, testid } from '../support/app.js';
+import { clickToAddRow, blur, setNativeValue, testid } from '../support/app.js';
 
 /** The controls' `id`s, in one place: `select` needs the selector, the getters the element. */
 const CONTROL = {
@@ -82,12 +82,7 @@ export const variables = {
   },
 
   async add(name: string, value: string): Promise<void> {
-    await $(testid('variable-add')).click();
-    const rows = await $$(testid('variable-row')).getElements();
-    const last = rows[rows.length - 1];
-    if (!last) {
-      throw new Error('the variables page gained no row');
-    }
+    const last = await clickToAddRow(testid('variable-add'), testid('variable-row'));
     await last.$(testid('variable-name')).setValue(name);
     await last.$(testid('variable-value')).setValue(value);
     await blur();

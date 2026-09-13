@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { banners, fileMenu, titlebar } from '../pageobjects/titlebar.page.js';
-import { bridge, homeSpaceId } from '../support/bridge.js';
+import { bridge, homeSpaceId, query } from '../support/bridge.js';
 
 /**
  * The one scenario neither unit suite can reach: a database file that does not exist
@@ -14,7 +14,31 @@ import { bridge, homeSpaceId } from '../support/bridge.js';
  * still exactly one, and writes it down for the eleven files that follow.
  */
 describe('First launch', () => {
-  before(canvas.open);
+  /**
+   * ⚠️ `waitForCanvas` cannot see this one, and says so in its own comment: it has no
+   * signal for the reload that follows a write, "nor for the one that follows the sample
+   * seeding". Seeding is what a virgin profile does **after** the first view has already
+   * arrived and settled — empty — so on a slow machine the settle loop reports a settled,
+   * empty canvas and this file asserts on nothing. Both CI platforms have failed exactly
+   * here, with `no card titled "" — found []`.
+   *
+   * It waits for notes to **exist**, and never for how many: the count is what the first
+   * scenario is about to assert, and waiting for it would make the assertion its own
+   * witness.
+   */
+  before(async () => {
+    await browser.waitUntil(async () => (await bridge.queryNotes(query())).matched > 0, {
+      timeout: 30_000,
+      timeoutMsg: 'the first launch seeded no note',
+    });
+
+    await browser.waitUntil(async () => (await canvas.cards().length) > 0, {
+      timeout: 30_000,
+      timeoutMsg: 'the seeded notes never reached the canvas',
+    });
+
+    await canvas.open();
+  });
 
   it('opens on a window wearing the application name', async () => {
     // From `Cargo.toml` through `APP_METADATA`, not from `tauri.conf.json`'s lowercase
@@ -41,8 +65,7 @@ describe('First launch', () => {
     const everything = await canvas.titles();
     expect(everything).toHaveLength(4);
 
-    await canvas.filter('untriaged').click();
-    await browser.pause(400);
+    await canvas.applyFilter('untriaged');
 
     // One of the four, not all four: a filter that filtered nothing would pass a
     // "more than zero" assertion.
@@ -50,8 +73,7 @@ describe('First launch', () => {
     expect(untriaged).toHaveLength(1);
     expect(everything).toContain(untriaged[0]);
 
-    await canvas.filter('all').click();
-    await browser.pause(400);
+    await canvas.applyFilter('all');
     expect(await canvas.titles()).toHaveLength(4);
   });
 

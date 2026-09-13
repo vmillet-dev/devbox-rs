@@ -1,6 +1,15 @@
 import { $, $$ } from '@wdio/globals';
 
-import { blur, press, setNativeValue, submitFormOf, testid } from '../support/app.js';
+import {
+  blur,
+  clickToAddRow,
+  confirmTwice,
+  press,
+  setField,
+  setNativeValue,
+  submitFormOf,
+  testid,
+} from '../support/app.js';
 
 /**
  * The editor overlay. Title, body and source commit on **blur**, so every setter here
@@ -8,9 +17,7 @@ import { blur, press, setNativeValue, submitFormOf, testid } from '../support/ap
  * asserting on a draft nothing has saved.
  */
 async function typeAndCommit(selector: string, text: string): Promise<void> {
-  const field = $(selector);
-  await field.click();
-  await field.setValue(text);
+  await setField(selector, text);
   await blur();
 }
 
@@ -86,9 +93,7 @@ export const editor = {
   },
 
   async deleteNote(): Promise<void> {
-    const remove = $(testid('editor-delete'));
-    await remove.click();
-    await remove.click();
+    await confirmTwice($(testid('editor-delete')));
     await $(testid('editor-title')).waitForExist({ reverse: true, timeout: 10_000 });
   },
 
@@ -112,13 +117,8 @@ export const editor = {
   },
 
   async addItem(text: string): Promise<void> {
-    await $(testid('checklist-add')).click();
-    const rows = await $$(testid('checklist-row')).getElements();
-    const last = rows[rows.length - 1];
-    if (!last) {
-      throw new Error('the checklist gained no row');
-    }
-    await last.$(testid('checklist-text')).setValue(text);
+    const row = await clickToAddRow(testid('checklist-add'), testid('checklist-row'));
+    await row.$(testid('checklist-text')).setValue(text);
     await blur();
   },
 

@@ -1,3 +1,4 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -81,5 +82,45 @@ export const config: WebdriverIO.Config = {
   async before() {
     const { browser } = await import('@wdio/globals');
     await browser.refresh();
+  },
+
+  /**
+   * A failing scenario leaves nothing behind but its assertion message, and "the row is
+   * missing" and "the field was never filled" read exactly the same from there. This
+   * writes down what was actually on screen, which is the difference between the two.
+   */
+  async afterTest(test, _context, result) {
+    if (result.passed) return;
+
+    const { browser } = await import('@wdio/globals');
+    const directory = join(here, 'logs', 'failures');
+    mkdirSync(directory, { recursive: true });
+
+    const name = `${test.parent} ${test.title}`.replace(/[^a-z0-9]+/gi, '-').slice(0, 110);
+
+    try {
+      await browser.saveScreenshot(join(directory, `${name}.png`));
+
+      const state = await browser.execute(() => ({
+        cards: [...document.querySelectorAll('[data-testid="note-card-title"]')].map((card) =>
+          (card.textContent ?? '').trim(),
+        ),
+        busy: document.querySelector('[data-testid="canvas"]')?.getAttribute('aria-busy') ?? null,
+        // The crux: a value that never arrived looks nothing like a write that was lost.
+        fields: [...document.querySelectorAll('input, textarea')].map((field) => ({
+          testid: field.getAttribute('data-testid'),
+          value: (field as HTMLInputElement).value,
+        })),
+        dialogs: [...document.querySelectorAll('[role="dialog"]')].map(
+          (dialog) => dialog.getAttribute('aria-labelledby') ?? dialog.getAttribute('aria-label'),
+        ),
+        error: document.querySelector('[data-testid="error-banner"]')?.textContent?.trim() ?? null,
+        console: (window as unknown as { __e2eConsole?: string[] }).__e2eConsole ?? [],
+      }));
+
+      writeFileSync(join(directory, `${name}.json`), JSON.stringify(state, null, 2), 'utf8');
+    } catch (error) {
+      writeFileSync(join(directory, `${name}.json`), `capture failed: ${String(error)}`, 'utf8');
+    }
   },
 };
