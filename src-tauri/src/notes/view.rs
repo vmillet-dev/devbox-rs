@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use chrono::{DateTime, Datelike, FixedOffset, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use unicode_normalization::char::{decompose_canonical, is_combining_mark};
 
 use super::language::Language;
 use super::model::{self, DisplayNote, Note};
@@ -104,7 +105,7 @@ pub fn apply_global_defaults(view: &mut NotesView, globals: &BTreeMap<String, St
 }
 
 pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesView {
-    let needle = request.search.trim().to_lowercase();
+    let needle = fold(request.search.trim());
     if !needle.is_empty() {
         notes.retain(|note| matches_search(note, &needle));
     }
@@ -136,7 +137,7 @@ pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> Note
     }
 }
 
-/// `needle` is expected **already folded to lowercase and trimmed**.
+/// `needle` is expected to have been through [`fold`] and trimmed.
 ///
 /// ⚠️ Folded in Rust and not in SQL: without ICU, SQLite's `LOWER()` only handles
 /// ASCII, so `Étape` would not match `étape`. The items count as much as the
@@ -151,12 +152,52 @@ fn matches_search(note: &Note, needle: &str) -> bool {
             .any(|item| contains_folded(&item.text, needle))
 }
 
+/// Lowercase **and** accent-free, so `etape` finds `Étape`. Both sides go through
+/// here, which makes the match symmetric: an accented needle finds unaccented text
+/// too, since a search field is not where anyone wants to be precise about it.
+///
+/// Decomposing to NFD and dropping the combining marks handles every script rather
+/// than the Latin letters someone thought to list. Only what a canonical
+/// decomposition separates is folded: `ø` and `ß` are letters of their own and stay.
+///
+/// ⚠️ Decomposed one character at a time, and not through the `nfd()` iterator over
+/// the whole string: on 800 notes of 13 kB of accented text, release, the streaming
+/// version cost 76 ms against 15 ms here for the same answer. Its lookahead buffering
+/// earns nothing when every mark is dropped anyway — canonical order cannot matter to
+/// a fold that keeps none of it.
+///
+/// The ASCII branches are the common ones, not micro-optimisations: a snippet of code
+/// is ASCII from end to end, and a French sentence is ASCII between its accents. That
+/// is also what pays for the accents: the same corpus took 27 ms through
+/// `to_lowercase()`, which folded no accent at all.
+fn fold(text: &str) -> String {
+    if text.is_ascii() {
+        return text.to_ascii_lowercase();
+    }
+
+    let mut folded = String::with_capacity(text.len());
+
+    for character in text.chars() {
+        if character.is_ascii() {
+            folded.push(character.to_ascii_lowercase());
+        } else {
+            decompose_canonical(character, |part| {
+                if !is_combining_mark(part) {
+                    folded.extend(part.to_lowercase());
+                }
+            });
+        }
+    }
+
+    folded
+}
+
 /// ⚠️ Do **not** hand-roll a fold-as-you-compare scan to save the copy: measured
 /// on 800 notes of 13 kB, a needle matching nothing took 11.0 ms that way against
 /// 6.3 ms here. `str::contains` runs Two-Way (O(n+m)); a window scan is O(n·m),
 /// and searching is precisely the case where most notes do not match.
 fn contains_folded(haystack: &str, needle: &str) -> bool {
-    haystack.to_lowercase().contains(needle)
+    fold(haystack).contains(needle)
 }
 
 const A_WEEK: TimeDelta = TimeDelta::days(7);
@@ -320,7 +361,7 @@ mod tests {
             notes,
             Facets::default(),
             &NotesQuery {
-                search: "  DÉPLOI  ".to_string(),
+                search: "  DEPLOI  ".to_string(),
                 ..request()
             },
         );
@@ -419,10 +460,10 @@ mod tests {
                 ..sample()
             };
 
-            assert!(matches_search(&note, "déploi"));
-            assert!(matches_search(&note, "kubectl"));
-            assert!(matches_search(&note, "ops"));
-            assert!(!matches_search(&note, "terraform"));
+            assert!(matches_search(&note, &fold("déploi")));
+            assert!(matches_search(&note, &fold("kubectl")));
+            assert!(matches_search(&note, &fold("ops")));
+            assert!(!matches_search(&note, &fold("terraform")));
         }
 
         #[test]
@@ -432,7 +473,52 @@ mod tests {
                 ..sample()
             };
 
-            assert!(matches_search(&note, "étape"));
+            assert!(matches_search(&note, &fold("étape")));
+            assert!(matches_search(&note, &fold("ÉTAPE")));
+        }
+
+        /// The point of the whole fold: nobody reaches for the accent key to search.
+        #[test]
+        fn an_unaccented_needle_finds_accented_text() {
+            let note = Note {
+                title: "Étape de migration".to_string(),
+                content: "Prévenir l'équipe".to_string(),
+                tags: vec!["déploiement".to_string()],
+                ..sample()
+            };
+
+            assert!(matches_search(&note, &fold("etape")));
+            assert!(matches_search(&note, &fold("equipe")));
+            assert!(matches_search(&note, &fold("deploiement")));
+        }
+
+        /// Both sides go through `fold`, so it works the other way round too.
+        #[test]
+        fn an_accented_needle_finds_unaccented_text() {
+            let note = Note {
+                title: "Etape de migration".to_string(),
+                ..sample()
+            };
+
+            assert!(matches_search(&note, &fold("Étape")));
+        }
+
+        /// Not everything an eye reads as an accent is one: only what a canonical
+        /// decomposition separates is folded away.
+        #[test]
+        fn a_letter_of_its_own_is_not_folded_into_another() {
+            let note = Note {
+                title: "Størrelse".to_string(),
+                ..sample()
+            };
+
+            assert!(matches_search(&note, &fold("størrelse")));
+            assert!(!matches_search(&note, &fold("storrelse")));
+        }
+
+        #[test]
+        fn folding_leaves_an_ascii_needle_alone() {
+            assert_eq!(fold("Kubectl APPLY"), "kubectl apply");
         }
 
         #[test]
@@ -454,9 +540,9 @@ mod tests {
                 ..sample()
             };
 
-            assert!(matches_search(&note, "migration"));
-            assert!(matches_search(&note, "équipe"));
-            assert!(!matches_search(&note, "terraform"));
+            assert!(matches_search(&note, &fold("migration")));
+            assert!(matches_search(&note, &fold("equipe")));
+            assert!(!matches_search(&note, &fold("terraform")));
         }
     }
 
