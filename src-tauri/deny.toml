@@ -12,8 +12,21 @@ all-features = true
 # Only the crates this project actually chose. An unmaintained crate five levels
 # down is not something a pull request here can act on.
 unmaintained = "workspace"
+# "all", not "workspace": unsoundness in a transitive crate still runs in our
+# process. The one exception below is named rather than the policy weakened, so a
+# second one fails this job.
 unsound = "all"
-ignore = []
+ignore = [
+    # `glib::VariantStrIter` — Linux only, and immovable from here: 0.18.5 is the
+    # last 0.18.x, pinned by `gtk 0.18.2`, which Tauri v2.11 pins in turn, and the
+    # fix landed in glib 0.20. DevBox never calls glib, let alone the five affected
+    # `VariantStrIter` methods; the crate arrives under the GTK/WebKitGTK stack and
+    # is absent from the Windows tree entirely.
+    #
+    # ⚠️ Drop this line when Tauri moves to gtk-rs 0.20+ — keeping it afterwards
+    # would hide a real finding.
+    { id = "RUSTSEC-2024-0429", reason = "glib 0.18 is pinned by Tauri's gtk-rs 0.18; unreachable from our code" },
+]
 
 [licenses]
 confidence-threshold = 0.93
@@ -30,7 +43,6 @@ allow = [
     "BSD-3-Clause",
     "BSL-1.0",
     "CC0-1.0",
-    "CDLA-Permissive-2.0",
     "GPL-3.0-only",
     "ISC",
     "MIT",
