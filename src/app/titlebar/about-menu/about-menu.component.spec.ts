@@ -84,6 +84,17 @@ describe('AboutMenuComponent', () => {
       expect(dot()).not.toBeNull();
     });
 
+    it('marks the entry the dot is about, once the menu is open', async () => {
+      updater.available = { version: '0.2.0', currentVersion: '0.1.0' };
+      await store.check();
+      await store.dismiss(true);
+      await openMenu();
+
+      const marked = option('mises à jour');
+
+      expect(marked.querySelector('[data-testid="update-dot-option"]')).not.toBeNull();
+    });
+
     it('carries a text twin, since it says something no word does', async () => {
       updater.available = { version: '0.2.0', currentVersion: '0.1.0' };
       await store.check();
