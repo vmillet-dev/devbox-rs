@@ -169,8 +169,16 @@ fn with_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
 fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // `tauri.conf.json` carries the product name, which is the crate's and is
     // lowercase; the window wears the name the user is shown everywhere else.
+    //
+    // ⚠️ The window is declared `"visible": false` and is shown **here**, because
+    // `tauri-plugin-window-state` restores the geometry from `on_webview_ready` — which
+    // has already run by the time `setup` does. Created visible, the window appeared at
+    // the config's size for ~190 ms and then jumped to the remembered one, measured.
+    // Showing it first, and here rather than from the front end, is also what keeps a
+    // front end that fails to boot from leaving a process with no window at all.
     if let Some(window) = app.get_webview_window("main") {
         window.set_title(app_info::METADATA.name)?;
+        window.show()?;
     }
 
     app.handle()

@@ -1477,6 +1477,18 @@ both skip one, which on Windows reports itself at -32000. And the file is writte
 `RunEvent::Exit`, not on every move: the tray's "Quitter" is `app.exit(0)`, so it goes
 through, while a force-kill saves nothing and leaves the previous geometry standing.
 
+⚠️ **The window is declared `"visible": false` and shown from `setup`.** The plugin restores
+the geometry from `on_webview_ready`, which runs _after_ the window is on screen: created
+visible, the window appeared at the config's size and then jumped to the remembered one.
+Measured by polling the window rectangle through startup — 1116×759 at +172 ms, 900×600 at
++359 ms, so nearly 200 ms of the wrong window. Created hidden, there is one rectangle and no
+jump. `setup` is also the right place rather than the front end: a front end that fails to
+boot would otherwise leave a process with no window at all.
+
+`backgroundColor` is the dark `--bg-0`, for the same reason the dark palette is the base
+one — the WebView paints white before the first frame, and the theme preference cannot be
+read before Angular boots.
+
 ### System tray
 
 DevBox stays resident in the notification area, and **the window's close button only hides it**
