@@ -1,6 +1,6 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { confirmTwice, setField, setNativeValue, submitFormOf, testid } from '../support/app.js';
+import { confirmTwice, readEach, setField, setNativeValue, submitFormOf, testid } from '../support/app.js';
 
 /** The space switcher, which is a menu, a create form and an edit panel in one. */
 export const spaces = {
@@ -25,13 +25,7 @@ export const spaces = {
   /** `null` is "all spaces", and it is a choice rather than a loading state. */
   allOption: () => $(testid('space-option-all')),
 
-  async names(): Promise<string[]> {
-    const found: string[] = [];
-    for await (const option of $$(testid('space-option'))) {
-      found.push((await option.getText()).trim());
-    }
-    return found;
-  },
+  names: (): Promise<string[]> => readEach(testid('space-option'), 'text'),
 
   async create(name: string): Promise<void> {
     await $(testid('space-create-open')).click();
@@ -71,13 +65,7 @@ export const trash = {
 
   rows: () => $$(testid('trash-row')),
 
-  async titles(): Promise<string[]> {
-    const found: string[] = [];
-    for await (const row of $$(testid('trash-row'))) {
-      found.push((await row.$(testid('trash-row-title')).getText()).trim());
-    }
-    return found;
-  },
+  titles: (): Promise<string[]> => readEach(testid('trash-row'), 'text', testid('trash-row-title')),
 
   async restore(title: string): Promise<void> {
     const row = await trash.rowWithTitle(title);
@@ -94,13 +82,25 @@ export const trash = {
     await confirmTwice($(testid('trash-empty')));
   },
 
+  /**
+   * The note id, matched in **one** call and then used as a selector — like
+   * `canvas.cardWithTitle`, and for the same reason: a walk comparing titles one round
+   * trip at a time compares them across a re-render.
+   */
   async rowWithTitle(title: string) {
-    for await (const row of $$(testid('trash-row'))) {
-      if ((await row.$(testid('trash-row-title')).getText()).trim() === title) {
-        return row;
-      }
+    const titles = await trash.titles();
+    const index = titles.indexOf(title);
+    if (index < 0) {
+      throw new Error(`no trash row titled "${title}" — found ${JSON.stringify(titles)}`);
     }
-    throw new Error(`no trash row titled "${title}" — found ${JSON.stringify(await trash.titles())}`);
+
+    const ids = await readEach(testid('trash-row'), '@data-note-id');
+    const id = ids[index];
+    if (!id) {
+      throw new Error(`the trash row titled "${title}" carries no id`);
+    }
+
+    return $(`${testid('trash-row')}[data-note-id="${id}"]`);
   },
 
   close: () => $(testid('trash-close')).click(),
@@ -119,13 +119,7 @@ export const palette = {
   createRow: () => $(testid('palette-create')),
   empty: () => $(testid('palette-empty')),
 
-  async titles(): Promise<string[]> {
-    const found: string[] = [];
-    for await (const option of $$(testid('palette-option'))) {
-      found.push((await option.getText()).trim());
-    }
-    return found;
-  },
+  titles: (): Promise<string[]> => readEach(testid('palette-option'), 'text'),
 
   async type(text: string): Promise<void> {
     await $(testid('palette-input')).setValue(text);
@@ -160,13 +154,7 @@ export const tagManager = {
   isSelected: async (tag: string) =>
     (await $(`${testid('tag-item')}[data-tag="${tag}"]`).getAttribute('aria-pressed')) === 'true',
 
-  async tags(): Promise<string[]> {
-    const found: string[] = [];
-    for await (const item of $$(testid('tag-item'))) {
-      found.push((await item.getAttribute('data-tag')) ?? '');
-    }
-    return found;
-  },
+  tags: (): Promise<string[]> => readEach(testid('tag-item'), '@data-tag'),
 
   async setTarget(value: string): Promise<void> {
     const field = $(testid('tag-target'));

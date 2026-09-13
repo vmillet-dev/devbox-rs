@@ -143,6 +143,52 @@ export async function confirmTwice(button: Confirmable): Promise<void> {
   await button.click();
 }
 
+/** What to take off each match: its text, an input's value, or `@some-attribute`. */
+type Extract = 'text' | 'value' | `@${string}`;
+
+/**
+ * Reads one thing off **every** match, in a single call.
+ *
+ * ⚠️ A walk that fetches one element per round trip leaves a window in which the page
+ * re-renders, and the list that comes back mixes two states: the same row read twice, an
+ * element that no longer exists, or — the one CI caught — a card compared against a title
+ * from a view that has since been replaced. `canvas.titles()` was already written this
+ * way and says why; thirteen other walks were not.
+ */
+export async function readEach(selector: string, extract: Extract, child?: string): Promise<string[]> {
+  return browser.execute(
+    (parent: string, how: string, kid: string | null) =>
+      [...document.querySelectorAll(parent)].map((element) => {
+        const target = kid ? element.querySelector(kid) : element;
+        if (!target) return '';
+        if (how === 'text') return (target.textContent ?? '').trim();
+        if (how === 'value') return (target as HTMLInputElement).value ?? '';
+        return target.getAttribute(how.slice(1)) ?? '';
+      }),
+    selector,
+    extract,
+    child ?? null,
+  );
+}
+
+/**
+ * Clicks a toggle and waits for it to **report** the new state.
+ *
+ * Pinning crosses the bridge and comes back through the store — writes here are not
+ * optimistic — so `aria-pressed` read on the line after the click is the state before it.
+ */
+export async function toggleAndWait(selector: string, attribute = 'aria-pressed'): Promise<void> {
+  const button = $(selector);
+  const before = await button.getAttribute(attribute);
+
+  await button.click();
+
+  await browser.waitUntil(async () => (await button.getAttribute(attribute)) !== before, {
+    timeout: 10_000,
+    timeoutMsg: `${selector} never reported a new ${attribute}`,
+  });
+}
+
 export type Modifier = 'Control' | 'Alt' | 'Shift' | 'Meta';
 
 /** `KeyboardEvent.code`: a letter is its physical key, a digit its own. */

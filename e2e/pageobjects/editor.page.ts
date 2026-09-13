@@ -5,7 +5,9 @@ import {
   clickToAddRow,
   confirmTwice,
   press,
+  readEach,
   setField,
+  toggleAndWait,
   setNativeValue,
   submitFormOf,
   testid,
@@ -46,30 +48,28 @@ export const editor = {
   setDeadline: (isoDay: string) => setNativeValue(testid('editor-deadline'), isoDay),
 
   async addTag(tag: string): Promise<void> {
-    const field = $(testid('editor-tag-add'));
-    await field.click();
-    await field.setValue(tag);
+    // `setField` and not a bare `setValue`: submitting a field whose value never landed
+    // adds an empty tag, silently, and the assertion blames the normalisation.
+    await setField(testid('editor-tag-add'), tag);
     // The field commits by **submitting its form**, which Enter does natively and no
     // synthetic key can — see `submitFormOf`.
     await submitFormOf(testid('editor-tag-add'));
+    await browser.waitUntil(async () => (await $(testid('editor-tag-add')).getValue()) === '', {
+      timeout: 10_000,
+      timeoutMsg: 'the tag field never cleared, so the submit never landed',
+    });
   },
 
   removeTag: (tag: string) => $(`${testid('editor-tag-remove')}[data-tag="${tag}"]`).click(),
 
-  async tags(): Promise<string[]> {
-    const found: string[] = [];
-    for await (const button of $$(testid('editor-tag-remove'))) {
-      found.push((await button.getAttribute('data-tag')) ?? '');
-    }
-    return found;
-  },
+  tags: (): Promise<string[]> => readEach(testid('editor-tag-remove'), '@data-tag'),
 
-  togglePin: () => $(testid('editor-pin')).click(),
+  togglePin: () => toggleAndWait(testid('editor-pin')),
   isPinned: async () => (await $(testid('editor-pin')).getAttribute('aria-pressed')) === 'true',
 
   footer: () => $(testid('editor-footer')).getText(),
 
-  toggleFullscreen: () => $(testid('editor-fullscreen')).click(),
+  toggleFullscreen: () => toggleAndWait(testid('editor-fullscreen')),
   isFullscreen: async () => (await $(testid('editor-fullscreen')).getAttribute('aria-pressed')) === 'true',
 
   /**
@@ -100,20 +100,11 @@ export const editor = {
   // Checklists
   items: () => $$(testid('checklist-row')),
 
-  async itemTexts(): Promise<string[]> {
-    const texts: string[] = [];
-    for await (const row of $$(testid('checklist-row'))) {
-      texts.push(await row.$(testid('checklist-text')).getValue());
-    }
-    return texts;
-  },
+  itemTexts: (): Promise<string[]> => readEach(testid('checklist-row'), 'value', testid('checklist-text')),
 
   async itemChecks(): Promise<boolean[]> {
-    const states: boolean[] = [];
-    for await (const row of $$(testid('checklist-row'))) {
-      states.push((await row.$(testid('checklist-check')).getAttribute('aria-checked')) === 'true');
-    }
-    return states;
+    const states = await readEach(testid('checklist-row'), '@aria-checked', testid('checklist-check'));
+    return states.map((state) => state === 'true');
   },
 
   async addItem(text: string): Promise<void> {
@@ -181,13 +172,7 @@ export const editor = {
   attachments: () => $$(testid('attachment-item')),
   attachmentEmpty: () => $(testid('attachment-empty')),
 
-  async attachmentNames(): Promise<string[]> {
-    const names: string[] = [];
-    for await (const item of $$(testid('attachment-item'))) {
-      names.push((await item.getAttribute('data-file-name')) ?? '');
-    }
-    return names;
-  },
+  attachmentNames: (): Promise<string[]> => readEach(testid('attachment-item'), '@data-file-name'),
 
   /**
    * ⚠️ Asserted on, never clicked — both of them open OS UI. "Add" raises the file

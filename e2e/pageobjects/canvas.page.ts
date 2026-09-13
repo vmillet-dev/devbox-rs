@@ -1,7 +1,7 @@
 import { $, $$, browser } from '@wdio/globals';
 import type { ChainablePromiseElement } from 'webdriverio';
 
-import { setField, testid, waitForCanvas } from '../support/app.js';
+import { readEach, setField, testid, toggleAndWait, waitForCanvas } from '../support/app.js';
 
 /**
  * The notes page: the header above the cards, and the cards themselves. Every selector
@@ -38,7 +38,8 @@ export const canvas = {
    * The card is then addressed by its **id**, so what comes back is resolved against the
    * canvas as it is now rather than against a position in a list that has moved.
    */
-  async cardWithTitle(title: string) {
+  /** The note id behind a title, matched in one call. */
+  async noteIdWithTitle(title: string): Promise<string> {
     await canvas.waitForCard(title);
 
     const id = await browser.execute(
@@ -55,6 +56,15 @@ export const canvas = {
       throw new Error(`no card titled "${title}" — found ${JSON.stringify(await canvas.titles())}`);
     }
 
+    return id;
+  },
+
+  /**
+   * The card as a **selector**, not as a resolved element: it re-resolves on every
+   * command, so a canvas that re-renders after the lookup costs nothing.
+   */
+  async cardWithTitle(title: string) {
+    const id = await canvas.noteIdWithTitle(title);
     return $(`${testid('note-card')}[data-note-id="${id}"]`);
   },
 
@@ -160,13 +170,7 @@ export const canvas = {
   },
   sections: () => $$(testid('note-section')),
 
-  async sectionKeys(): Promise<string[]> {
-    const keys: string[] = [];
-    for await (const section of $$(testid('note-section'))) {
-      keys.push((await section.getAttribute('data-section')) ?? '');
-    }
-    return keys;
-  },
+  sectionKeys: (): Promise<string[]> => readEach(testid('note-section'), '@data-section'),
 
   noResults: () => $(testid('canvas-no-results')),
 
@@ -177,8 +181,8 @@ export const canvas = {
 
   // Multiple selection
   async check(title: string): Promise<void> {
-    const card = await canvas.cardWithTitle(title);
-    await card.$(testid('note-card-check')).click();
+    const id = await canvas.noteIdWithTitle(title);
+    await toggleAndWait(`${testid('note-card')}[data-note-id="${id}"] ${testid('note-card-check')}`);
   },
 
   async isChecked(title: string): Promise<boolean> {
