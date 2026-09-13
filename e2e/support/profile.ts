@@ -1,4 +1,4 @@
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -49,6 +49,22 @@ export function homeSpaceMarker(): string {
  * no ordering to get wrong.
  */
 export function resetProfile(): void {
-  rmSync(e2eDataDir(), { recursive: true, force: true });
+  const directory = e2eDataDir();
+
+  rmSync(directory, { recursive: true, force: true });
   rmSync(homeSpaceMarker(), { force: true });
+
+  // ⚠️ `force` covers "it was not there", which is the ordinary case — but it also
+  // swallows the one that matters: a previous run's application still holding the
+  // database open, on Windows above all. The wipe then does nothing, the suite starts
+  // on the corpus the last run left, and the failures blame the wrong thing — one run
+  // read `["Archive", "Découverte"]` where only the seeded space should exist, and
+  // the first-launch scenario, the only one that can resolve it, had already failed.
+  //
+  // Say so here rather than let fifteen files disagree about why.
+  if (existsSync(directory)) {
+    throw new Error(
+      `the e2e profile at ${directory} could not be wiped — an application from a previous run is probably still holding it open`,
+    );
+  }
 }

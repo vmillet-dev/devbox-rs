@@ -388,6 +388,63 @@ describe('NotesStore', () => {
       expect(create).not.toHaveBeenCalled();
     });
 
+    /**
+     * ⚠️ The exact shape of `requestClose()`: it fires `commitTitle`, `commitSource` and
+     * `commitContent` back to back, synchronously, with no `await` between them. The
+     * second therefore starts while the first is still writing the row, and a draft that
+     * resolved to `DRAFT_ID` in that window was created a second time — one close, two
+     * notes, which is data loss the user sees on the canvas.
+     */
+    it('creates one note when the closing commits are chained without awaiting', async () => {
+      const { store, repository } = await createNotesHarness([]);
+      const written = repository.create.bind(repository);
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      const create = vi.spyOn(repository, 'create').mockImplementation(async (draft) => {
+        await held;
+        return written(draft);
+      });
+      const update = vi.spyOn(repository, 'update');
+
+      store.createNote();
+      const commits = [
+        store.applyPatch(DRAFT_ID, { title: 'Staging CSR' }),
+        store.applyPatch(DRAFT_ID, { content: 'openssl req -new -key staging.key' }),
+      ];
+      release();
+      await Promise.all(commits);
+
+      expect(create).toHaveBeenCalledTimes(1);
+      // The second commit is not swallowed along the way: it lands as an update.
+      expect(update).toHaveBeenCalledTimes(1);
+      expect(store.persistedNoteId()).not.toBeNull();
+    });
+
+    it('keeps both fields when the closing commits are chained', async () => {
+      const { store, repository } = await createNotesHarness([]);
+      const written = repository.create.bind(repository);
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      vi.spyOn(repository, 'create').mockImplementation(async (draft) => {
+        await held;
+        return written(draft);
+      });
+
+      store.createNote();
+      const commits = [
+        store.applyPatch(DRAFT_ID, { title: 'Staging CSR' }),
+        store.applyPatch(DRAFT_ID, { content: 'openssl req -new -key staging.key' }),
+      ];
+      release();
+      await Promise.all(commits);
+
+      // `persist` adopts what the back end returned, so the open note carries both.
+      expect(store.selectedNote()).toMatchObject({
+        title: 'Staging CSR',
+        content: 'openssl req -new -key staging.key',
+      });
+    });
+
     it('persists a checklist as soon as it holds an item, having no body to fill', async () => {
       const { store, repository } = await createNotesHarness([]);
       const create = vi.spyOn(repository, 'create');

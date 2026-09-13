@@ -177,11 +177,16 @@ export class NotesStore {
   private readonly hideUndoBanner = debounced(() => this._undoVisible.set(false), UNDO_WINDOW_MS);
 
   /**
-   * ⚠️ Load-bearing: closing the editor commits the title **then** the content with
-   * no change detection in between, so the second call still carries `DRAFT_ID` while
-   * the note already exists.
+   * ⚠️ Load-bearing, and it is the **promise** rather than the id it will yield.
+   *
+   * `requestClose()` fires the title, source and content commits back to back with no
+   * change detection and no `await` between them, so the second starts while the first
+   * is still writing the row. Holding the id — which only exists once the write comes
+   * back — left that whole window answering "still a draft", and a single close then
+   * created two notes. Installed before the write leaves, it makes the second commit
+   * wait for the first instead of racing it.
    */
-  private draftMaterialisedAs: string | null = null;
+  private draftMaterialisation: Promise<string | null> | null = null;
 
   openNote(id: string): void {
     this.discardDraft();
@@ -232,7 +237,7 @@ export class NotesStore {
     if (!spaceId) return;
 
     this._selectedNote.set(null);
-    this.draftMaterialisedAs = null;
+    this.draftMaterialisation = null;
     this._draftNote.set(emptyNote(spaceId, this.clock.now(), kind));
   }
 
@@ -264,7 +269,7 @@ export class NotesStore {
 
   /** Moves to the trash and offers the undo. The note stays there for 30 days. */
   async deleteNote(id: string): Promise<void> {
-    const resolved = this.resolve(id);
+    const resolved = await this.resolve(id);
 
     // A draft exists nowhere: nothing to trash, so nothing to undo either.
     if (resolved === DRAFT_ID) {
@@ -334,7 +339,7 @@ export class NotesStore {
    * `updatedAt` stays put and the note does not float to the top of the canvas.
    */
   async setPlaceholderValues(id: string, values: Record<string, string>): Promise<void> {
-    const resolved = this.resolve(id);
+    const resolved = await this.resolve(id);
     const target = resolved === DRAFT_ID ? await this.materialiseDraft() : resolved;
     if (!target) return;
 
@@ -364,12 +369,26 @@ export class NotesStore {
     return spaceId;
   }
 
-  /** Writes the draft and adopts the returned note: `DRAFT_ID` stops existing here. */
-  private async saveDraft(draft: Note): Promise<string | null> {
-    const created = await this.persistNew(toDraftPayload(draft));
-    if (!created) return null;
+  /**
+   * Writes the draft and adopts the returned note: `DRAFT_ID` stops existing here.
+   *
+   * ⚠️ Synchronous down to the assignment, so a second caller arriving before the write
+   * comes back joins it rather than starting one of its own.
+   */
+  private saveDraft(draft: Note): Promise<string | null> {
+    this.draftMaterialisation ??= this.writeDraft(draft);
 
-    this.draftMaterialisedAs = created.id;
+    return this.draftMaterialisation;
+  }
+
+  /** A refused write releases the gate: the next commit may still be worth keeping. */
+  private async writeDraft(draft: Note): Promise<string | null> {
+    const created = await this.persistNew(toDraftPayload(draft));
+    if (!created) {
+      this.draftMaterialisation = null;
+      return null;
+    }
+
     this._draftNote.set(null);
 
     return created.id;
@@ -389,7 +408,7 @@ export class NotesStore {
 
   private discardDraft(): void {
     this._draftNote.set(null);
-    this.draftMaterialisedAs = null;
+    this.draftMaterialisation = null;
   }
 
   private async runOnSelection(action: (ids: readonly string[]) => Promise<number>): Promise<void> {
@@ -412,7 +431,7 @@ export class NotesStore {
 
   /** `changes` answers `null` when nothing moved: a no-op edit makes no round trip. */
   private async edit(id: string, changes: (note: Note) => NotePatch | null): Promise<void> {
-    const resolved = this.resolve(id);
+    const resolved = await this.resolve(id);
     const target = this.find(resolved);
     const patch = target && changes(target);
     if (!patch) return;
@@ -437,15 +456,30 @@ export class NotesStore {
       return;
     }
 
+    // ⚠️ A write already in flight owns the row, so this patch is an update of it and
+    // not a second creation. Joining the write instead would drop the patch on the
+    // floor: it carries the argument of the *first* call, not this one.
+    if (this.draftMaterialisation) {
+      const id = await this.draftMaterialisation;
+
+      return id ? this.persist(id, patch) : undefined;
+    }
+
     await this.saveDraft(updated);
   }
 
   /**
    * `DRAFT_ID` names the draft **or** the note it became: the editor chains several
    * commits with no change detection in between, and keeps sending the old id.
+   *
+   * ⚠️ Asynchronous on purpose — see [`draftMaterialisation`]. Awaiting a write already
+   * in flight is what turns the second commit into an update of the row the first one
+   * created, instead of a second row.
    */
-  private resolve(id: string): string {
-    return id === DRAFT_ID && this.draftMaterialisedAs ? this.draftMaterialisedAs : id;
+  private async resolve(id: string): Promise<string> {
+    if (id !== DRAFT_ID || !this.draftMaterialisation) return id;
+
+    return (await this.draftMaterialisation) ?? DRAFT_ID;
   }
 
   /**
