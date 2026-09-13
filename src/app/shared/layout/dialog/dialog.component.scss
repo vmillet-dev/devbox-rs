@@ -16,6 +16,12 @@
   padding-top: var(--dialog-offset, 0);
 }
 
+// The offset pushes a panel down from the top — the palette sits at 12vh. A fullscreen
+// panel is sized against this box, so the offset would come straight off its height.
+.dialog-backdrop.fullscreen {
+  padding-top: 0;
+}
+
 .dialog-panel {
   display: flex;
   flex-direction: column;
@@ -46,10 +52,15 @@
   gap: var(--dialog-gap, 0);
 }
 
-// Last, so it wins over both variants above.
+// Last, so it wins over both variants above — including `fitted`'s own `max-height`.
+// ⚠️ The base rule's `max-*` pair has to be undone explicitly: 92vw × 92vh is a
+// percentage, so it left a band that grew with the display. Loosening it there instead
+// is what would put every other dialog on the screen edges.
 .dialog-panel.fullscreen {
   width: 100%;
   height: 100%;
+  max-width: none;
+  max-height: none;
   border: none;
   border-radius: 0;
   box-shadow: none;

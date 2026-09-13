@@ -65,6 +65,12 @@ export const editor = {
   toggleFullscreen: () => $(testid('editor-fullscreen')).click(),
   isFullscreen: async () => (await $(testid('editor-fullscreen')).getAttribute('aria-pressed')) === 'true',
 
+  /**
+   * The shell's panel, measured: `aria-pressed` says the button was pressed, not that the
+   * panel grew. Only the editor is open here, so the role is selector enough.
+   */
+  panelSize: () => $('[role="dialog"]').getSize(),
+
   /** Only shown for a note carrying `{{fields}}`; a plain note gets the ordinary copy button. */
   copyFilled: () => $(testid('editor-copy-filled')).click(),
   hasCopyFilled: () => $(testid('editor-copy-filled')).isExisting(),

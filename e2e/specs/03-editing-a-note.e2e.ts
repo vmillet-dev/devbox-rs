@@ -3,7 +3,7 @@ import { browser, expect } from '@wdio/globals';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
 import { spaces } from '../pageobjects/overlays.page.js';
-import { reloadCanvas } from '../support/app.js';
+import { reloadCanvas, viewportSize } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -57,9 +57,19 @@ describe('Editing a note', () => {
     await canvas.openNote(title);
     expect(await editor.isFullscreen()).toBe(false);
 
+    const viewport = await viewportSize();
+    const framed = await editor.panelSize();
+    expect(framed.width).toBeLessThan(viewport.width);
+
     await editor.toggleFullscreen();
     expect(await editor.isFullscreen()).toBe(true);
     expect(await editor.body()).toBe('kubectl rollout restart deployment/api');
+
+    // Measured, not asked: the button reported itself pressed while the panel was still
+    // clamped to 92vw × 92vh, leaving a band of canvas that grew with the display.
+    const full = await editor.panelSize();
+    expect(full.width).toBeGreaterThanOrEqual(viewport.width - 1);
+    expect(full.height).toBeGreaterThanOrEqual(viewport.height - 1);
 
     await editor.toggleFullscreen();
     expect(await editor.isFullscreen()).toBe(false);
