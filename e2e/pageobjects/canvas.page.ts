@@ -1,4 +1,5 @@
 import { $, $$, browser } from '@wdio/globals';
+import type { ChainablePromiseElement } from 'webdriverio';
 
 import { setField, testid, waitForCanvas } from '../support/app.js';
 
@@ -28,13 +29,33 @@ export const canvas = {
     );
   },
 
+  /**
+   * ⚠️ Matched in **one** call, for the same reason `titles()` is: a round trip per card
+   * leaves a window in which the canvas re-renders, and the walk then compares titles from
+   * two different views. CI caught it saying `no card titled "Rollout under edit" — found
+   * ["Rollout under edit", …]` — the card it could not find, in the list it printed.
+   *
+   * The card is then addressed by its **id**, so what comes back is resolved against the
+   * canvas as it is now rather than against a position in a list that has moved.
+   */
   async cardWithTitle(title: string) {
-    for await (const card of $$(testid('note-card'))) {
-      if ((await card.$(testid('note-card-title')).getText()).trim() === title) {
-        return card;
-      }
+    await canvas.waitForCard(title);
+
+    const id = await browser.execute(
+      (cardSelector: string, titleSelector: string, wanted: string) =>
+        [...document.querySelectorAll(cardSelector)]
+          .find((card) => (card.querySelector(titleSelector)?.textContent ?? '').trim() === wanted)
+          ?.getAttribute('data-note-id') ?? null,
+      testid('note-card'),
+      testid('note-card-title'),
+      title,
+    );
+
+    if (id === null) {
+      throw new Error(`no card titled "${title}" — found ${JSON.stringify(await canvas.titles())}`);
     }
-    throw new Error(`no card titled "${title}" — found ${JSON.stringify(await canvas.titles())}`);
+
+    return $(`${testid('note-card')}[data-note-id="${id}"]`);
   },
 
   async waitForCard(title: string): Promise<void> {
@@ -62,10 +83,16 @@ export const canvas = {
     await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
   },
 
-  /** The card button itself, which is the click surface a snippet card is opened by. */
-  cardButton: (card: WebdriverIO.Element) => card.$(testid('note-card-open')),
+  /**
+   * The card button itself, which is the click surface a snippet card is opened by.
+   *
+   * `ChainablePromiseElement` and not `Element`: `cardWithTitle` hands back a selector
+   * that re-resolves, so a canvas that re-renders between finding the card and reading it
+   * costs nothing. A resolved element would be the stale reference this used to carry.
+   */
+  cardButton: (card: ChainablePromiseElement) => card.$(testid('note-card-open')),
 
-  cardTags: (card: WebdriverIO.Element) => card.$(testid('note-card-tags')),
+  cardTags: (card: ChainablePromiseElement) => card.$(testid('note-card-tags')),
 
   async createSnippet(): Promise<void> {
     await $(testid('new-note')).click();
