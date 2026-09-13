@@ -10,7 +10,7 @@ app-dialog {
   --dialog-gap: 8px;
 }
 .palette-input {
-  @include unstyled-control;
+  @include text-field;
   @include surface($radius: 8px);
   padding: 10px 12px;
   font-size: 13px;

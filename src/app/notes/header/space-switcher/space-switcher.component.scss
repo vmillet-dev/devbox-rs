@@ -72,7 +72,7 @@
 }
 
 .space-create-input {
-  @include unstyled-control;
+  @include text-field;
   @include surface(var(--bg-1), 6px);
   flex: 1;
   min-width: 0;

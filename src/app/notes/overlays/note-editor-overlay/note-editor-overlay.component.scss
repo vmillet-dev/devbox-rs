@@ -15,7 +15,7 @@ app-dialog {
 }
 
 .overlay-title-input {
-  @include unstyled-control;
+  @include text-field;
   font-size: 16px;
   font-weight: 600;
   color: var(--text-0);
@@ -68,7 +68,7 @@ app-dialog {
 }
 
 .overlay-source-input {
-  @include unstyled-control;
+  @include text-field;
   width: 160px;
   padding: 2px 6px;
   border-radius: 6px;
@@ -159,7 +159,7 @@ app-dialog {
 }
 
 .tag-add-input {
-  @include unstyled-control;
+  @include text-field;
   width: 90px;
   padding: 2px 6px;
   border-radius: 999px;
@@ -200,7 +200,7 @@ app-dialog {
 // the line-number gutter to the padding — 32px in total, not 32 + 16, the global
 // `box-sizing: border-box` keeping `.line-no`'s `padding-right` inside its `width`.
 .overlay-body-editor {
-  @include unstyled-control;
+  @include text-field;
   position: absolute;
   inset: 0;
   width: 100%;

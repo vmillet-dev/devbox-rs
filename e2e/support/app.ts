@@ -63,6 +63,17 @@ export async function viewportSize(): Promise<{ width: number; height: number }>
   return browser.execute(() => ({ width: window.innerWidth, height: window.innerHeight }));
 }
 
+/** The cursor the WebView paints, which is what `all: unset` quietly took away. */
+export async function cursorOf(selector: string): Promise<string> {
+  return browser.execute((sel: string) => {
+    const element = document.querySelector(sel);
+    if (!element) {
+      throw new Error(`no element at ${sel}`);
+    }
+    return getComputedStyle(element).cursor;
+  }, selector);
+}
+
 export type Modifier = 'Control' | 'Alt' | 'Shift' | 'Meta';
 
 /** `KeyboardEvent.code`: a letter is its physical key, a digit its own. */

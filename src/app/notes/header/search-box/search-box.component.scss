@@ -10,10 +10,13 @@
   padding: 7px 12px;
   color: var(--text-2);
   font-size: 13px;
+  // The <label> is the field's visible box, and clicking its padding already focuses the
+  // input — the cursor says so before the click.
+  cursor: text;
 }
 
 .search-bar input {
-  @include unstyled-control;
+  @include text-field;
   flex: 1;
   color: var(--text-0);
   font-family: var(--font-sans);
