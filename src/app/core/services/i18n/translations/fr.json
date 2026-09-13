@@ -312,6 +312,7 @@
     "quitConfirm": "Confirmer ?",
     "imported": "{{notes}} note(s) importée(s) depuis {{path}}, {{skipped}} ignorée(s).",
     "importedNothing": "Rien à importer : ces {{skipped}} note(s) sont déjà dans votre bibliothèque.",
+    "importedFromNewerVersion": "{{notes}} note(s) importée(s) depuis {{path}}, {{skipped}} ignorée(s). {{degraded}} vien(nen)t d’une version plus récente : leur langage ou leur type a été ramené à ce que cette version sait lire.",
     "exported": "{{notes}} note(s) exportée(s) vers {{path}}.",
     "copied": "{{notes}} note(s) copiée(s) en Markdown dans le presse-papier.",
     "needsSelection": "Sélectionnez au moins une note.",

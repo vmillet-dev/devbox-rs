@@ -16,7 +16,12 @@ export class FakeTransferRepository implements Pick<TransferRepository, keyof Tr
   exportedIds: readonly string[] | null = null;
 
   exportReport: ExportReport = { notes: 3, spaces: 1 };
-  importReport: ImportReport = { spacesCreated: 1, notesImported: 2, notesSkipped: 0 };
+  importReport: ImportReport = {
+    spacesCreated: 1,
+    notesImported: 2,
+    notesSkipped: 0,
+    notesDegraded: 0,
+  };
   markdown = '## Shared\n\n```txt\nbody\n```\n';
 
   export(path: string, spaceId: string | null): Promise<ExportReport> {

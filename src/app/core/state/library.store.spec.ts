@@ -60,13 +60,34 @@ describe('LibraryStore', () => {
       expect(await harness.store.import()).toBe(true);
       expect(harness.status.status()).toEqual({
         key: 'file.imported',
-        params: { notes: '2', skipped: '0', path: 'devbox-2026-08-27.json' },
+        params: { notes: '2', skipped: '0', degraded: '0', path: 'devbox-2026-08-27.json' },
       });
+    });
+
+    // A bundle from a newer DevBox imports rather than failing whole, and the note it
+    // brought down to a language this build knows is the only trace of it.
+    it('says when a note came from a newer version', async () => {
+      harness.dialog.openPath = 'C:/in.json';
+      harness.repository.importReport = {
+        spacesCreated: 0,
+        notesImported: 5,
+        notesSkipped: 0,
+        notesDegraded: 1,
+      };
+
+      expect(await harness.store.import()).toBe(true);
+      expect(harness.status.status()?.key).toBe('file.importedFromNewerVersion');
+      expect(harness.status.status()?.params).toMatchObject({ notes: '5', degraded: '1' });
     });
 
     it('says so plainly when everything was already there', async () => {
       harness.dialog.openPath = 'C:/in.json';
-      harness.repository.importReport = { spacesCreated: 0, notesImported: 0, notesSkipped: 4 };
+      harness.repository.importReport = {
+        spacesCreated: 0,
+        notesImported: 0,
+        notesSkipped: 4,
+        notesDegraded: 0,
+      };
 
       expect(await harness.store.import()).toBe(false);
       expect(harness.status.status()?.key).toBe('file.importedNothing');

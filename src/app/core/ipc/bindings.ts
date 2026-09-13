@@ -213,6 +213,11 @@ export type ImportReport = {
 	spacesCreated: number,
 	notesImported: number,
 	notesSkipped: number,
+	/**
+	 *  Imported, but with a `language` or a `kind` this build does not know brought
+	 *  down to the default. Counted so the loss is said rather than discovered.
+	 */
+	notesDegraded: number,
 };
 
 /**

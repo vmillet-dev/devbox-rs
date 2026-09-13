@@ -7,7 +7,7 @@ use chrono::Utc;
 use diesel::SqliteConnection;
 use diesel::prelude::*;
 
-use super::model::{self, Bundle, ImportReport};
+use super::model::{self, Bundle, ImportReport, IncomingBundle};
 use crate::error::StorageError;
 use crate::notes::model::Note;
 use crate::notes::store as notes;
@@ -41,8 +41,10 @@ pub fn collect(
 /// created and part of the notes in, with the report lost along with the error.
 pub fn merge(
     connection: &mut SqliteConnection,
-    bundle: Bundle,
+    incoming: IncomingBundle,
 ) -> Result<ImportReport, StorageError> {
+    let IncomingBundle { bundle, degraded } = incoming;
+
     connection.transaction(|connection| {
         let mut report = ImportReport::default();
 
@@ -74,6 +76,11 @@ pub fn merge(
 
             if notes::insert_imported(connection, &note)? {
                 report.notes_imported += 1;
+                // Only what actually came in: re-importing the same file imports
+                // nothing, and would otherwise keep reporting the same degradation.
+                if degraded.contains(&note.id) {
+                    report.notes_degraded += 1;
+                }
             } else {
                 report.notes_skipped += 1;
             }
