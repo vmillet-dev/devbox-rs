@@ -12,6 +12,30 @@ Keep the shape — a `## ` heading per release, `### ` headings for the categori
 bullet per entry — or the entry will not be rendered. It is deliberately untranslated, like
 the release notes the updater hands over.
 
+## [0.1.3] - 2026-09-13
+
+### ✨ Added
+
+- Open in the system language when none has been chosen (#53)
+
+### 🐛 Fixed
+
+- Move the titlebar menus to the left (#52)
+
+### 🧰 Under the hood
+
+- Generate the changelog from merged pull requests and their labels (#67)
+- Add e2e testing harness (#66)
+- Give the front-end tree the shape of the interface (#65)
+- The section and the card read their own state (#63)
+- The editor overlay reaches for its own stores (#62)
+- Delete the contribution registries, each menu owns its actions (#61)
+- Describe the application from Cargo.toml, at compile time (#58)
+- Size dialogs with CSS custom properties, not inputs (#57)
+- Drop the DTO aliases, rename note.dto.ts to note.mapper.ts (#56)
+- Merge AppShellComponent into AppComponent (#51)
+- Enhance code safety, optimize performance, and improve documentation (#8)
+
 ## [0.1.2] - 2026-09-11
 
 ### ✨ Added
