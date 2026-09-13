@@ -123,7 +123,7 @@ describe('Import, export and share', () => {
             ...source.notes[0],
             id: 'written-by-a-newer-devbox',
             title: 'Ahead of this build',
-            language: 'rust',
+            language: 'from-the-future',
           },
         ],
       }),

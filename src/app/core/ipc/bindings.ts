@@ -224,7 +224,7 @@ export type ImportReport = {
  *  **Closed**: the front end receives it as a generated TypeScript union, so
  *  an unknown value stops compiling there instead of being refused at runtime.
  */
-export type Language = "json" | "js" | "ts" | "py" | "sql" | "yml" | "toml" | "xml" | "html" | "css" | "sh" | "md" | 
+export type Language = "json" | "js" | "ts" | "py" | "rs" | "go" | "java" | "cs" | "php" | "c" | "sql" | "yml" | "toml" | "xml" | "html" | "css" | "sh" | "md" | 
 /**  Default, and the signal that the front end chose nothing. */
 "txt";
 

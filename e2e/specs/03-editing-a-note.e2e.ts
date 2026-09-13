@@ -82,6 +82,14 @@ describe('Editing a note', () => {
     await editor.close();
 
     expect((await reread())?.language).toBe('sh');
+
+    // A variant added to the Rust enum, through the select, the patch, the column and
+    // back: the column stores the literal, so it takes no migration to get here.
+    await canvas.openNote(title);
+    await editor.setLanguage('rs');
+    await editor.close();
+
+    expect((await reread())?.language).toBe('rs');
   });
 
   it('adds and removes a tag, normalised by Rust', async () => {

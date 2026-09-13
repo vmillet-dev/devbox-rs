@@ -22,7 +22,7 @@ use crate::spaces::model::Space;
 /// ⚠️ An **added enum variant does not bump this**. It is not a format break: the
 /// file still parses, one field just names something this build has never heard of,
 /// and [`read_bundle`] brings that field down to the default. Bumping here instead
-/// would refuse a 500-note file over one note's `"rust"`.
+/// would refuse a 500-note file over one note's unknown `language`.
 pub const FORMAT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -88,8 +88,8 @@ pub fn read_bundle(json: &str) -> Result<IncomingBundle, StorageError> {
 }
 
 /// A newer DevBox may have written a `language` or a `kind` this build never heard of,
-/// and `Note` deserialises both as closed enums — so one `"rust"` in a 500-note file
-/// failed the whole import with a serde message about a variant.
+/// and `Note` deserialises both as closed enums — so one unknown value in a 500-note
+/// file failed the whole import with a serde message about a variant.
 ///
 /// **It degrades, like the database read already does** (`notes::store`,
 /// `TryFrom<NoteRow>`): a bundle is the same data through another door, and that is the
@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn an_unknown_language_is_brought_down_to_the_default_rather_than_refused() {
-        let read = read_bundle(&bundle_with("language", "rust".into())).unwrap();
+        let read = read_bundle(&bundle_with("language", "from-the-future".into())).unwrap();
 
         assert_eq!(read.bundle.notes[0].language, Language::default());
         assert_eq!(read.degraded.len(), 1);
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn an_unknown_kind_is_brought_down_the_same_way() {
-        let read = read_bundle(&bundle_with("kind", "table".into())).unwrap();
+        let read = read_bundle(&bundle_with("kind", "from-the-future".into())).unwrap();
 
         assert_eq!(read.bundle.notes[0].kind, NoteKind::default());
         assert_eq!(read.degraded.len(), 1);

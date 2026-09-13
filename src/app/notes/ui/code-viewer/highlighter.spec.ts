@@ -1,5 +1,33 @@
 import { describe, expect, it } from 'vitest';
+import { LANGUAGE_LABELS, LanguageTag } from '@core/model/language.model';
 import { highlightLines, splitHighlightedLines } from './highlighter';
+
+/**
+ * ⚠️ `Record`, not `Partial<Record>`: a language added to the Rust enum has to stop this
+ * spec compiling. Left partial, the new one would come back uncoloured with nothing
+ * saying so — which is the whole failure the grammar table exists to prevent.
+ */
+const SAMPLES: Readonly<Record<LanguageTag, string>> = {
+  json: '{ "a": 1 }',
+  js: 'const a = 1;',
+  ts: 'const a: number = 1;',
+  py: 'def run(): pass',
+  rs: 'fn main() { let x = 1; }',
+  go: 'func main() { return }',
+  java: 'class A { int x = 1; }',
+  cs: 'using System;',
+  php: '<?php echo 1;',
+  c: '#include <stdio.h>',
+  sql: 'select 1',
+  yml: 'a: 1',
+  toml: 'key = "value"',
+  xml: '<a>x</a>',
+  html: '<p>hi</p>',
+  css: 'a { color: red; }',
+  sh: 'echo hi',
+  md: '# Title',
+  txt: 'plain text',
+};
 
 describe('splitHighlightedLines', () => {
   it('returns one line for content without any newline', () => {
@@ -63,5 +91,20 @@ describe('highlightLines', () => {
   it('maps a language tag onto the grammar that describes it', () => {
     expect(highlightLines('key = "value"', 'toml').join('')).toContain('hljs-');
     expect(highlightLines('<p>hi</p>', 'html').join('')).toContain('hljs-');
+  });
+
+  it.each(Object.keys(SAMPLES).filter((tag) => tag !== 'txt') as LanguageTag[])(
+    'colours %s, whose grammar has to be registered for it',
+    (tag) => {
+      expect(highlightLines(SAMPLES[tag], tag).join('')).toContain('hljs-');
+    },
+  );
+
+  it('leaves free text alone, which has nothing to colour', () => {
+    expect(highlightLines(SAMPLES.txt, 'txt').join('')).not.toContain('hljs-');
+  });
+
+  it('has a label for every tag it can colour', () => {
+    expect(Object.keys(SAMPLES)).toEqual(Object.keys(LANGUAGE_LABELS));
   });
 });

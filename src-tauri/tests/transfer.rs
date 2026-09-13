@@ -168,7 +168,7 @@ fn a_note_in_an_unknown_language_arrives_without_taking_the_file_down() {
     let mut target = open_in_memory().unwrap();
     let report = merge(
         &mut target,
-        written_by_a_newer_version(&file, "language", "rust"),
+        written_by_a_newer_version(&file, "language", "from-the-future"),
     )
     .unwrap();
 
@@ -192,7 +192,7 @@ fn a_note_of_an_unknown_kind_is_degraded_the_same_way() {
     let mut target = open_in_memory().unwrap();
     let report = merge(
         &mut target,
-        written_by_a_newer_version(&file, "kind", "table"),
+        written_by_a_newer_version(&file, "kind", "from-the-future"),
     )
     .unwrap();
 
@@ -216,13 +216,13 @@ fn a_degraded_note_is_counted_once_and_not_again_on_a_second_import() {
     let mut target = open_in_memory().unwrap();
     merge(
         &mut target,
-        written_by_a_newer_version(&file, "language", "rust"),
+        written_by_a_newer_version(&file, "language", "from-the-future"),
     )
     .unwrap();
 
     let second = merge(
         &mut target,
-        written_by_a_newer_version(&file, "language", "rust"),
+        written_by_a_newer_version(&file, "language", "from-the-future"),
     )
     .unwrap();
 

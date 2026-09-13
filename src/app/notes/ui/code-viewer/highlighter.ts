@@ -1,11 +1,17 @@
 import hljs from 'highlight.js/lib/core';
 import bash from 'highlight.js/lib/languages/bash';
+import c from 'highlight.js/lib/languages/c';
+import csharp from 'highlight.js/lib/languages/csharp';
 import css from 'highlight.js/lib/languages/css';
+import go from 'highlight.js/lib/languages/go';
 import ini from 'highlight.js/lib/languages/ini';
+import java from 'highlight.js/lib/languages/java';
 import javascript from 'highlight.js/lib/languages/javascript';
 import json from 'highlight.js/lib/languages/json';
 import markdown from 'highlight.js/lib/languages/markdown';
+import php from 'highlight.js/lib/languages/php';
 import python from 'highlight.js/lib/languages/python';
+import rust from 'highlight.js/lib/languages/rust';
 import sql from 'highlight.js/lib/languages/sql';
 import typescript from 'highlight.js/lib/languages/typescript';
 import xml from 'highlight.js/lib/languages/xml';
@@ -14,8 +20,8 @@ import { LanguageTag } from '@core/model/language.model';
 
 /**
  * Grammars are imported **one by one** from `highlight.js/lib/`: the full package carries
- * close to 200 languages, which would blow the initial bundle budget for the twelve used
- * here. No highlight.js stylesheet is imported — they hard-code their colours, and the
+ * close to 200 languages, which would blow the initial bundle budget for the eighteen
+ * used here. No highlight.js stylesheet is imported — they hard-code their colours, and the
  * theme lives in the global `src/styles/_code-theme.scss`.
  */
 
@@ -31,6 +37,12 @@ const GRAMMARS: Readonly<Record<LanguageTag, string | null>> = {
   js: 'javascript',
   ts: 'typescript',
   py: 'python',
+  rs: 'rust',
+  go: 'go',
+  java: 'java',
+  cs: 'csharp',
+  php: 'php',
+  c: 'c',
   sql: 'sql',
   yml: 'yaml',
   toml: 'ini',
@@ -44,12 +56,18 @@ const GRAMMARS: Readonly<Record<LanguageTag, string | null>> = {
 
 for (const [name, grammar] of Object.entries({
   bash,
+  c,
+  csharp,
   css,
+  go,
   ini,
+  java,
   javascript,
   json,
   markdown,
+  php,
   python,
+  rust,
   sql,
   typescript,
   xml,
