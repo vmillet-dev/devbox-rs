@@ -10,7 +10,7 @@ use crate::db::{Db, lock};
 use crate::error::AppError;
 use model::{Space, SpaceDraft};
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, AppError> {
     let mut connection = lock(&db)?;
@@ -18,7 +18,7 @@ pub fn list_spaces(db: State<'_, Db>) -> Result<Vec<Space>, AppError> {
     Ok(store::list(&mut connection)?)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppError> {
     let name = draft.validated_name()?;
@@ -28,7 +28,7 @@ pub fn create_space(draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppEr
     Ok(store::create(&mut connection, &name)?)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<Space, AppError> {
     let name = draft.validated_name()?;
@@ -38,7 +38,7 @@ pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<
     Ok(store::rename(&mut connection, &id, &name)?)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn delete_space(
     id: String,

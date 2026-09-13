@@ -103,11 +103,28 @@ pub fn run() {
     let builder = ipc_builder();
 
     // Not in release: the front-end `src/` does not exist next to an installed binary.
+    // Not fatal either — a debug build launched where that path is not writable has no
+    // reason to die without a window rather than run against the committed bindings.
     #[cfg(debug_assertions)]
-    export_bindings().expect("failed to generate TypeScript bindings");
+    if let Err(error) = export_bindings() {
+        log::warn!("TypeScript bindings not regenerated: {error}");
+    }
 
     #[allow(unused_mut)]
-    let mut tauri_builder = tauri::Builder::default()
+    let mut tauri_builder = tauri::Builder::default();
+
+    // ⚠️ Before every other plugin, as the plugin requires. A second launch — from the
+    // autostart entry, a desktop shortcut, the installer's "run now" — would otherwise
+    // open a second process on the same SQLite file, and silently lose every global
+    // shortcut to the instance already holding it.
+    #[cfg(desktop)]
+    {
+        tauri_builder = tauri_builder.plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            desktop::reveal(app);
+        }));
+    }
+
+    tauri_builder = tauri_builder
         // First: the plugins that follow already log.
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -159,7 +176,7 @@ pub fn run() {
 
             // The tray waits for its translated labels to arrive from the front end.
             #[cfg(desktop)]
-            desktop::register_shortcuts(app.handle())?;
+            desktop::init(app.handle())?;
 
             // The only writable location guaranteed once the app is installed.
             let directory = app.path().app_data_dir()?;

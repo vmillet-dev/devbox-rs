@@ -81,10 +81,14 @@ impl ShortcutBindings {
 /// preferences, so the handler cannot compare them against captured values.
 type ActiveShortcuts = Mutex<Vec<(Shortcut, GlobalAction)>>;
 
+/// Every piece of state the native side owns is managed here, before any command
+/// can run: a command that had to create its own would race another doing the same.
+///
 /// A shortcut already taken by another application is logged but **not fatal**:
 /// DevBox has to start without it.
-pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
+pub(crate) fn init(app: &AppHandle) -> tauri::Result<()> {
     app.manage(ActiveShortcuts::default());
+    app.manage(WindowBehaviorState::default());
 
     app.plugin(
         tauri_plugin_global_shortcut::Builder::new()
@@ -195,15 +199,10 @@ type WindowBehaviorState = Mutex<WindowBehavior>;
 #[tauri::command]
 #[specta::specta]
 #[allow(clippy::needless_pass_by_value)]
-pub fn set_window_behavior(behavior: WindowBehavior, app: AppHandle) {
-    if let Some(state) = app.try_state::<WindowBehaviorState>() {
-        if let Ok(mut current) = state.lock() {
-            *current = behavior;
-        }
-        return;
+pub fn set_window_behavior(behavior: WindowBehavior, state: State<'_, WindowBehaviorState>) {
+    if let Ok(mut current) = state.lock() {
+        *current = behavior;
     }
-
-    app.manage(WindowBehaviorState::new(behavior));
 }
 
 fn window_behavior(app: &AppHandle) -> WindowBehavior {

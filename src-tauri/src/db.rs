@@ -42,9 +42,14 @@ pub fn open_in_memory() -> Result<SqliteConnection, StorageError> {
 fn configure(connection: &mut SqliteConnection) -> Result<(), StorageError> {
     // ⚠️ `foreign_keys` is set **per connection** and is off by default: without it
     // the `ON DELETE CASCADE` clauses are inert. WAL: a reader no longer blocks a writer.
+    //
+    // `busy_timeout` covers the window where a second process still holds the file —
+    // a stale instance shutting down, a backup tool reading it — where the default of
+    // zero surfaces `SQLITE_BUSY` as a storage error on the very first write.
     connection.batch_execute(
         "PRAGMA foreign_keys = ON;
-         PRAGMA journal_mode = WAL;",
+         PRAGMA journal_mode = WAL;
+         PRAGMA busy_timeout = 5000;",
     )?;
 
     Ok(())

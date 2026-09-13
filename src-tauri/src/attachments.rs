@@ -8,6 +8,7 @@
 pub mod model;
 pub mod store;
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
@@ -51,7 +52,21 @@ pub(crate) fn remove_files(directory: &Path, stored_names: &[String]) {
     }
 }
 
-#[tauri::command]
+/// ⚠️ The limit is enforced by the copy itself. Reading `metadata().len()` first and
+/// copying afterwards left the two free to disagree: a file growing between them
+/// landed whole, whatever the limit said.
+fn copy_within_limit(source: &str, destination: &Path) -> Result<u32, AppError> {
+    let mut reader = std::fs::File::open(source).map_err(|error| file_error(source, &error))?;
+    let mut writer =
+        std::fs::File::create(destination).map_err(|error| file_error(source, &error))?;
+
+    let copied = std::io::copy(&mut reader.by_ref().take(model::MAX_BYTES + 1), &mut writer)
+        .map_err(|error| file_error(source, &error))?;
+
+    Ok(model::validate_size(copied)?)
+}
+
+#[tauri::command(async)]
 #[specta::specta]
 pub fn attach_file(
     note_id: String,
@@ -60,19 +75,13 @@ pub fn attach_file(
     db: State<'_, Db>,
 ) -> Result<Attachment, AppError> {
     let file_name = model::display_name(&path)?;
-    let source = PathBuf::from(&path);
-    let byte_size = model::validate_size(
-        std::fs::metadata(&source)
-            .map_err(|error| file_error(&path, &error))?
-            .len(),
-    )?;
 
-    let attachment = Attachment {
+    let mut attachment = Attachment {
         id: Uuid::new_v4().to_string(),
         note_id,
         mime_type: model::mime_of(&file_name),
         file_name,
-        byte_size,
+        byte_size: 0,
         created_at: Utc::now(),
     };
 
@@ -80,7 +89,13 @@ pub fn attach_file(
     let destination = directory.join(attachment.stored_name());
     // Copy before the database write: a record without a file would show a
     // broken thumbnail, where a file without a record is swept at startup.
-    std::fs::copy(&source, &destination).map_err(|error| file_error(&path, &error))?;
+    match copy_within_limit(&path, &destination) {
+        Ok(byte_size) => attachment.byte_size = byte_size,
+        Err(error) => {
+            remove_files(&directory, &[attachment.stored_name()]);
+            return Err(error);
+        }
+    }
 
     let mut connection = lock(&db)?;
     if let Err(error) = store::create(&mut connection, &attachment) {
@@ -136,7 +151,7 @@ fn write_attachment(
     Ok(attachment)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn list_attachments(note_id: String, db: State<'_, Db>) -> Result<Vec<Attachment>, AppError> {
     let mut connection = lock(&db)?;
@@ -144,7 +159,7 @@ pub fn list_attachments(note_id: String, db: State<'_, Db>) -> Result<Vec<Attach
     Ok(store::list(&mut connection, &note_id)?)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn read_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<String, AppError> {
     let attachment = {
@@ -165,7 +180,7 @@ pub fn read_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<
 
 /// The call starts from **Rust**, not the `WebView`: opening a path from the front
 /// end would have meant allowing `opener:allow-open-path` over a whole directory.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn open_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<(), AppError> {
     let path = locate(&id, &app, &db)?;
@@ -179,7 +194,7 @@ pub fn open_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<
 
 /// The path comes from a native picker; the write stays here, the only place that
 /// knows the directory.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn save_attachment(
     id: String,
@@ -196,7 +211,7 @@ pub fn save_attachment(
 
 /// The bytes do **not** cross the bridge: the clipboard is read natively, where the
 /// image arrives as raw RGBA, then encoded to PNG.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn attach_clipboard_image(
     note_id: String,
@@ -213,7 +228,7 @@ pub fn attach_clipboard_image(
     write_attachment(note_id, model::png_name(&file_name), png, &app, &db)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn delete_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<(), AppError> {
     let directory = directory(&app)?;
@@ -254,4 +269,64 @@ pub fn sweep_orphan_files(app: &AppHandle, db: &Db) -> Result<usize, StorageErro
     remove_files(&directory, &orphans);
 
     Ok(orphans.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::ErrorCode;
+
+    fn scratch() -> PathBuf {
+        let directory = std::env::temp_dir().join(format!("devbox-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+
+        directory
+    }
+
+    #[test]
+    fn a_file_within_the_limit_is_copied_whole() {
+        let directory = scratch();
+        let source = directory.join("capture.png");
+        std::fs::write(&source, vec![7u8; 2048]).unwrap();
+        let destination = directory.join("a-1.png");
+
+        let copied = copy_within_limit(&source.to_string_lossy(), &destination).unwrap();
+
+        assert_eq!(copied, 2048);
+        assert_eq!(std::fs::read(&destination).unwrap().len(), 2048);
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// The limit is applied by the copy, so a file that grew past it after any
+    /// earlier `metadata` read is still refused rather than stored whole.
+    #[test]
+    fn a_file_over_the_limit_is_refused_and_leaves_nothing_behind() {
+        let directory = scratch();
+        let source = directory.join("huge.bin");
+        std::fs::write(
+            &source,
+            vec![0u8; usize::try_from(model::MAX_BYTES).unwrap() + 1],
+        )
+        .unwrap();
+        let destination = directory.join("a-1.bin");
+
+        let error = copy_within_limit(&source.to_string_lossy(), &destination).unwrap_err();
+
+        assert!(matches!(error.code, ErrorCode::InvalidInput));
+        assert_eq!(
+            error.params.get("field").map(String::as_str),
+            Some("byteSize")
+        );
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn a_missing_source_is_reported_rather_than_panicking() {
+        let directory = scratch();
+
+        let error = copy_within_limit("no-such-file.png", &directory.join("a-1.png")).unwrap_err();
+
+        assert!(matches!(error.code, ErrorCode::FileAccess));
+        std::fs::remove_dir_all(&directory).ok();
+    }
 }

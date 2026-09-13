@@ -63,7 +63,7 @@ use trash::TrashedNote;
 use view::{NotesQuery, NotesView};
 
 /// No command returns the raw list: it would invite re-filtering on the front end.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, AppError> {
     let mut connection = lock(&db)?;
@@ -79,7 +79,7 @@ pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, Ap
     Ok(view)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<DisplayNote, AppError> {
     let mut connection = lock(&db)?;
@@ -88,7 +88,7 @@ pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<DisplayNote, A
     Ok(display(&mut connection, note)?)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn update_note(
     id: String,
@@ -103,7 +103,7 @@ pub fn update_note(
 
 /// **Moves to the trash**: the note comes back through [`restore_notes`] for
 /// [`trash::RETENTION`].
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
     let mut connection = lock(&db)?;
@@ -111,7 +111,7 @@ pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
     Ok(store::delete(&mut connection, &id, Utc::now())?)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn delete_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
@@ -123,7 +123,7 @@ pub fn delete_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError
     )?))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn restore_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
@@ -133,7 +133,7 @@ pub fn restore_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppErro
 
 /// Purges what retention has caught up with **first**: the trash must never
 /// show a note a restart would erase.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn list_trash(app: AppHandle, db: State<'_, Db>) -> Result<Vec<TrashedNote>, AppError> {
     purge_expired(&app, &db)?;
@@ -146,13 +146,13 @@ pub fn list_trash(app: AppHandle, db: State<'_, Db>) -> Result<Vec<TrashedNote>,
         .collect())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn purge_notes(ids: Vec<String>, app: AppHandle, db: State<'_, Db>) -> Result<u32, AppError> {
     Ok(count(purge(&app, &db, ids)?))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn empty_trash(app: AppHandle, db: State<'_, Db>) -> Result<u32, AppError> {
     let ids = {
@@ -163,7 +163,7 @@ pub fn empty_trash(app: AppHandle, db: State<'_, Db>) -> Result<u32, AppError> {
     Ok(count(purge(&app, &db, ids)?))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn move_notes(ids: Vec<String>, space_id: String, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
@@ -178,7 +178,7 @@ pub fn move_notes(ids: Vec<String>, space_id: String, db: State<'_, Db>) -> Resu
 
 /// Normalised here as everywhere else, or an `#urgent` typed in the action bar
 /// would not join the `urgent` already stored.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn tag_notes(ids: Vec<String>, tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
     let normalized = model::normalize_tags(&tags);
@@ -193,7 +193,7 @@ pub fn tag_notes(ids: Vec<String>, tags: Vec<String>, db: State<'_, Db>) -> Resu
     )?))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn list_tags(db: State<'_, Db>) -> Result<Vec<TagUsage>, AppError> {
     let mut connection = lock(&db)?;
@@ -208,7 +208,7 @@ pub fn list_tags(db: State<'_, Db>) -> Result<Vec<TagUsage>, AppError> {
 }
 
 /// Renaming onto an existing tag **is** a merge: a note cannot carry one twice.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn rename_tag(tag: String, into: String, db: State<'_, Db>) -> Result<u32, AppError> {
     let target = model::validated_tag(&into)?;
@@ -218,7 +218,7 @@ pub fn rename_tag(tag: String, into: String, db: State<'_, Db>) -> Result<u32, A
     Ok(count(store::retag(&mut connection, &[tag], &target)?))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn merge_tags(tags: Vec<String>, into: String, db: State<'_, Db>) -> Result<u32, AppError> {
     let target = model::validated_tag(&into)?;
@@ -230,7 +230,7 @@ pub fn merge_tags(tags: Vec<String>, into: String, db: State<'_, Db>) -> Result<
 
 /// A list rather than one tag at a time: the panel deletes a whole selection, and
 /// one round trip per tag was one lock and one transaction per tag.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn delete_tags(tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
@@ -240,7 +240,7 @@ pub fn delete_tags(tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError
 
 /// ⚠️ A command of its own rather than a `NotePatch` field: filling a field is not
 /// editing the note, so `updated_at` stays put — the canvas sorts on it.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn set_placeholder_values(
     id: String,
@@ -257,7 +257,7 @@ pub fn set_placeholder_values(
 
 /// No note identifier: the palette fills an unsaved draft as readily as the note
 /// it just opened. The database is read only for the **global variables**.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn fill_placeholders(
     content: String,
@@ -273,7 +273,7 @@ pub fn fill_placeholders(
     ))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn list_global_placeholders(db: State<'_, Db>) -> Result<BTreeMap<String, String>, AppError> {
     let mut connection = lock(&db)?;
@@ -283,7 +283,7 @@ pub fn list_global_placeholders(db: State<'_, Db>) -> Result<BTreeMap<String, St
 
 /// Stores the **whole** set: what is not sent is what the user removed. No note is
 /// touched, not even its `updated_at`.
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn set_global_placeholders(
     values: BTreeMap<String, String>,

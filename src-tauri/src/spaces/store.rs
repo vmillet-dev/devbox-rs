@@ -64,19 +64,24 @@ fn ensure_unique_name(
 }
 
 /// `name` is expected **already validated**: this layer only decides uniqueness.
+///
+/// The transaction is what pairs the check with the write. Without it the guarantee
+/// rested on the connection mutex two layers up, where nothing named it.
 pub fn create(connection: &mut SqliteConnection, name: &str) -> Result<Space, StorageError> {
-    ensure_unique_name(connection, name, None)?;
+    connection.transaction(|connection| {
+        ensure_unique_name(connection, name, None)?;
 
-    let space = Space {
-        id: Uuid::new_v4().to_string(),
-        name: name.to_string(),
-    };
+        let space = Space {
+            id: Uuid::new_v4().to_string(),
+            name: name.to_string(),
+        };
 
-    diesel::insert_into(spaces::table)
-        .values((spaces::id.eq(&space.id), spaces::name.eq(&space.name)))
-        .execute(connection)?;
+        diesel::insert_into(spaces::table)
+            .values((spaces::id.eq(&space.id), spaces::name.eq(&space.name)))
+            .execute(connection)?;
 
-    Ok(space)
+        Ok(space)
+    })
 }
 
 pub fn rename(
@@ -84,19 +89,21 @@ pub fn rename(
     id: &str,
     name: &str,
 ) -> Result<Space, StorageError> {
-    if !exists(connection, id)? {
-        return Err(StorageError::SpaceNotFound(id.to_string()));
-    }
+    connection.transaction(|connection| {
+        if !exists(connection, id)? {
+            return Err(StorageError::SpaceNotFound(id.to_string()));
+        }
 
-    ensure_unique_name(connection, name, Some(id))?;
+        ensure_unique_name(connection, name, Some(id))?;
 
-    diesel::update(spaces::table.find(id))
-        .set(spaces::name.eq(name))
-        .execute(connection)?;
+        diesel::update(spaces::table.find(id))
+            .set(spaces::name.eq(name))
+            .execute(connection)?;
 
-    Ok(Space {
-        id: id.to_string(),
-        name: name.to_string(),
+        Ok(Space {
+            id: id.to_string(),
+            name: name.to_string(),
+        })
     })
 }
 
