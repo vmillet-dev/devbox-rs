@@ -1,4 +1,4 @@
-// Commands receive their arguments owned, deserialised from the IPC payload.
+// Commands receive their arguments owned, deserialized from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod model;

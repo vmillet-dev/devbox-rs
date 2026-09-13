@@ -1,11 +1,14 @@
 [package]
 name = "devbox"
 version = "0.1.4"
-description = "Couteau suisse de développeur : prise de notes, hachage, encodage"
+# ⚠️ Shipped: the installer and the Linux `.desktop` entry show this string.
+description = "A developer's notes and snippets manager for the desktop"
 authors = ["Valentin MILLET"]
 edition = "2024"
 rust-version = "1.88"
 repository = "https://github.com/vmillet-dev/devbox-rs"
+license = "GPL-3.0-only"
+readme = "../README.md"
 default-run = "devbox"
 
 [package.metadata.devbox]

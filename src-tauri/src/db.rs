@@ -11,7 +11,7 @@ use crate::error::{AppError, StorageError};
 
 pub const DB_FILE_NAME: &str = "devbox.sqlite3";
 
-/// `SqliteConnection` is not `Sync`: overlapping commands serialise on this mutex.
+/// `SqliteConnection` is not `Sync`: overlapping commands serialize on this mutex.
 pub type Db = Mutex<SqliteConnection>;
 
 /// A poisoned mutex means a command panicked while holding it: better to say so
@@ -90,7 +90,7 @@ pub mod iso8601 {
         }
 
         #[test]
-        fn an_offset_instant_is_normalised_to_utc() {
+        fn an_offset_instant_is_normalized_to_utc() {
             let instant = parse("2026-07-25T11:00:00+02:00").unwrap();
 
             assert_eq!(format(instant), "2026-07-25T09:00:00.000Z");

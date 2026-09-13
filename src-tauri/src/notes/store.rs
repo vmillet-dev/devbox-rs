@@ -413,7 +413,7 @@ pub fn fetch(
         query = query.filter(notes::language.eq_any(selected));
     }
 
-    // Same normalisation as on write, or a typed `#urgent` misses `urgent`.
+    // Same normalization as on write, or a typed `#urgent` misses `urgent`.
     let selected_tags = model::normalize_tags(&request.tags);
     if !selected_tags.is_empty() {
         query = query.filter(

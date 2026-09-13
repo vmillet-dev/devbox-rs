@@ -69,7 +69,7 @@ mod tests {
     }
 
     #[test]
-    fn the_serialised_form_matches_the_stored_one() {
+    fn the_serialized_form_matches_the_stored_one() {
         for kind in NoteKind::ALL {
             let json = serde_json::to_string(&kind).unwrap();
 
@@ -89,7 +89,7 @@ mod tests {
     }
 
     #[test]
-    fn normalising_trims_and_drops_the_blank_rows() {
+    fn normalizing_trims_and_drops_the_blank_rows() {
         let items = normalize_items(&[
             item("  Ship it  ", true),
             item("   ", false),
@@ -107,7 +107,7 @@ mod tests {
     }
 
     #[test]
-    fn normalising_keeps_the_order_it_was_given() {
+    fn normalizing_keeps_the_order_it_was_given() {
         let items = normalize_items(&[item("b", false), item("a", false), item("c", false)]);
 
         assert_eq!(

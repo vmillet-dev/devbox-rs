@@ -349,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn a_tag_that_normalises_to_nothing_does_not_count_as_filtering() {
+    fn a_tag_that_normalizes_to_nothing_does_not_count_as_filtering() {
         let view = build(
             vec![note("a", "Un")],
             Facets::default(),
@@ -446,7 +446,7 @@ mod tests {
                 kind: NoteKind::Checklist,
                 items: vec![
                     ChecklistItem {
-                        text: "Relire la migration".to_string(),
+                        text: "Review the migration".to_string(),
                         done: false,
                     },
                     ChecklistItem {

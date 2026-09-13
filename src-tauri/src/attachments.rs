@@ -2,7 +2,7 @@
 //! forbids loading a local file, and opening the `asset:` protocol to show a
 //! screenshot would be a wide door for a narrow need.
 
-// Commands receive their arguments owned, deserialised from the IPC payload.
+// Commands receive their arguments owned, deserialized from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod model;

@@ -176,7 +176,7 @@ pub fn move_notes(ids: Vec<String>, space_id: String, db: State<'_, Db>) -> Resu
     )?))
 }
 
-/// Normalised here as everywhere else, or an `#urgent` typed in the action bar
+/// Normalized here as everywhere else, or an `#urgent` typed in the action bar
 /// would not join the `urgent` already stored.
 #[tauri::command(async)]
 #[specta::specta]

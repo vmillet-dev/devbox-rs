@@ -166,7 +166,7 @@ mod tests {
     use crate::notes::model::{NoteDraft, NoteLifecycle};
 
     fn note(connection: &mut SqliteConnection) -> String {
-        let space = crate::spaces::store::create(connection, "Perso").unwrap();
+        let space = crate::spaces::store::create(connection, "Personal").unwrap();
         crate::notes::store::create(
             connection,
             NoteDraft {

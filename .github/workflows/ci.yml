@@ -6,8 +6,8 @@ on:
   pull_request:
     branches: [main]
 
-# On annule les runs empilés sur une branche. Plus de run de tag à ménager : la
-# publication vit dans `release.yml`, qui a sa propre concurrence.
+# Stacked runs on a branch are cancelled. No tag run to spare any more: publishing lives
+# in `release.yml`, which has a concurrency group of its own.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -34,12 +34,12 @@ jobs:
 
       - run: npm ci
 
-      # ESLint (règles d'accessibilité des templates incluses) + vérification Prettier,
-      # qui couvre aussi les fichiers de ce workflow.
+      # ESLint (template accessibility rules included) plus the Prettier check, which also
+      # covers this workflow file.
       - run: npm run lint
 
-      # Le générateur de notes de release n'est ni Angular ni Rust : son runner est celui
-      # de Node, sans dépendance à installer.
+      # The release-notes generator is neither Angular nor Rust: its runner is Node's own,
+      # with no dependency to install.
       - run: npm run test:scripts
 
   lint-rust:
@@ -53,8 +53,8 @@ jobs:
         with:
           shared-key: rust-ubuntu
 
-      # `generate_context!` lit frontendDist à la compilation. Faire dépendre ce job du
-      # build front le sérialiserait pour rien : il valide du Rust, pas le bundle.
+      # `generate_context!` reads frontendDist at compile time. Making this job depend on the
+      # front-end build would serialise it for nothing: it validates Rust, not the bundle.
       - name: Placeholder frontendDist
         run: |
           mkdir -p dist/devbox/browser
@@ -92,8 +92,8 @@ jobs:
           npm run build
           echo "\`build-front\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
-      # Pas consommé par `test-front` : la cible `test` d'angular.json refait sa propre build
-      # dev (buildTarget "::development"). Conservé court, comme preuve et pour le debug.
+      # Not consumed by `test-front`: angular.json's `test` target rebuilds its own dev build
+      # (buildTarget "::development"). Kept short, as evidence and for debugging.
       - uses: actions/upload-artifact@v4
         with:
           name: front-dist
@@ -107,7 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Seul job autorisé à écrire le cache cargo, pour que `test-rust` le lise sans course.
+      # The only job allowed to write the cargo cache, so `test-rust` reads it without racing.
       - uses: ./.github/actions/setup-rust
         with:
           shared-key: rust-ubuntu
@@ -137,7 +137,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      # Lecture seule : le cache a été écrit par `build-front`, dont le post-step est terminé.
+      # Read-only: the cache was written by `build-front`, whose post-step has finished.
       - uses: actions/cache/restore@v4
         with:
           path: .angular/cache
@@ -148,7 +148,7 @@ jobs:
 
       - run: npm ci
 
-      # Les seuils de couverture à 80 % font la garde.
+      # The 80% coverage thresholds are the guard.
       - name: Test
         run: |
           start=$(date +%s)
@@ -170,9 +170,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Restaure le target/ de `build-rust` — dont la compilation de SQLite
-      # (`libsqlite3-sys` en `bundled` compile les sources C), qui est l'essentiel
-      # du temps de ce job.
+      # Restores `build-rust`'s target/ — including the SQLite compilation (`libsqlite3-sys`
+      # in `bundled` builds the C sources), which is most of this job's time.
       - uses: ./.github/actions/setup-rust
         with:
           shared-key: rust-ubuntu
@@ -188,17 +187,15 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --locked
           echo "\`test-rust\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
-  # Le seul job qui lance l'application assemblée : vrai binaire, vraie WebView,
-  # vraie base SQLite sur disque. Les deux plateformes de la matrice de release
-  # sont couvertes, et elles ne cassent pas de la même façon : la WebView est
-  # WebView2 sur Windows et WebKitGTK sur Linux, et surtout Windows confond
-  # `data_dir()` et `config_dir()` (tous deux `%APPDATA%\<id>`) là où Linux les
-  # sépare. C'est le seul runner capable de démentir un chemin : il a déjà
-  # attrapé un `preferences.json` cherché au mauvais endroit.
+  # The only job that launches the assembled application: real binary, real WebView, real
+  # SQLite file on disk. Both platforms of the release matrix are covered, and they do not
+  # break the same way: the WebView is WebView2 on Windows and WebKitGTK on Linux, and above
+  # all Windows conflates `data_dir()` and `config_dir()` (both `%APPDATA%\<id>`) where Linux
+  # keeps them apart. It is the only runner able to disprove a path — it has already caught a
+  # `preferences.json` looked for in the wrong place.
   #
-  # `continue-on-error` volontairement : un job E2E instable que tout le monde
-  # ignore vaut moins que pas de job du tout. À retirer une fois qu'il a fait ses
-  # preuves sur quelques dizaines de runs.
+  # `continue-on-error` on purpose: a flaky E2E job everyone ignores is worth less than no job
+  # at all. To be removed once it has proven itself over a few dozen runs.
   test-e2e:
     name: Test E2E (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -219,33 +216,32 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      # L'étape apt de l'action installe les dépendances Tauri sur Linux ; sur
-      # Windows elle ne pose que la toolchain et le cache cargo.
+      # The action's apt step installs the Tauri dependencies on Linux; on Windows it only
+      # lays down the toolchain and the cargo cache.
       - uses: ./.github/actions/setup-rust
         with:
           shared-key: e2e-${{ matrix.os }}
           save-if: 'true'
 
-      # WebKitGTK a besoin d'un serveur X : sans lui la fenêtre ne s'ouvre pas et
-      # le serveur WebDriver embarqué n'écoute jamais.
-      - name: Serveur X virtuel
+      # WebKitGTK needs an X server: without one the window never opens and the embedded
+      # WebDriver server never listens.
+      - name: Virtual X server
         if: runner.os == 'Linux'
         run: sudo apt-get install -y --no-install-recommends xvfb
 
       - run: npm ci
 
-      # `tauri build` enchaîne `beforeBuildCommand` (le build front e2e) puis cargo.
-      # Le binaire produit porte l'identifiant `com.devbox.app.e2e`, donc son profil
-      # est à lui : il ne peut pas écraser une bibliothèque existante.
+      # `tauri build` chains `beforeBuildCommand` (the e2e front-end build) then cargo. The
+      # binary it produces carries the `com.devbox.app.e2e` identifier, so its profile is its
+      # own: it cannot overwrite an existing library.
       - name: Build the e2e binary
         run: |
           start=$(date +%s)
           npm run e2e:build
           echo "\`build-e2e\` (${{ matrix.os }}) — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
-      # `xvfb-run` enveloppe le runner et non le binaire : c'est le service wdio qui
-      # lance l'application, depuis son propre `onPrepare`, donc le DISPLAY doit
-      # exister pour tout le processus.
+      # `xvfb-run` wraps the runner, not the binary: the wdio service is what launches the
+      # application, from its own `onPrepare`, so DISPLAY has to exist for the whole process.
       - name: Run the scenarios
         run: |
           start=$(date +%s)
@@ -256,9 +252,8 @@ jobs:
           fi
           echo "\`test-e2e\` (${{ matrix.os }}) — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
-      # `E2E_LOG_LEVEL=trace` à la main sur un run en échec : par défaut les logs
-      # restent lisibles, et une session qui refuse de s'ouvrir se diagnostique en
-      # relançant le job avec la variable.
+      # `E2E_LOG_LEVEL=trace` by hand on a failing run: by default the logs stay readable, and
+      # a session that refuses to open is diagnosed by re-running the job with the variable.
       - uses: actions/upload-artifact@v4
         if: always()
         with:

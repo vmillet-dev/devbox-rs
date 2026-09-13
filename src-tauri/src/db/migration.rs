@@ -171,7 +171,7 @@ mod tests {
         let mut connection = legacy_database(
             &[
                 LEGACY_SCHEMA,
-                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Perso');
+                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Personal');
                      INSERT INTO notes VALUES
                        ('n-1', 's-1', 'A', 'txt', '', '', 0, '2026-07-25T09:00:00.000Z',
                         '2026-07-25T09:00:00.000Z', 'permanent', NULL),
@@ -206,7 +206,7 @@ mod tests {
             &[
                 LEGACY_SCHEMA,
                 LEGACY_FOLD_TAG_CASE,
-                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Perso');
+                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Personal');
                      INSERT INTO notes VALUES
                        ('n-1', 's-1', 'A', 'json', '', '', 0, '2026-07-25T09:00:00.000Z',
                         '2026-07-25T09:00:00.000Z', 'permanent', NULL);",
@@ -243,7 +243,7 @@ mod tests {
             &[
                 LEGACY_SCHEMA,
                 LEGACY_FOLD_TAG_CASE,
-                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Perso');
+                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Personal');
                      INSERT INTO notes VALUES
                        ('n-1', 's-1', 'A', 'sql', 'select 1', '', 0, '2026-07-25T09:00:00.000Z',
                         '2026-07-25T09:00:00.000Z', 'permanent', NULL);",

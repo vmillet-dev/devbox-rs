@@ -32,9 +32,9 @@ fn draft(space_id: &str, title: &str) -> NoteDraft {
 /// A populated database, the way a user would have one.
 fn library() -> SqliteConnection {
     let mut connection = open_in_memory().unwrap();
-    let perso = spaces::create(&mut connection, "Perso").unwrap().id;
+    let personal = spaces::create(&mut connection, "Personal").unwrap().id;
     let boulot = spaces::create(&mut connection, "Boulot").unwrap().id;
-    notes::create(&mut connection, draft(&perso, "Première"), t0()).unwrap();
+    notes::create(&mut connection, draft(&personal, "Première"), t0()).unwrap();
     notes::create(&mut connection, draft(&boulot, "Seconde"), t0()).unwrap();
 
     connection
@@ -45,7 +45,7 @@ fn exported(connection: &mut SqliteConnection) -> Bundle {
     collect(connection, all).unwrap()
 }
 
-/// The file as it is really written and read back, serialisation included.
+/// The file as it is really written and read back, serialization included.
 fn round_tripped(bundle: &Bundle) -> Bundle {
     model::read_bundle(&serde_json::to_string(bundle).unwrap()).unwrap()
 }
@@ -75,8 +75,8 @@ fn a_library_moves_whole_to_another_machine() {
 #[test]
 fn only_the_spaces_actually_cited_travel() {
     let mut source = library();
-    let perso = spaces::list(&mut source).unwrap()[1].id.clone();
-    let single = notes::all(&mut source, Some(&perso)).unwrap();
+    let personal = spaces::list(&mut source).unwrap()[1].id.clone();
+    let single = notes::all(&mut source, Some(&personal)).unwrap();
 
     let bundle = collect(&mut source, single).unwrap();
 
@@ -117,7 +117,7 @@ fn a_space_of_the_same_name_is_reused_rather_than_duplicated() {
     let bundle = round_tripped(&exported(&mut source));
 
     let mut target = open_in_memory().unwrap();
-    spaces::create(&mut target, "PERSO").unwrap();
+    spaces::create(&mut target, "PERSONAL").unwrap();
 
     let report = merge(&mut target, bundle).unwrap();
 

@@ -12,7 +12,7 @@ pub fn list(connection: &mut SqliteConnection) -> Result<Vec<Space>, StorageErro
     let rows = spaces::table
         .select((spaces::id, spaces::name))
         // Raw fragment: Diesel does not model collations, and sorting as BINARY
-        // would place "perso" after "Zebra".
+        // would place "personal" after "Zebra".
         .order(sql::<Text>("name COLLATE NOCASE"))
         .load::<(String, String)>(connection)?;
 
@@ -43,7 +43,7 @@ fn ensure_unique_name(
     except_id: Option<&str>,
 ) -> Result<(), StorageError> {
     // ⚠️ `spaces.name` is not declared `NOCASE` — only the unique index is — so the
-    // collation must be set on the comparison, or "PERSO" would miss "Perso".
+    // collation must be set on the comparison, or "PERSONAL" would miss "Personal".
     let mut query = spaces::table
         .filter(
             sql::<Bool>("name = ")

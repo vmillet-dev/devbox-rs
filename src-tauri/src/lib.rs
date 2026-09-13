@@ -196,7 +196,7 @@ pub fn run() {
 
             Ok(())
         })
-        // Closing — and, if asked for, minimising — files the window into the tray:
+        // Closing — and, if asked for, minimizing — files the window into the tray:
         // both are preferences, and both are refused when there is no tray to find
         // the window in (see `desktop`).
         .on_window_event(
@@ -211,7 +211,7 @@ pub fn run() {
                         api.prevent_close();
                         let _ = _window.hide();
                     }
-                    // Tauri emits nothing for "minimised": `Resized` is the only way through.
+                    // Tauri emits nothing for "minimized": `Resized` is the only way through.
                     tauri::WindowEvent::Resized(_)
                         if desktop::hides_on_minimize(_window.app_handle())
                             && _window.is_minimized().unwrap_or(false) =>

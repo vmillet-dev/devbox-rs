@@ -22,7 +22,7 @@ pub struct SpaceDraft {
 
 impl SpaceDraft {
     /// ⚠️ Trimming is not cosmetic: `COLLATE NOCASE` does not collapse
-    /// spaces, so "Perso" and " Perso " would coexist, identical on screen.
+    /// spaces, so "Personal" and " Personal " would coexist, identical on screen.
     pub fn validated_name(&self) -> Result<String, ValidationError> {
         let trimmed = self.name.trim();
         if trimmed.is_empty() {
@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn a_name_is_trimmed_before_being_stored() {
-        assert_eq!(draft("  Perso  ").validated_name().unwrap(), "Perso");
+        assert_eq!(draft("  Personal  ").validated_name().unwrap(), "Personal");
     }
 
     #[test]

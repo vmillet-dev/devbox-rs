@@ -79,7 +79,7 @@ pub enum ErrorCode {
 #[serde(rename_all = "camelCase")]
 pub struct AppError {
     pub code: ErrorCode,
-    /// Values to interpolate into the translated message, e.g. `{ "name": "Perso" }`.
+    /// Values to interpolate into the translated message, e.g. `{ "name": "Personal" }`.
     pub params: BTreeMap<String, String>,
     pub detail: String,
 }
