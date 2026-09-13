@@ -58,6 +58,11 @@ export async function waitForCanvas(): Promise<void> {
   );
 }
 
+/** The window's own box — not `getWindowSize`, which answers the OS frame with it. */
+export async function viewportSize(): Promise<{ width: number; height: number }> {
+  return browser.execute(() => ({ width: window.innerWidth, height: window.innerHeight }));
+}
+
 export type Modifier = 'Control' | 'Alt' | 'Shift' | 'Meta';
 
 /** `KeyboardEvent.code`: a letter is its physical key, a digit its own. */

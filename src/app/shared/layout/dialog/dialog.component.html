@@ -1,4 +1,10 @@
-<div appDialogBackdrop class="dialog-backdrop" [style.z-index]="rung()" (dismissed)="dismiss()">
+<div
+  appDialogBackdrop
+  class="dialog-backdrop"
+  [class.fullscreen]="fullscreen()"
+  [style.z-index]="rung()"
+  (dismissed)="dismiss()"
+>
   <div
     appFocusTrap
     class="dialog-panel"

@@ -16,6 +16,7 @@ import { DialogComponent } from './dialog.component';
       <app-dialog
         [layer]="'editor'"
         [dismissible]="dismissible()"
+        [fullscreen]="fullscreen()"
         labelledBy="back-title"
         (closed)="backClosed = backClosed + 1"
       >
@@ -34,6 +35,7 @@ class DialogHostComponent {
   readonly backOpen = signal(true);
   readonly frontOpen = signal(false);
   readonly dismissible = signal(true);
+  readonly fullscreen = signal(false);
 
   backClosed = 0;
   frontClosed = 0;
@@ -75,6 +77,19 @@ describe('DialogComponent', () => {
     expect(panel?.getAttribute('role')).toBe('dialog');
     expect(panel?.getAttribute('aria-modal')).toBe('true');
     expect(panel?.getAttribute('aria-labelledby')).toBe('back-title');
+  });
+
+  // The backdrop needs the class too: it carries the offset a full-height panel cannot
+  // afford to have taken off its height.
+  it('marks the panel and the backdrop when it fills the window', async () => {
+    expect(panels()[0]?.classList.contains('fullscreen')).toBe(false);
+    expect(backdrops()[0]?.classList.contains('fullscreen')).toBe(false);
+
+    host.fullscreen.set(true);
+    await fixture.whenStable();
+
+    expect(panels()[0]?.classList.contains('fullscreen')).toBe(true);
+    expect(backdrops()[0]?.classList.contains('fullscreen')).toBe(true);
   });
 
   it('takes focus, so the keyboard cannot walk behind the modal', () => {
