@@ -5,6 +5,7 @@ import { PreferencesService } from '@core/services/preferences/preferences.servi
 import { CodeViewerComponent } from '@notes/ui/code-viewer/code-viewer.component';
 import { LifecycleBadgeComponent } from './lifecycle-badge/lifecycle-badge.component';
 import { TagPillComponent } from '@notes/ui/tag-pill/tag-pill.component';
+import { LANGUAGE_LABELS } from '@core/model/language.model';
 import { NotePatch } from '@core/model/note.model';
 import { AttachmentsStore } from '@core/state/attachments.store';
 import { PlaceholderFillStore } from '@core/state/placeholder-fill.store';
@@ -503,21 +504,9 @@ describe('NoteEditorOverlayComponent', () => {
       await fixture.whenStable();
 
       const select = fixture.nativeElement.querySelector('.overlay-language-select') as HTMLSelectElement;
-      expect([...select.options].map((option) => option.value)).toEqual([
-        'json',
-        'js',
-        'ts',
-        'py',
-        'sql',
-        'yml',
-        'toml',
-        'xml',
-        'html',
-        'css',
-        'sh',
-        'md',
-        'txt',
-      ]);
+      // Against the label table rather than a copy of it: the select is meant to offer
+      // exactly what the generated union carries, in that order.
+      expect([...select.options].map((option) => option.value)).toEqual(Object.keys(LANGUAGE_LABELS));
       expect(select.value).toBe('sql');
     });
 

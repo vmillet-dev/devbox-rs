@@ -293,7 +293,7 @@ fn every_error_carries_a_non_empty_detail() {
 fn a_refused_value_names_the_field_at_fault() {
     let json = serde_json::to_value(AppError::from(ValidationError::new(
         "language",
-        "\"rust\" is not a known language",
+        "\"from-the-future\" is not a known language",
     )))
     .unwrap();
 
@@ -340,7 +340,7 @@ fn an_unknown_language_is_refused_at_the_bridge() {
     let refused = serde_json::from_value::<NoteDraft>(serde_json::json!({
         "spaceId": "s-1",
         "title": "",
-        "language": "rust",
+        "language": "from-the-future",
         "content": "",
         "source": "",
         "tags": [],

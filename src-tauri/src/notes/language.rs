@@ -10,6 +10,12 @@ closed_enum! {
         Js = "js",
         Ts = "ts",
         Py = "py",
+        Rs = "rs",
+        Go = "go",
+        Java = "java",
+        Cs = "cs",
+        Php = "php",
+        C = "c",
         Sql = "sql",
         Yml = "yml",
         Toml = "toml",
@@ -67,6 +73,10 @@ pub fn from_content(content: &str) -> Language {
     }
 
     let lower = trimmed.to_lowercase();
+    // Before the markup check, which reads `<?php` as an XML processing instruction.
+    if lower.starts_with("<?php") {
+        return Language::Php;
+    }
     if let Some(markup) = markup_kind(&lower) {
         return markup;
     }
@@ -78,6 +88,23 @@ pub fn from_content(content: &str) -> Language {
     }
     if is_python(trimmed) {
         return Language::Py;
+    }
+    // All five before TypeScript and JavaScript, which claim `=>` and `const`: a Rust
+    // match arm or a C# lambda used to be enough to take a snippet from its own language.
+    if is_go(trimmed) {
+        return Language::Go;
+    }
+    if is_rust(trimmed) {
+        return Language::Rs;
+    }
+    if is_java(trimmed) {
+        return Language::Java;
+    }
+    if is_csharp(trimmed) {
+        return Language::Cs;
+    }
+    if is_c(trimmed) {
+        return Language::C;
     }
     if is_typescript(trimmed) {
         return Language::Ts;
@@ -189,6 +216,48 @@ fn is_python(content: &str) -> bool {
         })
 }
 
+/// `func` and `package main` are Go's alone; `import (` is its grouped form.
+fn is_go(content: &str) -> bool {
+    content.contains("fmt.Print")
+        || any_line(content, |line| {
+            starts_with_any(line, &["func ", "package main", "import ("])
+        })
+}
+
+/// Deliberately narrow. `enum`, `struct` and `trait` are shared with languages checked
+/// after this one, so only what Rust does not lend counts: `fn`, `impl`, `let mut`, a
+/// macro call, and a `use` carrying a path.
+fn is_rust(content: &str) -> bool {
+    content.contains("println!")
+        || content.contains("let mut ")
+        || any_line(content, |line| {
+            let line = line.strip_prefix("pub ").unwrap_or(line);
+            starts_with_any(line, &["fn ", "async fn ", "impl "])
+                || (line.starts_with("use ") && line.contains("::"))
+        })
+}
+
+/// `public class` is left to neither this nor C#: both write it, and a snippet that
+/// says nothing else says nothing.
+fn is_java(content: &str) -> bool {
+    content.contains("System.out.print")
+        || content.contains("public static void main")
+        || any_line(content, |line| line.starts_with("import java"))
+}
+
+fn is_csharp(content: &str) -> bool {
+    content.contains("Console.Write")
+        || any_line(content, |line| {
+            starts_with_any(line, &["using System", "namespace "])
+        })
+}
+
+/// `#include` is the one marker nothing else here writes.
+fn is_c(content: &str) -> bool {
+    any_line(content, |line| line.starts_with("#include"))
+        || (content.contains("int main(") && content.contains("printf("))
+}
+
 fn is_typescript(content: &str) -> bool {
     const ANNOTATIONS: [&str; 4] = [": string", ": number", ": boolean", "implements "];
     const DECLARATIONS: [&str; 4] = ["interface ", "type ", "enum ", "declare "];
@@ -293,7 +362,7 @@ mod tests {
 
     #[test]
     fn an_unknown_value_is_refused_rather_than_guessed() {
-        assert_eq!("rust".parse::<Language>(), Err(()));
+        assert_eq!("from-the-future".parse::<Language>(), Err(()));
         assert_eq!("JSON".parse::<Language>(), Err(()));
     }
 
@@ -500,6 +569,95 @@ mod tests {
         assert_eq!(from_content("class Note:\n    pass"), Language::Py);
         assert_eq!(from_content("from os import path"), Language::Py);
         assert_eq!(from_content("class Note { }"), Language::Js);
+    }
+
+    /// The five compiled languages are tried **before** TypeScript and JavaScript,
+    /// which claim `=>` and `const`. Every line below used to come back `js` or `txt`.
+    #[test]
+    fn a_compiled_language_is_not_taken_for_javascript() {
+        assert_eq!(
+            from_content(
+                "fn main() {
+    println!(\"hi\");
+}"
+            ),
+            Language::Rs
+        );
+        assert_eq!(
+            from_content(
+                "match value {
+    Some(x) => x,
+}
+let mut total = 0;"
+            ),
+            Language::Rs
+        );
+        assert_eq!(
+            from_content(
+                "package main
+
+func main() {
+    fmt.Println(\"hi\")
+}"
+            ),
+            Language::Go
+        );
+        assert_eq!(
+            from_content(
+                "import java.util.List;
+
+class Note { }"
+            ),
+            Language::Java
+        );
+        assert_eq!(
+            from_content(
+                "using System;
+
+var greet = () => Console.WriteLine(\"hi\");"
+            ),
+            Language::Cs
+        );
+        assert_eq!(
+            from_content(
+                "#include <stdio.h>
+
+int main(void) { return 0; }"
+            ),
+            Language::C
+        );
+    }
+
+    /// `<?php` opens with a `<`, which the markup check reads as a processing
+    /// instruction: without its own branch first, every PHP snippet came back `xml`.
+    #[test]
+    fn php_is_recognised_before_the_markup_check_claims_it() {
+        assert_eq!(
+            from_content(
+                "<?php
+
+echo 'hi';"
+            ),
+            Language::Php
+        );
+        assert_eq!(from_content("<?xml version=\"1.0\"?>"), Language::Xml);
+    }
+
+    /// The new branches sit in front of the old ones, so this is what says they take
+    /// nothing that was not theirs.
+    #[test]
+    fn the_languages_detected_before_them_are_left_alone() {
+        assert_eq!(from_content("export enum Kind { A }"), Language::Ts);
+        assert_eq!(from_content("interface Note { id: string }"), Language::Ts);
+        assert_eq!(
+            from_content(
+                "def run():
+    return 1"
+            ),
+            Language::Py
+        );
+        assert_eq!(from_content("select 1"), Language::Sql);
+        assert_eq!(from_content("const add = (a, b) => a + b"), Language::Js);
     }
 
     #[test]

@@ -349,8 +349,21 @@ that imports highlight.js.
 
 - **Grammars are imported one by one** from `highlight.js/lib/`, never the default bundle,
   which carries close to 200 languages. `GRAMMARS` maps a `LanguageTag` onto the grammar that
-  describes it; three do not share a name (`toml` is `ini`, `html` is `xml`, `yml` is `yaml`),
-  and `txt` deliberately has none — free text has nothing to colour, so it is only escaped.
+  describes it; five do not share a name (`toml` is `ini`, `html` is `xml`, `yml` is `yaml`,
+  `rs` is `rust`, `cs` is `csharp`), and `txt` deliberately has none — free text has nothing
+  to colour, so it is only escaped. The discipline is what keeps the cost legible: the six
+  compiled languages added in v0.1.4 weigh 5.9 kB over the wire, all of it in the lazy
+  notes-page chunk, which is where the viewer already lived.
+- **Adding a language is four edits and no migration.** A variant in `closed_enum!`
+  (`notes/language.rs`), a grammar in `GRAMMARS`, a label in `LANGUAGE_LABELS`, and
+  `npm run bindings`. The column stores the literal and carries no `CHECK`, so nothing on
+  disk changes. Three `Record<LanguageTag, …>` tables — the grammars, the labels and the
+  highlighter spec's samples — are exhaustive by type, so a variant added in Rust stops the
+  front end compiling until each has an answer for it. A detection heuristic in
+  `language::from_content` is optional, but the **order** is not: the compiled languages are
+  tried before TypeScript and JavaScript, which claim `=>` and `const` and would otherwise
+  take a Rust match arm or a C# lambda for their own; PHP is tried before the markup check,
+  which reads `<?php` as a processing instruction.
 - **`ignoreIllegals` is on.** A note is free text, often a fragment that does not parse end to
   end; without it a truncated JSON snippet would throw instead of rendering.
 - **Output is re-split into lines** by `splitHighlightedLines`. highlight.js colours the whole
