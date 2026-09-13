@@ -2,14 +2,19 @@
 
 Notable changes to DevBox, newest first.
 
-This file is **shipped inside the binary** (`src-tauri/src/changelog.rs` embeds it with
-`include_str!`) and read by "À propos → Nouveautés". Keep the shape below — a `## ` heading per
-release, `### ` headings for the categories, one `- ` bullet per entry — or the entry will not be
-rendered. It is deliberately untranslated, like the release notes the updater hands over.
+**The newest section is generated.** `.github/workflows/release.yml` writes it from the pull
+requests merged since the last tag, then commits it **before** creating the tag — this file is
+shipped inside the binary (`src-tauri/src/changelog.rs` embeds it with `include_str!`) and read
+by "À propos → Nouveautés", so a release whose section came after the tag would ship a binary
+missing its own entry. Sections already written are never touched: edit them by hand freely.
 
-## [Unreleased]
+Keep the shape — a `## ` heading per release, `### ` headings for the categories, one `- `
+bullet per entry — or the entry will not be rendered. It is deliberately untranslated, like
+the release notes the updater hands over.
 
-### Added
+## [0.1.2] - 2026-09-11
+
+### ✨ Added
 
 - **Todo-list notes.** A note is now either a snippet or a checklist: ordered items, ticked from
   the card without opening it, reordered with the pointer or `Alt+↑` / `Alt+↓`.
@@ -20,26 +25,15 @@ rendered. It is deliberately untranslated, like the release notes the updater ha
 - **Help in the About menu:** "Nouveautés" (this file), "Prise en main" and "Raccourcis clavier".
 - **Sample notes on first launch**, in their own space, to show what a note can carry.
 
-### Changed
-
-- **The interface language is a preference**, in Préférences → Apparence: Système, Français or
-  Anglais. `Système` follows the display language of the machine — English when it speaks
-  neither — and keeps following it until you pick one yourself. The `FR` / `EN` buttons in the
-  titlebar are still there and set an explicit language.
-- **The About card says what DevBox is**, and names the Angular, Rust and Tauri versions it
-  was built with.
-- **The Fichier and À propos menus moved to the left** of the titlebar, where a menu bar
-  belongs on Windows and Linux.
-
 ## [0.1.1] - 2026-08-27
 
-### Fixed
+### 🐛 Fixed
 
 - Various fixes to note editing and to the test suite.
 
 ## [0.1.0] - 2026-07-28
 
-### Added
+### ✨ Added
 
 - **Notes and spaces.** Spaces to file notes in, with creation, renaming and deletion — deleting a
   space moves its notes rather than dropping them.

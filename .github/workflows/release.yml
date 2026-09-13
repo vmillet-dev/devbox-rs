@@ -1,0 +1,428 @@
+name: Release
+
+# Un seul bouton. La version est déjà dans src-tauri/Cargo.toml — c'est l'humain qui la monte,
+# ce workflow en tire une section de changelog, un commit, un tag, les bundles et la release.
+#
+# Tout dans le même run, et ce n'est pas un choix de confort : un tag poussé avec le
+# GITHUB_TOKEN par défaut ne déclenche aucun workflow, donc il n'y a pas de second run à
+# attendre. Et le changelog doit être commité *avant* le build : `changelog.rs` l'embarque
+# avec `include_str!`, donc un fichier écrit après le tag livrerait un binaire dont
+# « Nouveautés » ignore sa propre version.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Tout jouer sauf le commit, le tag et la publication.'
+        type: boolean
+        default: false
+
+# Jamais annulé : un run coupé entre le commit et le tag laisserait main en avance sur les
+# tags. `--atomic` couvre le push lui-même, la concurrence couvre le reste.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Tout ce qui peut refuser la release le fait ici, et avant d'écrire quoi que ce soit : les
+  # mutations sont les deux dernières étapes du job.
+  #
+  # Ce job ne rejoue aucun test — la CI a déjà tourné sur ce commit, il se contente de le
+  # vérifier. Ce qu'il exécute : npm ci, les tests du générateur, et Prettier.
+  prepare:
+    name: Préparer la release
+    # L'environnement est ce qui restreint réellement le workflow à main : sa règle de branche
+    # refuse de démarrer le job depuis un autre ref, là où un `if` ne ferait que le constater
+    # après avoir réservé un runner. C'est aussi là que vivent les secrets de signature.
+    environment: release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: read
+      # Sans lui, `closingIssuesReferences` renvoie des nœuds vides et tout le classement
+      # retombe silencieusement sur le préfixe du titre.
+      issues: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.push.outputs.sha }}
+    steps:
+      # `fetch-depth: 0` pour `git describe` et la plage de commits ; les identifiants restent
+      # dans le worktree, ce sont eux qui pousseront le commit et le tag.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: true
+
+      # Doublon lisible de la règle de branche de l'environnement, pour le jour où celle-ci
+      # n'est pas encore configurée.
+      - name: On ne publie que depuis main
+        if: github.ref_name != 'main'
+        run: |
+          echo "::error::dispatché depuis ${{ github.ref_name }}, la release part de main"
+          exit 1
+
+      # Cargo.toml fait foi : faute de version dans tauri.conf.json, c'est celle-là que Tauri
+      # grave dans le binaire.
+      - name: Lire la version
+        id: version
+        run: |
+          version=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          if [ -z "$version" ]; then
+            echo '::error::pas de version dans src-tauri/Cargo.toml'
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "Version : $version"
+
+      # L'ancien job `check-version`, avancé avant le tag plutôt qu'après : ici il peut encore
+      # empêcher la dérive au lieu de la constater. Les deux lockfiles sont de la partie — la
+      # release construit avec `--locked` et `npm ci`.
+      - name: Les quatre fichiers doivent dire la même version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          npm_lock=$(node -p "require('./package-lock.json').packages[''].version")
+          cargo_lock=$(awk '/^name = "devbox"$/{f=1;next} f&&/^version = /{print;exit}' \
+            src-tauri/Cargo.lock | cut -d'"' -f2)
+          echo "Cargo.toml=$VERSION package.json=$pkg package-lock=$npm_lock Cargo.lock=$cargo_lock"
+          for found in "$pkg" "$npm_lock" "$cargo_lock"; do
+            if [ "$found" != "$VERSION" ]; then
+              echo "::error::version $found ne correspond pas à $VERSION"
+              exit 1
+            fi
+          done
+
+      - name: Ni le tag ni la release ne doivent exister
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::le tag $TAG existe déjà"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::le tag $TAG existe déjà sur origin"
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::la release $TAG existe déjà"
+            exit 1
+          fi
+
+      # Garde d'idempotence : un re-dispatch après un `prepare` réussi doit dire pourquoi il
+      # refuse, plutôt que d'empiler une seconde section.
+      - name: Le changelog ne doit pas déjà porter la section
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if grep -qE "^## +\[?${VERSION//./\\.}\]?( |$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md porte déjà une section $VERSION"
+            exit 1
+          fi
+
+      # La porte d'entrée : c'est elle qui dispense la release de rejouer quoi que ce soit.
+      # `test-e2e` étant en `continue-on-error`, son échec ne retient rien — c'est la
+      # conclusion du run entier qui décide, exactement comme avant.
+      - name: La CI doit être verte sur ce commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -r status conclusion <<< "$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" \
+            --limit 1 --json status,conclusion \
+            --jq '.[0] // {} | "\(.status // "none") \(.conclusion // "none")"')"
+          echo "CI sur $GITHUB_SHA : $status / $conclusion"
+          if [ "$status" != completed ]; then
+            echo "::error::la CI n'a pas terminé sur ce commit ($status) — relance dans quelques minutes"
+            exit 1
+          fi
+          if [ "$conclusion" != success ]; then
+            echo "::error::la CI a conclu « $conclusion » sur ce commit"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Pour Prettier, qui reformate le fichier écrit : un CHANGELOG.md non formaté casserait
+      # `npm run lint` sur le prochain push de quelqu'un d'autre.
+      - run: npm ci
+
+      - run: npm run test:scripts
+
+      # Prettier passe entre l'écriture et l'extraction : le corps de la release est lu sur les
+      # octets exacts qui seront commités. Le `--check` après le `--write` n'est pas redondant,
+      # il assure le point fixe que `npm run lint` exigera au prochain push humain.
+      - name: Écrire la section et en tirer le corps de la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node scripts/release-notes.mjs generate --version "$VERSION" --write \
+            --summary "$GITHUB_STEP_SUMMARY"
+          npx prettier --write CHANGELOG.md
+          npx prettier --check CHANGELOG.md
+          node scripts/release-notes.mjs extract --version "$VERSION" \
+            --out "$RUNNER_TEMP/release-notes.md"
+          cp CHANGELOG.md "$RUNNER_TEMP/CHANGELOG.md"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/*.md
+          retention-days: 7
+
+      # Première et dernière mutation du dépôt. Tout ce qui précède peut échouer sans rien
+      # laisser derrière.
+      - name: Commiter, taguer, pousser
+        id: push
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add CHANGELOG.md
+          git commit -m "chore(release): $TAG"
+          git tag -a "$TAG" -m "$TAG"
+          # `--atomic` : le commit et le tag partent ensemble ou pas du tout. Sans lui, un refus
+          # du second laisserait main en avance sur les tags, et la relance buterait sur la
+          # section déjà écrite sans moyen simple de revenir en arrière.
+          git push --atomic origin HEAD:main "refs/tags/$TAG"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Aperçu seulement
+        if: ${{ inputs.dry_run }}
+        run: echo "::notice::dry run — rien n'a été commité, tagué ni publié"
+
+  release-build:
+    name: Bundle ${{ matrix.target }}
+    needs: prepare
+    if: ${{ !inputs.dry_run }}
+    environment: release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ubuntu-22.04 et non ubuntu-latest : 24.04 lie une glibc plus récente et
+          # l'AppImage produit refuse alors de démarrer sur les distributions plus anciennes.
+          - os: ubuntu-22.04
+            target: linux
+          - os: windows-latest
+            target: windows
+    steps:
+      # Le SHA plutôt que le nom du tag : le tag vient d'être créé par `prepare`, et un SHA ne
+      # peut pas désigner autre chose entre-temps.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: release-${{ matrix.target }}
+          save-if: 'true'
+
+      - run: npm ci
+
+      # Sans `tagName`, l'action se contente de builder : elle ne crée aucune release,
+      # donc les deux jobs de la matrice ne se disputent pas la même.
+      # `bundle.targets: "all"` produit NSIS + MSI sur Windows, deb + rpm + AppImage sur Linux.
+      #
+      # `bundle.createUpdaterArtifacts` étant actif, le bundler exige la clé privée
+      # de signature : sans le secret, ce job échoue au lieu de publier des binaires
+      # que l'updater refuserait ensuite d'installer.
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          args: --verbose
+
+      # Les `.sig` sont remontés en bloc — le bundler en produit pour chaque cible,
+      # y compris celles que l'updater ne sait pas installer. C'est `publish` qui
+      # trie, plutôt que ce filtre : une signature écartée ici disparaîtrait des
+      # journaux, et avec elle le moyen de comprendre un manifeste incomplet.
+      #
+      # ⚠️ La version vient de `prepare` et non de `GITHUB_REF_NAME` : sur un
+      # `workflow_dispatch`, ce dernier vaut `main`, et les binaires s'appelleraient
+      # `devbox-main-windows.exe`.
+      - name: Rassembler installateurs et exécutable standalone
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          mkdir -p release
+          find src-tauri/target/release/bundle -type f \
+            \( -name '*.exe' -o -name '*.msi' -o -name '*.deb' -o -name '*.rpm' \
+               -o -name '*.AppImage' -o -name '*.sig' \) \
+            -exec cp {} release/ \;
+          # Le bundler ne remonte pas le binaire nu ; on le renomme pour que les deux OS
+          # ne se recouvrent pas dans la release.
+          if [ '${{ matrix.target }}' = 'windows' ]; then
+            cp src-tauri/target/release/devbox.exe "release/devbox-${VERSION}-windows.exe"
+          else
+            cp src-tauri/target/release/devbox "release/devbox-${VERSION}-linux"
+          fi
+          ls -l release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: release
+          retention-days: 7
+
+  publish:
+    name: Publier la release
+    needs: [prepare, release-build]
+    if: ${{ !inputs.dry_run }}
+    environment: release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # ⚠️ Avant `download-artifact` : `checkout` nettoie le workspace, et emporterait les
+      # bundles téléchargés. Le dépôt est là pour `scripts/release-notes.mjs`, qui relit la
+      # section au tag — le fichier commité est la seule source du corps de la release comme
+      # du panneau « Nouveautés ».
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: release
+
+      # Hors de `release/` : ce dossier part entier dans la release et dans les sommes.
+      - name: Relire la section au tag
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          node scripts/release-notes.mjs extract --version "$VERSION" \
+            --out "$RUNNER_TEMP/release-notes.md"
+          cat "$RUNNER_TEMP/release-notes.md"
+
+      # Manifeste lu par le plugin updater. Il est assemblé ici plutôt que par
+      # `tauri-action` : celle-ci ne le produit qu'en créant elle-même la release,
+      # ce que la matrice de build évite pour ne pas publier deux fois.
+      - name: Assembler latest.json
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+
+          const dir = 'release';
+          const { TAG, REPO } = process.env;
+
+          // Le bundler signe tout ce qu'il produit, paquets système compris. Or
+          // l'updater ne sait installer que l'installateur NSIS et l'AppImage :
+          // les autres signatures (.deb, .rpm, .msi) sont ignorées, pas fatales.
+          const TARGETS = [
+            { suffix: '.exe', key: 'windows-x86_64' },
+            { suffix: '.AppImage', key: 'linux-x86_64' },
+          ];
+
+          // Chaque .sig désigne le fichier qu'il signe. C'est ce qui distingue
+          // l'installateur NSIS de l'exécutable standalone, tous deux en .exe :
+          // seul le premier est signé.
+          const platforms = {};
+          const chosen = {};
+          const ignored = [];
+
+          for (const sig of fs.readdirSync(dir).filter((name) => name.endsWith('.sig'))) {
+            const asset = sig.slice(0, -'.sig'.length);
+            if (!fs.existsSync(`${dir}/${asset}`)) {
+              throw new Error(`signature orpheline : ${sig}`);
+            }
+
+            const target = TARGETS.find(({ suffix }) => asset.endsWith(suffix));
+            if (!target) {
+              ignored.push(asset);
+              continue;
+            }
+            // Deux candidats pour une même plateforme : en retenir un au hasard
+            // livrerait peut-être celui que l'updater ne sait pas lancer.
+            if (chosen[target.key]) {
+              throw new Error(
+                `deux artefacts pour ${target.key} : ${chosen[target.key]} et ${asset}`,
+              );
+            }
+
+            chosen[target.key] = asset;
+            platforms[target.key] = {
+              signature: fs.readFileSync(`${dir}/${sig}`, 'utf8').trim(),
+              url: `https://github.com/${REPO}/releases/download/${TAG}/${asset}`,
+            };
+          }
+
+          if (ignored.length) {
+            console.log(`Signatures ignorées (cibles hors updater) : ${ignored.join(', ')}`);
+          }
+
+          // Windows est la cible prioritaire : sans elle le manifeste ne servirait
+          // personne, donc la publication casse. Linux est livré s'il est là, mais
+          // son absence ne doit pas retenir une release Windows par ailleurs saine.
+          if (!platforms['windows-x86_64']) {
+            throw new Error("aucun artefact de mise à jour Windows dans release/");
+          }
+          if (!platforms['linux-x86_64']) {
+            console.log("::warning::Pas d'artefact de mise à jour Linux : manifeste Windows seul.");
+          }
+
+          // Sans le « v » : l'updater compare la valeur en semver, un préfixe la
+          // rendrait illisible et aucune mise à jour ne serait jamais proposée.
+          const manifest = {
+            version: TAG.replace(/^v/, ''),
+            pub_date: new Date().toISOString(),
+            platforms,
+          };
+          fs.writeFileSync(`${dir}/latest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+          console.log(JSON.stringify(manifest, null, 2));
+          EOF
+
+      - name: Checksums
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      # `tag_name` est obligatoire ici : sans lui l'action retombe sur `github.ref`, qui vaut
+      # `refs/heads/main` sur un `workflow_dispatch`.
+      #
+      # `generate_release_notes` reste actif et vient **après** le corps : l'API met notre
+      # texte en tête, et la liste brute des PR, les nouveaux contributeurs et le lien de
+      # comparaison à la suite.
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.tag }}
+          body_path: ${{ runner.temp }}/release-notes.md
+          generate_release_notes: true
+          files: release/*

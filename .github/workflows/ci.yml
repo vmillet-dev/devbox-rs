@@ -3,14 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     branches: [main]
 
-# On annule les runs empilés sur une branche, jamais un run de tag qui publie une release.
+# On annule les runs empilés sur une branche. Plus de run de tag à ménager : la
+# publication vit dans `release.yml`, qui a sa propre concurrence.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -37,6 +37,10 @@ jobs:
       # ESLint (règles d'accessibilité des templates incluses) + vérification Prettier,
       # qui couvre aussi les fichiers de ce workflow.
       - run: npm run lint
+
+      # Le générateur de notes de release n'est ni Angular ni Rust : son runner est celui
+      # de Node, sans dépendance à installer.
+      - run: npm run test:scripts
 
   lint-rust:
     name: Lint Rust
@@ -261,208 +265,3 @@ jobs:
           name: e2e-logs-${{ matrix.os }}
           path: e2e/logs
           retention-days: 7
-
-  # Rien ne synchronise package.json et Cargo.toml. Job court et sans dépendance :
-  # sur un tag qui a dérivé, la CI casse en quelques secondes plutôt qu'après la matrice.
-  check-version:
-    name: Cohérence des versions
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Le tag doit correspondre à package.json et Cargo.toml
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          pkg=$(node -p "require('./package.json').version")
-          cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
-          echo "tag=$tag package.json=$pkg Cargo.toml=$cargo"
-          for found in "$pkg" "$cargo"; do
-            if [ "$found" != "$tag" ]; then
-              echo "::error::version $found ne correspond pas au tag $tag"
-              exit 1
-            fi
-          done
-
-  release-build:
-    name: Bundle ${{ matrix.target }}
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [lint-front, lint-rust, test-front, test-rust, check-version]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # ubuntu-22.04 et non ubuntu-latest : 24.04 lie une glibc plus récente et
-          # l'AppImage produit refuse alors de démarrer sur les distributions plus anciennes.
-          - os: ubuntu-22.04
-            target: linux
-          - os: windows-latest
-            target: windows
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - uses: ./.github/actions/setup-rust
-        with:
-          shared-key: release-${{ matrix.target }}
-          save-if: 'true'
-
-      - run: npm ci
-
-      # Sans `tagName`, l'action se contente de builder : elle ne crée aucune release,
-      # donc les deux jobs de la matrice ne se disputent pas la même.
-      # `bundle.targets: "all"` produit NSIS + MSI sur Windows, deb + rpm + AppImage sur Linux.
-      #
-      # `bundle.createUpdaterArtifacts` étant actif, le bundler exige la clé privée
-      # de signature : sans le secret, ce job échoue au lieu de publier des binaires
-      # que l'updater refuserait ensuite d'installer.
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          args: --verbose
-
-      # Les `.sig` sont remontés en bloc — le bundler en produit pour chaque cible,
-      # y compris celles que l'updater ne sait pas installer. C'est `publish` qui
-      # trie, plutôt que ce filtre : une signature écartée ici disparaîtrait des
-      # journaux, et avec elle le moyen de comprendre un manifeste incomplet.
-      - name: Rassembler installateurs et exécutable standalone
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          mkdir -p release
-          find src-tauri/target/release/bundle -type f \
-            \( -name '*.exe' -o -name '*.msi' -o -name '*.deb' -o -name '*.rpm' \
-               -o -name '*.AppImage' -o -name '*.sig' \) \
-            -exec cp {} release/ \;
-          # Le bundler ne remonte pas le binaire nu ; on le renomme pour que les deux OS
-          # ne se recouvrent pas dans la release.
-          if [ '${{ matrix.target }}' = 'windows' ]; then
-            cp src-tauri/target/release/devbox.exe "release/devbox-${tag}-windows.exe"
-          else
-            cp src-tauri/target/release/devbox "release/devbox-${tag}-linux"
-          fi
-          ls -l release
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist-${{ matrix.target }}
-          path: release
-          retention-days: 7
-
-  publish:
-    name: Publier la release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: release-build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: dist-*
-          merge-multiple: true
-          path: release
-
-      # Manifeste lu par le plugin updater. Il est assemblé ici plutôt que par
-      # `tauri-action` : celle-ci ne le produit qu'en créant elle-même la release,
-      # ce que la matrice de build évite pour ne pas publier deux fois.
-      - name: Assembler latest.json
-        env:
-          TAG: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
-        run: |
-          node <<'EOF'
-          const fs = require('fs');
-
-          const dir = 'release';
-          const { TAG, REPO } = process.env;
-
-          // Le bundler signe tout ce qu'il produit, paquets système compris. Or
-          // l'updater ne sait installer que l'installateur NSIS et l'AppImage :
-          // les autres signatures (.deb, .rpm, .msi) sont ignorées, pas fatales.
-          const TARGETS = [
-            { suffix: '.exe', key: 'windows-x86_64' },
-            { suffix: '.AppImage', key: 'linux-x86_64' },
-          ];
-
-          // Chaque .sig désigne le fichier qu'il signe. C'est ce qui distingue
-          // l'installateur NSIS de l'exécutable standalone, tous deux en .exe :
-          // seul le premier est signé.
-          const platforms = {};
-          const chosen = {};
-          const ignored = [];
-
-          for (const sig of fs.readdirSync(dir).filter((name) => name.endsWith('.sig'))) {
-            const asset = sig.slice(0, -'.sig'.length);
-            if (!fs.existsSync(`${dir}/${asset}`)) {
-              throw new Error(`signature orpheline : ${sig}`);
-            }
-
-            const target = TARGETS.find(({ suffix }) => asset.endsWith(suffix));
-            if (!target) {
-              ignored.push(asset);
-              continue;
-            }
-            // Deux candidats pour une même plateforme : en retenir un au hasard
-            // livrerait peut-être celui que l'updater ne sait pas lancer.
-            if (chosen[target.key]) {
-              throw new Error(
-                `deux artefacts pour ${target.key} : ${chosen[target.key]} et ${asset}`,
-              );
-            }
-
-            chosen[target.key] = asset;
-            platforms[target.key] = {
-              signature: fs.readFileSync(`${dir}/${sig}`, 'utf8').trim(),
-              url: `https://github.com/${REPO}/releases/download/${TAG}/${asset}`,
-            };
-          }
-
-          if (ignored.length) {
-            console.log(`Signatures ignorées (cibles hors updater) : ${ignored.join(', ')}`);
-          }
-
-          // Windows est la cible prioritaire : sans elle le manifeste ne servirait
-          // personne, donc la publication casse. Linux est livré s'il est là, mais
-          // son absence ne doit pas retenir une release Windows par ailleurs saine.
-          if (!platforms['windows-x86_64']) {
-            throw new Error("aucun artefact de mise à jour Windows dans release/");
-          }
-          if (!platforms['linux-x86_64']) {
-            console.log("::warning::Pas d'artefact de mise à jour Linux : manifeste Windows seul.");
-          }
-
-          // Sans le « v » : l'updater compare la valeur en semver, un préfixe la
-          // rendrait illisible et aucune mise à jour ne serait jamais proposée.
-          const manifest = {
-            version: TAG.replace(/^v/, ''),
-            pub_date: new Date().toISOString(),
-            platforms,
-          };
-          fs.writeFileSync(`${dir}/latest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
-          console.log(JSON.stringify(manifest, null, 2));
-          EOF
-
-      - name: Checksums
-        run: |
-          cd release
-          sha256sum * > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-
-      - uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: release/*
