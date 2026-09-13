@@ -36,6 +36,9 @@ const driverProvider = 'embedded';
 /** `E2E_LOG_LEVEL=trace` when a session refuses to open; the default keeps runs readable. */
 const logLevel = (process.env['E2E_LOG_LEVEL'] ?? 'warn') as NonNullable<WebdriverIO.Config['logLevel']>;
 
+/** The refresh below is for what a *previous* file left behind, so it has none to undo yet. */
+let aFileHasRun = false;
+
 export const config: WebdriverIO.Config = {
   runner: 'local',
   specs: ['./specs/**/*.e2e.ts'],
@@ -81,6 +84,19 @@ export const config: WebdriverIO.Config = {
    */
   async before() {
     const { browser } = await import('@wdio/globals');
+
+    // ⚠️ Never before the **first** file. The refresh clears what the previous file left
+    // on screen, and there is no previous file — while the application is still seeding
+    // its samples. `SampleNotesService` writes its marker *before* the notes, on purpose,
+    // so a front end reloaded inside that window skips the seeding it interrupted: a
+    // space, no notes, and every launch after it agreeing there is nothing to do. The
+    // corpus then has no samples for the whole run, which is how `01-first-launch` came
+    // to assert on an empty canvas on both CI platforms.
+    if (!aFileHasRun) {
+      aFileHasRun = true;
+      return;
+    }
+
     await browser.refresh();
   },
 
