@@ -3,7 +3,7 @@ import { browser, expect } from '@wdio/globals';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { trash, undoBar } from '../pageobjects/overlays.page.js';
 import { press, reloadCanvas } from '../support/app.js';
-import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
+import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
  * Deleting a note does not delete it: `deleted_at` is stamped and retention decides
@@ -15,7 +15,7 @@ describe('Deleting a note, and taking it back', () => {
 
   before(async () => {
     await canvas.open();
-    spaceId = await firstSpaceId();
+    spaceId = await homeSpaceId();
   });
 
   async function seed(title: string): Promise<void> {
@@ -29,8 +29,8 @@ describe('Deleting a note, and taking it back', () => {
     const card = await canvas.openCardMenu('Armed but not fired');
     await card.$('[data-testid="note-card-delete"]').click();
 
-    // One click only arms the confirmation — a spec asserting after a single
-    // click would pass while the note is still there.
+    // One click only arms the confirmation — a spec asserting after a single click
+    // would pass while the note is still there.
     await browser.pause(500);
     expect((await bridge.queryNotes(query({ search: 'Armed but not fired' }))).matched).toBe(1);
 
@@ -82,7 +82,7 @@ describe('Deleting a note, and taking it back', () => {
     await canvas.waitForCard('Restore from panel');
   });
 
-  it('purges for good, which the retention no longer protects', async () => {
+  it('purges one row for good, which the retention no longer protects', async () => {
     await seed('Purge me');
     await canvas.deleteNote('Purge me');
     await canvas.waitForNoCard('Purge me');
@@ -95,5 +95,28 @@ describe('Deleting a note, and taking it back', () => {
     await trash.close();
 
     expect((await bridge.listTrash()).map((row) => row.title)).not.toContain('Purge me');
+  });
+
+  it('empties the whole trash, and says so once it is empty', async () => {
+    await seed('Swept away');
+    await seed('Swept away too');
+    await canvas.deleteNote('Swept away');
+    await canvas.waitForNoCard('Swept away');
+    await undoBar.dismiss();
+    await canvas.deleteNote('Swept away too');
+    await canvas.waitForNoCard('Swept away too');
+    await undoBar.dismiss();
+
+    await trash.open();
+    expect((await trash.titles()).length).toBeGreaterThan(1);
+
+    await trash.empty();
+    await browser.pause(800);
+
+    // The empty state replaces the list rather than leaving a header over nothing.
+    expect(await trash.emptyState().isExisting()).toBe(true);
+    expect(await trash.rows().length).toBe(0);
+    expect(await bridge.listTrash()).toHaveLength(0);
+    await trash.close();
   });
 });

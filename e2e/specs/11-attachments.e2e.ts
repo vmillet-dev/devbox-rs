@@ -6,16 +6,16 @@ import { join } from 'node:path';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
 import { reloadCanvas } from '../support/app.js';
-import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
+import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * Attachment bytes are not in the database: the row holds a record and the file
- * lives under `app_data_dir()/attachments/` with a name derived from the record id.
- * Write order is load-bearing — copy the file, then insert — and only a real
- * directory can show it.
+ * Attachment bytes are not in the database: the row holds a record and the file lives
+ * under `app_data_dir()/attachments/` with a name derived from the record id. Write
+ * order is load-bearing — copy the file, then insert — and only a real directory can
+ * show it.
  *
- * ⚠️ The picker is not driven (see `support/app.ts`); `attach_file` takes the path
- * the picker would have returned.
+ * ⚠️ The picker is not driven (see `support/app.ts`); `attach_file` takes the path the
+ * picker would have returned.
  */
 describe('Attachments', () => {
   const title = 'Note with a file';
@@ -26,12 +26,13 @@ describe('Attachments', () => {
   before(async () => {
     writeFileSync(filePath, 'step one\nstep two\n');
     await canvas.open();
-    const spaceId = await firstSpaceId();
+    const spaceId = await homeSpaceId();
     noteId = (await bridge.createNote(draft({ spaceId, title }))).id;
     await reloadCanvas();
     await canvas.waitForCard(title);
   });
 
+  /** Forward slashes: `\` is an escape on the wire, a separator on Windows. */
   async function attach(path: string) {
     return browser.executeAsync(
       (id: string, file: string, done: (value: unknown) => void) => {
@@ -42,12 +43,23 @@ describe('Attachments', () => {
           .catch((error: unknown) => done({ err: String(error) }));
       },
       noteId,
-      path,
+      path.replaceAll('\\', '/'),
     ) as Promise<{ ok?: { id: string; fileName: string }; err?: string }>;
   }
 
+  it('says the strip is empty before anything is attached', async () => {
+    await canvas.openNote(title);
+    expect(await editor.attachmentEmpty().isExisting()).toBe(true);
+    expect(await editor.attachments().length).toBe(0);
+
+    // ⚠️ Presence only: clicking it raises the OS file picker, which blocks the whole
+    // application until a human answers. `attach_file` below is the same operation.
+    expect(await editor.attachmentAdd().isExisting()).toBe(true);
+    await editor.close();
+  });
+
   it('records the file and keeps its name', async () => {
-    const outcome = await attach(filePath.replaceAll('\\', '/'));
+    const outcome = await attach(filePath);
     expect(outcome.err).toBeUndefined();
     expect(outcome.ok?.fileName).toBe('runbook.txt');
 
@@ -66,14 +78,21 @@ describe('Attachments', () => {
 
   it('lists it in the editor strip, and still does after a reopen', async () => {
     await canvas.openNote(title);
-    await browser.$('[data-testid="attachment-item"]').waitForExist({ timeout: 10_000 });
-    expect(await browser.$('[data-testid="attachment-item"]').getAttribute('data-file-name')).toBe(
-      'runbook.txt',
-    );
+    expect(await editor.attachmentNames()).toEqual(['runbook.txt']);
+    expect(await editor.attachmentEmpty().isExisting()).toBe(false);
 
     await editor.close();
     await canvas.openNote(title);
-    await browser.$('[data-testid="attachment-item"]').waitForExist({ timeout: 10_000 });
+    expect(await editor.attachmentNames()).toEqual(['runbook.txt']);
+  });
+
+  it('offers to hand the file to the desktop, which nothing here clicks', async () => {
+    // ⚠️ `open_attachment` asks the OS to launch the default application for the file.
+    // On a runner that is a text editor nobody closes — presence and label only.
+    const open = editor.attachmentOpen('runbook.txt');
+    expect(await open.isExisting()).toBe(true);
+    expect(await open.getAttribute('aria-label')).toContain('runbook.txt');
+    await editor.close();
   });
 
   it('gives two files of the same name two records', async () => {
@@ -83,7 +102,7 @@ describe('Attachments', () => {
     const twin = join(second, 'runbook.txt');
     writeFileSync(twin, 'a different runbook\n');
 
-    const outcome = await attach(twin.replaceAll('\\', '/'));
+    const outcome = await attach(twin);
     expect(outcome.err).toBeUndefined();
 
     const listed = await bridge.listAttachments(noteId);
@@ -92,7 +111,6 @@ describe('Attachments', () => {
   });
 
   it('removes one on the second click, and only then', async () => {
-    await editor.close();
     await canvas.openNote(title);
 
     const remove = browser.$('[data-testid="attachment-remove"]');
@@ -103,5 +121,6 @@ describe('Attachments', () => {
     await remove.click();
     await browser.pause(800);
     expect(await bridge.listAttachments(noteId)).toHaveLength(1);
+    await editor.close();
   });
 });

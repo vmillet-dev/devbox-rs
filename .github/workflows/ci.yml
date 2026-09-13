@@ -184,18 +184,25 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --locked
           echo "\`test-rust\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
-  # Le seul job qui lance l'application assemblée : vrai binaire, vraie WebView2,
-  # vraie base SQLite sur disque. Windows parce que c'est la plateforme de la
-  # matrice de release et celle qui a une WebView2 à piloter.
+  # Le seul job qui lance l'application assemblée : vrai binaire, vraie WebView,
+  # vraie base SQLite sur disque. Les deux plateformes de la matrice de release
+  # sont couvertes, et elles ne cassent pas de la même façon : la WebView est
+  # WebView2 sur Windows et WebKitGTK sur Linux, et `app_config_dir()` vaut
+  # `%APPDATA%` sur l'une mais `~/.config` sur l'autre — divergence que
+  # `15-preferences-on-disk` lit directement.
   #
   # `continue-on-error` volontairement : un job E2E instable que tout le monde
   # ignore vaut moins que pas de job du tout. À retirer une fois qu'il a fait ses
   # preuves sur quelques dizaines de runs.
   test-e2e:
-    name: Test E2E
-    runs-on: windows-latest
+    name: Test E2E (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
     defaults:
       run:
         shell: bash
@@ -207,12 +214,18 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      # L'étape apt de l'action est gardée par `runner.os == 'Linux'` : sur Windows
-      # elle n'installe que la toolchain et le cache cargo.
+      # L'étape apt de l'action installe les dépendances Tauri sur Linux ; sur
+      # Windows elle ne pose que la toolchain et le cache cargo.
       - uses: ./.github/actions/setup-rust
         with:
-          shared-key: e2e-windows
+          shared-key: e2e-${{ matrix.os }}
           save-if: 'true'
+
+      # WebKitGTK a besoin d'un serveur X : sans lui la fenêtre ne s'ouvre pas et
+      # le serveur WebDriver embarqué n'écoute jamais.
+      - name: Serveur X virtuel
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends xvfb
 
       - run: npm ci
 
@@ -223,57 +236,28 @@ jobs:
         run: |
           start=$(date +%s)
           npm run e2e:build
-          echo "\`build-e2e\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`build-e2e\` (${{ matrix.os }}) — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Does the binary survive without a driver?
-        run: |
-          set +e
-          echo "--- WebView2 Runtime ---"
-          ls "/c/Program Files (x86)/Microsoft/EdgeWebView/Application/" 2>/dev/null \
-            || echo "::warning::WebView2 Runtime introuvable — cause probable à elle seule"
-
-          # ⚠️ Sur un port à elle, jamais 4445 : c'est celui où `tauri-driver` place
-          # msedgedriver, et le plugin WebDriver de l'application s'y lie aussi. Un
-          # binaire lancé ici qui survivrait garderait 4445 pour tout le reste du job
-          # et condamnerait chaque session — le diagnostic deviendrait la panne.
-          export TAURI_WEBDRIVER_PORT=4465
-
-          log="$RUNNER_TEMP/app-start.log"
-          ./src-tauri/target/debug/devbox.exe > "$log" 2>&1 &
-          pid=$!
-          sleep 15
-
-          if kill -0 "$pid" 2>/dev/null; then
-            echo "Vivant après 15 s : le binaire démarre seul, la cause est le bac à sable ou le driver."
-            # `kill` ne termine pas de façon fiable un processus GUI natif depuis Git
-            # Bash : `taskkill //F` sur l'arbre complet, sinon il survit à l'étape.
-            taskkill //F //T //PID "$(cat /proc/$pid/winpid 2>/dev/null || echo "$pid")" >/dev/null 2>&1 || kill -9 "$pid" 2>/dev/null
-          else
-            wait "$pid"
-            code=$?
-            echo "::warning::Mort sans driver, code de sortie $code — la cause est dans l'application, pas dans wdio."
-          fi
-
-          echo "--- sortie de l'application ---"
-          cat "$log" 2>/dev/null
-          exit 0
-
-      # ⚠️ Ne pas poser `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` ici : c'est la variable
-      # par laquelle `tauri-driver` injecte `--remote-debugging-port` dans la WebView2.
-      # La définir l'écrase, et le port de débogage que msedgedriver attend n'est alors
-      # jamais ouvert — exactement le `DevToolsActivePort file doesn't exist` qu'on
-      # cherche à corriger. Essayé, sans effet, et dangereux : la suite passe en local
-      # sans elle.
+      # `xvfb-run` enveloppe le runner et non le binaire : c'est le service wdio qui
+      # lance l'application, depuis son propre `onPrepare`, donc le DISPLAY doit
+      # exister pour tout le processus.
       - name: Run the scenarios
         run: |
           start=$(date +%s)
-          npm run test:e2e
-          echo "\`test-e2e\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" npm run test:e2e
+          else
+            npm run test:e2e
+          fi
+          echo "\`test-e2e\` (${{ matrix.os }}) — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
+      # `E2E_LOG_LEVEL=trace` à la main sur un run en échec : par défaut les logs
+      # restent lisibles, et une session qui refuse de s'ouvrir se diagnostique en
+      # relançant le job avec la variable.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: e2e-logs
+          name: e2e-logs-${{ matrix.os }}
           path: e2e/logs
           retention-days: 7
 

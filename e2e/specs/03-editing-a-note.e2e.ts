@@ -1,28 +1,27 @@
-import { expect } from '@wdio/globals';
+import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
 import { spaces } from '../pageobjects/overlays.page.js';
 import { reloadCanvas } from '../support/app.js';
-import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
+import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
  * Every field goes through one `applyPatch`, whose comparator table decides what
  * actually moved. What a unit spec cannot see is the wire: an omitted key must stay
- * omitted, and `targetSpaceId` is the one argument Tauri renames between the two
- * sides.
+ * omitted, and `targetSpaceId` is the one argument Tauri renames between the two sides.
  */
 describe('Editing a note', () => {
-  // ⚠️ Not a sample note's title. `reread()` takes the first hit of a search, so a
-  // title shared with a seeded note makes the assertions depend on which of the two
-  // sorts first — that is, on what an earlier spec file happened to touch.
+  // ⚠️ Not a sample note's title. `reread()` takes the first hit of a search, so a title
+  // shared with a seeded note makes the assertions depend on which of the two sorts
+  // first — that is, on what an earlier spec file happened to touch.
   const title = 'Rollout under edit';
   let spaceId = '';
   let refugeId = '';
 
   before(async () => {
     await canvas.open();
-    spaceId = await firstSpaceId();
+    spaceId = await homeSpaceId();
     refugeId = (await bridge.createSpace({ name: 'Ops' })).id;
     await bridge.createNote(draft({ spaceId, title, content: 'kubectl rollout status' }));
     await reloadCanvas();
@@ -45,6 +44,28 @@ describe('Editing a note', () => {
     expect(note?.source).toBe('runbooks/api.md');
   });
 
+  it('counts what the body holds, in the footer', async () => {
+    await canvas.openNote(title);
+    // Language label, lines and bytes — derived from the draft, so it is what tells a
+    // reader the editor is looking at the note they opened.
+    const footer = await editor.footer();
+    expect(footer).toContain('1');
+    await editor.close();
+  });
+
+  it('goes fullscreen and back, without losing the draft', async () => {
+    await canvas.openNote(title);
+    expect(await editor.isFullscreen()).toBe(false);
+
+    await editor.toggleFullscreen();
+    expect(await editor.isFullscreen()).toBe(true);
+    expect(await editor.body()).toBe('kubectl rollout restart deployment/api');
+
+    await editor.toggleFullscreen();
+    expect(await editor.isFullscreen()).toBe(false);
+    await editor.close();
+  });
+
   it('changes the language through the generated union', async () => {
     await canvas.openNote(title);
     await editor.setLanguage('sh');
@@ -55,10 +76,11 @@ describe('Editing a note', () => {
 
   it('adds and removes a tag, normalised by Rust', async () => {
     await canvas.openNote(title);
-    // The leading `#` is stripped and the case-insensitive duplicate collapsed,
-    // in `notes::model::normalize_tags` and nowhere else.
+    // The leading `#` is stripped and the case-insensitive duplicate collapsed, in
+    // `notes::model::normalize_tags` and nowhere else.
     await editor.addTag('#deploy');
     await editor.addTag('Deploy');
+    expect(await editor.tags()).toEqual(['deploy']);
     await editor.close();
     expect((await reread())?.tags).toEqual(['deploy']);
 
@@ -71,6 +93,7 @@ describe('Editing a note', () => {
   it('pins the note, and the card says so', async () => {
     await canvas.openNote(title);
     await editor.togglePin();
+    expect(await editor.isPinned()).toBe(true);
     await editor.close();
 
     expect((await reread())?.pinned).toBe(true);
@@ -86,8 +109,8 @@ describe('Editing a note', () => {
     const lifecycle = (await reread())?.lifecycle;
     expect(lifecycle?.kind).toBe('expires');
 
-    // Read back in local time, and late in the day: midnight would make a note
-    // dated today expired the moment it was saved.
+    // Read back in local time, and late in the day: midnight would make a note dated
+    // today expired the moment it was saved.
     const at = new Date((lifecycle as { at: string }).at);
     expect(at.getFullYear()).toBe(2030);
     expect(at.getMonth()).toBe(5);
@@ -106,5 +129,17 @@ describe('Editing a note', () => {
     await spaces.open();
     await spaces.option(refugeId).click();
     await canvas.waitForCard(title);
+  });
+
+  it('shows every space again through the "all spaces" row', async () => {
+    await spaces.open();
+    await spaces.allOption().click();
+    // `null` is a choice, not a loading state: the note filed in `Ops` is still listed.
+    await canvas.waitForCard(title);
+
+    // Reopened, because selecting closes the menu with the row that has to be checked.
+    await spaces.open();
+    expect(await spaces.allOption().getAttribute('aria-checked')).toBe('true');
+    await spaces.close();
   });
 });

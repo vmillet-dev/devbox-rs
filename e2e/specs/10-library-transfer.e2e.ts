@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { fileMenu } from '../pageobjects/titlebar.page.js';
 import { press, reloadCanvas } from '../support/app.js';
-import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
+import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
  * Export and import compose the notes and spaces stores rather than owning a table,
@@ -21,6 +21,12 @@ import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
  */
 describe('Import, export and share', () => {
   const directory = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
+
+  /**
+   * Forward slashes for the command, which crosses JSON and lands in a Rust `Path`:
+   * `\` is an escape on the wire and a separator on Windows. Node reads the same path
+   * back with `/` on either platform, so nothing converts it a second time.
+   */
   const bundlePath = join(directory, 'library.json').replaceAll('\\', '/');
 
   /** Kept from `before`: the seeded space is named from a translation (see below). */
@@ -28,7 +34,7 @@ describe('Import, export and share', () => {
 
   before(async () => {
     await canvas.open();
-    homeId = await firstSpaceId();
+    homeId = await homeSpaceId();
     await bridge.createNote(draft({ spaceId: homeId, title: 'Worth exporting', content: 'echo hello' }));
     await reloadCanvas();
   });
@@ -40,7 +46,7 @@ describe('Import, export and share', () => {
     expect(written.notes).toBe(corpus.matched);
     expect(written.spaces).toBe((await bridge.listSpaces()).length);
 
-    expect(existsSync(bundlePath.replaceAll('/', '\\'))).toBe(true);
+    expect(existsSync(bundlePath)).toBe(true);
     const bundle = JSON.parse(readFileSync(bundlePath, 'utf8')) as { notes: { title: string }[] };
     expect(bundle.notes.map((note) => note.title)).toContain('Worth exporting');
   });
@@ -99,10 +105,14 @@ describe('Import, export and share', () => {
 
   it('greys out the menu entries that have nothing to act on', async () => {
     await fileMenu.open();
-    // Nothing is ticked, so there is no selection to export. The entry stays in the
-    // DOM and clickable — it carries `aria-disabled`, not `disabled`.
+    // Nothing is ticked, so there is no selection to export. The entry stays in the DOM
+    // and clickable — it carries `aria-disabled`, not `disabled`.
     expect(await fileMenu.isDisabled('exportSelection')).toBe(true);
     expect(await fileMenu.isDisabled('exportAll')).toBe(false);
+
+    // ⚠️ Neither is clicked: both open the OS file picker, which blocks the application
+    // until a human answers it. The commands underneath are what the tests above drive.
+    expect(await fileMenu.entry('exportAll').isExisting()).toBe(true);
     await press('Escape');
   });
 });

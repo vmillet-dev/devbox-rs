@@ -5,8 +5,7 @@
     "rootDir": "..",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["node", "mocha", "@wdio/globals/types"],
-    "noUncheckedIndexedAccess": false
+    "types": ["node", "mocha", "@wdio/globals/types"]
   },
   "include": ["**/*.ts"]
 }

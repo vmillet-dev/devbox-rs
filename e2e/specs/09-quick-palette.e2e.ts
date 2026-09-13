@@ -4,7 +4,7 @@ import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
 import { palette } from '../pageobjects/overlays.page.js';
 import { emitGlobalAction, press, reloadCanvas } from '../support/app.js';
-import { bridge, draft, firstSpaceId } from '../support/bridge.js';
+import { bridge, draft, homeSpaceId } from '../support/bridge.js';
 
 /**
  * ⚠️ The OS-level `Ctrl+Alt+P` is **out of scope**: WebDriver types into the
@@ -25,7 +25,7 @@ describe('The quick-paste palette', () => {
 
   before(async () => {
     await canvas.open();
-    const spaceId = await firstSpaceId();
+    const spaceId = await homeSpaceId();
     await bridge.createNote(
       draft({ spaceId, title: 'Reset the dev database', content: 'cargo run -- reset', language: 'sh' }),
     );
@@ -48,6 +48,16 @@ describe('The quick-paste palette', () => {
   it('offers to create a note from a query that matches nothing', async () => {
     await palette.type('a query matching nothing at all');
     expect(await palette.createRow().isExisting()).toBe(true);
+    // The offer replaces the list rather than sitting under an empty one.
+    expect(await palette.options().length).toBe(0);
+  });
+
+  it('says the corpus is empty rather than showing a bare list', async () => {
+    await palette.type('');
+    // Every note is a candidate with no query, so the empty row is the one thing that
+    // must not appear here — it belongs to a corpus with nothing in it.
+    expect(await palette.empty().isExisting()).toBe(false);
+    expect(await palette.options().length).toBeGreaterThan(0);
   });
 
   it('opens the highlighted note in the editor on Tab', async () => {

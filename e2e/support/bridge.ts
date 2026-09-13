@@ -1,4 +1,7 @@
 import { browser } from '@wdio/globals';
+import { readFileSync, writeFileSync } from 'node:fs';
+
+import { homeSpaceMarker } from './profile.js';
 
 import type {
   Attachment,
@@ -59,8 +62,16 @@ export const bridge = {
   updateNote: (id: string, patch: NotePatch) => invoke<DisplayNote>('update_note', { id, patch }),
   deleteNote: (id: string) => invoke<null>('delete_note', { id }),
 
+  /** The batch commands answer with a count: a selection can hold an id that went stale. */
+  deleteNotes: (ids: string[]) => invoke<number>('delete_notes', { ids }),
+  moveNotes: (ids: string[], spaceId: string) => invoke<number>('move_notes', { ids, spaceId }),
+  tagNotes: (ids: string[], tags: string[]) => invoke<number>('tag_notes', { ids, tags }),
+  purgeNotes: (ids: string[]) => invoke<number>('purge_notes', { ids }),
+  emptyTrash: () => invoke<number>('empty_trash'),
+
   listTrash: () => invoke<TrashedNote[]>('list_trash'),
   listTags: () => invoke<TagUsage[]>('list_tags'),
+  renameTag: (tag: string, into: string) => invoke<number>('rename_tag', { tag, into }),
   listAttachments: (noteId: string) => invoke<Attachment[]>('list_attachments', { noteId }),
   listGlobalPlaceholders: () => invoke<Record<string, string>>('list_global_placeholders'),
   setGlobalPlaceholders: (values: Record<string, string>) =>
@@ -100,12 +111,47 @@ export function query(overrides: Partial<NotesQuery> = {}): NotesQuery {
   };
 }
 
-/** The id of the only space a fresh install has — where a seeded note goes. */
-export async function firstSpaceId(): Promise<string> {
+/**
+ * Where a seeded note goes: the space the install seeded, by id, for the whole run.
+ *
+ * ⚠️ **Not** `listSpaces()[0]`. `list_spaces` orders by `name COLLATE NOCASE`, so the
+ * first row is the alphabetically first space, not the seeded one — and a spec file
+ * running after another created `Ops` or `Veille` would silently pick that one
+ * instead. It worked only because `Découverte` and `Getting started` both sort early;
+ * renaming the sample space, or adding a locale, would have moved it under the suite.
+ *
+ * Resolved once, while a virgin profile still holds exactly one space, then read back
+ * from a file — WebdriverIO gives each spec file its own worker process, so a
+ * module-level cache would be empty again in the next one. `resetProfile()` deletes
+ * the note along with the profile, so a new run resolves it afresh.
+ */
+function readHomeSpaceId(): string | null {
+  try {
+    return readFileSync(homeSpaceMarker(), 'utf8').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function homeSpaceId(): Promise<string> {
+  const remembered = readHomeSpaceId();
+  if (remembered) {
+    return remembered;
+  }
+
   const spaces = await bridge.listSpaces();
   const first = spaces[0];
   if (!first) {
     throw new Error('a fresh profile should have seeded one space');
   }
+  if (spaces.length > 1) {
+    throw new Error(
+      `the seeded space is asked for with ${spaces.length} spaces present, so "the first one" is a ` +
+        `guess. It has to be resolved while the profile is still virgin, in 01-first-launch. ` +
+        `Found ${JSON.stringify(spaces.map((space) => space.name))}`,
+    );
+  }
+
+  writeFileSync(homeSpaceMarker(), first.id, 'utf8');
   return first.id;
 }

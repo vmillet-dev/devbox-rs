@@ -3,29 +3,40 @@ import { browser, expect } from '@wdio/globals';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { spaces } from '../pageobjects/overlays.page.js';
 import { press, reloadCanvas } from '../support/app.js';
-import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
+import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * `notes.space_id` carries `ON DELETE CASCADE`, so deleting a space without a
- * refuge would take its notes with it. The refuge is enforced in the model and in
- * the schema; only a real database proves the cascade never fires.
+ * `notes.space_id` carries `ON DELETE CASCADE`, so deleting a space without a refuge
+ * would take its notes with it. The refuge is enforced in the model and in the schema;
+ * only a real database proves the cascade never fires.
  */
 describe('Spaces', () => {
   let homeId = '';
 
   before(async () => {
     await canvas.open();
-    homeId = await firstSpaceId();
+    homeId = await homeSpaceId();
 
-    // ⚠️ The first scenario asserts on "the only space there is", which is a property
-    // of the **whole database** — and one application now serves the whole run, so an
-    // earlier spec file's space is still there. The precondition is established here
-    // rather than inherited, which also makes this file runnable on its own.
+    // ⚠️ The first scenario asserts on "the only space there is", which is a property of
+    // the **whole database** — and one application serves the whole run, so an earlier
+    // spec file's space is still there. The precondition is established here rather than
+    // inherited, which also makes this file runnable on its own.
     for (const space of await bridge.listSpaces()) {
       if (space.id !== homeId) {
         await bridge.deleteSpace(space.id, homeId);
       }
     }
+    await reloadCanvas();
+  });
+
+  /**
+   * The canvas is left filtered on a space this file then deletes, and the active space
+   * outlives the page. Every later file asserts on titles, so it is put back on "all
+   * spaces" here rather than each of them guessing what this one left behind.
+   */
+  after(async () => {
+    await spaces.open();
+    await spaces.allOption().click();
     await reloadCanvas();
   });
 
@@ -47,6 +58,12 @@ describe('Spaces', () => {
     expect(all.map((space) => space.name)).toContain('Veille');
   });
 
+  it('lists both in the switcher, by name', async () => {
+    await spaces.open();
+    expect(await spaces.names()).toContain('Veille');
+    await spaces.close();
+  });
+
   it('renames one without touching its id', async () => {
     const before = (await bridge.listSpaces()).find((space) => space.name === 'Veille');
     await spaces.open();
@@ -66,6 +83,10 @@ describe('Spaces', () => {
     await spaces.option(target.id).click();
     await canvas.waitForCard('Only in Lectures');
     expect(await canvas.titles()).toEqual(['Only in Lectures']);
+
+    // The switcher wears the space it is filtering on, which is the only thing on
+    // screen saying the canvas is not showing everything.
+    expect(await spaces.label()).toContain('Lectures');
   });
 
   it('moves the notes out before dropping the space', async () => {

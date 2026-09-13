@@ -7,10 +7,6 @@ export function testid(name: string): string {
   return `[data-testid="${name}"]`;
 }
 
-export function byTestId(name: string): ChainablePromiseElement {
-  return $(testid(name));
-}
-
 /**
  * The canvas is behind a lazy route, a `resource` and a debounce; every scenario
  * starts by waiting for it rather than for the window, which exists long before
@@ -38,21 +34,18 @@ function codeFor(key: string): string {
 }
 
 /**
- * ⚠️ Not `browser.keys`, and that is the whole point.
- *
- * The embedded WebDriver server answers `POST /session/:id/actions` with a 200 and
- * dispatches nothing. Every keyboard shortcut in this suite was therefore doing
- * nothing at all, silently — the canvas keys, `Ctrl+Z`, `Escape`, the accelerator
- * capture. A synthetic `KeyboardEvent` reaches the same handlers, because all of
- * them listen in the DOM: `CANVAS_KEYS`, `DialogStack` and `acceleratorFromEvent`.
+ * ⚠️ Not `browser.keys`: the embedded WebDriver server answers
+ * `POST /session/:id/actions` with a 200 and dispatches nothing, so every shortcut in
+ * this suite was silently doing nothing. A synthetic `KeyboardEvent` reaches the same
+ * handlers, which all listen in the DOM (`CANVAS_KEYS`, `DialogStack`,
+ * `acceleratorFromEvent`).
  *
  * `code` is filled as carefully as `key`: the shortcut field reads the **physical**
- * key, so an event carrying only `key` would record the wrong accelerator and the
- * test would pass for the wrong reason.
+ * key, so an event carrying only `key` would record the wrong accelerator and the test
+ * would pass for the wrong reason.
  *
- * Out of reach — and always was, for any WebDriver: the **native** global shortcuts,
- * which the system delivers outside the window. `emitGlobalAction` covers what sits
- * downstream of those.
+ * Out of reach for any WebDriver: the **native** global shortcuts, which the system
+ * delivers outside the window. `emitGlobalAction` covers what sits downstream of those.
  */
 export async function press(key: string, modifiers: Modifier[] = []): Promise<void> {
   await browser.execute(
@@ -78,20 +71,24 @@ export async function press(key: string, modifiers: Modifier[] = []): Promise<vo
 }
 
 /**
- * ⚠️ Not `selectByAttribute`. The embedded WebDriver server moves the selection
- * without the `change` the component listens to, so a `<select>` shows the new
- * value while the model keeps the old one — the language stayed `txt`, the theme
- * stayed `dark`, and the assertion read the control rather than the effect.
+ * Assign the value, then dispatch the `change` the browser would have.
  *
- * Same shape as the editor's date field, which was already written this way for a
- * different reason: assign, then dispatch what the browser would have.
+ * ⚠️ Covers `<select>` and `<input type="date">` alike, and neither can be driven the
+ * obvious way. `selectByAttribute` moves the selection without the `change` the
+ * components listen to, so the model kept the old value while the control showed the
+ * new one; and a date input accepts keystrokes in the **display** format, which follows
+ * the WebView's locale — a spec typing `15/06/2030` would pass at home and fail on an
+ * English runner.
+ *
+ * What this skips is the browser's own parsing; every handler downstream still runs.
  */
-export async function selectOption(selector: string, value: string): Promise<void> {
+export async function setNativeValue(selector: string, value: string): Promise<void> {
+  await $(selector).waitForExist({ timeout: 10_000 });
   await browser.execute(
     (sel: string, next: string) => {
-      const field = document.querySelector(sel) as HTMLSelectElement | null;
+      const field = document.querySelector(sel) as HTMLInputElement | HTMLSelectElement | null;
       if (!field) {
-        throw new Error(`no <select> at ${sel}`);
+        throw new Error(`no field at ${sel}`);
       }
       field.value = next;
       field.dispatchEvent(new Event('change', { bubbles: true }));
@@ -103,10 +100,8 @@ export async function selectOption(selector: string, value: string): Promise<voi
 
 /**
  * Enter inside a text input submits its form through the browser's **implicit
- * submission** — a native behaviour, not a handler. Neither `browser.keys` nor a
- * synthetic `KeyboardEvent` reproduces it: the browser reserves it for real user
- * input. `requestSubmit()` fires exactly the event the browser would, which is what
- * the editor's tag field listens to (`<form (submit)="submitTag($event)">`).
+ * submission** — a native behaviour, not a handler, and one the browser reserves for
+ * real user input. `requestSubmit()` fires exactly the event the form listens to.
  */
 export async function submitFormOf(selector: string): Promise<void> {
   await browser.execute((sel: string) => {
@@ -116,9 +111,8 @@ export async function submitFormOf(selector: string): Promise<void> {
 }
 
 /**
- * Title, body and source commit on **blur**, and the suite used to reach that with
- * `Tab`. A synthetic key event does not move focus, so the blur is asked for
- * directly rather than hoped for as a side effect.
+ * Title, body and source commit on **blur**. A synthetic key event does not move
+ * focus, so the blur is asked for directly rather than hoped for as a side effect.
  */
 export async function blur(): Promise<void> {
   await browser.execute(() => {
@@ -137,12 +131,21 @@ export async function reloadCanvas(): Promise<void> {
 }
 
 /**
- * A real restart, database and preferences kept: the profile is wiped once before
- * the runner starts and never again, so a new session meets the same
- * `app_data_dir()` the previous one wrote to. That is what makes "close it and it
- * is still there" mean anything.
+ * ⚠️ **Not** a restart of the application, and it cannot be one.
+ *
+ * Under the `embedded` driver provider the WebDriver server lives *inside* the
+ * application, so `reloadSession` tears the session down and opens a new one against
+ * the same living process — which has to stay up, since it *is* the server. The Rust
+ * side, its SQLite connection and the store plugin's in-memory map all survive.
+ *
+ * What it does buy is a front end built from nothing: the new session loads the page
+ * fresh, so Angular reboots and every store is reconstructed from what the commands
+ * answer rather than from a signal it was still holding.
+ *
+ * ⚠️ Never use it to prove that something reached the **disk** — it cannot.
+ * `15-preferences-on-disk.e2e.ts` reads the file from Node for that.
  */
-export async function restart(): Promise<void> {
+export async function reopenSession(): Promise<void> {
   await browser.reloadSession();
   await waitForCanvas();
 }
@@ -166,11 +169,11 @@ export async function emitGlobalAction(action: GlobalAction): Promise<void> {
  * What the application actually put on the system clipboard — or `null` when this
  * machine will not let anyone read it.
  *
- * ⚠️ On Windows the clipboard is a single global lock, and a clipboard manager (or
- * the history pane) can hold it indefinitely: the plugin then answers "held by
- * another party" to a read *and* to a write. That is a property of the runner, not
- * of DevBox, so a caller treats `null` as "not observable here" rather than as a
- * failure — and asserts on `DisplayNote.copyText`, which is the part DevBox owns.
+ * ⚠️ On Windows the clipboard is a single global lock, and a clipboard manager (or the
+ * history pane) can hold it indefinitely; on a headless Linux runner there may be no
+ * selection owner at all. Either way that is a property of the runner, not of DevBox,
+ * so a caller treats `null` as "not observable here" and skips rather than fails — and
+ * asserts on `DisplayNote.copyText`, which is the part DevBox owns.
  */
 export async function clipboardText(): Promise<string | null> {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -191,18 +194,17 @@ export async function clipboardText(): Promise<string | null> {
 }
 
 /**
- * ⚠️ There is no way to stand in front of the OS file picker from here, and the
- * scenarios are written around that rather than against it.
+ * ⚠️ There is no way to stand in front of the OS file picker, and the scenarios are
+ * written around that rather than against it.
  *
- * `window.__TAURI_INTERNALS__.invoke` — the single funnel every `invoke` goes
- * through, the application's own included — is defined `writable: false,
- * configurable: false`. Neither an assignment nor `Object.defineProperty` can wrap
- * it, which is deliberate hardening on Tauri's side; `browser.tauri.mock()` cannot
- * reach it either. So a picker opened by a click blocks the whole application until
- * a human clicks it.
+ * `window.__TAURI_INTERNALS__.invoke` — the single funnel every `invoke` goes through,
+ * the application's own included — is defined `writable: false, configurable: false`.
+ * Neither an assignment nor `Object.defineProperty` can wrap it, which is deliberate
+ * hardening on Tauri's side; `browser.tauri.mock()` cannot reach it either. So a picker
+ * opened by a click blocks the whole application until a human clicks it.
  *
- * Consequence for the suite: import, export and attaching a file are exercised
- * through their commands, which take a path and are what actually touch the
- * database and the disk. What is left untested is the picker itself — OS UI, like
- * the global accelerator and the tray menu.
+ * Consequence for the suite: import, export and attaching a file are exercised through
+ * their commands, which take a path and are what actually touch the database and the
+ * disk. The controls that *open* a picker are asserted on, never clicked — like the
+ * tray menu and the global accelerator, they are OS UI.
  */

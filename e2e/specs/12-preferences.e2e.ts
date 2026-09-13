@@ -2,13 +2,16 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { fileMenu, settings, titlebar } from '../pageobjects/titlebar.page.js';
-import { press, restart } from '../support/app.js';
+import { press, reopenSession } from '../support/app.js';
 
 /**
  * A preference applies as it is typed — there is no OK anywhere in the panel — and
- * is written through to `preferences.json` one key at a time. Only a restart can
- * show that the file was actually written and read back: the store plugin's round
- * trip happens outside both unit suites.
+ * `SettingsStore` writes it through one key at a time.
+ *
+ * ⚠️ What this file does **not** prove is that any of it reached the disk.
+ * `reopenSession()` opens a new WebDriver session against the same living process, so
+ * the store plugin's in-memory map is still the one answering; a page reload reads the
+ * cache, not the file. `15-preferences-on-disk` is where the file itself is read.
  */
 describe('Preferences', () => {
   before(canvas.open);
@@ -36,10 +39,12 @@ describe('Preferences', () => {
     expect(await titlebar.activeLocale()).toBe('en');
   });
 
-  it('still holds all three after a restart', async () => {
+  it('rebuilds all three from the store rather than from a signal it was holding', async () => {
     await settings.close();
-    await restart();
+    await reopenSession();
 
+    // Angular and every store were built again from nothing; these three came back
+    // because `SettingsStore` restored them, not because anything survived in memory.
     expect(await browser.$('html').getAttribute('data-theme')).toBe('light');
     expect(await browser.$('html').getAttribute('data-density')).toBe('compact');
     expect(await titlebar.activeLocale()).toBe('en');
@@ -51,8 +56,8 @@ describe('Preferences', () => {
     const before = await field.getValue();
 
     // A *global* accelerator without a modifier would swallow that key in every
-    // application on the machine — which is also what leaves Tab and Escape
-    // working inside the field.
+    // application on the machine — which is also what leaves Tab and Escape working
+    // inside the field.
     await field.click();
     await press('p');
     expect(await field.getValue()).toBe(before);

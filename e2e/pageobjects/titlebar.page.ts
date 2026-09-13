@@ -1,6 +1,6 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { blur, selectOption, testid } from '../support/app.js';
+import { blur, setNativeValue, testid } from '../support/app.js';
 
 /** The controls' `id`s, in one place: `select` needs the selector, the getters the element. */
 const CONTROL = {
@@ -29,6 +29,9 @@ export const fileMenu = {
   open: () => $(testid('file-menu')).click(),
   entry: (id: string) => $(`${testid('file-option')}[data-entry="${id}"]`),
 
+  /** ⚠️ Asserted on, never clicked: it would take the application down mid-run. */
+  quit: () => $(testid('file-quit')),
+
   async isDisabled(id: string): Promise<boolean> {
     return (await fileMenu.entry(id).getAttribute('aria-disabled')) === 'true';
   },
@@ -45,22 +48,19 @@ export const settings = {
   close: () => $(testid('settings-close')).click(),
 
   /**
-   * The preference controls are addressed by their `id`, which is not a test hook
-   * but the `for` target of their own `<label>` — it cannot be renamed without
-   * breaking the association, which makes it as stable as a `data-testid`.
+   * The preference controls are addressed by their `id`, which is not a test hook but
+   * the `for` target of their own `<label>` — it cannot be renamed without breaking the
+   * association, which makes it as stable as a `data-testid`.
    */
   control: CONTROL,
 
-  theme: () => $(CONTROL.theme),
-  density: () => $(CONTROL.density),
   locale: () => $(CONTROL.locale),
-  pinnedFirst: () => $('#setting-pinned-first'),
   shortcut: () => $('#setting-shortcut'),
   resetShortcut: () => $('.setting-shortcut-reset').click(),
 
-  /** Takes the selector and not the element: `selectOption` assigns and dispatches. */
+  /** Takes the selector and not the element: `setNativeValue` assigns and dispatches. */
   async select(selector: string, value: string): Promise<void> {
-    await selectOption(selector, value);
+    await setNativeValue(selector, value);
     await browser.pause(200);
   },
 };
@@ -73,6 +73,14 @@ export const variables = {
 
   rows: () => $$(testid('variable-row')),
 
+  async names(): Promise<string[]> {
+    const found: string[] = [];
+    for await (const row of $$(testid('variable-row'))) {
+      found.push(await row.$(testid('variable-name')).getValue());
+    }
+    return found;
+  },
+
   async add(name: string, value: string): Promise<void> {
     await $(testid('variable-add')).click();
     const rows = await $$(testid('variable-row')).getElements();
@@ -84,6 +92,18 @@ export const variables = {
     await last.$(testid('variable-value')).setValue(value);
     await blur();
     await browser.pause(200);
+  },
+
+  async remove(name: string): Promise<void> {
+    for await (const row of $$(testid('variable-row'))) {
+      if ((await row.$(testid('variable-name')).getValue()) === name) {
+        await row.$(testid('variable-remove')).click();
+        await blur();
+        await browser.pause(200);
+        return;
+      }
+    }
+    throw new Error(`no variable row named "${name}" — found ${JSON.stringify(await variables.names())}`);
   },
 };
 

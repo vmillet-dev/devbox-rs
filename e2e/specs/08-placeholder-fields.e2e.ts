@@ -1,16 +1,17 @@
 import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
+import { editor } from '../pageobjects/editor.page.js';
 import { fieldsForm } from '../pageobjects/overlays.page.js';
-import { variables, settings } from '../pageobjects/titlebar.page.js';
-import { reloadCanvas } from '../support/app.js';
-import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
+import { settings, variables } from '../pageobjects/titlebar.page.js';
+import { clipboardText, reloadCanvas } from '../support/app.js';
+import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * A `{{field}}` is decided in `notes::placeholder` and nowhere else, its value is
- * kept in a table of its own, and a global variable only ever *proposes* one. The
- * last part is the one a unit suite cannot see: the proposal reaches the card as
- * the field's `defaultValue`, and copying it into `value` would freeze it.
+ * A `{{field}}` is decided in `notes::placeholder` and nowhere else, its value is kept
+ * in a table of its own, and a global variable only ever *proposes* one. The last part
+ * is what a unit suite cannot see: the proposal reaches the card as the field's
+ * `defaultValue`, and copying it into `value` would freeze it.
  */
 describe('{{fields}} in a snippet', () => {
   const title = 'Connect to the database';
@@ -18,7 +19,7 @@ describe('{{fields}} in a snippet', () => {
 
   before(async () => {
     await canvas.open();
-    const spaceId = await firstSpaceId();
+    const spaceId = await homeSpaceId();
     await bridge.createNote(draft({ spaceId, title, content: body, language: 'sh' }));
     await reloadCanvas();
     await canvas.waitForCard(title);
@@ -45,6 +46,72 @@ describe('{{fields}} in a snippet', () => {
     expect(port?.defaultValue).toBe('5432');
   });
 
+  it('shows the fields panel open, counting what is filled', async () => {
+    await canvas.openNote(title);
+
+    // Open by default: a panel folded away would hide the feature from anyone who does
+    // not know it exists yet.
+    expect(await editor.isFieldsPanelOpen()).toBe(true);
+
+    // Nothing typed yet, and the default written in the text does not count as filled.
+    expect(await editor.fieldsPanelCount()).toBe('0/3');
+    await editor.close();
+  });
+
+  it('folds the panel away, and remembers it was folded', async () => {
+    await canvas.openNote(title);
+    await editor.toggleFieldsPanel();
+    expect(await editor.isFieldsPanelOpen()).toBe(false);
+    await editor.close();
+
+    // The choice is a preference, not a per-note state: reopening keeps it folded.
+    await canvas.openNote(title);
+    expect(await editor.isFieldsPanelOpen()).toBe(false);
+
+    await editor.openFieldsPanel();
+    expect(await editor.isFieldsPanelOpen()).toBe(true);
+    await editor.close();
+  });
+
+  it('swaps the plain copy for one that fills the fields first', async function () {
+    await canvas.openNote(title);
+    // A note with fields copies filled; "copy as is" stays within reach in the panel.
+    expect(await editor.hasCopyFilled()).toBe(true);
+
+    await editor.copyFilled();
+    await browser.pause(800);
+    const filled = await clipboardText();
+    await editor.close();
+
+    if (filled === null) {
+      this.skip();
+      return;
+    }
+    // `fill_placeholders` reads the database, so the default written in the text stands
+    // in for a field nothing has typed into yet.
+    expect(filled).toContain('-p 5432');
+    expect(filled).not.toContain('{{port');
+  });
+
+  it('copies the snippet as it is, tokens included, from the panel', async function () {
+    const card = await canvas.cardWithTitle(title);
+    await card.$('[data-testid="note-card-fill"]').click();
+    await fieldsForm.form().waitForExist({ timeout: 10_000 });
+
+    await fieldsForm.copyRaw();
+    // ⚠️ Copies **and dismisses** — there is no form left to cancel.
+    await fieldsForm.form().waitForExist({ reverse: true, timeout: 10_000 });
+
+    const raw = await clipboardText();
+    if (raw === null) {
+      this.skip();
+      return;
+    }
+    // "As is" means the text, not the form's answer — the tokens survive.
+    expect(raw).toContain('{{host}}');
+    expect(raw).toContain('{{port=5432}}');
+  });
+
   it('keeps what was typed into the form', async () => {
     const card = await canvas.cardWithTitle(title);
     await card.$('[data-testid="note-card-fill"]').click();
@@ -60,9 +127,30 @@ describe('{{fields}} in a snippet', () => {
     expect(fields.find((field) => field.name === 'user')?.value).toBe('reader');
   });
 
+  it('counts those two in the editor panel', async () => {
+    await canvas.openNote(title);
+    await editor.openFieldsPanel();
+    expect(await editor.fieldsPanelCount()).toBe('2/3');
+    expect(await editor.field('host').getValue()).toBe('db.internal');
+    await editor.close();
+  });
+
+  it('leaves the form without writing anything when it is cancelled', async () => {
+    const card = await canvas.cardWithTitle(title);
+    await card.$('[data-testid="note-card-fill"]').click();
+    await fieldsForm.form().waitForExist({ timeout: 10_000 });
+
+    await fieldsForm.field('host').setValue('db.discarded');
+    await fieldsForm.cancel();
+    await fieldsForm.form().waitForExist({ reverse: true, timeout: 10_000 });
+
+    const fields = (await reread())?.placeholders ?? [];
+    expect(fields.find((field) => field.name === 'host')?.value).toBe('db.internal');
+  });
+
   it('does not refresh updated_at, which the canvas sorts on', async () => {
-    // Filling a field is not aimed at the note: `set_placeholder_values` has a
-    // command of its own precisely so it does not take the patch path.
+    // Filling a field is not aimed at the note: `set_placeholder_values` has a command
+    // of its own precisely so it does not take the patch path.
     const before = (await reread())?.updatedAt;
     const card = await canvas.cardWithTitle(title);
     await card.$('[data-testid="note-card-fill"]').click();
@@ -86,5 +174,17 @@ describe('{{fields}} in a snippet', () => {
     expect(port?.defaultValue).toBe('6543');
     expect(port?.value).toBe('');
     expect(await bridge.listGlobalPlaceholders()).toEqual({ port: '6543' });
+  });
+
+  it('gives the snippet its own default back when the variable is removed', async () => {
+    await variables.open();
+    await variables.remove('port');
+    await settings.close();
+    await reloadCanvas();
+
+    const port = (await reread())?.placeholders.find((field) => field.name === 'port');
+    // Back to the default written in the text: the note never stored the proposal.
+    expect(port?.defaultValue).toBe('5432');
+    expect(await bridge.listGlobalPlaceholders()).toEqual({});
   });
 });

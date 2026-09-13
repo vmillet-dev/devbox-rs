@@ -3,8 +3,8 @@ import { $, $$, browser } from '@wdio/globals';
 import { testid, waitForCanvas } from '../support/app.js';
 
 /**
- * The notes page: the header above the cards, and the cards themselves. Every
- * selector the scenarios use lives here, so a renamed `data-testid` is one edit.
+ * The notes page: the header above the cards, and the cards themselves. Every selector
+ * the scenarios use lives here, so a renamed `data-testid` is one edit.
  */
 export const canvas = {
   open: waitForCanvas,
@@ -43,9 +43,9 @@ export const canvas = {
   },
 
   /**
-   * Clicks the **title** and not the card: a checklist card carries its tickable
-   * items on a layer over the card button, and a click aimed at the button's centre
-   * lands on an item instead.
+   * Clicks the **title** and not the card: a checklist card carries its tickable items
+   * on a layer over the card button, and a click aimed at the button's centre lands on
+   * an item instead.
    */
   async openNote(title: string): Promise<void> {
     const card = await canvas.cardWithTitle(title);
@@ -53,14 +53,32 @@ export const canvas = {
     await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
   },
 
+  /** The card button itself, which is the click surface a snippet card is opened by. */
+  cardButton: (card: WebdriverIO.Element) => card.$(testid('note-card-open')),
+
+  cardTags: (card: WebdriverIO.Element) => card.$(testid('note-card-tags')),
+
   async createSnippet(): Promise<void> {
     await $(testid('new-note')).click();
+    await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
+  },
+
+  /** Through the kind menu rather than the split button's default half. */
+  async createSnippetFromMenu(): Promise<void> {
+    await $(testid('new-note-kind')).click();
+    await $(testid('new-note-snippet')).click();
     await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
   },
 
   async createChecklist(): Promise<void> {
     await $(testid('new-note-kind')).click();
     await $(testid('new-note-checklist')).click();
+    await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
+  },
+
+  /** The empty card at the end of the `week` section, which is why that section is always emitted. */
+  async createFromGhost(): Promise<void> {
+    await $(testid('create-ghost')).click();
     await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
   },
 
@@ -78,9 +96,8 @@ export const canvas = {
   async clearSearch(): Promise<void> {
     const field = $(testid('search-input'));
     await field.click();
-    // `setValue('')` rather than select-all-then-Backspace: it goes through the
-    // element endpoint, which the embedded driver implements, where key actions
-    // are accepted and dropped.
+    // `setValue('')` rather than select-all-then-Backspace: it goes through the element
+    // endpoint, which the embedded driver implements, where key actions are dropped.
     await field.setValue('');
     await browser.pause(400);
   },
@@ -99,8 +116,22 @@ export const canvas = {
   },
 
   noResults: () => $(testid('canvas-no-results')),
-  trashButton: () => $(testid('trash-open')),
-  manageTagsButton: () => $(testid('tag-manage')),
+
+  async openTagManager(): Promise<void> {
+    await $(testid('tag-manage')).click();
+    await $(testid('tag-manager-close')).waitForExist({ timeout: 10_000 });
+  },
+
+  // Multiple selection
+  async check(title: string): Promise<void> {
+    const card = await canvas.cardWithTitle(title);
+    await card.$(testid('note-card-check')).click();
+  },
+
+  async isChecked(title: string): Promise<boolean> {
+    const card = await canvas.cardWithTitle(title);
+    return (await card.$(testid('note-card-check')).getAttribute('aria-pressed')) === 'true';
+  },
 
   /** Opening an already-open menu closes it, so this asks rather than toggles. */
   async openCardMenu(title: string) {

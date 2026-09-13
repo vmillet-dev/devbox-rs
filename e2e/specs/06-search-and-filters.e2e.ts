@@ -2,17 +2,17 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { reloadCanvas } from '../support/app.js';
-import { bridge, draft, firstSpaceId } from '../support/bridge.js';
+import { bridge, draft, homeSpaceId } from '../support/bridge.js';
 
 /**
  * Filtering, grouping and facet aggregation all run in Rust; the front end only
- * describes the query. What crosses the bridge here is the query itself — the
- * debounce, the local-day offset, and a section set that must stay exhaustive.
+ * describes the query. What crosses the bridge here is the query itself — the debounce,
+ * the local-day offset, and a section set that must stay exhaustive.
  */
 describe('Search, filters and facets', () => {
   before(async () => {
     await canvas.open();
-    const spaceId = await firstSpaceId();
+    const spaceId = await homeSpaceId();
     await bridge.createNote(
       draft({
         spaceId,
@@ -53,6 +53,9 @@ describe('Search, filters and facets', () => {
   });
 
   it('collapses to a single flat results section while searching', async () => {
+    // Searched here rather than inherited from the test above: an `it` that depends on
+    // what the previous one left cannot be run, reordered or bailed on alone.
+    await canvas.search('étape');
     expect(await canvas.sectionKeys()).toEqual(['results']);
   });
 
@@ -67,6 +70,13 @@ describe('Search, filters and facets', () => {
     expect(keys).not.toContain('results');
     // `week` is always emitted: it hosts the create-ghost card.
     expect(keys).toContain('week');
+  });
+
+  it('shows a note its tags, on the card', async () => {
+    await canvas.search('Docker');
+    const card = await canvas.cardWithTitle('Docker compose');
+    expect(await canvas.cardTags(card).getText()).toContain('ops');
+    await canvas.clearSearch();
   });
 
   it('filters on a tag from the rail', async () => {
