@@ -50,10 +50,10 @@ src/                Angular front-end
 ├── styles/         global theme (styles.scss) and SCSS partials
 └── testing/        test doubles, fixtures and shared providers
 src-tauri/          Rust back-end
-├── src/notes/      the notes feature: model, language, view, placeholder, trash, SQL
+├── src/notes/      the notes feature: model, language, view, placeholder, trash, store/
 ├── src/spaces/     the spaces feature: model, SQL
 ├── src/attachments/ the attachments feature: model, SQL (the bytes live on disk)
-├── src/transfer/   import, export and share: the exchange format and Markdown rendering
+├── src/transfer/   import, export and share: bundle rules, the file, the exchange format
 ├── src/db.rs       connection, migrations, schema, stored-instant format
 ├── src/error.rs    the three errors and the translation between them
 ├── src/desktop.rs  tray and global shortcuts — native glue, not a feature
@@ -75,7 +75,9 @@ and the rules in the module, which is what lets the parser be tested without a T
 `transfer` is the one without a `store.rs`: import and export read and write **whole
 libraries**, so they compose the two other stores rather than owning a table. That is also why
 it is the only feature allowed a `notes::store::all` — a raw note list, which no command ever
-returns to the front (see [Data access](#data-access)).
+returns to the front (see [Data access](#data-access)). Its rules sit in two modules of its
+own instead: `transfer/bundle.rs` (what travels with an export, how an import merges) and
+`transfer/file.rs` (reading and writing the file, staged then renamed).
 
 Both follow the same three-part convention:
 
@@ -88,9 +90,21 @@ Both follow the same three-part convention:
 `notes/` carries extra modules, all of them notes-specific vocabulary: `language.rs`
 (the closed `Language` enum and the heuristics that guess one from pasted content),
 `view.rs` (what is asked — `NotesQuery`, `NoteFilter` — what comes back — `NotesView`,
-`NoteSection` — plus the search matching and chronological placement that produce it), and
-`checklist.rs` (the closed `NoteKind` enum, `ChecklistItem`, the normalisation of a list and
-its Markdown rendering).
+`NoteSection` — plus the search matching and chronological placement that produce it),
+`trash.rs` (the 30-day retention, `TrashedNote`, and the purge that erases the attachment
+files with the rows) and `checklist.rs` (the closed `NoteKind` enum, `ChecklistItem`, the
+normalization of a list and its Markdown rendering).
+
+Its SQL is the one store large enough to be split, into `notes/store/`: `related.rs` for the
+three side tables a note owns — tags, checklist items, `{{field}}` values, each keyed on
+`note_id` and rewritten whole, so each read, replaced and bulk-loaded the same way — and
+`trash.rs` for the queries that reason about `deleted_at`. ⚠️ `notes::trash` and
+`notes::store::trash` are the retention's **rules** and its **SQL**; they are the same split
+as `model.rs` and `store.rs` everywhere else.
+
+⚠️ `notes::store::trash` is a **soft** delete — it stamps `deleted_at` — where
+`spaces::store::delete` and `attachments::store::delete` erase. `notes::store::trash::purge`
+is the destructive one, and it is restricted to rows already in the trash.
 
 What is left at the root is what belongs to no single feature:
 
@@ -100,6 +114,7 @@ What is left at the root is what belongs to no single feature:
 | `db.rs`       | the connection and its `Mutex`, `open`/`open_in_memory`, plus `db::schema` and `db::migration` |
 | `db::iso8601` | the stored-instant format — millisecond-exact, because the canvas sorts on a TEXT column       |
 | `desktop.rs`  | tray and global shortcuts, including the `sync_tray` command that feeds the tray its labels    |
+| `app_info.rs` | what the application says about itself, read from `Cargo.toml` at compile time by `build.rs`   |
 
 This replaces an earlier split into three technical layers (`commands/ → domain/ ← storage/`),
 which cost three files and three modules per subject and a `check-layers.sh` script in CI to
@@ -1321,8 +1336,14 @@ who remember to touch the select. Three things keep it honest:
 ### Rules
 
 - A new command needs **one** registration: `collect_commands![…]` in `src-tauri/src/lib.rs`.
-  Annotate it `#[tauri::command]` **and** `#[specta::specta]`, then regenerate — an unannotated
-  function will not compile inside `collect_commands!`.
+  Annotate it `#[tauri::command(async)]` — see the threading note under
+  [Persistence](#persistence-rust) — **and** `#[specta::specta]`, then regenerate; an
+  unannotated function will not compile inside `collect_commands!`.
+- A module holding commands is `pub`, and that is not decoration: `#[specta::specta]`
+  generates a macro per command that `collect_commands!` resolves from the crate root.
+  Everything else is `pub(crate)` or narrower, so that `dead_code` and `unreachable_pub` —
+  both denied in `Cargo.toml` — still have something to say. A blanket `pub` silenced them
+  across the whole back end, and three unused items had accumulated behind it.
 - Every type crossing the bridge must derive `specta::Type` alongside its serde derives.
 - Specta refuses to export `usize`, `isize` and the 64-bit-and-wider integers, since JSON
   cannot carry them without precision loss. Use a sized type the wire can hold — `NotesView.matched`
@@ -1485,7 +1506,7 @@ connection, and `AppError` turns the refusal into `invalidInput` with `{{field}}
 
 What is checked: `language` against the known list (an arbitrary value would be unreadable by
 any front build), a space name trimmed and non-empty (`COLLATE NOCASE` folds case but not
-whitespace, so `"Perso "` would otherwise sit beside `"Perso"`, identical on screen), and
+whitespace, so `"Personal "` would otherwise sit beside `"Personal"`, identical on screen), and
 `NotesQuery.now` as a parseable instant — falling back to the server clock would silently
 re-cut every section on a different day.
 
@@ -1509,8 +1530,22 @@ installed or shipped alongside the executable. The database file lives in Tauri'
 - **Concurrency.** A `SqliteConnection` is not `Sync`, and Diesel takes it exclusively for
   every query, reads included. A single connection is shared as `tauri::State<Db>`
   (`Db = Mutex<SqliteConnection>`), registered with `.manage()` in `lib.rs` — never a global.
-  Overlapping commands serialise on that mutex, as they already did; the `&mut` changes the
-  signatures, not the concurrency.
+  Overlapping commands serialize on that mutex, and each command holds `db::lock` for its
+  whole body, so a check and the write that depends on it cannot be interleaved.
+- **⚠️ Commands that touch the database or the disk are `#[tauri::command(async)]`.** A plain
+  `#[tauri::command]` is compiled as `ExecutionContext::Blocking` and its body runs **inline
+  in the WebView's IPC handler** — on the main thread, where it freezes the window for as long
+  as it takes. Exporting a library, importing one, reading a 10 MB attachment into a `data:`
+  URI or copying a file all did exactly that. `(async)` on the same synchronous function moves
+  the body to the thread pool; no signature changes and `bindings.ts` is unaffected, since the
+  generated TypeScript was always promise-based.
+
+  The exception is `desktop.rs`: `sync_tray`, `set_global_shortcuts` and
+  `set_window_behavior` stay blocking, because the tray and shortcut registration want the
+  main thread. That is also why every piece of native state is managed in `desktop::init`
+  before any command can run — a command creating its own on first call would race another
+  doing the same.
+
 - **Migrations.** They live as SQL files in `src-tauri/migrations/`, are compiled into the
   binary by `embed_migrations!`, and are tracked in the `__diesel_schema_migrations` table.
   Evolving the model means adding a `YYYY-MM-DD-HHMMSS_name/` directory — never editing a
