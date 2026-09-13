@@ -26,7 +26,7 @@ e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-toml = "0.9"
+toml = "1.1"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }
