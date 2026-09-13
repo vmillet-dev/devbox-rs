@@ -166,12 +166,28 @@ mod tests {
         assert_eq!(applied.len(), embedded_versions().unwrap().len());
     }
 
+    /// Reverting is a development convenience, never something an install does — but a
+    /// `down.sql` nobody runs is a `down.sql` nobody can trust. This is what keeps the
+    /// set honest, and what would catch an `ALTER TABLE ... DROP COLUMN` blocked by an
+    /// index the revert forgot to drop first.
+    #[test]
+    fn every_migration_can_be_reverted_and_replayed() {
+        let mut connection = open_in_memory().unwrap();
+
+        connection.revert_all_migrations(MIGRATIONS).unwrap();
+        assert!(connection.applied_migrations().unwrap().is_empty());
+
+        connection.run_pending_migrations(MIGRATIONS).unwrap();
+
+        assert!(!connection.has_pending_migration(MIGRATIONS).unwrap());
+    }
+
     #[test]
     fn a_v1_database_upgrades_and_folds_tag_case() {
         let mut connection = legacy_database(
             &[
                 LEGACY_SCHEMA,
-                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Perso');
+                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Personal');
                      INSERT INTO notes VALUES
                        ('n-1', 's-1', 'A', 'txt', '', '', 0, '2026-07-25T09:00:00.000Z',
                         '2026-07-25T09:00:00.000Z', 'permanent', NULL),
@@ -206,7 +222,7 @@ mod tests {
             &[
                 LEGACY_SCHEMA,
                 LEGACY_FOLD_TAG_CASE,
-                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Perso');
+                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Personal');
                      INSERT INTO notes VALUES
                        ('n-1', 's-1', 'A', 'json', '', '', 0, '2026-07-25T09:00:00.000Z',
                         '2026-07-25T09:00:00.000Z', 'permanent', NULL);",
@@ -243,7 +259,7 @@ mod tests {
             &[
                 LEGACY_SCHEMA,
                 LEGACY_FOLD_TAG_CASE,
-                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Perso');
+                "INSERT INTO spaces (id, name) VALUES ('s-1', 'Personal');
                      INSERT INTO notes VALUES
                        ('n-1', 's-1', 'A', 'sql', 'select 1', '', 0, '2026-07-25T09:00:00.000Z',
                         '2026-07-25T09:00:00.000Z', 'permanent', NULL);",

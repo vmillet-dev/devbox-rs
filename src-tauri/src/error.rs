@@ -48,6 +48,10 @@ pub enum StorageError {
     SchemaTooRecent(String),
     #[error("Migration failed: {0}")]
     Migration(String),
+    /// A command panicked while holding the connection. Saying so beats panicking
+    /// again on the next one.
+    #[error("Storage unavailable: a previous operation failed")]
+    Unavailable,
     /// `#[from]`: required by `Connection::transaction`. `#[source]` comes along for
     /// free, where an overridden `impl Display` used to lose the cause chain.
     #[error("Storage error: {0}")]
@@ -79,7 +83,7 @@ pub enum ErrorCode {
 #[serde(rename_all = "camelCase")]
 pub struct AppError {
     pub code: ErrorCode,
-    /// Values to interpolate into the translated message, e.g. `{ "name": "Perso" }`.
+    /// Values to interpolate into the translated message, e.g. `{ "name": "Personal" }`.
     pub params: BTreeMap<String, String>,
     pub detail: String,
 }
@@ -135,6 +139,7 @@ impl From<StorageError> for AppError {
             StorageError::AttachmentNotFound(id) => {
                 Self::with(ErrorCode::AttachmentNotFound, detail, "id", &id)
             }
+            StorageError::Unavailable => Self::new(ErrorCode::StorageUnavailable, detail),
             StorageError::File(_) => Self::new(ErrorCode::FileAccess, detail),
             StorageError::ImportFormat(_) => Self::new(ErrorCode::ImportFormat, detail),
             // Nothing here gives the front end anything to do beyond reporting the

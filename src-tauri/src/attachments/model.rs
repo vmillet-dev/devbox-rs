@@ -30,10 +30,6 @@ impl Attachment {
     pub fn stored_name(&self) -> String {
         stored_name(&self.id, &self.file_name)
     }
-
-    pub fn is_image(&self) -> bool {
-        self.mime_type.starts_with("image/")
-    }
 }
 
 /// The extension kept **lowercase and purely alphanumeric**: anything else

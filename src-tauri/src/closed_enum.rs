@@ -33,9 +33,13 @@ macro_rules! closed_enum {
         }
 
         impl $name {
-            pub const ALL: [Self; [$(Self::$variant),+].len()] = [$(Self::$variant),+];
+            /// Every variant, in declaration order. Production code matches rather
+            /// than iterates; this is what lets a test assert over the whole set,
+            /// so that adding a variant cannot quietly escape the round-trip checks.
+            #[allow(dead_code)]
+            $vis const ALL: [Self; [$(Self::$variant),+].len()] = [$(Self::$variant),+];
 
-            pub fn as_str(self) -> &'static str {
+            $vis fn as_str(self) -> &'static str {
                 match self {
                     $(Self::$variant => $text),+
                 }

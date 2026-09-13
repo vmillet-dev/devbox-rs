@@ -13,19 +13,19 @@ use specta::Type;
 /// the length of a round trip.
 #[derive(Serialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct AppMetadata {
+pub(crate) struct AppMetadata {
     /// What the user is shown, which is not the crate name (`devbox`).
-    pub name: &'static str,
+    pub(crate) name: &'static str,
     /// ⚠️ Must stay covered by the scope declared for `opener:allow-open-url` in
     /// `capabilities/default.json`, or opening it is refused at runtime.
-    pub repository: &'static str,
-    pub author: &'static str,
-    pub author_handle: &'static str,
+    pub(crate) repository: &'static str,
+    pub(crate) author: &'static str,
+    pub(crate) author_handle: &'static str,
     /// The toolchain the project pins, for the about card.
-    pub rust_version: &'static str,
+    pub(crate) rust_version: &'static str,
 }
 
-pub const METADATA: AppMetadata = AppMetadata {
+pub(crate) const METADATA: AppMetadata = AppMetadata {
     name: env!("DEVBOX_DISPLAY_NAME"),
     repository: env!("CARGO_PKG_REPOSITORY"),
     author: env!("DEVBOX_AUTHOR"),

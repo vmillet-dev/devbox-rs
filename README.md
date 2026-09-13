@@ -1,7 +1,7 @@
 # DevBox
 
-A developer's Swiss Army knife for the desktop: a notes/snippets manager, plus utilities
-(hashing, encoding, formatting) to come.
+A developer's notes and snippets manager for the desktop: write a snippet once, find it
+by tag or full text, and paste it anywhere from a global shortcut.
 
 **Angular 22** (standalone components, signals, zoneless change detection) on the front,
 **Rust / Tauri v2** as the native shell.
@@ -9,7 +9,7 @@ A developer's Swiss Army knife for the desktop: a notes/snippets manager, plus u
 > **Status** — the notes feature is complete end to end. The UI has no mock data left, every
 > read and write crosses the `invoke()` bridge, and the Rust side persists to an embedded
 > SQLite database. Business rules live in each feature's `model.rs`, which depends on neither
-> Diesel nor Tauri. `crypto` and `formatters` are documented placeholders, not yet built.
+> Diesel nor Tauri.
 
 What it does today, beyond writing notes:
 
@@ -94,6 +94,8 @@ owns its model, its SQL and the commands that expose it: `<feature>.rs` holds th
 
 ## Documentation
 
+- [Contributing](CONTRIBUTING.md) — how to build, what CI checks, and the handful of
+  conventions the compiler cannot enforce for you. Read it before your first change.
 - [Architecture](docs/architecture.md) — front-end structure, state and data-access
   patterns, i18n, theming, the Angular ↔ Rust IPC boundary, and testing conventions.
 - [`docs/scratch-mockup-v2.html`](docs/scratch-mockup-v2.html) — static UI mockup used as
@@ -156,3 +158,12 @@ in `Cargo.toml`.
 
 [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) + [Angular Language Service](https://marketplace.visualstudio.com/items?itemName=Angular.ng-template),
 or JetBrains RustRover / WebStorm.
+
+## License
+
+DevBox is free software, released under the **GNU General Public License v3.0** — see
+[LICENSE](LICENSE). You may use, study, share and modify it; a distributed fork has to stay
+under the same terms and ship its source.
+
+Contributions are accepted under that same license: opening a pull request means you agree
+to have your work distributed under the GPL-3.0.

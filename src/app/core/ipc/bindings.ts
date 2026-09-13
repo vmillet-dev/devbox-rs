@@ -24,7 +24,7 @@ export const commands = {
 	emptyTrash: () => typedError<number, AppError>(__TAURI_INVOKE("empty_trash")),
 	moveNotes: (ids: string[], spaceId: string) => typedError<number, AppError>(__TAURI_INVOKE("move_notes", { ids, spaceId })),
 	/**
-	 *  Normalised here as everywhere else, or an `#urgent` typed in the action bar
+	 *  Normalized here as everywhere else, or an `#urgent` typed in the action bar
 	 *  would not join the `urgent` already stored.
 	 */
 	tagNotes: (ids: string[], tags: string[]) => typedError<number, AppError>(__TAURI_INVOKE("tag_notes", { ids, tags })),
@@ -82,6 +82,10 @@ export const commands = {
 	 */
 	exportNotes: (path: string, spaceId: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_notes", { path, spaceId })),
 	exportSelection: (path: string, ids: string[]) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_selection", { path, ids })),
+	/**
+	 *  The file is read **before** the lock is taken: parsing a large export while
+	 *  holding the connection would block every other command for the length of it.
+	 */
 	importNotes: (path: string) => typedError<ImportReport, AppError>(__TAURI_INVOKE("import_notes", { path })),
 	/**  Nothing is sent anywhere: "share" stops at the clipboard. */
 	shareNotes: (ids: string[]) => typedError<string, AppError>(__TAURI_INVOKE("share_notes", { ids })),
@@ -111,7 +115,7 @@ export const GLOBAL_ACTION_EVENT = "devbox:action" as const;
 /* Types */
 export type AppError = {
 	code: ErrorCode,
-	/**  Values to interpolate into the translated message, e.g. `{ "name": "Perso" }`. */
+	/**  Values to interpolate into the translated message, e.g. `{ "name": "Personal" }`. */
 	params: { [key in string]: string },
 	detail: string,
 };
@@ -233,7 +237,7 @@ export type Note = {
 	updatedAt: string,
 	lifecycle: NoteLifecycle,
 	/**
-	 *  ⚠️ `default`: `transfer::Bundle` deserialises `Note` itself, and a required
+	 *  ⚠️ `default`: `transfer::Bundle` deserializes `Note` itself, and a required
 	 *  key would make every export file written before todo-lists unreadable.
 	 */
 	kind?: NoteKind,

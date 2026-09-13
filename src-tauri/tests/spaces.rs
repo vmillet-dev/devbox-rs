@@ -40,19 +40,19 @@ fn names(connection: &mut SqliteConnection) -> Vec<String> {
 fn a_created_space_is_listed_back() {
     let mut connection = open_in_memory().unwrap();
 
-    let created = create(&mut connection, "Perso").unwrap();
+    let created = create(&mut connection, "Personal").unwrap();
     let listed = list(&mut connection).unwrap();
 
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].id, created.id);
-    assert_eq!(listed[0].name, "Perso");
+    assert_eq!(listed[0].name, "Personal");
 }
 
 #[test]
 fn each_space_gets_its_own_identifier() {
     let mut connection = open_in_memory().unwrap();
 
-    let first = create(&mut connection, "Perso").unwrap();
+    let first = create(&mut connection, "Personal").unwrap();
     let second = create(&mut connection, "Boulot").unwrap();
 
     assert_ne!(first.id, second.id);
@@ -64,17 +64,17 @@ fn spaces_are_listed_in_name_order() {
 
     create(&mut connection, "Veille").unwrap();
     create(&mut connection, "Boulot").unwrap();
-    create(&mut connection, "perso").unwrap();
+    create(&mut connection, "personal").unwrap();
 
-    assert_eq!(names(&mut connection), ["Boulot", "perso", "Veille"]);
+    assert_eq!(names(&mut connection), ["Boulot", "personal", "Veille"]);
 }
 
 #[test]
 fn a_duplicate_name_is_refused_regardless_of_case() {
     let mut connection = open_in_memory().unwrap();
-    create(&mut connection, "Perso").unwrap();
+    create(&mut connection, "Personal").unwrap();
 
-    let error = create(&mut connection, "PERSO").unwrap_err();
+    let error = create(&mut connection, "PERSONAL").unwrap_err();
 
     assert!(matches!(error, StorageError::DuplicateSpaceName(_)));
     assert_eq!(list(&mut connection).unwrap().len(), 1);
@@ -83,16 +83,16 @@ fn a_duplicate_name_is_refused_regardless_of_case() {
 #[test]
 fn exists_distinguishes_known_from_unknown_identifiers() {
     let mut connection = open_in_memory().unwrap();
-    let space = create(&mut connection, "Perso").unwrap();
+    let space = create(&mut connection, "Personal").unwrap();
 
     assert!(exists(&mut connection, &space.id).unwrap());
-    assert!(!exists(&mut connection, "inconnu").unwrap());
+    assert!(!exists(&mut connection, "unknown").unwrap());
 }
 
 #[test]
 fn a_renamed_space_keeps_its_identifier() {
     let mut connection = open_in_memory().unwrap();
-    let space = create(&mut connection, "Perso").unwrap();
+    let space = create(&mut connection, "Personal").unwrap();
 
     let renamed = rename(&mut connection, &space.id, "Personnel").unwrap();
 
@@ -104,30 +104,30 @@ fn a_renamed_space_keeps_its_identifier() {
 #[test]
 fn a_space_can_be_renamed_to_a_different_case_of_its_own_name() {
     let mut connection = open_in_memory().unwrap();
-    let space = create(&mut connection, "perso").unwrap();
+    let space = create(&mut connection, "personal").unwrap();
 
-    let renamed = rename(&mut connection, &space.id, "Perso").unwrap();
+    let renamed = rename(&mut connection, &space.id, "Personal").unwrap();
 
-    assert_eq!(renamed.name, "Perso");
+    assert_eq!(renamed.name, "Personal");
 }
 
 #[test]
 fn renaming_onto_another_space_name_is_refused() {
     let mut connection = open_in_memory().unwrap();
     create(&mut connection, "Boulot").unwrap();
-    let space = create(&mut connection, "Perso").unwrap();
+    let space = create(&mut connection, "Personal").unwrap();
 
     let error = rename(&mut connection, &space.id, "BOULOT").unwrap_err();
 
     assert!(matches!(error, StorageError::DuplicateSpaceName(_)));
-    assert_eq!(list(&mut connection).unwrap()[1].name, "Perso");
+    assert_eq!(list(&mut connection).unwrap()[1].name, "Personal");
 }
 
 #[test]
 fn renaming_an_unknown_space_reports_an_error() {
     let mut connection = open_in_memory().unwrap();
 
-    let error = rename(&mut connection, "inconnu", "Perso").unwrap_err();
+    let error = rename(&mut connection, "unknown", "Personal").unwrap_err();
 
     assert!(matches!(error, StorageError::SpaceNotFound(_)));
 }
@@ -135,7 +135,7 @@ fn renaming_an_unknown_space_reports_an_error() {
 #[test]
 fn deleting_a_space_moves_its_notes_to_the_target() {
     let mut connection = open_in_memory().unwrap();
-    let doomed = create(&mut connection, "Perso").unwrap();
+    let doomed = create(&mut connection, "Personal").unwrap();
     let refuge = create(&mut connection, "Boulot").unwrap();
     note_in(&mut connection, &doomed.id);
 
@@ -153,7 +153,7 @@ fn deleting_a_space_moves_its_notes_to_the_target() {
 #[test]
 fn moving_notes_out_of_a_deleted_space_does_not_touch_their_timestamps() {
     let mut connection = open_in_memory().unwrap();
-    let doomed = create(&mut connection, "Perso").unwrap();
+    let doomed = create(&mut connection, "Personal").unwrap();
     let refuge = create(&mut connection, "Boulot").unwrap();
     note_in(&mut connection, &doomed.id);
 
@@ -170,7 +170,7 @@ fn moving_notes_out_of_a_deleted_space_does_not_touch_their_timestamps() {
 #[test]
 fn deleting_an_empty_space_leaves_the_others_alone() {
     let mut connection = open_in_memory().unwrap();
-    let doomed = create(&mut connection, "Perso").unwrap();
+    let doomed = create(&mut connection, "Personal").unwrap();
     let refuge = create(&mut connection, "Boulot").unwrap();
 
     delete(&mut connection, &doomed.id, &refuge.id).unwrap();
@@ -183,7 +183,7 @@ fn deleting_an_unknown_space_reports_an_error() {
     let mut connection = open_in_memory().unwrap();
     let refuge = create(&mut connection, "Boulot").unwrap();
 
-    let error = delete(&mut connection, "inconnu", &refuge.id).unwrap_err();
+    let error = delete(&mut connection, "unknown", &refuge.id).unwrap_err();
 
     assert!(matches!(error, StorageError::SpaceNotFound(_)));
 }
@@ -191,10 +191,10 @@ fn deleting_an_unknown_space_reports_an_error() {
 #[test]
 fn deleting_into_an_unknown_space_changes_nothing() {
     let mut connection = open_in_memory().unwrap();
-    let doomed = create(&mut connection, "Perso").unwrap();
+    let doomed = create(&mut connection, "Personal").unwrap();
     note_in(&mut connection, &doomed.id);
 
-    let error = delete(&mut connection, &doomed.id, "inconnu").unwrap_err();
+    let error = delete(&mut connection, &doomed.id, "unknown").unwrap_err();
 
     assert!(matches!(error, StorageError::SpaceNotFound(_)));
     assert_eq!(list(&mut connection).unwrap().len(), 1);

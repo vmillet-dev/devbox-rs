@@ -1,4 +1,4 @@
-import { $, browser } from '@wdio/globals';
+import { $, $$, browser } from '@wdio/globals';
 
 import type { GlobalAction } from '@core/ipc/bindings';
 
@@ -7,6 +7,10 @@ export function testid(name: string): string {
   return `[data-testid="${name}"]`;
 }
 
+/** Consecutive quiet polls before the canvas counts as settled, `SETTLE_INTERVAL` apart. */
+const SETTLE_POLLS = 3;
+const SETTLE_INTERVAL = 200;
+
 /**
  * The canvas is behind a lazy route, a `resource` and a debounce; every scenario
  * starts by waiting for it rather than for the window, which exists long before
@@ -14,10 +18,44 @@ export function testid(name: string): string {
  */
 export async function waitForCanvas(): Promise<void> {
   await $(testid('canvas')).waitForExist({ timeout: 30_000 });
-  await browser.waitUntil(async () => (await $(testid('canvas')).getAttribute('aria-busy')) !== 'true', {
-    timeout: 30_000,
-    timeoutMsg: 'the canvas never stopped loading',
-  });
+
+  // ⚠️ `aria-busy` is `NotesQueryStore.isLoading`, which is `!hasView && resource.isLoading()`
+  // — and the retained `linkedSignal` means that once a view has landed it is false for
+  // the rest of the session. So the flag does not toggle once per reload: it answers
+  // "has anything at all arrived yet", once, and then says nothing ever again.
+  //
+  // That is exactly why waiting on it alone is not enough. It gives no signal for the
+  // reload that follows a write, nor for the one that follows the sample seeding, and
+  // the canvas re-renders under the spec either way: a count read mid-render is short,
+  // a card list read across it mixes two states, and a *click* read across it lands on
+  // a control that has moved — which is how a single create button produced two drafts.
+  //
+  // Settled therefore means idle *and* unchanged: the card count has to hold still. It
+  // deliberately does not wait for a number, so it cannot assume the answer a spec is
+  // about to assert.
+  let previous = -1;
+  let quiet = 0;
+
+  await browser.waitUntil(
+    async () => {
+      if ((await $(testid('canvas')).getAttribute('aria-busy')) === 'true') {
+        quiet = 0;
+        previous = -1;
+        return false;
+      }
+
+      const count = await $$(testid('note-card')).length;
+      quiet = count === previous ? quiet + 1 : 0;
+      previous = count;
+
+      return quiet >= SETTLE_POLLS;
+    },
+    {
+      timeout: 30_000,
+      interval: SETTLE_INTERVAL,
+      timeoutMsg: 'the canvas never settled',
+    },
+  );
 }
 
 export type Modifier = 'Control' | 'Alt' | 'Shift' | 'Meta';

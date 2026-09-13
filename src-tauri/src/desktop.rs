@@ -27,7 +27,7 @@ closed_enum! {
 /// Exported as a constant too, so neither side spells it twice.
 pub(crate) const ACTION_EVENT: &str = "devbox:action";
 
-/// `unminimize` first: a minimised window merely shown stays in the taskbar.
+/// `unminimize` first: a minimized window merely shown stays in the taskbar.
 pub(crate) fn reveal(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -81,10 +81,14 @@ impl ShortcutBindings {
 /// preferences, so the handler cannot compare them against captured values.
 type ActiveShortcuts = Mutex<Vec<(Shortcut, GlobalAction)>>;
 
+/// Every piece of state the native side owns is managed here, before any command
+/// can run: a command that had to create its own would race another doing the same.
+///
 /// A shortcut already taken by another application is logged but **not fatal**:
 /// DevBox has to start without it.
-pub(crate) fn register_shortcuts(app: &AppHandle) -> tauri::Result<()> {
+pub(crate) fn init(app: &AppHandle) -> tauri::Result<()> {
     app.manage(ActiveShortcuts::default());
+    app.manage(WindowBehaviorState::default());
 
     app.plugin(
         tauri_plugin_global_shortcut::Builder::new()
@@ -180,7 +184,7 @@ pub struct WindowBehavior {
 }
 
 /// The close button files the window into the tray — the application is meant to
-/// stay within reach of a shortcut — and "minimise" minimises, as everywhere else.
+/// stay within reach of a shortcut — and "minimize" minimizes, as everywhere else.
 impl Default for WindowBehavior {
     fn default() -> Self {
         Self {
@@ -195,15 +199,10 @@ type WindowBehaviorState = Mutex<WindowBehavior>;
 #[tauri::command]
 #[specta::specta]
 #[allow(clippy::needless_pass_by_value)]
-pub fn set_window_behavior(behavior: WindowBehavior, app: AppHandle) {
-    if let Some(state) = app.try_state::<WindowBehaviorState>() {
-        if let Ok(mut current) = state.lock() {
-            *current = behavior;
-        }
-        return;
+pub fn set_window_behavior(behavior: WindowBehavior, state: State<'_, WindowBehaviorState>) {
+    if let Ok(mut current) = state.lock() {
+        *current = behavior;
     }
-
-    app.manage(WindowBehaviorState::new(behavior));
 }
 
 fn window_behavior(app: &AppHandle) -> WindowBehavior {
@@ -218,7 +217,7 @@ pub(crate) fn hides_on_close(app: &AppHandle) -> bool {
     window_behavior(app).close_to_tray && tray_exists(app)
 }
 
-/// Tauri emits no "minimised" event: only `Resized` comes through, and it is up
+/// Tauri emits no "minimized" event: only `Resized` comes through, and it is up
 /// to the caller to ask the window where it stands.
 pub(crate) fn hides_on_minimize(app: &AppHandle) -> bool {
     window_behavior(app).minimize_to_tray && tray_exists(app)

@@ -303,7 +303,7 @@ mod tests {
     }
 
     #[test]
-    fn the_serialised_form_matches_the_stored_one() {
+    fn the_serialized_form_matches_the_stored_one() {
         for language in Language::ALL {
             let json = serde_json::to_value(language).unwrap();
             assert_eq!(json, serde_json::json!(language.as_str()));
@@ -365,7 +365,7 @@ mod tests {
     #[test]
     fn a_note_that_already_had_content_keeps_its_language() {
         let note = Note {
-            content: "du texte".to_string(),
+            content: "some prose".to_string(),
             ..blank_note()
         };
 
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn a_patch_carrying_no_content_detects_nothing() {
         let patch = NotePatch {
-            title: Some("Titre".to_string()),
+            title: Some("Title".to_string()),
             ..NotePatch::default()
         };
 
@@ -424,7 +424,7 @@ mod tests {
             "key: value",
             "# Title\n\n- item",
             "git status",
-            "juste du texte",
+            "just some prose",
         ];
 
         for sample in samples {
@@ -450,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn a_json_object_or_array_is_recognised() {
+    fn a_json_object_or_array_is_recognized() {
         assert_eq!(from_content("{\n  \"id\": 42\n}"), Language::Json);
         assert_eq!(from_content("[1, 2, 3]"), Language::Json);
         assert_eq!(from_content("  {\"a\": [1]}  "), Language::Json);
@@ -479,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn sql_is_recognised_whatever_its_case() {
+    fn sql_is_recognized_whatever_its_case() {
         assert_eq!(from_content("SELECT * FROM notes"), Language::Sql);
         assert_eq!(from_content("select 1"), Language::Sql);
         assert_eq!(
@@ -521,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn yaml_is_recognised_by_its_mappings_and_lists() {
+    fn yaml_is_recognized_by_its_mappings_and_lists() {
         assert_eq!(from_content("name: devbox\nversion: 1"), Language::Yml);
         assert_eq!(from_content("---\nsteps:\n  - build"), Language::Yml);
     }
@@ -532,8 +532,8 @@ mod tests {
     }
 
     #[test]
-    fn markdown_is_recognised_by_its_headings_and_fences() {
-        assert_eq!(from_content("# Titre\n\nUn paragraphe."), Language::Md);
+    fn markdown_is_recognized_by_its_headings_and_fences() {
+        assert_eq!(from_content("# Heading\n\nA paragraph."), Language::Md);
         assert_eq!(from_content("Voir ```code``` ici"), Language::Md);
         assert_eq!(from_content("Un [lien](https://x.dev)"), Language::Md);
     }

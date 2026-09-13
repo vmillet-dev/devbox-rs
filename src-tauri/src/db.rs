@@ -7,17 +7,17 @@ use std::sync::{Mutex, MutexGuard};
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 
-use crate::error::{AppError, StorageError};
+use crate::error::StorageError;
 
 pub const DB_FILE_NAME: &str = "devbox.sqlite3";
 
-/// `SqliteConnection` is not `Sync`: overlapping commands serialise on this mutex.
+/// `SqliteConnection` is not `Sync`: overlapping commands serialize on this mutex.
 pub type Db = Mutex<SqliteConnection>;
 
 /// A poisoned mutex means a command panicked while holding it: better to say so
 /// than to panic again.
-pub(crate) fn lock(db: &Db) -> Result<MutexGuard<'_, SqliteConnection>, AppError> {
-    db.lock().map_err(|_| AppError::storage_unavailable())
+pub(crate) fn lock(db: &Db) -> Result<MutexGuard<'_, SqliteConnection>, StorageError> {
+    db.lock().map_err(|_| StorageError::Unavailable)
 }
 
 pub fn open(path: &Path) -> Result<SqliteConnection, StorageError> {
@@ -42,9 +42,14 @@ pub fn open_in_memory() -> Result<SqliteConnection, StorageError> {
 fn configure(connection: &mut SqliteConnection) -> Result<(), StorageError> {
     // ⚠️ `foreign_keys` is set **per connection** and is off by default: without it
     // the `ON DELETE CASCADE` clauses are inert. WAL: a reader no longer blocks a writer.
+    //
+    // `busy_timeout` covers the window where a second process still holds the file —
+    // a stale instance shutting down, a backup tool reading it — where the default of
+    // zero surfaces `SQLITE_BUSY` as a storage error on the very first write.
     connection.batch_execute(
         "PRAGMA foreign_keys = ON;
-         PRAGMA journal_mode = WAL;",
+         PRAGMA journal_mode = WAL;
+         PRAGMA busy_timeout = 5000;",
     )?;
 
     Ok(())
@@ -85,7 +90,7 @@ pub mod iso8601 {
         }
 
         #[test]
-        fn an_offset_instant_is_normalised_to_utc() {
+        fn an_offset_instant_is_normalized_to_utc() {
             let instant = parse("2026-07-25T11:00:00+02:00").unwrap();
 
             assert_eq!(format(instant), "2026-07-25T09:00:00.000Z");
@@ -103,7 +108,7 @@ pub mod iso8601 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::ErrorCode;
+    use crate::error::{AppError, ErrorCode};
     use diesel::sql_types::Integer;
 
     fn in_memory() -> Db {
@@ -155,6 +160,11 @@ mod tests {
             panic!("a poisoned mutex must be reported, not returned");
         };
 
-        assert!(matches!(error.code, ErrorCode::StorageUnavailable));
+        assert!(matches!(error, StorageError::Unavailable));
+        // And it still reaches the front end as the code it always did.
+        assert!(matches!(
+            AppError::from(error).code,
+            ErrorCode::StorageUnavailable
+        ));
     }
 }

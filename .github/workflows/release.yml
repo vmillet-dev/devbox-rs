@@ -1,23 +1,23 @@
 name: Release
 
-# Un seul bouton. La version est déjà dans src-tauri/Cargo.toml — c'est l'humain qui la monte,
-# ce workflow en tire une section de changelog, un commit, un tag, les bundles et la release.
+# One button. The version is already in src-tauri/Cargo.toml — a human bumps it, and this
+# workflow draws a changelog section, a commit, a tag, the bundles and the release from it.
 #
-# Tout dans le même run, et ce n'est pas un choix de confort : un tag poussé avec le
-# GITHUB_TOKEN par défaut ne déclenche aucun workflow, donc il n'y a pas de second run à
-# attendre. Et le changelog doit être commité *avant* le build : `changelog.rs` l'embarque
-# avec `include_str!`, donc un fichier écrit après le tag livrerait un binaire dont
-# « Nouveautés » ignore sa propre version.
+# All in the same run, and that is not a comfort choice: a tag pushed with the default
+# GITHUB_TOKEN triggers no workflow, so there is no second run to wait for. And the changelog
+# has to be committed *before* the build: `changelog.rs` embeds it with `include_str!`, so a
+# file written after the tag would ship a binary whose "What's new" panel does not know its
+# own version.
 on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Tout jouer sauf le commit, le tag et la publication.'
+        description: 'Run everything except the commit, the tag and the publication.'
         type: boolean
         default: false
 
-# Jamais annulé : un run coupé entre le commit et le tag laisserait main en avance sur les
-# tags. `--atomic` couvre le push lui-même, la concurrence couvre le reste.
+# Never cancelled: a run cut between the commit and the tag would leave main ahead of the
+# tags. `--atomic` covers the push itself, the concurrency group covers the rest.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -30,64 +30,64 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # Tout ce qui peut refuser la release le fait ici, et avant d'écrire quoi que ce soit : les
-  # mutations sont les deux dernières étapes du job.
+  # Everything that can refuse the release does so here, and before anything is written: the
+  # mutations are the last two steps of the job.
   #
-  # Ce job ne rejoue aucun test — la CI a déjà tourné sur ce commit, il se contente de le
-  # vérifier. Ce qu'il exécute : npm ci, les tests du générateur, et Prettier.
+  # This job replays no test — CI has already run on this commit, it merely checks that. What
+  # it does execute: npm ci, the generator's tests, and Prettier.
   prepare:
-    name: Préparer la release
-    # L'environnement est ce qui restreint réellement le workflow à main : sa règle de branche
-    # refuse de démarrer le job depuis un autre ref, là où un `if` ne ferait que le constater
-    # après avoir réservé un runner. C'est aussi là que vivent les secrets de signature.
+    name: Prepare the release
+    # The environment is what really restricts the workflow to main: its branch rule refuses
+    # to start the job from another ref, where an `if` would only note it after reserving a
+    # runner. It is also where the signing secrets live.
     environment: release
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     permissions:
       contents: write
       pull-requests: read
-      # Sans lui, `closingIssuesReferences` renvoie des nœuds vides et tout le classement
-      # retombe silencieusement sur le préfixe du titre.
+      # Without it, `closingIssuesReferences` returns empty nodes and the whole sorting
+      # silently falls back to the title prefix.
       issues: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       sha: ${{ steps.push.outputs.sha }}
     steps:
-      # `fetch-depth: 0` pour `git describe` et la plage de commits ; les identifiants restent
-      # dans le worktree, ce sont eux qui pousseront le commit et le tag.
+      # `fetch-depth: 0` for `git describe` and the commit range; the credentials stay in the
+      # worktree, they are what will push the commit and the tag.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: true
 
-      # Doublon lisible de la règle de branche de l'environnement, pour le jour où celle-ci
-      # n'est pas encore configurée.
-      - name: On ne publie que depuis main
+      # A readable double of the environment's branch rule, for the day that rule is not yet
+      # configured.
+      - name: Releases only go out from main
         if: github.ref_name != 'main'
         run: |
-          echo "::error::dispatché depuis ${{ github.ref_name }}, la release part de main"
+          echo "::error::dispatched from ${{ github.ref_name }}, the release goes out from main"
           exit 1
 
-      # Cargo.toml fait foi : faute de version dans tauri.conf.json, c'est celle-là que Tauri
-      # grave dans le binaire.
-      - name: Lire la version
+      # Cargo.toml is the authority: with no version in tauri.conf.json, that is the one Tauri
+      # writes into the binary.
+      - name: Read the version
         id: version
         run: |
           version=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
           if [ -z "$version" ]; then
-            echo '::error::pas de version dans src-tauri/Cargo.toml'
+            echo '::error::no version in src-tauri/Cargo.toml'
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
-          echo "Version : $version"
+          echo "Version: $version"
 
-      # L'ancien job `check-version`, avancé avant le tag plutôt qu'après : ici il peut encore
-      # empêcher la dérive au lieu de la constater. Les deux lockfiles sont de la partie — la
-      # release construit avec `--locked` et `npm ci`.
-      - name: Les quatre fichiers doivent dire la même version
+      # The former `check-version` job, moved ahead of the tag rather than after it: here it
+      # can still prevent the drift instead of reporting it. Both lockfiles take part — the
+      # release builds with `--locked` and `npm ci`.
+      - name: The four files must say the same version
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -98,57 +98,57 @@ jobs:
           echo "Cargo.toml=$VERSION package.json=$pkg package-lock=$npm_lock Cargo.lock=$cargo_lock"
           for found in "$pkg" "$npm_lock" "$cargo_lock"; do
             if [ "$found" != "$VERSION" ]; then
-              echo "::error::version $found ne correspond pas à $VERSION"
+              echo "::error::version $found does not match $VERSION"
               exit 1
             fi
           done
 
-      - name: Ni le tag ni la release ne doivent exister
+      - name: Neither the tag nor the release may exist
         env:
           TAG: ${{ steps.version.outputs.tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
           if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            echo "::error::le tag $TAG existe déjà"
+            echo "::error::tag $TAG already exists"
             exit 1
           fi
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "::error::le tag $TAG existe déjà sur origin"
+            echo "::error::tag $TAG already exists on origin"
             exit 1
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::error::la release $TAG existe déjà"
+            echo "::error::release $TAG already exists"
             exit 1
           fi
 
-      # Garde d'idempotence : un re-dispatch après un `prepare` réussi doit dire pourquoi il
-      # refuse, plutôt que d'empiler une seconde section.
-      - name: Le changelog ne doit pas déjà porter la section
+      # Idempotence guard: a re-dispatch after a successful `prepare` must say why it refuses,
+      # rather than stacking a second section.
+      - name: The changelog must not already carry the section
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           if grep -qE "^## +\[?${VERSION//./\\.}\]?( |$)" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md porte déjà une section $VERSION"
+            echo "::error::CHANGELOG.md already carries a $VERSION section"
             exit 1
           fi
 
-      # La porte d'entrée : c'est elle qui dispense la release de rejouer quoi que ce soit.
-      # `test-e2e` étant en `continue-on-error`, son échec ne retient rien — c'est la
-      # conclusion du run entier qui décide, exactement comme avant.
-      - name: La CI doit être verte sur ce commit
+      # The gate: this is what excuses the release from replaying anything. `test-e2e` being
+      # `continue-on-error`, its failure holds nothing back — the whole run's conclusion is
+      # what decides, exactly as before.
+      - name: CI must be green on this commit
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           read -r status conclusion <<< "$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" \
             --limit 1 --json status,conclusion \
             --jq '.[0] // {} | "\(.status // "none") \(.conclusion // "none")"')"
-          echo "CI sur $GITHUB_SHA : $status / $conclusion"
+          echo "CI on $GITHUB_SHA: $status / $conclusion"
           if [ "$status" != completed ]; then
-            echo "::error::la CI n'a pas terminé sur ce commit ($status) — relance dans quelques minutes"
+            echo "::error::CI has not finished on this commit ($status) — retry in a few minutes"
             exit 1
           fi
           if [ "$conclusion" != success ]; then
-            echo "::error::la CI a conclu « $conclusion » sur ce commit"
+            echo "::error::CI concluded \"$conclusion\" on this commit"
             exit 1
           fi
 
@@ -157,16 +157,16 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      # Pour Prettier, qui reformate le fichier écrit : un CHANGELOG.md non formaté casserait
-      # `npm run lint` sur le prochain push de quelqu'un d'autre.
+      # For Prettier, which reformats the written file: an unformatted CHANGELOG.md would
+      # break `npm run lint` on somebody else's next push.
       - run: npm ci
 
       - run: npm run test:scripts
 
-      # Prettier passe entre l'écriture et l'extraction : le corps de la release est lu sur les
-      # octets exacts qui seront commités. Le `--check` après le `--write` n'est pas redondant,
-      # il assure le point fixe que `npm run lint` exigera au prochain push humain.
-      - name: Écrire la section et en tirer le corps de la release
+      # Prettier runs between writing and extracting: the release body is read from the exact
+      # bytes that will be committed. The `--check` after the `--write` is not redundant, it
+      # secures the fixed point `npm run lint` will demand on the next human push.
+      - name: Write the section and draw the release body from it
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -185,9 +185,9 @@ jobs:
           path: ${{ runner.temp }}/*.md
           retention-days: 7
 
-      # Première et dernière mutation du dépôt. Tout ce qui précède peut échouer sans rien
-      # laisser derrière.
-      - name: Commiter, taguer, pousser
+      # First and last mutation of the repository. Everything above can fail leaving nothing
+      # behind.
+      - name: Commit, tag, push
         id: push
         if: ${{ !inputs.dry_run }}
         env:
@@ -198,15 +198,15 @@ jobs:
           git add CHANGELOG.md
           git commit -m "chore(release): $TAG"
           git tag -a "$TAG" -m "$TAG"
-          # `--atomic` : le commit et le tag partent ensemble ou pas du tout. Sans lui, un refus
-          # du second laisserait main en avance sur les tags, et la relance buterait sur la
-          # section déjà écrite sans moyen simple de revenir en arrière.
+          # `--atomic`: the commit and the tag go out together or not at all. Without it, a
+          # refusal of the second would leave main ahead of the tags, and the retry would hit
+          # the section already written with no simple way back.
           git push --atomic origin HEAD:main "refs/tags/$TAG"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Aperçu seulement
+      - name: Preview only
         if: ${{ inputs.dry_run }}
-        run: echo "::notice::dry run — rien n'a été commité, tagué ni publié"
+        run: echo "::notice::dry run — nothing was committed, tagged or published"
 
   release-build:
     name: Bundle ${{ matrix.target }}
@@ -222,15 +222,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # ubuntu-22.04 et non ubuntu-latest : 24.04 lie une glibc plus récente et
-          # l'AppImage produit refuse alors de démarrer sur les distributions plus anciennes.
+          # ubuntu-22.04 and not ubuntu-latest: 24.04 links a newer glibc and the AppImage it
+          # produces then refuses to start on older distributions.
           - os: ubuntu-22.04
             target: linux
           - os: windows-latest
             target: windows
     steps:
-      # Le SHA plutôt que le nom du tag : le tag vient d'être créé par `prepare`, et un SHA ne
-      # peut pas désigner autre chose entre-temps.
+      # The SHA rather than the tag name: the tag was just created by `prepare`, and a SHA
+      # cannot come to mean something else in between.
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.prepare.outputs.sha }}
@@ -247,13 +247,13 @@ jobs:
 
       - run: npm ci
 
-      # Sans `tagName`, l'action se contente de builder : elle ne crée aucune release,
-      # donc les deux jobs de la matrice ne se disputent pas la même.
-      # `bundle.targets: "all"` produit NSIS + MSI sur Windows, deb + rpm + AppImage sur Linux.
+      # Without `tagName` the action only builds: it creates no release, so the two matrix
+      # jobs do not fight over the same one.
+      # `bundle.targets: "all"` produces NSIS + MSI on Windows, deb + rpm + AppImage on Linux.
       #
-      # `bundle.createUpdaterArtifacts` étant actif, le bundler exige la clé privée
-      # de signature : sans le secret, ce job échoue au lieu de publier des binaires
-      # que l'updater refuserait ensuite d'installer.
+      # `bundle.createUpdaterArtifacts` being on, the bundler demands the private signing key:
+      # without the secret this job fails instead of publishing binaries the updater would
+      # then refuse to install.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -262,15 +262,15 @@ jobs:
         with:
           args: --verbose
 
-      # Les `.sig` sont remontés en bloc — le bundler en produit pour chaque cible,
-      # y compris celles que l'updater ne sait pas installer. C'est `publish` qui
-      # trie, plutôt que ce filtre : une signature écartée ici disparaîtrait des
-      # journaux, et avec elle le moyen de comprendre un manifeste incomplet.
+      # The `.sig` files are collected wholesale — the bundler produces one per target,
+      # including those the updater cannot install. `publish` is what sorts them, rather than
+      # this filter: a signature dropped here would vanish from the logs, and with it the
+      # means of understanding an incomplete manifest.
       #
-      # ⚠️ La version vient de `prepare` et non de `GITHUB_REF_NAME` : sur un
-      # `workflow_dispatch`, ce dernier vaut `main`, et les binaires s'appelleraient
+      # ⚠️ The version comes from `prepare` and not from `GITHUB_REF_NAME`: on a
+      # `workflow_dispatch` the latter is `main`, and the binaries would be called
       # `devbox-main-windows.exe`.
-      - name: Rassembler installateurs et exécutable standalone
+      - name: Gather installers and the standalone executable
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
@@ -279,8 +279,8 @@ jobs:
             \( -name '*.exe' -o -name '*.msi' -o -name '*.deb' -o -name '*.rpm' \
                -o -name '*.AppImage' -o -name '*.sig' \) \
             -exec cp {} release/ \;
-          # Le bundler ne remonte pas le binaire nu ; on le renomme pour que les deux OS
-          # ne se recouvrent pas dans la release.
+          # The bundler does not collect the bare binary; renaming it keeps the two operating
+          # systems from overlapping in the release.
           if [ '${{ matrix.target }}' = 'windows' ]; then
             cp src-tauri/target/release/devbox.exe "release/devbox-${VERSION}-windows.exe"
           else
@@ -295,7 +295,7 @@ jobs:
           retention-days: 7
 
   publish:
-    name: Publier la release
+    name: Publish the release
     needs: [prepare, release-build]
     if: ${{ !inputs.dry_run }}
     environment: release
@@ -304,10 +304,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      # ⚠️ Avant `download-artifact` : `checkout` nettoie le workspace, et emporterait les
-      # bundles téléchargés. Le dépôt est là pour `scripts/release-notes.mjs`, qui relit la
-      # section au tag — le fichier commité est la seule source du corps de la release comme
-      # du panneau « Nouveautés ».
+      # ⚠️ Before `download-artifact`: `checkout` cleans the workspace, and would take the
+      # downloaded bundles with it. The repository is here for `scripts/release-notes.mjs`,
+      # which re-reads the section at the tag — the committed file is the only source of both
+      # the release body and the "What's new" panel.
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.prepare.outputs.sha }}
@@ -318,8 +318,8 @@ jobs:
           merge-multiple: true
           path: release
 
-      # Hors de `release/` : ce dossier part entier dans la release et dans les sommes.
-      - name: Relire la section au tag
+      # Outside `release/`: that folder goes whole into the release and into the checksums.
+      - name: Re-read the section at the tag
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
@@ -327,10 +327,10 @@ jobs:
             --out "$RUNNER_TEMP/release-notes.md"
           cat "$RUNNER_TEMP/release-notes.md"
 
-      # Manifeste lu par le plugin updater. Il est assemblé ici plutôt que par
-      # `tauri-action` : celle-ci ne le produit qu'en créant elle-même la release,
-      # ce que la matrice de build évite pour ne pas publier deux fois.
-      - name: Assembler latest.json
+      # The manifest the updater plugin reads. It is assembled here rather than by
+      # `tauri-action`: that one only produces it when it creates the release itself, which
+      # the build matrix avoids so as not to publish twice.
+      - name: Assemble latest.json
         env:
           TAG: ${{ needs.prepare.outputs.tag }}
           REPO: ${{ github.repository }}
@@ -341,17 +341,16 @@ jobs:
           const dir = 'release';
           const { TAG, REPO } = process.env;
 
-          // Le bundler signe tout ce qu'il produit, paquets système compris. Or
-          // l'updater ne sait installer que l'installateur NSIS et l'AppImage :
-          // les autres signatures (.deb, .rpm, .msi) sont ignorées, pas fatales.
+          // The bundler signs everything it produces, system packages included. But the
+          // updater only knows how to install the NSIS installer and the AppImage: the
+          // other signatures (.deb, .rpm, .msi) are ignored, not fatal.
           const TARGETS = [
             { suffix: '.exe', key: 'windows-x86_64' },
             { suffix: '.AppImage', key: 'linux-x86_64' },
           ];
 
-          // Chaque .sig désigne le fichier qu'il signe. C'est ce qui distingue
-          // l'installateur NSIS de l'exécutable standalone, tous deux en .exe :
-          // seul le premier est signé.
+          // Each .sig names the file it signs. That is what tells the NSIS installer from
+          // the standalone executable, both of them .exe: only the first one is signed.
           const platforms = {};
           const chosen = {};
           const ignored = [];
@@ -359,7 +358,7 @@ jobs:
           for (const sig of fs.readdirSync(dir).filter((name) => name.endsWith('.sig'))) {
             const asset = sig.slice(0, -'.sig'.length);
             if (!fs.existsSync(`${dir}/${asset}`)) {
-              throw new Error(`signature orpheline : ${sig}`);
+              throw new Error(`orphan signature: ${sig}`);
             }
 
             const target = TARGETS.find(({ suffix }) => asset.endsWith(suffix));
@@ -367,11 +366,11 @@ jobs:
               ignored.push(asset);
               continue;
             }
-            // Deux candidats pour une même plateforme : en retenir un au hasard
-            // livrerait peut-être celui que l'updater ne sait pas lancer.
+            // Two candidates for one platform: picking one at random might ship the one
+            // the updater cannot launch.
             if (chosen[target.key]) {
               throw new Error(
-                `deux artefacts pour ${target.key} : ${chosen[target.key]} et ${asset}`,
+                `two artifacts for ${target.key}: ${chosen[target.key]} and ${asset}`,
               );
             }
 
@@ -383,21 +382,21 @@ jobs:
           }
 
           if (ignored.length) {
-            console.log(`Signatures ignorées (cibles hors updater) : ${ignored.join(', ')}`);
+            console.log(`Signatures ignored (targets outside the updater): ${ignored.join(', ')}`);
           }
 
-          // Windows est la cible prioritaire : sans elle le manifeste ne servirait
-          // personne, donc la publication casse. Linux est livré s'il est là, mais
-          // son absence ne doit pas retenir une release Windows par ailleurs saine.
+          // Windows is the priority target: without it the manifest would serve nobody, so
+          // publication breaks. Linux ships if it is there, but its absence must not hold
+          // back an otherwise healthy Windows release.
           if (!platforms['windows-x86_64']) {
-            throw new Error("aucun artefact de mise à jour Windows dans release/");
+            throw new Error('no Windows update artifact in release/');
           }
           if (!platforms['linux-x86_64']) {
-            console.log("::warning::Pas d'artefact de mise à jour Linux : manifeste Windows seul.");
+            console.log('::warning::No Linux update artifact: Windows-only manifest.');
           }
 
-          // Sans le « v » : l'updater compare la valeur en semver, un préfixe la
-          // rendrait illisible et aucune mise à jour ne serait jamais proposée.
+          // Without the "v": the updater compares the value as semver, and a prefix would
+          // make it unreadable — no update would ever be offered.
           const manifest = {
             version: TAG.replace(/^v/, ''),
             pub_date: new Date().toISOString(),
@@ -413,12 +412,11 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      # `tag_name` est obligatoire ici : sans lui l'action retombe sur `github.ref`, qui vaut
-      # `refs/heads/main` sur un `workflow_dispatch`.
+      # `tag_name` is mandatory here: without it the action falls back on `github.ref`, which
+      # is `refs/heads/main` on a `workflow_dispatch`.
       #
-      # `generate_release_notes` reste actif et vient **après** le corps : l'API met notre
-      # texte en tête, et la liste brute des PR, les nouveaux contributeurs et le lien de
-      # comparaison à la suite.
+      # `generate_release_notes` stays on and comes **after** the body: the API puts our text
+      # first, then the raw pull-request list, the new contributors and the comparison link.
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}

@@ -12,10 +12,10 @@ use devbox_lib::error::StorageError;
 use devbox_lib::notes::checklist::{ChecklistItem, NoteKind};
 use devbox_lib::notes::language::Language;
 use devbox_lib::notes::model::{Note, NoteDraft, NoteLifecycle, NotePatch, decorate};
+use devbox_lib::notes::store::trash::{expired_ids, list_trashed, purge, restore_many, trash};
 use devbox_lib::notes::store::{
-    all, by_ids, create, delete, drop_tag, expired_ids, fetch, global_placeholder_values,
-    insert_imported, list_trashed, move_many, purge, replace_global_placeholder_values,
-    restore_many, retag, set_placeholder_values, tag_many, tag_usage, update,
+    all, by_ids, create, drop_tags, fetch, global_placeholder_values, insert_imported, move_many,
+    replace_global_placeholder_values, retag, set_placeholder_values, tag_many, tag_usage, update,
 };
 use devbox_lib::notes::view::{self, NoteFilter, NotesQuery, NotesView};
 use devbox_lib::spaces::store as spaces;
@@ -40,7 +40,7 @@ fn list(connection: &mut SqliteConnection) -> Result<Vec<Note>, StorageError> {
 }
 
 fn at(iso: &str) -> DateTime<Utc> {
-    iso8601::parse(iso).expect("les tests écrivent des instants valides")
+    iso8601::parse(iso).expect("tests write valid instants")
 }
 
 fn t0() -> DateTime<Utc> {
@@ -81,7 +81,7 @@ fn draft(space_id: &str) -> NoteDraft {
 #[test]
 fn a_created_note_is_read_back_whole() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
 
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
     let listed = list(&mut connection).unwrap();
@@ -100,7 +100,7 @@ fn a_created_note_is_read_back_whole() {
 #[test]
 fn creation_stamps_both_dates_identically() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
 
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
@@ -111,7 +111,7 @@ fn creation_stamps_both_dates_identically() {
 #[test]
 fn an_expiring_lifecycle_survives_a_round_trip() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let expiring = NoteDraft {
         lifecycle: NoteLifecycle::Expires {
             at: at("2026-08-01T00:00:00.000Z"),
@@ -132,7 +132,7 @@ fn an_expiring_lifecycle_survives_a_round_trip() {
 #[test]
 fn dropping_an_expiry_clears_the_stored_date() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let expiring = NoteDraft {
         lifecycle: NoteLifecycle::Expires {
             at: at("2026-08-01T00:00:00.000Z"),
@@ -157,7 +157,7 @@ fn dropping_an_expiry_clears_the_stored_date() {
 fn creating_in_an_unknown_space_is_refused() {
     let mut connection = open_in_memory().unwrap();
 
-    let error = create(&mut connection, draft("inconnu"), t0()).unwrap_err();
+    let error = create(&mut connection, draft("unknown"), t0()).unwrap_err();
 
     assert!(matches!(error, StorageError::SpaceNotFound(_)));
     assert!(list(&mut connection).unwrap().is_empty());
@@ -166,7 +166,7 @@ fn creating_in_an_unknown_space_is_refused() {
 #[test]
 fn notes_are_listed_most_recently_updated_first() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
 
     let older = create(&mut connection, draft(&space_id), t0()).unwrap();
     let newer = create(&mut connection, draft(&space_id), t1()).unwrap();
@@ -183,7 +183,7 @@ fn notes_are_listed_most_recently_updated_first() {
 #[test]
 fn an_absent_patch_field_leaves_the_stored_value_untouched() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let patch = NotePatch {
@@ -202,7 +202,7 @@ fn an_absent_patch_field_leaves_the_stored_value_untouched() {
 #[test]
 fn updating_refreshes_updated_at_but_not_created_at() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let updated = update(&mut connection, &created.id, &NotePatch::default(), t1()).unwrap();
@@ -214,7 +214,7 @@ fn updating_refreshes_updated_at_but_not_created_at() {
 #[test]
 fn pasting_into_a_freshly_created_note_settles_its_language() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let empty = NoteDraft {
         language: Language::Txt,
         content: String::new(),
@@ -235,7 +235,7 @@ fn pasting_into_a_freshly_created_note_settles_its_language() {
 #[test]
 fn a_later_edit_does_not_move_the_language_again() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let empty = NoteDraft {
         language: Language::Txt,
         content: String::new(),
@@ -277,7 +277,7 @@ fn checklist(space_id: &str, items: Vec<ChecklistItem>) -> NoteDraft {
 #[test]
 fn a_checklist_is_read_back_in_the_order_it_was_written() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
 
     let created = create(
         &mut connection,
@@ -300,7 +300,7 @@ fn a_checklist_is_read_back_in_the_order_it_was_written() {
 #[test]
 fn patching_the_items_replaces_the_whole_list() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(
         &mut connection,
         checklist(
@@ -329,7 +329,7 @@ fn patching_the_items_replaces_the_whole_list() {
 #[test]
 fn emptying_the_list_leaves_no_row_behind() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(
         &mut connection,
         checklist(&space_id, vec![item("a", false)]),
@@ -361,7 +361,7 @@ fn emptying_the_list_leaves_no_row_behind() {
 #[test]
 fn a_patch_that_says_nothing_about_the_items_leaves_them_stored() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(
         &mut connection,
         checklist(&space_id, vec![item("a", true)]),
@@ -386,14 +386,14 @@ fn a_patch_that_says_nothing_about_the_items_leaves_them_stored() {
 #[test]
 fn purging_removes_the_note_and_its_items_for_good() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(
         &mut connection,
         checklist(&space_id, vec![item("a", false)]),
         t0(),
     )
     .unwrap();
-    delete(&mut connection, &created.id, t1()).unwrap();
+    trash(&mut connection, &created.id, t1()).unwrap();
 
     purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
 
@@ -409,7 +409,7 @@ fn purging_removes_the_note_and_its_items_for_good() {
 #[test]
 fn patching_tags_replaces_the_whole_set() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let patch = NotePatch {
@@ -424,7 +424,7 @@ fn patching_tags_replaces_the_whole_set() {
 #[test]
 fn mixed_case_tags_come_back_in_the_same_order_a_reload_gives() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let patch = NotePatch {
@@ -440,7 +440,7 @@ fn mixed_case_tags_come_back_in_the_same_order_a_reload_gives() {
 #[test]
 fn patching_tags_to_an_empty_list_clears_them() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let patch = NotePatch {
@@ -456,7 +456,7 @@ fn patching_tags_to_an_empty_list_clears_them() {
 #[test]
 fn a_note_can_be_moved_to_another_space() {
     let mut connection = open_in_memory().unwrap();
-    let origin = space(&mut connection, "Perso");
+    let origin = space(&mut connection, "Personal");
     let destination = space(&mut connection, "Boulot");
     let created = create(&mut connection, draft(&origin), t0()).unwrap();
 
@@ -472,11 +472,11 @@ fn a_note_can_be_moved_to_another_space() {
 #[test]
 fn moving_a_note_to_an_unknown_space_is_refused_and_changes_nothing() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let patch = NotePatch {
-        space_id: Some("inconnu".to_string()),
+        space_id: Some("unknown".to_string()),
         title: Some("Ne doit pas passer".to_string()),
         ..NotePatch::default()
     };
@@ -492,7 +492,7 @@ fn moving_a_note_to_an_unknown_space_is_refused_and_changes_nothing() {
 fn updating_an_unknown_note_reports_an_error() {
     let mut connection = open_in_memory().unwrap();
 
-    let error = update(&mut connection, "inconnu", &NotePatch::default(), t1()).unwrap_err();
+    let error = update(&mut connection, "unknown", &NotePatch::default(), t1()).unwrap_err();
 
     assert!(matches!(error, StorageError::NoteNotFound(_)));
 }
@@ -500,10 +500,10 @@ fn updating_an_unknown_note_reports_an_error() {
 #[test]
 fn deleting_takes_the_note_off_the_canvas_without_destroying_it() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    delete(&mut connection, &created.id, t1()).unwrap();
+    trash(&mut connection, &created.id, t1()).unwrap();
 
     assert!(list(&mut connection).unwrap().is_empty());
     let kept_tags = note_tags::table
@@ -521,9 +521,9 @@ fn deleting_takes_the_note_off_the_canvas_without_destroying_it() {
 #[test]
 fn a_restored_note_comes_back_whole() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
-    delete(&mut connection, &created.id, t1()).unwrap();
+    trash(&mut connection, &created.id, t1()).unwrap();
 
     assert_eq!(
         restore_many(&mut connection, std::slice::from_ref(&created.id)).unwrap(),
@@ -539,9 +539,9 @@ fn a_restored_note_comes_back_whole() {
 #[test]
 fn a_trashed_note_is_no_longer_editable() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
-    delete(&mut connection, &created.id, t1()).unwrap();
+    trash(&mut connection, &created.id, t1()).unwrap();
 
     let error = update(&mut connection, &created.id, &NotePatch::default(), t1()).unwrap_err();
 
@@ -551,9 +551,9 @@ fn a_trashed_note_is_no_longer_editable() {
 #[test]
 fn purging_removes_the_note_and_its_tags_for_good() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
-    delete(&mut connection, &created.id, t1()).unwrap();
+    trash(&mut connection, &created.id, t1()).unwrap();
 
     assert_eq!(
         purge(&mut connection, std::slice::from_ref(&created.id)).unwrap(),
@@ -571,7 +571,7 @@ fn purging_removes_the_note_and_its_tags_for_good() {
 #[test]
 fn a_note_still_on_the_canvas_cannot_be_purged() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     assert_eq!(
@@ -584,11 +584,11 @@ fn a_note_still_on_the_canvas_cannot_be_purged() {
 #[test]
 fn only_notes_past_the_retention_are_reported_as_expired() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let old = create(&mut connection, draft(&space_id), t0()).unwrap();
     let recent = create(&mut connection, draft(&space_id), t0()).unwrap();
-    delete(&mut connection, &old.id, t0()).unwrap();
-    delete(&mut connection, &recent.id, at("2026-08-20T09:00:00.000Z")).unwrap();
+    trash(&mut connection, &old.id, t0()).unwrap();
+    trash(&mut connection, &recent.id, at("2026-08-20T09:00:00.000Z")).unwrap();
 
     let expired = expired_ids(&mut connection, at("2026-08-25T09:00:00.000Z")).unwrap();
 
@@ -599,7 +599,7 @@ fn only_notes_past_the_retention_are_reported_as_expired() {
 fn deleting_an_unknown_note_reports_an_error() {
     let mut connection = open_in_memory().unwrap();
 
-    let error = delete(&mut connection, "inconnu", t1()).unwrap_err();
+    let error = trash(&mut connection, "unknown", t1()).unwrap_err();
 
     assert!(matches!(error, StorageError::NoteNotFound(_)));
 }
@@ -607,11 +607,11 @@ fn deleting_an_unknown_note_reports_an_error() {
 #[test]
 fn deleting_the_same_note_twice_reports_an_error_rather_than_a_silent_ok() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
-    delete(&mut connection, &created.id, t1()).unwrap();
+    trash(&mut connection, &created.id, t1()).unwrap();
 
-    let error = delete(&mut connection, &created.id, t1()).unwrap_err();
+    let error = trash(&mut connection, &created.id, t1()).unwrap_err();
 
     assert!(matches!(error, StorageError::NoteNotFound(_)));
 }
@@ -634,7 +634,7 @@ fn values(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
 #[test]
 fn a_filled_field_is_read_back_on_the_next_opening() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
 
     set_placeholder_values(&mut connection, &created.id, &values(&[("host", "db")])).unwrap();
@@ -646,7 +646,7 @@ fn a_filled_field_is_read_back_on_the_next_opening() {
 #[test]
 fn filling_a_field_does_not_touch_updated_at() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
 
     let saved =
@@ -659,7 +659,7 @@ fn filling_a_field_does_not_touch_updated_at() {
 #[test]
 fn writing_the_values_replaces_the_whole_set() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
     set_placeholder_values(
         &mut connection,
@@ -679,7 +679,7 @@ fn writing_the_values_replaces_the_whole_set() {
 #[test]
 fn a_value_whose_token_left_the_content_stays_stored_but_out_of_the_fields() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
     set_placeholder_values(&mut connection, &created.id, &values(&[("host", "db")])).unwrap();
 
@@ -704,9 +704,9 @@ fn a_value_whose_token_left_the_content_stays_stored_but_out_of_the_fields() {
 #[test]
 fn filling_a_trashed_note_is_refused() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
-    delete(&mut connection, &created.id, t1()).unwrap();
+    trash(&mut connection, &created.id, t1()).unwrap();
 
     let error = set_placeholder_values(&mut connection, &created.id, &values(&[("host", "db")]))
         .unwrap_err();
@@ -717,10 +717,10 @@ fn filling_a_trashed_note_is_refused() {
 #[test]
 fn purging_removes_the_note_and_its_values_for_good() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
     set_placeholder_values(&mut connection, &created.id, &values(&[("host", "db")])).unwrap();
-    delete(&mut connection, &created.id, t1()).unwrap();
+    trash(&mut connection, &created.id, t1()).unwrap();
 
     purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
 
@@ -766,11 +766,11 @@ fn writing_the_set_again_drops_what_is_no_longer_sent() {
 #[test]
 fn a_global_variable_belongs_to_no_note_and_survives_a_purge() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
     replace_global_placeholder_values(&mut connection, &values(&[("host", "db.internal")]))
         .unwrap();
-    delete(&mut connection, &created.id, t1()).unwrap();
+    trash(&mut connection, &created.id, t1()).unwrap();
 
     purge(&mut connection, std::slice::from_ref(&created.id)).unwrap();
 
@@ -783,7 +783,7 @@ fn a_global_variable_belongs_to_no_note_and_survives_a_purge() {
 #[test]
 fn a_global_variable_shows_up_as_the_suggested_value_of_a_field() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, templated(&space_id), t0()).unwrap();
 
     let globals = values(&[("host", "db.internal")]);
@@ -802,7 +802,7 @@ fn a_global_variable_shows_up_as_the_suggested_value_of_a_field() {
 #[test]
 fn moving_a_selection_leaves_the_notes_already_there_untouched() {
     let mut connection = open_in_memory().unwrap();
-    let source = space(&mut connection, "Perso");
+    let source = space(&mut connection, "Personal");
     let target = space(&mut connection, "Boulot");
     let moved = create(&mut connection, draft(&source), t0()).unwrap();
     let settled = create(&mut connection, draft(&target), t0()).unwrap();
@@ -825,7 +825,7 @@ fn moving_a_selection_leaves_the_notes_already_there_untouched() {
 #[test]
 fn moving_to_an_unknown_space_is_refused_for_the_whole_batch() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let note = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let error = move_many(
@@ -843,7 +843,7 @@ fn moving_to_an_unknown_space_is_refused_for_the_whole_batch() {
 #[test]
 fn tagging_a_selection_adds_without_replacing() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let note = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let count = tag_many(
@@ -864,7 +864,7 @@ fn tagging_a_selection_adds_without_replacing() {
 #[test]
 fn tagging_twice_does_not_duplicate_the_tag() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let note = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     tag_many(
@@ -881,7 +881,7 @@ fn tagging_twice_does_not_duplicate_the_tag() {
 #[test]
 fn every_tag_is_listed_with_the_number_of_notes_carrying_it() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
@@ -894,10 +894,10 @@ fn every_tag_is_listed_with_the_number_of_notes_carrying_it() {
 #[test]
 fn a_trashed_note_no_longer_counts_towards_its_tags() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let kept = create(&mut connection, draft(&space_id), t0()).unwrap();
     let thrown = create(&mut connection, draft(&space_id), t0()).unwrap();
-    delete(&mut connection, &thrown.id, t1()).unwrap();
+    trash(&mut connection, &thrown.id, t1()).unwrap();
 
     let usage = tag_usage(&mut connection).unwrap();
 
@@ -908,7 +908,7 @@ fn a_trashed_note_no_longer_counts_towards_its_tags() {
 #[test]
 fn renaming_a_tag_onto_an_existing_one_merges_them() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let note = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let touched = retag(&mut connection, &["api".to_string()], "auth").unwrap();
@@ -921,7 +921,7 @@ fn renaming_a_tag_onto_an_existing_one_merges_them() {
 #[test]
 fn merging_several_tags_keeps_one_note_entry_each() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     retag(
@@ -937,7 +937,7 @@ fn merging_several_tags_keeps_one_note_entry_each() {
 #[test]
 fn correcting_the_case_of_a_tag_does_not_erase_it() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     retag(&mut connection, &["auth".to_string()], "Auth").unwrap();
@@ -948,10 +948,13 @@ fn correcting_the_case_of_a_tag_does_not_erase_it() {
 #[test]
 fn dropping_a_tag_leaves_the_notes_in_place() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    assert_eq!(drop_tag(&mut connection, "auth").unwrap(), 1);
+    assert_eq!(
+        drop_tags(&mut connection, &["auth".to_string()]).unwrap(),
+        1
+    );
 
     let listed = list(&mut connection).unwrap();
     assert_eq!(listed.len(), 1);
@@ -961,7 +964,7 @@ fn dropping_a_tag_leaves_the_notes_in_place() {
 #[test]
 fn a_global_retag_does_not_float_the_corpus_to_the_top_of_the_canvas() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     retag(&mut connection, &["auth".to_string()], "identity").unwrap();
@@ -972,14 +975,14 @@ fn a_global_retag_does_not_float_the_corpus_to_the_top_of_the_canvas() {
 #[test]
 fn an_export_reads_every_live_note_of_a_space() {
     let mut connection = open_in_memory().unwrap();
-    let perso = space(&mut connection, "Perso");
+    let personal = space(&mut connection, "Personal");
     let boulot = space(&mut connection, "Boulot");
-    create(&mut connection, draft(&perso), t0()).unwrap();
+    create(&mut connection, draft(&personal), t0()).unwrap();
     let elsewhere = create(&mut connection, draft(&boulot), t0()).unwrap();
-    let thrown = create(&mut connection, draft(&perso), t0()).unwrap();
-    delete(&mut connection, &thrown.id, t1()).unwrap();
+    let thrown = create(&mut connection, draft(&personal), t0()).unwrap();
+    trash(&mut connection, &thrown.id, t1()).unwrap();
 
-    let exported = all(&mut connection, Some(&perso)).unwrap();
+    let exported = all(&mut connection, Some(&personal)).unwrap();
 
     assert_eq!(exported.len(), 1);
     assert_eq!(exported[0].tags, ["api", "auth"]);
@@ -995,7 +998,7 @@ fn an_export_reads_every_live_note_of_a_space() {
 #[test]
 fn an_imported_note_keeps_its_identifier_and_its_dates() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let mut note = create(&mut connection, draft(&space_id), t0()).unwrap();
     note.id = "imported".to_string();
 
@@ -1013,7 +1016,7 @@ fn an_imported_note_keeps_its_identifier_and_its_dates() {
 #[test]
 fn importing_the_same_note_twice_leaves_the_first_one_alone() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let mut note = create(&mut connection, draft(&space_id), t0()).unwrap();
     note.title = "Écrasé ?".to_string();
 
@@ -1024,7 +1027,7 @@ fn importing_the_same_note_twice_leaves_the_first_one_alone() {
 #[test]
 fn sharing_a_selection_reads_the_notes_it_names() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let first = create(&mut connection, draft(&space_id), t0()).unwrap();
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
@@ -1074,7 +1077,7 @@ fn written_in(space_id: &str, language: Language) -> NoteDraft {
 #[test]
 fn a_query_without_criteria_returns_every_note() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let view = query(&mut connection, &all_notes()).unwrap();
@@ -1086,7 +1089,7 @@ fn a_query_without_criteria_returns_every_note() {
 #[test]
 fn the_space_filter_excludes_the_other_spaces() {
     let mut connection = open_in_memory().unwrap();
-    let here = space(&mut connection, "Perso");
+    let here = space(&mut connection, "Personal");
     let elsewhere = space(&mut connection, "Boulot");
     let kept = create(&mut connection, draft(&here), t0()).unwrap();
     create(&mut connection, draft(&elsewhere), t0()).unwrap();
@@ -1106,7 +1109,7 @@ fn the_space_filter_excludes_the_other_spaces() {
 #[test]
 fn no_space_means_every_space_rather_than_none() {
     let mut connection = open_in_memory().unwrap();
-    let here = space(&mut connection, "Perso");
+    let here = space(&mut connection, "Personal");
     let elsewhere = space(&mut connection, "Boulot");
     create(&mut connection, draft(&here), t0()).unwrap();
     create(&mut connection, draft(&elsewhere), t0()).unwrap();
@@ -1119,7 +1122,7 @@ fn no_space_means_every_space_rather_than_none() {
 #[test]
 fn the_pinned_filter_keeps_only_pinned_notes() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let pinned = create(
         &mut connection,
         NoteDraft {
@@ -1146,7 +1149,7 @@ fn the_pinned_filter_keeps_only_pinned_notes() {
 #[test]
 fn the_untriaged_filter_keeps_only_expiring_notes() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let expiring = create(
         &mut connection,
         NoteDraft {
@@ -1175,7 +1178,7 @@ fn the_untriaged_filter_keeps_only_expiring_notes() {
 #[test]
 fn a_quick_filter_alone_does_not_switch_to_results_mode() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let view = query(
@@ -1193,7 +1196,7 @@ fn a_quick_filter_alone_does_not_switch_to_results_mode() {
 #[test]
 fn the_search_matches_the_title_the_content_and_the_tags() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let by_title = create(
         &mut connection,
         NoteDraft {
@@ -1242,7 +1245,7 @@ fn the_search_matches_the_title_the_content_and_the_tags() {
 #[test]
 fn the_search_ignores_case_beyond_ascii() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(
         &mut connection,
         NoteDraft {
@@ -1268,7 +1271,7 @@ fn the_search_ignores_case_beyond_ascii() {
 #[test]
 fn a_blank_search_is_not_a_search() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let view = query(
@@ -1287,7 +1290,7 @@ fn a_blank_search_is_not_a_search() {
 #[test]
 fn a_note_matches_when_it_carries_at_least_one_selected_tag() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let one = create(&mut connection, tagged(&space_id, &["urgent"]), t0()).unwrap();
     let two = create(&mut connection, tagged(&space_id, &["later"]), t0()).unwrap();
     create(&mut connection, tagged(&space_id, &["neither"]), t0()).unwrap();
@@ -1308,9 +1311,9 @@ fn a_note_matches_when_it_carries_at_least_one_selected_tag() {
 }
 
 #[test]
-fn a_selected_tag_is_normalised_like_a_stored_one() {
+fn a_selected_tag_is_normalized_like_a_stored_one() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, tagged(&space_id, &["urgent"]), t0()).unwrap();
 
     let view = query(
@@ -1328,7 +1331,7 @@ fn a_selected_tag_is_normalised_like_a_stored_one() {
 #[test]
 fn a_selected_tag_matches_a_stored_one_of_a_different_case() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, tagged(&space_id, &["Urgent"]), t0()).unwrap();
 
     let view = query(
@@ -1346,7 +1349,7 @@ fn a_selected_tag_matches_a_stored_one_of_a_different_case() {
 #[test]
 fn the_rail_offers_one_facet_for_tags_differing_only_in_case() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, tagged(&space_id, &["Urgent"]), t0()).unwrap();
     create(&mut connection, tagged(&space_id, &["urgent"]), t1()).unwrap();
 
@@ -1358,7 +1361,7 @@ fn the_rail_offers_one_facet_for_tags_differing_only_in_case() {
 #[test]
 fn criteria_combine_rather_than_replace_each_other() {
     let mut connection = open_in_memory().unwrap();
-    let here = space(&mut connection, "Perso");
+    let here = space(&mut connection, "Personal");
     let elsewhere = space(&mut connection, "Boulot");
 
     let target = create(
@@ -1435,7 +1438,7 @@ fn criteria_combine_rather_than_replace_each_other() {
 #[test]
 fn a_note_matches_when_it_is_written_in_one_of_the_selected_languages() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let json = create(&mut connection, written_in(&space_id, Language::Json), t0()).unwrap();
     let yml = create(&mut connection, written_in(&space_id, Language::Yml), t0()).unwrap();
     create(&mut connection, written_in(&space_id, Language::Py), t0()).unwrap();
@@ -1458,7 +1461,7 @@ fn a_note_matches_when_it_is_written_in_one_of_the_selected_languages() {
 #[test]
 fn the_language_filter_combines_with_the_other_criteria() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let target = create(
         &mut connection,
         NoteDraft {
@@ -1495,7 +1498,7 @@ fn the_language_filter_combines_with_the_other_criteria() {
 #[test]
 fn available_languages_are_sorted_and_de_duplicated() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, written_in(&space_id, Language::Yml), t0()).unwrap();
     create(&mut connection, written_in(&space_id, Language::Json), t0()).unwrap();
     create(&mut connection, written_in(&space_id, Language::Json), t1()).unwrap();
@@ -1508,7 +1511,7 @@ fn available_languages_are_sorted_and_de_duplicated() {
 #[test]
 fn available_languages_are_scoped_to_the_active_space() {
     let mut connection = open_in_memory().unwrap();
-    let here = space(&mut connection, "Perso");
+    let here = space(&mut connection, "Personal");
     let elsewhere = space(&mut connection, "Boulot");
     create(&mut connection, written_in(&here, Language::Json), t0()).unwrap();
     create(&mut connection, written_in(&elsewhere, Language::Sql), t0()).unwrap();
@@ -1528,7 +1531,7 @@ fn available_languages_are_scoped_to_the_active_space() {
 #[test]
 fn available_languages_ignore_the_current_selection() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, written_in(&space_id, Language::Json), t0()).unwrap();
     create(&mut connection, written_in(&space_id, Language::Yml), t0()).unwrap();
 
@@ -1548,7 +1551,7 @@ fn available_languages_ignore_the_current_selection() {
 #[test]
 fn available_tags_are_sorted_and_de_duplicated() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, tagged(&space_id, &["zeta", "alpha"]), t0()).unwrap();
     create(&mut connection, tagged(&space_id, &["alpha", "beta"]), t0()).unwrap();
 
@@ -1560,7 +1563,7 @@ fn available_tags_are_sorted_and_de_duplicated() {
 #[test]
 fn available_tags_are_scoped_to_the_active_space() {
     let mut connection = open_in_memory().unwrap();
-    let here = space(&mut connection, "Perso");
+    let here = space(&mut connection, "Personal");
     let elsewhere = space(&mut connection, "Boulot");
     create(&mut connection, tagged(&here, &["here-tag"]), t0()).unwrap();
     create(
@@ -1585,7 +1588,7 @@ fn available_tags_are_scoped_to_the_active_space() {
 #[test]
 fn available_tags_ignore_the_current_search_and_selection() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, tagged(&space_id, &["urgent"]), t0()).unwrap();
     create(&mut connection, tagged(&space_id, &["later"]), t0()).unwrap();
 
@@ -1605,13 +1608,13 @@ fn available_tags_ignore_the_current_search_and_selection() {
 #[test]
 fn a_search_matching_nothing_reports_filtering_with_zero_matches() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     let view = query(
         &mut connection,
         &NotesQuery {
-            search: "introuvable".to_string(),
+            search: "no-such-thing".to_string(),
             ..all_notes()
         },
     )
@@ -1624,7 +1627,7 @@ fn a_search_matching_nothing_reports_filtering_with_zero_matches() {
 #[test]
 fn the_view_orders_notes_most_recently_updated_first() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let older = create(&mut connection, draft(&space_id), t0()).unwrap();
     let newer = create(&mut connection, draft(&space_id), t1()).unwrap();
 
@@ -1634,9 +1637,9 @@ fn the_view_orders_notes_most_recently_updated_first() {
 }
 
 #[test]
-fn tags_are_normalised_on_write() {
+fn tags_are_normalized_on_write() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
 
     let created = create(
         &mut connection,
@@ -1650,9 +1653,9 @@ fn tags_are_normalised_on_write() {
 }
 
 #[test]
-fn a_normalised_write_returns_what_a_read_would_return() {
+fn a_normalized_write_returns_what_a_read_would_return() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
 
     let created = create(&mut connection, tagged(&space_id, &["zeta", "alpha"]), t0()).unwrap();
 
@@ -1662,7 +1665,7 @@ fn a_normalised_write_returns_what_a_read_would_return() {
 #[test]
 fn deleting_a_space_takes_its_notes_with_it() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     diesel::delete(spaces_table::table.find(&space_id))
@@ -1675,7 +1678,7 @@ fn deleting_a_space_takes_its_notes_with_it() {
 #[test]
 fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
     diesel::update(devbox_lib::db::schema::notes::table.find(&created.id))
@@ -1697,7 +1700,7 @@ fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
 #[test]
 fn a_stored_date_always_carries_its_milliseconds() {
     let mut connection = open_in_memory().unwrap();
-    let space_id = space(&mut connection, "Perso");
+    let space_id = space(&mut connection, "Personal");
     let round_second = at("2026-07-25T09:00:00Z");
 
     let created = create(&mut connection, draft(&space_id), round_second).unwrap();

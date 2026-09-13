@@ -1,11 +1,14 @@
 [package]
 name = "devbox"
 version = "0.1.4"
-description = "Couteau suisse de développeur : prise de notes, hachage, encodage"
+# ⚠️ Shipped: the installer and the Linux `.desktop` entry show this string.
+description = "A developer's notes and snippets manager for the desktop"
 authors = ["Valentin MILLET"]
 edition = "2024"
 rust-version = "1.88"
 repository = "https://github.com/vmillet-dev/devbox-rs"
+license = "GPL-3.0-only"
+readme = "../README.md"
 default-run = "devbox"
 
 [package.metadata.devbox]
@@ -60,10 +63,13 @@ thiserror = "2.0.20"
 tauri-plugin-wdio = { version = "1", optional = true }
 tauri-plugin-wdio-webdriver = { version = "1", optional = true }
 
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+# Desktop-only plugins. They are plain dependencies rather than a
+# `cfg(not(android/ios))` table: DevBox targets the desktop, and a conditional table
+# only pretended the crate could build anywhere else.
 tauri-plugin-updater = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
 
 [profile.release]
 lto = true

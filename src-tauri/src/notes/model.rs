@@ -26,7 +26,7 @@ pub struct Note {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub lifecycle: NoteLifecycle,
-    /// ⚠️ `default`: `transfer::Bundle` deserialises `Note` itself, and a required
+    /// ⚠️ `default`: `transfer::Bundle` deserializes `Note` itself, and a required
     /// key would make every export file written before todo-lists unreadable.
     #[serde(default)]
     pub kind: NoteKind,
@@ -285,9 +285,8 @@ pub struct TagUsage {
 /// Written across the whole corpus (rename, merge), so its failure is an error:
 /// staying silent would rename onto nothing.
 pub fn validated_tag(raw: &str) -> Result<String, crate::error::ValidationError> {
-    normalize_tags(std::slice::from_ref(&raw.to_string()))
-        .into_iter()
-        .next()
+    normalize_tag(raw)
+        .map(str::to_string)
         .ok_or_else(|| crate::error::ValidationError::new("tag", "a tag must have a readable name"))
 }
 
@@ -380,7 +379,7 @@ mod tests {
     fn draft(language: Language, content: &str) -> NoteDraft {
         NoteDraft {
             space_id: "s-1".to_string(),
-            title: "Titre".to_string(),
+            title: "Title".to_string(),
             language,
             content: content.to_string(),
             source: "API Gateway".to_string(),
@@ -394,7 +393,7 @@ mod tests {
 
     #[test]
     fn a_draft_becomes_a_note_carrying_the_id_and_the_instant_it_was_given() {
-        let note = draft(Language::Md, "du texte").into_note("n-7".to_string(), now());
+        let note = draft(Language::Md, "some prose").into_note("n-7".to_string(), now());
 
         assert_eq!(note.id, "n-7");
         assert_eq!(note.created_at, now());
@@ -402,7 +401,7 @@ mod tests {
     }
 
     #[test]
-    fn turning_a_draft_into_a_note_detects_the_language_and_normalises_the_tags() {
+    fn turning_a_draft_into_a_note_detects_the_language_and_normalizes_the_tags() {
         let note = draft(Language::Txt, "{\"a\": 1}").into_note("n-7".to_string(), now());
 
         assert_eq!(note.language, Language::Json);
@@ -424,13 +423,13 @@ mod tests {
     fn a_patch_only_touches_the_fields_it_carries() {
         let mut note = sample();
         let patch = NotePatch {
-            title: Some("Nouveau".to_string()),
+            title: Some("New".to_string()),
             ..NotePatch::default()
         };
 
         patch.apply(&mut note, at("2026-07-25T10:00:00.000Z"));
 
-        assert_eq!(note.title, "Nouveau");
+        assert_eq!(note.title, "New");
         assert_eq!(note.content, "Content");
         assert_eq!(note.tags, ["auth"]);
         assert_eq!(note.updated_at, at("2026-07-25T10:00:00.000Z"));
@@ -438,7 +437,7 @@ mod tests {
     }
 
     #[test]
-    fn a_patch_normalises_the_tags_it_replaces() {
+    fn a_patch_normalizes_the_tags_it_replaces() {
         let mut note = sample();
         let patch = NotePatch {
             tags: Some(vec![
@@ -511,7 +510,7 @@ mod tests {
     }
 
     #[test]
-    fn a_patch_replaces_the_whole_item_list_and_normalises_it() {
+    fn a_patch_replaces_the_whole_item_list_and_normalizes_it() {
         let mut note = Note {
             items: vec![ChecklistItem {
                 text: "Old".to_string(),

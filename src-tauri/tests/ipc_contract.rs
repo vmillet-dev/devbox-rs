@@ -25,14 +25,14 @@ use devbox_lib::transfer::model::{Bundle, ImportReport};
 const NOW: &str = "2026-07-25T09:00:00.000Z";
 
 fn at(iso: &str) -> DateTime<Utc> {
-    iso8601::parse(iso).expect("les tests écrivent des instants valides")
+    iso8601::parse(iso).expect("tests write valid instants")
 }
 
 fn sample() -> Note {
     Note {
         id: "n-1".to_string(),
         space_id: "s-1".to_string(),
-        title: "Titre".to_string(),
+        title: "Title".to_string(),
         language: Language::Txt,
         content: "Contenu".to_string(),
         source: String::new(),
@@ -52,7 +52,7 @@ fn displayed(note: Note) -> DisplayNote {
 }
 
 #[test]
-fn a_note_serialises_with_camel_case_keys() {
+fn a_note_serializes_with_camel_case_keys() {
     let json = serde_json::to_value(sample()).unwrap();
 
     assert!(json.get("spaceId").is_some());
@@ -63,7 +63,7 @@ fn a_note_serialises_with_camel_case_keys() {
 }
 
 #[test]
-fn a_permanent_lifecycle_serialises_as_a_tagged_object() {
+fn a_permanent_lifecycle_serializes_as_a_tagged_object() {
     let json = serde_json::to_value(sample()).unwrap();
 
     assert_eq!(
@@ -73,7 +73,7 @@ fn a_permanent_lifecycle_serialises_as_a_tagged_object() {
 }
 
 #[test]
-fn an_expiring_lifecycle_serialises_flat_with_its_date() {
+fn an_expiring_lifecycle_serializes_flat_with_its_date() {
     let note = Note {
         lifecycle: NoteLifecycle::Expires {
             at: at("2026-08-01T00:00:00.000Z"),
@@ -92,13 +92,13 @@ fn an_expiring_lifecycle_serialises_flat_with_its_date() {
 }
 
 #[test]
-fn a_patch_omitting_a_field_deserialises_to_none() {
+fn a_patch_omitting_a_field_deserializes_to_none() {
     let patch: NotePatch = serde_json::from_value(serde_json::json!({
-        "title": "Nouveau titre"
+        "title": "New title"
     }))
     .unwrap();
 
-    assert_eq!(patch.title.as_deref(), Some("Nouveau titre"));
+    assert_eq!(patch.title.as_deref(), Some("New title"));
     assert!(patch.content.is_none());
     assert!(patch.tags.is_none());
     assert!(patch.lifecycle.is_none());
@@ -124,7 +124,7 @@ fn a_draft_is_read_from_the_camel_case_payload_the_front_sends() {
 }
 
 #[test]
-fn a_decorated_note_serialises_flat_with_its_footer() {
+fn a_decorated_note_serializes_flat_with_its_footer() {
     let json = serde_json::to_value(displayed(sample())).unwrap();
 
     assert_eq!(json["id"], "n-1");
@@ -139,7 +139,7 @@ fn a_decorated_note_serialises_flat_with_its_footer() {
 }
 
 #[test]
-fn a_source_footer_serialises_with_the_kind_the_front_discriminates_on() {
+fn a_source_footer_serializes_with_the_kind_the_front_discriminates_on() {
     let note = Note {
         pinned: true,
         source: "API Gateway / Auth".to_string(),
@@ -155,7 +155,7 @@ fn a_source_footer_serialises_with_the_kind_the_front_discriminates_on() {
 }
 
 #[test]
-fn a_view_serialises_with_camel_case_keys() {
+fn a_view_serializes_with_camel_case_keys() {
     let view = NotesView {
         sections: vec![NoteSection {
             key: NoteSectionKey::Week,
@@ -181,7 +181,7 @@ fn a_view_serialises_with_camel_case_keys() {
 }
 
 #[test]
-fn a_section_key_serialises_as_the_translation_key_the_front_expects() {
+fn a_section_key_serializes_as_the_translation_key_the_front_expects() {
     let section = NoteSection {
         key: NoteSectionKey::Older,
         notes: Vec::new(),
@@ -235,14 +235,14 @@ fn a_null_space_is_read_as_every_space() {
 /// `rename_all` has no effect while every field is one word: this test fails the day
 /// a `created_at` is added without the attribute.
 #[test]
-fn a_space_serialises_with_the_keys_the_front_reads() {
+fn a_space_serializes_with_the_keys_the_front_reads() {
     let json = serde_json::to_value(Space {
         id: "s-1".to_string(),
-        name: "Perso".to_string(),
+        name: "Personal".to_string(),
     })
     .unwrap();
 
-    assert_eq!(json, serde_json::json!({ "id": "s-1", "name": "Perso" }));
+    assert_eq!(json, serde_json::json!({ "id": "s-1", "name": "Personal" }));
 }
 
 #[test]
@@ -254,7 +254,7 @@ fn a_space_draft_is_read_from_the_payload_the_front_sends() {
 }
 
 #[test]
-fn a_code_serialises_in_camel_case() {
+fn a_code_serializes_in_camel_case() {
     let json = serde_json::to_value(AppError::from(StorageError::NoteNotFound(
         "n-1".to_string(),
     )))
@@ -266,12 +266,12 @@ fn a_code_serialises_in_camel_case() {
 #[test]
 fn a_duplicate_space_name_carries_the_name_as_a_parameter() {
     let json = serde_json::to_value(AppError::from(StorageError::DuplicateSpaceName(
-        "Perso".to_string(),
+        "Personal".to_string(),
     )))
     .unwrap();
 
     assert_eq!(json["code"], "duplicateSpaceName");
-    assert_eq!(json["params"]["name"], "Perso");
+    assert_eq!(json["params"]["name"], "Personal");
 }
 
 #[test]
@@ -279,7 +279,7 @@ fn every_error_carries_a_non_empty_detail() {
     let errors = [
         StorageError::NoteNotFound("n-1".to_string()),
         StorageError::SpaceNotFound("s-1".to_string()),
-        StorageError::DuplicateSpaceName("Perso".to_string()),
+        StorageError::DuplicateSpaceName("Personal".to_string()),
         StorageError::SchemaTooRecent("2099-01-01-000000".to_string()),
         StorageError::Migration("base verrouillée".to_string()),
     ];
@@ -293,7 +293,7 @@ fn every_error_carries_a_non_empty_detail() {
 fn a_refused_value_names_the_field_at_fault() {
     let json = serde_json::to_value(AppError::from(ValidationError::new(
         "language",
-        "« rust » n'est pas un langage reconnu",
+        "\"rust\" is not a known language",
     )))
     .unwrap();
 
@@ -385,7 +385,7 @@ fn a_decorated_note_announces_its_fields_and_its_attachments() {
 }
 
 #[test]
-fn an_attachment_serialises_with_camel_case_keys() {
+fn an_attachment_serializes_with_camel_case_keys() {
     let json = serde_json::to_value(Attachment {
         id: "a-1".to_string(),
         note_id: "n-1".to_string(),
@@ -438,7 +438,7 @@ fn an_export_bundle_reads_back_the_notes_it_wrote() {
         exported_at: at(NOW),
         spaces: vec![Space {
             id: "s-1".to_string(),
-            name: "Perso".to_string(),
+            name: "Personal".to_string(),
         }],
         notes: vec![sample()],
     };
@@ -477,7 +477,7 @@ fn an_ordinary_note_still_crosses_as_a_snippet() {
 
 #[test]
 fn an_export_written_before_todo_lists_existed_still_reads() {
-    // `Bundle` deserialises `Note` itself: without `#[serde(default)]` every file
+    // `Bundle` deserializes `Note` itself: without `#[serde(default)]` every file
     // already exported would become unreadable.
     let json = serde_json::json!({
         "version": transfer::model::FORMAT_VERSION,
@@ -486,7 +486,7 @@ fn an_export_written_before_todo_lists_existed_still_reads() {
         "notes": [{
             "id": "n-1",
             "spaceId": "s-1",
-            "title": "Titre",
+            "title": "Title",
             "language": "txt",
             "content": "Contenu",
             "source": "",
@@ -520,7 +520,7 @@ fn the_values_of_the_fields_cross_as_a_named_map() {
 }
 
 #[test]
-fn a_patch_omitting_the_items_deserialises_to_none() {
+fn a_patch_omitting_the_items_deserializes_to_none() {
     let patch: NotePatch = serde_json::from_value(serde_json::json!({ "title": "T" })).unwrap();
 
     assert!(patch.items.is_none());

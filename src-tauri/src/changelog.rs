@@ -9,7 +9,7 @@ use model::ChangelogRelease;
 /// shipped as a file, untranslated like the release notes the updater hands over.
 const CHANGELOG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../CHANGELOG.md"));
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 pub fn app_changelog() -> Vec<ChangelogRelease> {
     model::parse(CHANGELOG)

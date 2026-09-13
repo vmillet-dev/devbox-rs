@@ -135,7 +135,7 @@ mod tests {
     use crate::notes::fixtures::note as sample;
 
     fn spaces() -> BTreeMap<String, String> {
-        BTreeMap::from([("s-1".to_string(), "Perso".to_string())])
+        BTreeMap::from([("s-1".to_string(), "Personal".to_string())])
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod tests {
         let markdown = to_markdown(&[note], &spaces());
 
         assert!(markdown.contains("## Title"));
-        assert!(markdown.contains("_Perso · API Gateway / Auth · #auth_"));
+        assert!(markdown.contains("_Personal · API Gateway / Auth · #auth_"));
         assert!(markdown.contains("```txt\nContent\n```"));
     }
 
@@ -168,19 +168,19 @@ mod tests {
         note.content = String::new();
         note.items = vec![
             ChecklistItem {
-                text: "Relire".to_string(),
+                text: "Review".to_string(),
                 done: true,
             },
             ChecklistItem {
-                text: "Déployer".to_string(),
+                text: "Ship".to_string(),
                 done: false,
             },
         ];
 
         let markdown = to_markdown(&[note], &spaces());
 
-        assert!(markdown.contains("- [x] Relire"));
-        assert!(markdown.contains("- [ ] Déployer"));
+        assert!(markdown.contains("- [x] Review"));
+        assert!(markdown.contains("- [ ] Ship"));
         assert!(!markdown.contains("```"));
     }
 
@@ -222,7 +222,7 @@ mod tests {
             exported_at: sample().created_at,
             spaces: vec![Space {
                 id: "s-1".to_string(),
-                name: "Perso".to_string(),
+                name: "Personal".to_string(),
             }],
             notes: vec![sample()],
         };
@@ -231,6 +231,6 @@ mod tests {
 
         assert_eq!(read.notes.len(), 1);
         assert_eq!(read.notes[0].title, "Title");
-        assert_eq!(read.spaces[0].name, "Perso");
+        assert_eq!(read.spaces[0].name, "Personal");
     }
 }

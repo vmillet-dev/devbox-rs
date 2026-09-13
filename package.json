@@ -1,6 +1,12 @@
 {
   "name": "devbox",
   "version": "0.1.4",
+  "description": "A developer's notes and snippets manager for the desktop",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vmillet-dev/devbox-rs.git"
+  },
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
