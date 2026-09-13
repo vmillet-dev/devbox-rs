@@ -1,11 +1,22 @@
 @use 'mixins' as *;
 
+// Every band of the editor carries the panel's 20px inset itself, because the body must
+// reach the edges. This component is two sibling roots — the strip, and the preview that
+// opens under it — so the whole band's padding sits on the host: put on either rule
+// alone, the other slides out from under it.
+//
+// The top carries the 20px the code viewer insets its own first line by, so the label
+// reads as sitting between the header rule and the body rather than glued to the header.
+:host {
+  display: block;
+  padding: 20px 20px 6px;
+}
+
 .strip {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 6px 0;
 }
 
 .strip-label,
@@ -94,6 +105,7 @@ button.strip-name {
 }
 
 .strip-preview {
+  margin-top: 6px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
