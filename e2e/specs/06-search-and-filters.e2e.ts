@@ -60,6 +60,16 @@ describe('Search, filters and facets', () => {
     expect(await canvas.titles()).toEqual(['Étape de migration']);
   });
 
+  it('folds the accents too, on both sides of the comparison', async () => {
+    // Nobody reaches for the accent key to search, and the corpus is written with them.
+    await canvas.search('etape');
+    expect(await canvas.titles()).toEqual(['Étape de migration']);
+
+    // Symmetric, because the needle goes through the same fold as the haystack.
+    await canvas.search('Dôcker');
+    expect(await canvas.titles()).toEqual(['Docker compose']);
+  });
+
   it('collapses to a single flat results section while searching', async () => {
     // Searched here rather than inherited from the test above: an `it` that depends on
     // what the previous one left cannot be run, reordered or bailed on alone.

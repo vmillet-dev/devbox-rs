@@ -1602,6 +1602,17 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   matching is done **in Rust** (`notes::view`), because SQLite's `LOWER()` only folds ASCII
   without ICU, so `Étape` would not match `étape`. Grouping is `notes::view`, which
   touches no connection and is therefore testable without a database.
+- **The search fold drops the accents as well as the case, on both sides.** `view::fold`
+  lowercases and strips the combining marks, so `etape` finds `Étape` and `Étape` finds
+  `etape` — the needle goes through the same function as every haystack. It decomposes one
+  character at a time (`unicode_normalization::char::decompose_canonical`) rather than
+  streaming the whole string through `nfd()`: on 800 notes of 13 kB of accented text, in
+  release, that is 15 ms against 76 ms, and against 27 ms for the `to_lowercase()` it
+  replaces — which folded no accent at all. Pure ASCII, which is what a snippet of code is,
+  never leaves the fast path. Only what a **canonical** decomposition separates is folded:
+  `ø` and `ß` are letters in their own right and stay. ⚠️ Tag normalisation
+  (`notes::model::normalize_tags`) deliberately does **not** fold accents — `Étape` and
+  `etape` are two tags, and merging them would lose one.
 - **Tag normalisation lives in `notes::model::normalize_tags`, and only there.** Trimming,
   stripping leading `#`, dropping blanks and collapsing case-insensitive duplicates (first
   spelling wins) all happen on write, so the front sends what the user typed. The returned
