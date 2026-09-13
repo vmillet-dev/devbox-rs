@@ -1,0 +1,53 @@
+[graph]
+# The release matrix, plus macOS so a contributor working there is covered too.
+targets = [
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-apple-darwin",
+]
+# Reaches the `e2e` feature's dependencies, which nothing else inspects.
+all-features = true
+
+[advisories]
+# Only the crates this project actually chose. An unmaintained crate five levels
+# down is not something a pull request here can act on.
+unmaintained = "workspace"
+unsound = "all"
+ignore = []
+
+[licenses]
+confidence-threshold = 0.93
+# ⚠️ DevBox ships under GPL-3.0-only, so every dependency has to be
+# GPL-3.0-compatible. This list is the inventory of what the tree actually
+# carries — all permissive, MPL-2.0 included (compatible under its section 3.3).
+# A new entry means a real decision, not a formality: check the compatibility
+# before adding one.
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "GPL-3.0-only",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+exceptions = []
+
+[bans]
+# A Tauri tree always carries a few duplicate versions it does not control;
+# denying them would make this job red for something no contributor can fix.
+multiple-versions = "allow"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

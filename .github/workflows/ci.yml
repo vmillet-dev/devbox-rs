@@ -62,7 +62,9 @@ jobs:
 
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
 
-      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+      # `--all-features` is what type-checks the `e2e` feature. Without it a break in
+      # the end-to-end harness only surfaces at the next `npm run e2e:build`.
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features --locked -- -D warnings
 
   build-front:
     name: Build front
@@ -162,19 +164,41 @@ jobs:
           path: coverage
           retention-days: 7
 
+  # ⚠️ Windows is not redundant with Ubuntu here. DevBox ships primarily to Windows, and the
+  # back-end reasons about `app_data_dir()`, path separators, file locking and SQLite — all of
+  # which differ. Until this leg existed, nothing blocking ever ran the tests on the platform
+  # most users are on: `test-e2e` covers Windows but is `continue-on-error`.
   test-rust:
-    name: Test Rust
+    name: Test Rust (${{ matrix.os }})
     needs: build-rust
-    runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # `rust-ubuntu` on purpose: the same key `build-rust` wrote, which is the whole
+          # point of depending on it.
+          - os: ubuntu-22.04
+            cache-key: rust-ubuntu
+            save-cache: 'false'
+          - os: windows-latest
+            cache-key: rust-windows
+            save-cache: 'true'
     steps:
       - uses: actions/checkout@v4
 
-      # Restores `build-rust`'s target/ — including the SQLite compilation (`libsqlite3-sys`
-      # in `bundled` builds the C sources), which is most of this job's time.
+      # On Ubuntu this restores `build-rust`'s target/ — including the SQLite compilation
+      # (`libsqlite3-sys` in `bundled` builds the C sources), which is most of this job's
+      # time. Windows has no such job ahead of it, so it seeds a cache of its own; the two
+      # keys differ, so neither races the other for a write.
       - uses: ./.github/actions/setup-rust
         with:
-          shared-key: rust-ubuntu
+          shared-key: ${{ matrix.cache-key }}
+          save-if: ${{ matrix.save-cache }}
 
       - name: Placeholder frontendDist
         run: |
@@ -185,7 +209,7 @@ jobs:
         run: |
           start=$(date +%s)
           cargo test --manifest-path src-tauri/Cargo.toml --locked
-          echo "\`test-rust\` — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`test-rust\` (${{ matrix.os }}) — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
 
   # The only job that launches the assembled application: real binary, real WebView, real
   # SQLite file on disk. Both platforms of the release matrix are covered, and they do not

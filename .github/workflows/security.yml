@@ -1,0 +1,63 @@
+name: Security
+
+# Two triggers, because they catch different things. On a pull request: a dependency
+# arriving with a known advisory or an incompatible license, while there is still a
+# review to act on. On a schedule: an advisory published *after* a dependency was
+# merged, which no push would ever surface.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src-tauri/Cargo.toml'
+      - 'src-tauri/Cargo.lock'
+      - 'src-tauri/deny.toml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/security.yml'
+  schedule:
+    # Monday morning, so the week starts with the answer rather than ends with it.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-deny:
+    name: Cargo advisories and licenses
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads `Cargo.lock` and the advisory database; it compiles nothing, which is
+      # why this job needs no Rust toolchain and no cargo cache.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: src-tauri/Cargo.toml
+          # `licenses` is not decoration: DevBox ships under GPL-3.0-only, and a
+          # dependency that is not compatible with it cannot be distributed.
+          command: check advisories bans licenses sources
+
+  npm-audit:
+    name: npm advisories
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Production dependencies only, and from `high` up. The dev tree pulls in a
+      # build chain whose advisories never reach a user's machine, and a job that
+      # cries wolf on those is a job everyone learns to ignore.
+      - run: npm audit --omit=dev --audit-level=high
