@@ -89,3 +89,12 @@
   margin: 4px 6px;
   background: var(--line-soft);
 }
+
+// An update that was silenced still exists, and this is all that says so.
+.about-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  flex: none;
+}

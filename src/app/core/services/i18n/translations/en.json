@@ -188,7 +188,8 @@
     "downloading": "Downloading…",
     "downloadingPercent": "Downloading… {{percent}}%",
     "restarting": "Restarting {{app}}…",
-    "progressLabel": "Download progress"
+    "progressLabel": "Download progress",
+    "skipVersion": "Do not offer version {{version}} again"
   },
   "about": {
     "menuLabel": "About",
@@ -207,7 +208,8 @@
     "close": "Close",
     "whatsNew": "What's new",
     "gettingStarted": "Getting started",
-    "shortcuts": "Keyboard shortcuts"
+    "shortcuts": "Keyboard shortcuts",
+    "updateWaiting": "An update is available"
   },
   "trash": {
     "title": "Trash",
@@ -403,7 +405,10 @@
     },
     "notifications": {
       "title": "Notifications",
-      "copyConfirmation": "Confirm every copy"
+      "copyConfirmation": "Confirm every copy",
+      "updates": "Tell me about updates",
+      "updateSkipped": "Version {{version}} will not be offered again.",
+      "updateSkippedForget": "Undo"
     },
     "variables": {
       "intro": "Default values for your snippets' fields, across every note. What you type on a note wins; elsewhere the variable is offered in grey, never copied in.",

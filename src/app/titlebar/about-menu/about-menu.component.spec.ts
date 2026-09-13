@@ -60,6 +60,39 @@ describe('AboutMenuComponent', () => {
     fixture.autoDetectChanges();
   });
 
+  describe('the update dot', () => {
+    const dot = (): HTMLElement | null => fixture.nativeElement.querySelector('[data-testid="update-dot"]');
+
+    it('is absent while there is nothing waiting', () => {
+      expect(dot()).toBeNull();
+    });
+
+    /**
+     * ⚠️ The point of the dot. `dismiss()` returns the status to `idle`, which is what
+     * closes the prompt — a dot reading that state would disappear with the dialog it
+     * exists to outlive.
+     */
+    it('stays after the prompt has been dismissed', async () => {
+      updater.available = { version: '0.2.0', currentVersion: '0.1.0' };
+      await store.check();
+      await fixture.whenStable();
+      expect(dot()).not.toBeNull();
+
+      await store.dismiss(true);
+      await fixture.whenStable();
+
+      expect(dot()).not.toBeNull();
+    });
+
+    it('carries a text twin, since it says something no word does', async () => {
+      updater.available = { version: '0.2.0', currentVersion: '0.1.0' };
+      await store.check();
+      await fixture.whenStable();
+
+      expect(trigger().querySelector('.visually-hidden')?.textContent?.trim()).not.toBe('');
+    });
+  });
+
   it('keeps the menu closed until asked', () => {
     expect(fixture.debugElement.query(By.css('.about-dropdown'))).toBeNull();
     expect(trigger().getAttribute('aria-expanded')).toBe('false');

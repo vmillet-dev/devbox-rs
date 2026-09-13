@@ -27,6 +27,12 @@ const asBoolean: SettingCodec<boolean> = {
   format: String,
 };
 
+/** Free text, empty included — which is how "nothing is silenced" is written. */
+const asText: SettingCodec<string> = {
+  parse: (stored) => stored.trim(),
+  format: (value) => value.trim(),
+};
+
 /** A blank accelerator would leave the palette unreachable without saying so. */
 const asAccelerator: SettingCodec<string> = {
   parse: (stored) => stored.trim() || null,
@@ -69,6 +75,8 @@ export class SettingsStore {
   readonly paletteShortcut = this.setting('paletteShortcut', asAccelerator);
   readonly showPinnedFirst = this.setting('showPinnedFirst', asBoolean);
   readonly copyConfirmation = this.setting('copyConfirmation', asBoolean);
+  readonly updateNotifications = this.setting('updateNotifications', asBoolean);
+  readonly skippedUpdate = this.setting('skippedUpdate', asText);
 
   /** What the OS asks for, followed live: a "system" theme must switch without a restart. */
   private readonly systemPrefersDark = signal(false);
@@ -137,6 +145,23 @@ export class SettingsStore {
 
   setCopyConfirmation(enabled: boolean): void {
     this.copyConfirmation.write(enabled);
+  }
+
+  /**
+   * Turning the prompt back on also forgets the version that was skipped: "notify me
+   * about updates" is exactly what taking a skip back means, and a user who has just
+   * asked for it should not have to find a second control.
+   */
+  setUpdateNotifications(enabled: boolean): void {
+    this.updateNotifications.write(enabled);
+    if (enabled) {
+      this.skippedUpdate.write('');
+    }
+  }
+
+  /** `''` forgets the skip. Written by the prompt's checkbox, and by the panel. */
+  setSkippedUpdate(version: string): void {
+    this.skippedUpdate.write(version);
   }
 
   /**

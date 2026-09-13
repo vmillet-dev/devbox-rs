@@ -39,6 +39,14 @@ export class SettingsPageComponent {
   protected readonly densities = DENSITIES;
   protected readonly defaultShortcut = DEFAULT_SHORTCUTS.palette;
 
+  protected onUpdateNotifications(event: Event): void {
+    this.settings.setUpdateNotifications(checkedValue(event));
+  }
+
+  protected forgetSkippedUpdate(): void {
+    this.settings.setSkippedUpdate('');
+  }
+
   protected onLocale(event: Event): void {
     this.settings.setLocale(selectedValue(event) as LocaleChoice);
   }

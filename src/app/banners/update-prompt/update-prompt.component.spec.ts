@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { UpdateStore } from '@core/services/updates/update.store';
 import { UpdaterService } from '@core/services/updates/updater.service';
 import { FakeUpdater } from '@testing/fake-updater';
@@ -61,6 +62,42 @@ describe('UpdatePromptComponent', () => {
     expect(fixture.nativeElement.querySelector('.update-notes-body').textContent).toContain(
       'Corrige le rail de tags',
     );
+  });
+
+  describe('the skip checkbox', () => {
+    const box = (): HTMLInputElement => fixture.nativeElement.querySelector('[data-testid="update-skip"]');
+
+    it('writes the version down, never a bare "no"', async () => {
+      await offerUpdate();
+
+      box().click();
+      await fixture.whenStable();
+      fixture.debugElement.query(By.css('[data-testid="update-later"]')).triggerEventHandler('click');
+      await fixture.whenStable();
+
+      expect(TestBed.inject(SettingsStore).skippedUpdate()).toBe('0.2.0');
+    });
+
+    it('leaves the version alone when the box is untouched', async () => {
+      await offerUpdate();
+
+      fixture.debugElement.query(By.css('[data-testid="update-later"]')).triggerEventHandler('click');
+      await fixture.whenStable();
+
+      expect(TestBed.inject(SettingsStore).skippedUpdate()).toBe('');
+    });
+
+    /** Escape and the backdrop produce no click on "Later", and must honour it too. */
+    it('is honoured by the ways out that are not the button', async () => {
+      await offerUpdate();
+
+      box().click();
+      await fixture.whenStable();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await fixture.whenStable();
+
+      expect(TestBed.inject(SettingsStore).skippedUpdate()).toBe('0.2.0');
+    });
   });
 
   it('installs nothing until the user says so', async () => {

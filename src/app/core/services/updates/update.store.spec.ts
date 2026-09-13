@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { FakeUpdater } from '@testing/fake-updater';
 import { UpdateStore } from './update.store';
 import { UpdaterService } from './updater.service';
@@ -9,6 +10,7 @@ describe('UpdateStore', () => {
   let updater: FakeUpdater;
   let store: UpdateStore;
   let notifier: ErrorNotifier;
+  let settings: SettingsStore;
 
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -18,6 +20,7 @@ describe('UpdateStore', () => {
     });
     store = TestBed.inject(UpdateStore);
     notifier = TestBed.inject(ErrorNotifier);
+    settings = TestBed.inject(SettingsStore);
   });
 
   it('stays idle when the app is already up to date', async () => {
@@ -101,9 +104,76 @@ describe('UpdateStore', () => {
 
     await store.dismiss();
 
-    expect(store.update()).toBeNull();
+    // ⚠️ The offer closes, the **knowledge** stays: the dot is fed by the latter, and
+    // hiding a suggestion is not the same as there being nothing to suggest.
+    expect(store.offered()).toBeNull();
+    expect(store.update()?.version).toBe('0.2.0');
     expect(store.status()).toBe('idle');
     expect(updater.discarded).toBe(true);
+  });
+
+  describe('silencing', () => {
+    async function offer(version: string): Promise<void> {
+      updater.available = { version, currentVersion: '0.1.0' };
+      await store.check();
+    }
+
+    it('says nothing about a version the user set aside, and still knows it is there', async () => {
+      await offer('0.2.0');
+      await store.dismiss(true);
+
+      expect(settings.skippedUpdate()).toBe('0.2.0');
+
+      // The next launch, with the same version on the server.
+      await offer('0.2.0');
+
+      expect(store.offered()).toBeNull();
+      expect(store.hasPendingUpdate()).toBe(true);
+    });
+
+    it('offers the one after it without being asked again', async () => {
+      settings.setSkippedUpdate('0.2.0');
+
+      await offer('0.2.1');
+
+      expect(store.offered()?.version).toBe('0.2.1');
+    });
+
+    it('keeps offering a version the user only deferred', async () => {
+      await offer('0.2.0');
+      await store.dismiss();
+
+      await offer('0.2.0');
+
+      expect(store.offered()?.version).toBe('0.2.0');
+    });
+
+    it('stays quiet on every version once notifications are off', async () => {
+      settings.setUpdateNotifications(false);
+
+      await offer('0.2.0');
+
+      expect(store.offered()).toBeNull();
+      expect(store.hasPendingUpdate()).toBe(true);
+    });
+
+    /** A question asked out loud deserves an answer, whatever the settings say. */
+    it('answers an explicit check even for a version it was told to skip', async () => {
+      settings.setSkippedUpdate('0.2.0');
+      updater.available = { version: '0.2.0', currentVersion: '0.1.0' };
+
+      await store.checkNow();
+
+      expect(store.offered()?.version).toBe('0.2.0');
+    });
+
+    it('forgets the skip when the user asks to be told again', async () => {
+      settings.setSkippedUpdate('0.2.0');
+
+      settings.setUpdateNotifications(true);
+
+      expect(settings.skippedUpdate()).toBe('');
+    });
   });
 
   it('ignores a dismissal while the installer is running', async () => {

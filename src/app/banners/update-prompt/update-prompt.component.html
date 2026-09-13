@@ -1,4 +1,4 @@
-@if (store.update(); as update) {
+@if (store.offered(); as update) {
   <app-dialog [layer]="'update'" [dismissible]="!busy()" labelledBy="update-prompt-title" (closed)="later()">
     <h2 id="update-prompt-title" class="update-title">
       <span class="update-icon" aria-hidden="true">⬆</span>
@@ -30,8 +30,22 @@
         [attr.aria-label]="'update.progressLabel' | transloco"
       ></progress>
     } @else {
+      <!-- The decision is offered where the interruption happens: a user who means to
+           update at the weekend should not have to find the preferences panel to stop
+           being asked every morning. -->
+      <label class="update-skip">
+        <input
+          type="checkbox"
+          class="update-skip-box"
+          data-testid="update-skip"
+          [checked]="skip()"
+          (change)="skip.set($any($event.target).checked)"
+        />
+        {{ 'update.skipVersion' | transloco: { version: update.version } }}
+      </label>
+
       <div class="update-actions">
-        <button type="button" class="update-btn" (click)="later()">
+        <button type="button" class="update-btn" data-testid="update-later" (click)="later()">
           {{ 'update.later' | transloco }}
         </button>
         <button type="button" class="update-btn primary" (click)="install()">

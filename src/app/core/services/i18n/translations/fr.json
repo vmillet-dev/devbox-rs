@@ -188,7 +188,8 @@
     "downloading": "Téléchargement…",
     "downloadingPercent": "Téléchargement… {{percent}} %",
     "restarting": "Redémarrage de {{app}}…",
-    "progressLabel": "Avancement du téléchargement"
+    "progressLabel": "Avancement du téléchargement",
+    "skipVersion": "Ne plus me proposer la version {{version}}"
   },
   "about": {
     "menuLabel": "À propos",
@@ -207,7 +208,8 @@
     "close": "Fermer",
     "whatsNew": "Nouveautés",
     "gettingStarted": "Prise en main",
-    "shortcuts": "Raccourcis clavier"
+    "shortcuts": "Raccourcis clavier",
+    "updateWaiting": "Une mise à jour est disponible"
   },
   "trash": {
     "title": "Corbeille",
@@ -403,7 +405,10 @@
     },
     "notifications": {
       "title": "Notifications",
-      "copyConfirmation": "Accuser chaque copie"
+      "copyConfirmation": "Accuser chaque copie",
+      "updates": "Me signaler les mises à jour",
+      "updateSkipped": "La version {{version}} ne sera plus proposée.",
+      "updateSkippedForget": "Rétablir"
     },
     "variables": {
       "intro": "Valeurs par défaut des champs de vos snippets, valables pour toutes les notes. Ce qui est saisi sur une note passe devant ; ailleurs, la variable est proposée en gris, jamais recopiée.",

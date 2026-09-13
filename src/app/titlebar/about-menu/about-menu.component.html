@@ -8,6 +8,12 @@
     (click)="menu.toggle()"
   >
     {{ 'about.menuLabel' | transloco }}
+    @if (store.hasPendingUpdate()) {
+      <!-- Shown only graphically, so it needs a text twin: the linter asks, and a dot
+           nothing announces is a dot half the users never learn about. -->
+      <span class="about-dot" data-testid="update-dot" aria-hidden="true"></span>
+      <span class="visually-hidden">{{ 'about.updateWaiting' | transloco }}</span>
+    }
     <span class="chev" aria-hidden="true">▾</span>
   </button>
 
