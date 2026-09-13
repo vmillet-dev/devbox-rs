@@ -23,10 +23,13 @@ describe('Import, export and share', () => {
   const directory = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
   const bundlePath = join(directory, 'library.json').replaceAll('\\', '/');
 
+  /** Kept from `before`: the seeded space is named from a translation (see below). */
+  let homeId = '';
+
   before(async () => {
     await canvas.open();
-    const spaceId = await firstSpaceId();
-    await bridge.createNote(draft({ spaceId, title: 'Worth exporting', content: 'echo hello' }));
+    homeId = await firstSpaceId();
+    await bridge.createNote(draft({ spaceId: homeId, title: 'Worth exporting', content: 'echo hello' }));
     await reloadCanvas();
   });
 
@@ -76,8 +79,11 @@ describe('Import, export and share', () => {
 
   it('files an imported note into the existing space rather than a second one', async () => {
     const before = await bridge.listSpaces();
-    const home = before.find((space) => space.name === 'Découverte');
-    expect(home).toBeDefined();
+    // ⚠️ By identity, never by name: the seeded space is **translated**, and the
+    // application opens in the system language — `Découverte` on a French machine,
+    // `Getting started` on an English runner. A spec that spells the name passes at
+    // home and fails on CI, which is exactly what it did.
+    expect(before.some((space) => space.id === homeId)).toBe(true);
 
     // The bundle carries that space by name, and the database already has it:
     // matching is case-insensitive and by name, so nothing is created.
@@ -88,7 +94,7 @@ describe('Import, export and share', () => {
     expect(after.map((space) => space.name)).toEqual(before.map((space) => space.name));
 
     const view = await bridge.queryNotes(query({ search: 'Worth exporting' }));
-    expect(view.sections[0]?.notes[0]?.spaceId).toBe(home?.id);
+    expect(view.sections[0]?.notes[0]?.spaceId).toBe(homeId);
   });
 
   it('greys out the menu entries that have nothing to act on', async () => {
