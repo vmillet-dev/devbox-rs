@@ -19,6 +19,7 @@ pub(crate) mod closed_enum;
 pub(crate) mod count;
 
 use tauri::Manager;
+use tauri_plugin_window_state::StateFlags;
 use tauri_specta::{Builder, collect_commands};
 
 use attachments::{
@@ -103,6 +104,18 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         .constant("APP_METADATA", app_info::METADATA)
 }
 
+/// ⚠️ **Not** the plugin's default, which is `all()` — and `all()` carries `VISIBLE`.
+/// Quitting from the tray saves a window that is hidden, and the next launch would
+/// restore it hidden: an application that starts with nothing on screen and only a tray
+/// icon to be found by. `DECORATIONS` and `FULLSCREEN` are left out for the opposite
+/// reason — nothing here changes either, so saving them stores noise.
+///
+/// A minimized window is the plugin's own problem and it handles it: its `Moved` and
+/// `Resized` handlers both skip one, which on Windows reports itself at -32000.
+const WINDOW_STATE_FLAGS: StateFlags = StateFlags::SIZE
+    .union(StateFlags::POSITION)
+    .union(StateFlags::MAXIMIZED);
+
 /// Order matters here, and only here: `single_instance` has to come before every
 /// other plugin, and `log` before the plugins that already log during their own
 /// initialisation.
@@ -131,7 +144,12 @@ fn with_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_clipboard_manager::init());
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(WINDOW_STATE_FLAGS)
+                .build(),
+        );
 
     // The end-to-end harness. `tauri_plugin_log` has already taken the global logger,
     // so the plugin's own `set_boxed_logger` fails and WDIO captures no backend log —
@@ -235,4 +253,17 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while launching the Tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{StateFlags, WINDOW_STATE_FLAGS};
+
+    /// The one flag that turns "remembers its geometry" into "does not come back".
+    #[test]
+    fn the_window_state_never_remembers_that_it_was_hidden() {
+        assert!(!WINDOW_STATE_FLAGS.contains(StateFlags::VISIBLE));
+        assert!(WINDOW_STATE_FLAGS.contains(StateFlags::SIZE));
+        assert!(WINDOW_STATE_FLAGS.contains(StateFlags::POSITION));
+    }
 }

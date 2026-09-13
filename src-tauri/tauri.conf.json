@@ -12,8 +12,10 @@
     "windows": [
       {
         "title": "devbox",
-        "width": 800,
-        "height": 600
+        "width": 1100,
+        "height": 720,
+        "minWidth": 640,
+        "minHeight": 480
       }
     ],
     "security": {
