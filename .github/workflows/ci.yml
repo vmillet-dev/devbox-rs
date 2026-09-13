@@ -187,9 +187,10 @@ jobs:
   # Le seul job qui lance l'application assemblée : vrai binaire, vraie WebView,
   # vraie base SQLite sur disque. Les deux plateformes de la matrice de release
   # sont couvertes, et elles ne cassent pas de la même façon : la WebView est
-  # WebView2 sur Windows et WebKitGTK sur Linux, et `app_config_dir()` vaut
-  # `%APPDATA%` sur l'une mais `~/.config` sur l'autre — divergence que
-  # `15-preferences-on-disk` lit directement.
+  # WebView2 sur Windows et WebKitGTK sur Linux, et surtout Windows confond
+  # `data_dir()` et `config_dir()` (tous deux `%APPDATA%\<id>`) là où Linux les
+  # sépare. C'est le seul runner capable de démentir un chemin : il a déjà
+  # attrapé un `preferences.json` cherché au mauvais endroit.
   #
   # `continue-on-error` volontairement : un job E2E instable que tout le monde
   # ignore vaut moins que pas de job du tout. À retirer une fois qu'il a fait ses

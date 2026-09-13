@@ -17,11 +17,12 @@ import { preferencesPath } from '../support/profile.js';
  *
  * So the file is read from Node, which is outside the application entirely. That is the
  * whole round trip a unit suite misses: `SettingsStore` → `PreferencesService` →
- * the plugin → `app_config_dir()/preferences.json`.
+ * the plugin → `app_data_dir()/preferences.json`.
  *
- * ⚠️ `app_config_dir()` is `%APPDATA%/<identifier>` on Windows — the same folder as the
- * database — but `~/.config/<identifier>` on Linux, where the data lives under
- * `~/.local/share`. `support/profile.ts` computes both.
+ * ⚠️ The **data** directory, next to the database — `tauri-plugin-store` resolves
+ * against `BaseDirectory::AppData`. Windows cannot tell that apart from the config
+ * directory (both are `%APPDATA%\<identifier>`), so this file only says anything about
+ * the location on Linux. See `support/profile.ts`.
  */
 describe('Preferences reach the disk', () => {
   /** Longer than the plugin's `autoSave` debounce, with room for a slow runner. */
@@ -37,7 +38,7 @@ describe('Preferences reach the disk', () => {
 
   before(canvas.open);
 
-  it('writes the file at all, under app_config_dir()', async () => {
+  it('writes the file at all, next to the database', async () => {
     // Sets something rather than trusting an earlier file to have done it: a spec file
     // establishes its own preconditions, because one profile serves the whole run.
     await fileMenu.openPreferences();

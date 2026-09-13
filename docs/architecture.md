@@ -1590,7 +1590,9 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   signal representing time, so it never re-evaluates and a card shows "4 min ago" forever.
   Injecting `now()` makes those computeds both pure and self-refreshing.
 - **`PreferencesService`** (`core/services/preferences/`) stores UI preferences in a real file through
-  `tauri-plugin-store` (`preferences.json` in `app_config_dir()`), readable from Rust and
+  `tauri-plugin-store` (`preferences.json` in `app_data_dir()`, next to the database — the plugin
+  resolves against `BaseDirectory::AppData`; ⚠️ that is indistinguishable from `app_config_dir()`
+  on Windows, where both are `%APPDATA%\<identifier>`), readable from Rust and
   immune to a WebView cache wipe — unlike the `localStorage` it replaced. Two consumers:
   `LocaleService`, and the editor overlay's two display toggles — fullscreen
   (`devbox.editorFullscreen`) and the fields drawer (`devbox.editorFieldsPanel`, open by
@@ -2031,11 +2033,16 @@ case the control is asserted on — it exists, it is labelled — and never clic
 
 The suite is a job of its own, on a matrix of `windows-latest` and `ubuntu-22.04`, kept
 `continue-on-error` until it has proved itself — a flaky E2E job that everybody ignores is
-worse than no job. The two platforms do not break the same way: the WebView is WebView2 on one
-and WebKitGTK on the other, and `dirs::config_dir()` is `%APPDATA%` on Windows — the same
-folder as the database — but `~/.config` on Linux, where the data lives under `~/.local/share`.
-`support/profile.ts` computes both and `resetProfile()` wipes both; wiping only the data
-directory left Linux runs reading the previous run's preferences.
+worse than no job. The two platforms do not break the same way, and **Linux is the one that
+can tell paths apart**: the WebView is WebView2 on one and WebKitGTK on the other, and
+`dirs::data_dir()` and `dirs::config_dir()` are the same `%APPDATA%\<identifier>` on Windows
+but `~/.local/share` against `~/.config` on Linux.
+
+That is not theoretical. `preferences.json` goes to `app_data_dir()` — `tauri-plugin-store`
+resolves against `BaseDirectory::AppData` — and both the service's own comment and the first
+version of `15-preferences-on-disk` said `app_config_dir()`. Windows agreed with the mistake
+because the two resolve to one folder there; the Linux job is what produced a
+`no preferences file at /home/runner/.config/…` and settled it.
 
 On Linux the runner is wrapped in `xvfb-run`: WebKitGTK needs an X server, and it is the wdio
 service that spawns the application, so the `DISPLAY` has to exist for the whole process rather
