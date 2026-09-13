@@ -912,7 +912,7 @@ dependencies = [
  "diesel_migrations",
  "libsqlite3-sys",
  "log",
- "png 0.17.16",
+ "png 0.18.1",
  "serde",
  "serde_json",
  "specta",
