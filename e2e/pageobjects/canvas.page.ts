@@ -71,7 +71,6 @@ export const canvas = {
   async search(text: string): Promise<void> {
     const field = $(testid('search-input'));
     await field.click();
-    await browser.keys(['Control', 'a']);
     await field.setValue(text);
     await browser.pause(400);
   },
@@ -79,8 +78,10 @@ export const canvas = {
   async clearSearch(): Promise<void> {
     const field = $(testid('search-input'));
     await field.click();
-    await browser.keys(['Control', 'a']);
-    await browser.keys('Backspace');
+    // `setValue('')` rather than select-all-then-Backspace: it goes through the
+    // element endpoint, which the embedded driver implements, where key actions
+    // are accepted and dropped.
+    await field.setValue('');
     await browser.pause(400);
   },
 

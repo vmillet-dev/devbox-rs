@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { fileMenu, settings, titlebar } from '../pageobjects/titlebar.page.js';
-import { restart } from '../support/app.js';
+import { press, restart } from '../support/app.js';
 
 /**
  * A preference applies as it is typed — there is no OK anywhere in the panel — and
@@ -19,7 +19,7 @@ describe('Preferences', () => {
   });
 
   it('applies the theme as it is chosen, with no confirmation step', async () => {
-    await settings.select(settings.theme(), 'light');
+    await settings.select(settings.control.theme, 'light');
 
     // `:root[data-theme='light']` is what redefines the palette; dark is the base
     // because the preference lives in a file nothing can read before Angular boots.
@@ -27,12 +27,12 @@ describe('Preferences', () => {
   });
 
   it('applies the density the same way', async () => {
-    await settings.select(settings.density(), 'compact');
+    await settings.select(settings.control.density, 'compact');
     expect(await browser.$('html').getAttribute('data-density')).toBe('compact');
   });
 
   it('switches the interface language from the panel', async () => {
-    await settings.select(settings.locale(), 'en');
+    await settings.select(settings.control.locale, 'en');
     expect(await titlebar.activeLocale()).toBe('en');
   });
 
@@ -54,11 +54,11 @@ describe('Preferences', () => {
     // application on the machine — which is also what leaves Tab and Escape
     // working inside the field.
     await field.click();
-    await browser.keys('p');
+    await press('p');
     expect(await field.getValue()).toBe(before);
 
     // `KeyboardEvent.code`, so a combination set on AZERTY stays put on QWERTY.
-    await browser.keys(['Control', 'Alt', 'j']);
+    await press('j', ['Control', 'Alt']);
     expect(await field.getValue()).toBe('Ctrl+Alt+J');
 
     await settings.resetShortcut();

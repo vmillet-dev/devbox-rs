@@ -1,6 +1,13 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { testid } from '../support/app.js';
+import { blur, selectOption, testid } from '../support/app.js';
+
+/** The controls' `id`s, in one place: `select` needs the selector, the getters the element. */
+const CONTROL = {
+  theme: '#setting-theme',
+  density: '#setting-density',
+  locale: '#setting-locale',
+} as const;
 
 export const titlebar = {
   title: () => $(testid('titlebar-title')).getText(),
@@ -42,15 +49,18 @@ export const settings = {
    * but the `for` target of their own `<label>` — it cannot be renamed without
    * breaking the association, which makes it as stable as a `data-testid`.
    */
-  theme: () => $('#setting-theme'),
-  density: () => $('#setting-density'),
-  locale: () => $('#setting-locale'),
+  control: CONTROL,
+
+  theme: () => $(CONTROL.theme),
+  density: () => $(CONTROL.density),
+  locale: () => $(CONTROL.locale),
   pinnedFirst: () => $('#setting-pinned-first'),
   shortcut: () => $('#setting-shortcut'),
   resetShortcut: () => $('.setting-shortcut-reset').click(),
 
-  async select(control: ChainablePromiseElement, value: string): Promise<void> {
-    await control.selectByAttribute('value', value);
+  /** Takes the selector and not the element: `selectOption` assigns and dispatches. */
+  async select(selector: string, value: string): Promise<void> {
+    await selectOption(selector, value);
     await browser.pause(200);
   },
 };
@@ -72,7 +82,7 @@ export const variables = {
     }
     await last.$(testid('variable-name')).setValue(name);
     await last.$(testid('variable-value')).setValue(value);
-    await browser.keys('Tab');
+    await blur();
     await browser.pause(200);
   },
 };

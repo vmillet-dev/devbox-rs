@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { spaces } from '../pageobjects/overlays.page.js';
-import { reloadCanvas } from '../support/app.js';
+import { press, reloadCanvas } from '../support/app.js';
 import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -16,6 +16,17 @@ describe('Spaces', () => {
   before(async () => {
     await canvas.open();
     homeId = await firstSpaceId();
+
+    // ⚠️ The first scenario asserts on "the only space there is", which is a property
+    // of the **whole database** — and one application now serves the whole run, so an
+    // earlier spec file's space is still there. The precondition is established here
+    // rather than inherited, which also makes this file runnable on its own.
+    for (const space of await bridge.listSpaces()) {
+      if (space.id !== homeId) {
+        await bridge.deleteSpace(space.id, homeId);
+      }
+    }
+    await reloadCanvas();
   });
 
   it('refuses to delete the only space there is', async () => {
@@ -23,7 +34,7 @@ describe('Spaces', () => {
     await browser.$('[data-testid="space-edit"]').click();
 
     expect(await spaces.deleteBlocked().isExisting()).toBe(true);
-    await browser.keys('Escape');
+    await press('Escape');
     await spaces.close();
   });
 

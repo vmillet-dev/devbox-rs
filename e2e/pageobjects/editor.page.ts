@@ -1,6 +1,6 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { testid } from '../support/app.js';
+import { blur, press, submitFormOf, testid } from '../support/app.js';
 
 /**
  * The editor overlay. Title, body and source commit on **blur**, so every setter
@@ -10,9 +10,8 @@ import { testid } from '../support/app.js';
 async function typeAndCommit(selector: string, text: string): Promise<void> {
   const field = $(selector);
   await field.click();
-  await browser.keys(['Control', 'a']);
   await field.setValue(text);
-  await browser.keys('Tab');
+  await blur();
 }
 
 export const editor = {
@@ -25,15 +24,32 @@ export const editor = {
   title: () => $(testid('editor-title')).getValue(),
   body: () => $(testid('editor-body')).getValue(),
 
+  /**
+   * ⚠️ Assigned and dispatched rather than selected, for the same reason as
+   * `setDeadline` below: the embedded WebDriver server moves the selection without
+   * the `change` the component listens to, so the language stayed `txt` while the
+   * `<select>` showed `sh`.
+   */
   async setLanguage(language: string): Promise<void> {
-    await $(testid('editor-language')).selectByAttribute('value', language);
+    await $(testid('editor-language')).waitForExist({ timeout: 5_000 });
+    await browser.execute(
+      (selector: string, value: string) => {
+        const field = document.querySelector(selector) as HTMLSelectElement;
+        field.value = value;
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+      testid('editor-language'),
+      language,
+    );
   },
 
   async addTag(tag: string): Promise<void> {
     const field = $(testid('editor-tag-add'));
     await field.click();
     await field.setValue(tag);
-    await browser.keys('Enter');
+    // The field commits by **submitting its form**, which Enter does natively and no
+    // synthetic key can — see `submitFormOf`.
+    await submitFormOf(testid('editor-tag-add'));
   },
 
   removeTag: (tag: string) => $(`${testid('editor-tag-remove')}[data-tag="${tag}"]`).click(),
@@ -107,7 +123,7 @@ export const editor = {
       throw new Error('the checklist gained no row');
     }
     await last.$(testid('checklist-text')).setValue(text);
-    await browser.keys('Tab');
+    await blur();
   },
 
   /** Alt+↑/↓ and not the grip: the pointer drag has a keyboard twin, and it is the testable one. */
@@ -118,8 +134,8 @@ export const editor = {
       throw new Error(`no checklist row at ${index}`);
     }
     await row.$(testid('checklist-text')).click();
-    await browser.keys(['Alt', 'ArrowUp']);
-    await browser.keys('Tab');
+    await press('ArrowUp', ['Alt']);
+    await blur();
   },
 
   // Fields

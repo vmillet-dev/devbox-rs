@@ -3,7 +3,7 @@ import { browser, expect } from '@wdio/globals';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
 import { palette } from '../pageobjects/overlays.page.js';
-import { emitGlobalAction, reloadCanvas } from '../support/app.js';
+import { emitGlobalAction, press, reloadCanvas } from '../support/app.js';
 import { bridge, draft, firstSpaceId } from '../support/bridge.js';
 
 /**
@@ -52,7 +52,9 @@ describe('The quick-paste palette', () => {
 
   it('opens the highlighted note in the editor on Tab', async () => {
     await palette.type('reset');
-    await browser.keys('Tab');
+    // Tab is the palette's own shortcut here, not a way out of a field: it opens
+    // what is highlighted, so it is pressed rather than blurred.
+    await press('Tab');
 
     expect(await editor.isOpen()).toBe(true);
     expect(await editor.title()).toBe('Reset the dev database');
@@ -62,7 +64,7 @@ describe('The quick-paste palette', () => {
   it('closes on Escape', async () => {
     await emitGlobalAction('palette');
     await palette.input().waitForExist({ timeout: 10_000 });
-    await browser.keys('Escape');
+    await press('Escape');
     await palette.input().waitForExist({ reverse: true, timeout: 10_000 });
   });
 

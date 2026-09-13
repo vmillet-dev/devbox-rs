@@ -24,6 +24,108 @@ export async function waitForCanvas(): Promise<void> {
   });
 }
 
+export type Modifier = 'Control' | 'Alt' | 'Shift' | 'Meta';
+
+/** `KeyboardEvent.code`: a letter is its physical key, a digit its own. */
+function codeFor(key: string): string {
+  if (/^[a-z]$/i.test(key)) {
+    return `Key${key.toUpperCase()}`;
+  }
+  if (/^[0-9]$/.test(key)) {
+    return `Digit${key}`;
+  }
+  return key;
+}
+
+/**
+ * ⚠️ Not `browser.keys`, and that is the whole point.
+ *
+ * The embedded WebDriver server answers `POST /session/:id/actions` with a 200 and
+ * dispatches nothing. Every keyboard shortcut in this suite was therefore doing
+ * nothing at all, silently — the canvas keys, `Ctrl+Z`, `Escape`, the accelerator
+ * capture. A synthetic `KeyboardEvent` reaches the same handlers, because all of
+ * them listen in the DOM: `CANVAS_KEYS`, `DialogStack` and `acceleratorFromEvent`.
+ *
+ * `code` is filled as carefully as `key`: the shortcut field reads the **physical**
+ * key, so an event carrying only `key` would record the wrong accelerator and the
+ * test would pass for the wrong reason.
+ *
+ * Out of reach — and always was, for any WebDriver: the **native** global shortcuts,
+ * which the system delivers outside the window. `emitGlobalAction` covers what sits
+ * downstream of those.
+ */
+export async function press(key: string, modifiers: Modifier[] = []): Promise<void> {
+  await browser.execute(
+    (k: string, code: string, mods: string[]) => {
+      const target: Element = document.activeElement ?? document.body;
+      const init: KeyboardEventInit = {
+        key: k,
+        code,
+        bubbles: true,
+        cancelable: true,
+        ctrlKey: mods.includes('Control'),
+        altKey: mods.includes('Alt'),
+        shiftKey: mods.includes('Shift'),
+        metaKey: mods.includes('Meta'),
+      };
+      target.dispatchEvent(new KeyboardEvent('keydown', init));
+      target.dispatchEvent(new KeyboardEvent('keyup', init));
+    },
+    key,
+    codeFor(key),
+    modifiers,
+  );
+}
+
+/**
+ * ⚠️ Not `selectByAttribute`. The embedded WebDriver server moves the selection
+ * without the `change` the component listens to, so a `<select>` shows the new
+ * value while the model keeps the old one — the language stayed `txt`, the theme
+ * stayed `dark`, and the assertion read the control rather than the effect.
+ *
+ * Same shape as the editor's date field, which was already written this way for a
+ * different reason: assign, then dispatch what the browser would have.
+ */
+export async function selectOption(selector: string, value: string): Promise<void> {
+  await browser.execute(
+    (sel: string, next: string) => {
+      const field = document.querySelector(sel) as HTMLSelectElement | null;
+      if (!field) {
+        throw new Error(`no <select> at ${sel}`);
+      }
+      field.value = next;
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+    selector,
+    value,
+  );
+}
+
+/**
+ * Enter inside a text input submits its form through the browser's **implicit
+ * submission** — a native behaviour, not a handler. Neither `browser.keys` nor a
+ * synthetic `KeyboardEvent` reproduces it: the browser reserves it for real user
+ * input. `requestSubmit()` fires exactly the event the browser would, which is what
+ * the editor's tag field listens to (`<form (submit)="submitTag($event)">`).
+ */
+export async function submitFormOf(selector: string): Promise<void> {
+  await browser.execute((sel: string) => {
+    const field = document.querySelector(sel) as HTMLInputElement | null;
+    field?.form?.requestSubmit();
+  }, selector);
+}
+
+/**
+ * Title, body and source commit on **blur**, and the suite used to reach that with
+ * `Tab`. A synthetic key event does not move focus, so the blur is asked for
+ * directly rather than hoped for as a side effect.
+ */
+export async function blur(): Promise<void> {
+  await browser.execute(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+  });
+}
+
 /**
  * A note written straight through the bridge is invisible to a canvas that has not
  * been told to re-query — `NotesRevision` is a front-end signal, and the back end
@@ -35,10 +137,10 @@ export async function reloadCanvas(): Promise<void> {
 }
 
 /**
- * A real restart, database and preferences kept: `beforeSession` — which wipes the
- * profile — runs once per spec file, not per session, so a new session spawns a new
- * process against the same `app_data_dir()`. This is what makes "close it and it is
- * still there" mean anything.
+ * A real restart, database and preferences kept: the profile is wiped once before
+ * the runner starts and never again, so a new session meets the same
+ * `app_data_dir()` the previous one wrote to. That is what makes "close it and it
+ * is still there" mean anything.
  */
 export async function restart(): Promise<void> {
   await browser.reloadSession();

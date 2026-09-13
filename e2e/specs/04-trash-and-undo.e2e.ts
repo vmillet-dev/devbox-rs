@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { trash, undoBar } from '../pageobjects/overlays.page.js';
-import { reloadCanvas } from '../support/app.js';
+import { press, reloadCanvas } from '../support/app.js';
 import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -35,7 +35,7 @@ describe('Deleting a note, and taking it back', () => {
     expect((await bridge.queryNotes(query({ search: 'Armed but not fired' }))).matched).toBe(1);
 
     // Leave nothing armed for the next test.
-    await browser.keys('Escape');
+    await press('Escape');
   });
 
   it('moves the note to the trash rather than dropping it', async () => {
@@ -63,7 +63,7 @@ describe('Deleting a note, and taking it back', () => {
 
     // The banner is what the 8 s timer clears; the record it suggests is not.
     await undoBar.bar().waitForExist({ reverse: true, timeout: 15_000 });
-    await browser.keys(['Control', 'z']);
+    await press('z', ['Control']);
 
     await canvas.waitForCard('Undo by keyboard');
   });

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { fileMenu } from '../pageobjects/titlebar.page.js';
-import { reloadCanvas } from '../support/app.js';
+import { press, reloadCanvas } from '../support/app.js';
 import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -97,6 +97,6 @@ describe('Import, export and share', () => {
     // DOM and clickable — it carries `aria-disabled`, not `disabled`.
     expect(await fileMenu.isDisabled('exportSelection')).toBe(true);
     expect(await fileMenu.isDisabled('exportAll')).toBe(false);
-    await browser.keys('Escape');
+    await press('Escape');
   });
 });

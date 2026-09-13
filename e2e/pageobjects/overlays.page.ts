@@ -40,7 +40,6 @@ export const spaces = {
     await $(`${testid('space-edit')}[data-space-id="${id}"]`).click();
     const field = $(testid('space-rename-input'));
     await field.click();
-    await browser.keys(['Control', 'a']);
     await field.setValue(into);
     await $(testid('space-rename-submit')).click();
   },

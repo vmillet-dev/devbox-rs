@@ -13,7 +13,10 @@ import { bridge, draft, firstSpaceId, query } from '../support/bridge.js';
  * sides.
  */
 describe('Editing a note', () => {
-  const title = 'Kubernetes rollout';
+  // ⚠️ Not a sample note's title. `reread()` takes the first hit of a search, so a
+  // title shared with a seeded note makes the assertions depend on which of the two
+  // sorts first — that is, on what an earlier spec file happened to touch.
+  const title = 'Rollout under edit';
   let spaceId = '';
   let refugeId = '';
 

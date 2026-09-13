@@ -1,26 +1,8 @@
-import { rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, '..');
-
-/**
- * ⚠️ A port collision, and the reason the suite passed here and failed on CI.
- *
- * `tauri-plugin-wdio-webdriver` listens on **4445** by default, and `tauri-driver`
- * puts **msedgedriver** on that same 4445 — what it calls its native port. Both bind
- * it and the loser says nothing: the plugin's bind has no error path. Which one wins
- * depends on start order, so on the machine. Locally msedgedriver took it and every
- * spec passed; on a runner the application took it, `tauri-driver` had no driver left
- * to talk to, and each session died on `DevToolsActivePort file doesn't exist` — an
- * error naming neither the port nor the culprit.
- *
- * Moving the plugin off 4445 removes the race rather than winning it. Set here and
- * not in the workflow so both environments are configured the same way, and left
- * overridable so a machine that already uses 4455 can say so.
- */
-process.env['TAURI_WEBDRIVER_PORT'] ??= '4455';
 
 /**
  * Built by `npm run e2e:build`, which links the `e2e` Cargo feature and merges
@@ -33,28 +15,28 @@ const appBinary = resolve(
 );
 
 /**
- * `app_data_dir()` is `data_dir()/identifier`, and the e2e build carries an
- * identifier of its own — so this can be wiped without ever touching the library
- * being dogfooded at `com.devbox.app`.
+ * `embedded`: the WebDriver server runs **inside the application**, through
+ * `tauri-plugin-wdio-webdriver`, and WebdriverIO connects straight to it. No
+ * `tauri-driver`, no msedgedriver, no Chrome DevTools protocol — and therefore
+ * none of what that chain needs from its host.
+ *
+ * ⚠️ This used to be `external`, and that is what made the suite unrunnable on CI.
+ * The external chain drives the WebView through msedgedriver, which launches the
+ * binary expecting Chromium's handshake and gives up on `DevToolsActivePort file
+ * doesn't exist` — an error naming neither the port nor the cause. It passed on a
+ * developer machine and failed on every runner, identically, for hours.
+ *
+ * The reason `external` was chosen was real, and it still costs something: this
+ * provider spawns the application **once** for the whole run, so every spec file
+ * drives the same process and the same database. The profile is therefore wiped
+ * before the runner starts (`npm run test:e2e`, see `support/profile.ts`) rather
+ * than between sessions, and `before()` below reloads the page so each file at
+ * least meets a fresh interface.
+ *
+ * `external` is also absent from the documented values (`embedded` | `official` |
+ * `crabnebula`); it was accepted and quietly routed to the tauri-driver path.
  */
-function e2eProfileDir(): string {
-  const identifier = 'com.devbox.app.e2e';
-  if (process.platform === 'win32') {
-    return join(process.env['APPDATA'] ?? '', identifier);
-  }
-  const xdg = process.env['XDG_DATA_HOME'];
-  return xdg ? join(xdg, identifier) : join(process.env['HOME'] ?? '', '.local/share', identifier);
-}
-
-/**
- * ⚠️ `external`, and not the default `embedded`. The embedded provider keeps the
- * WebDriver server inside the application and reuses **one** process across every
- * spec file: the profile wipe below then runs against a database the living app
- * still holds open, silently does nothing, and the second spec file inherits the
- * first one's notes. `tauri-driver` spawns a process per session, which is what
- * makes "every spec file starts from a fresh install" true rather than intended.
- */
-const driverProvider = 'external';
+const driverProvider = 'embedded';
 
 export const config: WebdriverIO.Config = {
   runner: 'local',
@@ -72,10 +54,10 @@ export const config: WebdriverIO.Config = {
     },
   ] as unknown as WebdriverIO.Capabilities[],
 
-  // `autoInstallTauriDriver`: a fresh machine — a CI runner especially — has no
-  // `tauri-driver` on PATH, and a cargo install is cheaper than a documented
-  // prerequisite nobody reads.
-  services: [['@wdio/tauri-service', { driverProvider, autoInstallTauriDriver: true }]],
+  // No `autoInstallTauriDriver` any more: the embedded provider needs no external
+  // driver at all, so a runner installs nothing and waits for nothing. `embeddedPort`
+  // is the base — each worker gets that port plus its own index.
+  services: [['@wdio/tauri-service', { driverProvider, appBinaryPath: appBinary, embeddedPort: 4445 }]],
 
   framework: 'mocha',
   reporters: ['spec'],
@@ -102,12 +84,17 @@ export const config: WebdriverIO.Config = {
   bail: 1,
 
   /**
-   * Before the binary is spawned, not between tests: the database file is locked
-   * and its WAL open for as long as the application lives. Deleting the profile
-   * here is what makes every spec file start from a genuine fresh install —
-   * migrations replayed, sample notes seeded.
+   * One application serves the whole run, so a spec file inherits whatever the
+   * previous one left on screen — an overlay still open, a filter still set, a
+   * selection still ticked. The per-file process restart used to clear that for
+   * free; reloading the page buys it back, giving each file a fresh front end
+   * over the shared database. Angular reboots, and every store with it.
+   *
+   * Imported inside the hook on purpose: the launcher loads this file too, and it
+   * has no `browser` to speak of.
    */
-  beforeSession() {
-    rmSync(e2eProfileDir(), { recursive: true, force: true });
+  async before() {
+    const { browser } = await import('@wdio/globals');
+    await browser.refresh();
   },
 };
