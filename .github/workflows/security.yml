@@ -57,7 +57,70 @@ jobs:
 
       - run: npm ci
 
-      # Production dependencies only, and from `high` up. The dev tree pulls in a
-      # build chain whose advisories never reach a user's machine, and a job that
-      # cries wolf on those is a job everyone learns to ignore.
-      - run: npm audit --omit=dev --audit-level=high
+      # Production dependencies only. The dev tree pulls in a build chain whose
+      # advisories never reach a user's machine, and a job that cries wolf on those
+      # is a job everyone learns to ignore.
+      #
+      # ⚠️ `--omit=dev` reads the section a package is *declared* in, not what is
+      # actually bundled — `cosmiconfig` counts as production because transloco is a
+      # dependency. It is a coarse cut, and it errs on the safe side.
+      - name: Advisories that block
+        run: npm audit --omit=dev --audit-level=high
+
+      # `high` and above failed the step above; what is left is reported and does not
+      # hold a pull request. A moderate advisory in a shipped dependency is still
+      # worth seeing — it just should not be the thing that stops a fix landing.
+      #
+      # `if: always()`, so a red gate above still prints the whole picture rather
+      # than only the advisory that tripped it.
+      - name: Advisories worth knowing about
+        if: always()
+        run: |
+          npm audit --omit=dev --json > audit.json || true
+          node <<'EOF'
+          const fs = require('fs');
+
+          const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          const counts = audit.metadata.vulnerabilities;
+
+          const noted = Object.values(audit.vulnerabilities)
+            .filter((entry) => ['low', 'moderate'].includes(entry.severity))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+          // An advisory entry carries its detail in `via`, where a string is a parent
+          // package and an object is the advisory itself.
+          const detailed = (entry) => entry.via.find((via) => typeof via === 'object');
+
+          for (const entry of noted) {
+            const advisory = detailed(entry);
+            const detail = advisory
+              ? `${advisory.title} — ${advisory.url}`
+              : `via ${entry.via.join(', ')}`;
+            const fix = entry.fixAvailable ? 'fix available' : 'no fix published';
+            console.log(
+              `::warning title=npm audit (${entry.severity})::${entry.name} ${entry.range}: ${detail} (${fix})`,
+            );
+          }
+
+          const lines = ['### npm advisories (production tree)', ''];
+          if (noted.length === 0) {
+            lines.push('Nothing below the blocking threshold.');
+          } else {
+            lines.push(
+              `${counts.moderate} moderate, ${counts.low} low — reported, not blocking. \`high\` and above fail the job.`,
+              '',
+              '| Package | Severity | Advisory | Fix |',
+              '| --- | --- | --- | --- |',
+            );
+            for (const entry of noted) {
+              const advisory = detailed(entry);
+              const link = advisory
+                ? `[${advisory.title}](${advisory.url})`
+                : `via ${entry.via.join(', ')}`;
+              lines.push(
+                `| \`${entry.name}\` | ${entry.severity} | ${link} | ${entry.fixAvailable ? 'yes' : 'none'} |`,
+              );
+            }
+          }
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          EOF
