@@ -37,7 +37,7 @@
 }
 
 .field-input {
-  @include unstyled-control;
+  @include text-field;
   @include surface(var(--bg-1), 7px);
   flex: 1;
   min-width: 0;

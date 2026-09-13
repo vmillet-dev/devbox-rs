@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { fileMenu, settings, titlebar } from '../pageobjects/titlebar.page.js';
-import { press, reopenSession } from '../support/app.js';
+import { cursorOf, press, reopenSession } from '../support/app.js';
 
 /**
  * A preference applies as it is typed — there is no OK anywhere in the panel — and
@@ -68,6 +68,14 @@ describe('Preferences', () => {
 
     await settings.resetShortcut();
     expect(await field.getValue()).toBe(before);
+    await settings.close();
+  });
+
+  // Readonly, and pressed in rather than typed into: a text cursor there would promise
+  // the wrong interaction.
+  it('leaves the shortcut field a cursor that does not invite typing', async () => {
+    await fileMenu.openPreferences();
+    expect(await cursorOf('#setting-shortcut')).not.toBe('text');
     await settings.close();
   });
 

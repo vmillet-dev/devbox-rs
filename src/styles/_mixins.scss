@@ -9,6 +9,15 @@
   box-sizing: border-box;
 }
 
+// A field the user types into. `cursor` is inherited, so the `all: unset` above resolves
+// it to `inherit` and not to the UA's I-beam: a field built on `unstyled-control` alone
+// shows whatever its parent shows, which is the arrow. The declaration has to come after
+// the unset, which is why this is a mixin of its own rather than a line inside it.
+@mixin text-field {
+  @include unstyled-control;
+  cursor: text;
+}
+
 // The "card" surface: background, border, radius.
 @mixin surface($bg: var(--bg-2), $radius: 8px, $border-color: var(--line-soft)) {
   background: $bg;

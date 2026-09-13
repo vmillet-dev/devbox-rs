@@ -89,7 +89,7 @@ app-dialog {
 }
 
 .tags-target {
-  @include unstyled-control;
+  @include text-field;
   @include surface($radius: 7px);
   flex: 1;
   padding: 7px 10px;

@@ -94,7 +94,7 @@
 }
 
 .row-text {
-  @include unstyled-control;
+  @include text-field;
   flex: 1;
   background: transparent;
   padding: 6px 4px;

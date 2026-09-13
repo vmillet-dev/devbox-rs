@@ -1,7 +1,7 @@
 import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
-import { reloadCanvas } from '../support/app.js';
+import { cursorOf, reloadCanvas, testid } from '../support/app.js';
 import { bridge, draft, homeSpaceId } from '../support/bridge.js';
 
 /**
@@ -33,6 +33,14 @@ describe('Search, filters and facets', () => {
     );
     await bridge.createNote(draft({ spaceId, title: 'Pinned reference', pinned: true, tags: ['ops'] }));
     await reloadCanvas();
+  });
+
+  // `unstyled-control` is `all: unset`, and `cursor` is inherited — so every field in
+  // the app took its parent's arrow. The <label> is the visible box here, and clicking
+  // its padding already focuses the input.
+  it('says it can be typed into, on the whole box', async () => {
+    expect(await cursorOf(testid('search-input'))).toBe('text');
+    expect(await cursorOf('.search-bar')).toBe('text');
   });
 
   it('matches on the title, past the debounce', async () => {
