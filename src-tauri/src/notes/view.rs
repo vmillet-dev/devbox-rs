@@ -103,9 +103,7 @@ pub fn apply_global_defaults(view: &mut NotesView, globals: &BTreeMap<String, St
     }
 }
 
-pub fn build(notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesView {
-    let mut notes = notes;
-
+pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesView {
     let needle = request.search.trim().to_lowercase();
     if !needle.is_empty() {
         notes.retain(|note| matches_search(note, &needle));
@@ -208,8 +206,7 @@ fn section(
 
 /// Pinning hoists here too, otherwise the setting would only ever show before the
 /// first keystroke. The partition is **stable**: at equal pinning, SQL decides.
-fn results(notes: Vec<Note>, pinned_first: bool, now: DateTime<Utc>) -> Vec<NoteSection> {
-    let mut notes = notes;
+fn results(mut notes: Vec<Note>, pinned_first: bool, now: DateTime<Utc>) -> Vec<NoteSection> {
     if pinned_first {
         notes.sort_by_key(|note| !note.pinned);
     }

@@ -285,9 +285,8 @@ pub struct TagUsage {
 /// Written across the whole corpus (rename, merge), so its failure is an error:
 /// staying silent would rename onto nothing.
 pub fn validated_tag(raw: &str) -> Result<String, crate::error::ValidationError> {
-    normalize_tags(std::slice::from_ref(&raw.to_string()))
-        .into_iter()
-        .next()
+    normalize_tag(raw)
+        .map(str::to_string)
         .ok_or_else(|| crate::error::ValidationError::new("tag", "a tag must have a readable name"))
 }
 
