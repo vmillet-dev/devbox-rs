@@ -8,6 +8,12 @@
     (click)="menu.toggle()"
   >
     {{ 'about.menuLabel' | transloco }}
+    @if (store.hasPendingUpdate()) {
+      <!-- Shown only graphically, so it needs a text twin: the linter asks, and a dot
+           nothing announces is a dot half the users never learn about. -->
+      <span class="about-dot on-trigger" data-testid="update-dot" aria-hidden="true"></span>
+      <span class="visually-hidden">{{ 'about.updateWaiting' | transloco }}</span>
+    }
     <span class="chev" aria-hidden="true">▾</span>
   </button>
 
@@ -21,7 +27,15 @@
         [attr.aria-disabled]="checking()"
         (click)="checkUpdates()"
       >
-        {{ 'about.checkUpdates' | transloco }}
+        <!-- The trigger's dot says something is waiting; this one says what for. The
+             entry is a column, so the label and the dot need a row of their own. -->
+        <span class="about-option-label">
+          {{ 'about.checkUpdates' | transloco }}
+          @if (store.hasPendingUpdate()) {
+            <span class="about-dot" data-testid="update-dot-option" aria-hidden="true"></span>
+            <span class="visually-hidden">{{ 'about.updateWaiting' | transloco }}</span>
+          }
+        </span>
         <!-- aria-live: the result arrives after the click and must be announced without
              moving focus. -->
         <span class="about-option-status" aria-live="polite">

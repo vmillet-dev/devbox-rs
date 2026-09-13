@@ -1897,6 +1897,22 @@ update.
   lifecycle that `UpdatePromptComponent.busy()` reads; the former is only what the menu has
   left to announce. Its `idle` covers both "not checked yet" and "found something" — in the
   second case the prompt is doing the talking.
+- **"Later" can be made to stick, and what is written down is a version.** The prompt
+  carries a checkbox, because the decision belongs where the interruption happens.
+  `AppSettings.skippedUpdate` holds the version that was set aside — storing "the user said
+  no" would silence the release after it too, and a newer one is a new offer that needs no
+  gesture to become one again. `AppSettings.updateNotifications` is the blunter switch next
+  to it, and the preferences panel names the silenced version with a way to take it back,
+  since waiting for the next release is not one.
+  ⚠️ Only the **silent** startup check is silenced. `checkNow()` is a question asked out
+  loud and always answers, which is also what stops the feature from being a trap.
+- **The dot is a third thing, next to `UpdateStatus` and `CheckState`.** `hasPendingUpdate`
+  is "an update exists and is not installed", and the About menu wears it. It cannot read
+  `status()`: `dismiss()` returns that to `idle` — which is what closes the prompt — so a dot
+  driven by it would vanish with the dialog it exists to outlive. For the same reason
+  `dismiss()` leaves `_update` standing and moves only the status; `offered` is the computed
+  the prompt reads, and it is `null` exactly when the status is `idle`, so the dialog stays
+  up through the install it would otherwise disappear from.
 - **The download does not cross the CSP.** It runs in Rust through the plugin's HTTP client,
   not in the WebView, so pointing `endpoints` at GitHub needs no widening of `connect-src`.
 - `bundle.createUpdaterArtifacts` makes the bundler emit a `.sig` beside **every** bundle it

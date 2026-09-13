@@ -84,6 +84,47 @@ describe('SettingsPageComponent', () => {
     expect(settings.copyConfirmation()).toBe(false);
   });
 
+  describe('the update entry', () => {
+    const note = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector('[data-testid="setting-skipped-update"]');
+
+    it('says nothing while nothing has been silenced', () => {
+      expect(note()).toBeNull();
+    });
+
+    it('names the silenced version, so the row has a subject', async () => {
+      settings.setSkippedUpdate('0.1.5');
+      await fixture.whenStable();
+
+      expect(note()?.textContent).toContain('0.1.5');
+    });
+
+    it('takes the skip back without waiting for the next release', async () => {
+      settings.setSkippedUpdate('0.1.5');
+      await fixture.whenStable();
+
+      note()?.querySelector('button')?.click();
+      await fixture.whenStable();
+
+      expect(settings.skippedUpdate()).toBe('');
+      expect(note()).toBeNull();
+    });
+
+    /** Asking to be told about updates is exactly what taking a skip back means. */
+    it('forgets the skipped version when notifications are turned back on', async () => {
+      settings.setSkippedUpdate('0.1.5');
+      toggle('setting-update-notifications').click();
+      await fixture.whenStable();
+      expect(settings.updateNotifications()).toBe(false);
+
+      toggle('setting-update-notifications').click();
+      await fixture.whenStable();
+
+      expect(settings.updateNotifications()).toBe(true);
+      expect(settings.skippedUpdate()).toBe('');
+    });
+  });
+
   it('records a shortcut from the keystroke rather than from typed text', async () => {
     press({ code: 'KeyK', ctrlKey: true, shiftKey: true });
     await fixture.whenStable();

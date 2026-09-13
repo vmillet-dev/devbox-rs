@@ -39,6 +39,14 @@ export interface AppSettings {
   readonly showPinnedFirst: boolean;
   /** Acknowledges every clipboard copy under the titlebar. */
   readonly copyConfirmation: boolean;
+  /** Whether the silent startup check may open the prompt at all. */
+  readonly updateNotifications: boolean;
+  /**
+   * The version the user said "later" to, or `''`. A **version** and not a boolean:
+   * remembering "no" would silence the release after it too, and a newer one is a new
+   * offer that needs no gesture to become one again.
+   */
+  readonly skippedUpdate: string;
 }
 
 /**
@@ -57,6 +65,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   paletteShortcut: DEFAULT_SHORTCUTS.palette,
   showPinnedFirst: true,
   copyConfirmation: true,
+  updateNotifications: true,
+  skippedUpdate: '',
 };
 
 /** Derived rather than hand-written: the key **is** the field name, prefixed. */

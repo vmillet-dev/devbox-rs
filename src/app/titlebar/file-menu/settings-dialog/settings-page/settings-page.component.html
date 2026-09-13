@@ -150,5 +150,30 @@
         (change)="onCopyConfirmation($event)"
       />
     </div>
+
+    <div class="setting-row">
+      <label class="setting-label" for="setting-update-notifications">
+        {{ 'settings.notifications.updates' | transloco }}
+      </label>
+      <input
+        id="setting-update-notifications"
+        class="setting-switch"
+        type="checkbox"
+        data-testid="setting-update-notifications"
+        [checked]="settings.updateNotifications()"
+        (change)="onUpdateNotifications($event)"
+      />
+    </div>
+
+    <!-- Only when there is something to take back: a row saying "nothing is silenced"
+         would be a control with no subject. -->
+    @if (settings.skippedUpdate(); as skipped) {
+      <p class="setting-note" data-testid="setting-skipped-update">
+        {{ 'settings.notifications.updateSkipped' | transloco: { version: skipped } }}
+        <button type="button" class="setting-inline-btn" (click)="forgetSkippedUpdate()">
+          {{ 'settings.notifications.updateSkippedForget' | transloco }}
+        </button>
+      </p>
+    }
   </section>
 </div>

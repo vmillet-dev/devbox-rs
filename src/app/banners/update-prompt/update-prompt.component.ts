@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslationRef } from '@core/services/i18n/translation-ref.model';
 import { UpdateStore } from '@core/services/updates/update.store';
@@ -18,6 +18,12 @@ import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 export class UpdatePromptComponent {
   protected readonly store = inject(UpdateStore);
 
+  /**
+   * Local, and read on the way out: Escape and the backdrop close the dialog without
+   * touching the buttons, and both have to honour a box the user has already ticked.
+   */
+  protected readonly skip = signal(false);
+
   protected readonly busy = computed(
     () => this.store.status() === 'installing' || this.store.status() === 'installed',
   );
@@ -36,6 +42,6 @@ export class UpdatePromptComponent {
   }
 
   protected later(): void {
-    void this.store.dismiss();
+    void this.store.dismiss(this.skip());
   }
 }

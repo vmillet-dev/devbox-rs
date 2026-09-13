@@ -89,3 +89,29 @@
   margin: 4px 6px;
   background: var(--line-soft);
 }
+
+// An update that was silenced still exists, and this is all that says so.
+// ⚠️ Green, not the accent. Amber is what this interface already means "active" and
+// "selected" with — the space rail wears an amber dot of its own two rows below — and a
+// badge in the accent colour reads as one more state rather than as news.
+.about-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  flex: none;
+}
+
+// On the trigger it is a badge: superimposed on the corner rather than wedged between
+// the label and the chevron, which are one control and read as one.
+.about-dot.on-trigger {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+}
+
+.about-option-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
