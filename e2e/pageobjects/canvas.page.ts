@@ -11,12 +11,21 @@ export const canvas = {
 
   cards: () => $$(testid('note-card')),
 
+  /**
+   * ⚠️ Read in **one** call rather than a round trip per card. Enumerating the cards
+   * and then fetching each title leaves a window in which the canvas re-renders, and
+   * the list that comes back mixes two states — the same note read twice, or an
+   * element that no longer exists.
+   */
   async titles(): Promise<string[]> {
-    const found: string[] = [];
-    for await (const card of $$(testid('note-card'))) {
-      found.push((await card.$(testid('note-card-title')).getText()).trim());
-    }
-    return found;
+    return browser.execute(
+      (selector: string, titleSelector: string) =>
+        [...document.querySelectorAll(selector)].map((card) =>
+          (card.querySelector(titleSelector)?.textContent ?? '').trim(),
+        ),
+      testid('note-card'),
+      testid('note-card-title'),
+    );
   },
 
   async cardWithTitle(title: string) {

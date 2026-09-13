@@ -1,4 +1,4 @@
-import { $, browser } from '@wdio/globals';
+import { $, $$, browser } from '@wdio/globals';
 
 import type { GlobalAction } from '@core/ipc/bindings';
 
@@ -7,6 +7,10 @@ export function testid(name: string): string {
   return `[data-testid="${name}"]`;
 }
 
+/** Consecutive quiet polls before the canvas counts as settled, `SETTLE_INTERVAL` apart. */
+const SETTLE_POLLS = 3;
+const SETTLE_INTERVAL = 200;
+
 /**
  * The canvas is behind a lazy route, a `resource` and a debounce; every scenario
  * starts by waiting for it rather than for the window, which exists long before
@@ -14,10 +18,37 @@ export function testid(name: string): string {
  */
 export async function waitForCanvas(): Promise<void> {
   await $(testid('canvas')).waitForExist({ timeout: 30_000 });
-  await browser.waitUntil(async () => (await $(testid('canvas')).getAttribute('aria-busy')) !== 'true', {
-    timeout: 30_000,
-    timeoutMsg: 'the canvas never stopped loading',
-  });
+
+  // ⚠️ Not "`aria-busy` went false" once. The canvas clears that flag between two
+  // reloads, and a burst of writes produces several — first launch seeds four sample
+  // notes, so it goes idle four times. Commands run off the IPC thread, so the window
+  // repaints between them instead of once at the end; a count read in that gap sees a
+  // half-filled canvas, and a card list read across it sees elements being replaced.
+  //
+  // Settled therefore means idle *and* unchanged: the card count has to hold still.
+  let previous = -1;
+  let quiet = 0;
+
+  await browser.waitUntil(
+    async () => {
+      if ((await $(testid('canvas')).getAttribute('aria-busy')) === 'true') {
+        quiet = 0;
+        previous = -1;
+        return false;
+      }
+
+      const count = await $$(testid('note-card')).length;
+      quiet = count === previous ? quiet + 1 : 0;
+      previous = count;
+
+      return quiet >= SETTLE_POLLS;
+    },
+    {
+      timeout: 30_000,
+      interval: SETTLE_INTERVAL,
+      timeoutMsg: 'the canvas never settled',
+    },
+  );
 }
 
 export type Modifier = 'Control' | 'Alt' | 'Shift' | 'Meta';
