@@ -56,7 +56,7 @@ jobs:
     steps:
       # `fetch-depth: 0` for `git describe` and the commit range; the credentials stay in the
       # worktree, they are what will push the commit and the tag.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -152,7 +152,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -179,7 +179,7 @@ jobs:
             --out "$RUNNER_TEMP/release-notes.md"
           cp CHANGELOG.md "$RUNNER_TEMP/CHANGELOG.md"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-notes
           path: ${{ runner.temp }}/*.md
@@ -231,11 +231,11 @@ jobs:
     steps:
       # The SHA rather than the tag name: the tag was just created by `prepare`, and a SHA
       # cannot come to mean something else in between.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -254,7 +254,7 @@ jobs:
       # `bundle.createUpdaterArtifacts` being on, the bundler demands the private signing key:
       # without the secret this job fails instead of publishing binaries the updater would
       # then refuse to install.
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -288,7 +288,7 @@ jobs:
           fi
           ls -l release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.target }}
           path: release
@@ -308,11 +308,11 @@ jobs:
       # downloaded bundles with it. The repository is here for `scripts/release-notes.mjs`,
       # which re-reads the section at the tag — the committed file is the only source of both
       # the release body and the "What's new" panel.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.sha }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: dist-*
           merge-multiple: true
@@ -417,7 +417,7 @@ jobs:
       #
       # `generate_release_notes` stays on and comes **after** the body: the API puts our text
       # first, then the raw pull-request list, the new contributors and the comparison link.
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           name: ${{ needs.prepare.outputs.tag }}
