@@ -170,6 +170,11 @@ jobs:
   # most users are on: `test-e2e` covers Windows but is `continue-on-error`.
   test-rust:
     name: Test Rust (${{ matrix.os }})
+    # `needs` is per job, not per matrix leg, so the Windows leg waits on a build whose
+    # cache it does not read. Deliberate: splitting it into a second job to save that
+    # minute would duplicate five steps, and `test-e2e` (about seven) is the critical
+    # path either way. Dropping `needs` instead would race the Ubuntu leg against the
+    # cache it exists to reuse.
     needs: build-rust
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30

@@ -71,16 +71,32 @@ jobs:
       # hold a pull request. A moderate advisory in a shipped dependency is still
       # worth seeing — it just should not be the thing that stops a fix landing.
       #
-      # `if: always()`, so a red gate above still prints the whole picture rather
-      # than only the advisory that tripped it.
+      # `success() || failure()` and not `always()`: a red gate above should still print the
+      # whole picture, but a cancelled run or a failed `npm ci` should not reach a step that
+      # can only report on an audit it never got to run.
       - name: Advisories worth knowing about
-        if: always()
+        if: success() || failure()
         run: |
           npm audit --omit=dev --json > audit.json || true
           node <<'EOF'
           const fs = require('fs');
 
-          const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          // ⚠️ A registry that times out still exits non-zero *and* writes something that is
+          // not an audit — an `{ "error": … }` object, or nothing at all. This step reports;
+          // it must never be the reason a pull request goes red.
+          let audit;
+          try {
+            audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          } catch (error) {
+            console.log(`::warning title=npm audit::the audit produced no readable report (${error.message})`);
+            process.exit(0);
+          }
+
+          if (!audit.vulnerabilities || !audit.metadata?.vulnerabilities) {
+            console.log('::warning title=npm audit::the audit reported an error instead of a result');
+            process.exit(0);
+          }
+
           const counts = audit.metadata.vulnerabilities;
 
           const noted = Object.values(audit.vulnerabilities)

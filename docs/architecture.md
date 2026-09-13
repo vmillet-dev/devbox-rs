@@ -1537,8 +1537,19 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   in the WebView's IPC handler** — on the main thread, where it freezes the window for as long
   as it takes. Exporting a library, importing one, reading a 10 MB attachment into a `data:`
   URI or copying a file all did exactly that. `(async)` on the same synchronous function moves
-  the body to the thread pool; no signature changes and `bindings.ts` is unaffected, since the
+  the body off that thread; no signature changes and `bindings.ts` is unaffected, since the
   generated TypeScript was always promise-based.
+
+  ⚠️ Where it moves it to is worth being precise about, because the name suggests otherwise.
+  `tauri-macros` emits `respond_async_serialized(async move { … })`, which hands the task to
+  `async_runtime::spawn` — and Tauri's default runtime is Tokio's **multi-threaded** one. A
+  synchronous body therefore occupies a Tokio _worker_ for its whole duration; it is not
+  `spawn_blocking`, whatever the `sync_threadpool` label on the macro's tracing span implies.
+  The window is freed, which is the whole point, but the workers are a bounded pool the size of
+  the core count, shared with the updater and the plugins. It holds because the connection
+  mutex already serializes the database work behind it, and because no command here is
+  long-running by design. A genuinely long one would need `async fn` plus an explicit
+  `async_runtime::spawn_blocking`.
 
   The exception is `desktop.rs`: `sync_tray`, `set_global_shortcuts` and
   `set_window_behavior` stay blocking, because the tray and shortcut registration want the

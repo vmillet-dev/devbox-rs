@@ -220,9 +220,13 @@ pub fn run() {
     // Not in release: the front-end `src/` does not exist next to an installed binary.
     // Not fatal either — a debug build launched where that path is not writable has no
     // reason to die without a window rather than run against the committed bindings.
+    //
+    // ⚠️ `eprintln!` and not `log::warn!`: this runs before `tauri_plugin_log` has taken
+    // the global logger, so a logged line would reach the no-op default and vanish —
+    // leaving a stale `bindings.ts` to be discovered at the next compile error instead.
     #[cfg(debug_assertions)]
     if let Err(error) = export_bindings() {
-        log::warn!("TypeScript bindings not regenerated: {error}");
+        eprintln!("TypeScript bindings not regenerated: {error}");
     }
 
     with_plugins(tauri::Builder::default())
