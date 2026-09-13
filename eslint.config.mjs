@@ -88,8 +88,9 @@ export default tseslint.config(
     },
   },
   {
-    // Specs may be less strict: internals, partial doubles.
-    files: ['**/*.spec.ts', 'src/testing/**/*.ts'],
+    // Specs may be less strict: internals, partial doubles. The e2e harness is in
+    // the same bag, and reaches into `window` for an API it has no types for.
+    files: ['**/*.spec.ts', 'src/testing/**/*.ts', 'e2e/**/*.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-explicit-any': 'off',

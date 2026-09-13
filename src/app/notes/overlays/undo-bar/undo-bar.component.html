@@ -1,11 +1,12 @@
-<div class="undo-bar" role="status">
+<div class="undo-bar" data-testid="undo-bar" role="status">
   <span class="undo-text">{{ 'undo.deleted' | transloco: { count: count() } }}</span>
-  <button type="button" class="undo-action" (click)="undone.emit()">
+  <button type="button" class="undo-action" data-testid="undo-restore" (click)="undone.emit()">
     {{ 'undo.restore' | transloco }}
   </button>
   <button
     type="button"
     class="undo-dismiss"
+    data-testid="undo-dismiss"
     [attr.aria-label]="'undo.dismiss' | transloco"
     (click)="dismissed.emit()"
   >

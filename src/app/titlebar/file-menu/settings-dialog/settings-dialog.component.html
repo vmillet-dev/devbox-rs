@@ -16,6 +16,8 @@
         <button
           type="button"
           class="settings-rail-option"
+          data-testid="settings-page"
+          [attr.data-page]="page.id"
           [class.active]="page.id === activePage().id"
           [attr.aria-current]="page.id === activePage().id ? 'page' : null"
           (click)="select(page.id)"
@@ -33,7 +35,7 @@
 
   <div class="settings-actions">
     <p class="settings-hint">{{ 'settings.appliedImmediately' | transloco }}</p>
-    <button type="button" class="settings-close" (click)="closed.emit()">
+    <button type="button" class="settings-close" data-testid="settings-close" (click)="closed.emit()">
       {{ 'settings.close' | transloco }}
     </button>
   </div>

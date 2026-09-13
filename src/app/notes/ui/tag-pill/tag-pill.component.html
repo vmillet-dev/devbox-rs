@@ -4,6 +4,8 @@
   <button
     type="button"
     class="tag-pill"
+    data-testid="tag-pill"
+    [attr.data-tag]="label()"
     [class.on]="active()"
     [attr.aria-pressed]="active()"
     (click)="onClick()"

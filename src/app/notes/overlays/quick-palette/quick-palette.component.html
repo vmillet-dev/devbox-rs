@@ -5,6 +5,7 @@
     #searchInput
     type="text"
     class="palette-input"
+    data-testid="palette-input"
     role="combobox"
     aria-expanded="true"
     aria-controls="palette-results"
@@ -26,6 +27,8 @@
     @for (note of results(); track note.id; let index = $index) {
       <li
         class="palette-option"
+        data-testid="palette-option"
+        [attr.data-note-id]="note.id"
         role="option"
         [id]="optionId(index)"
         [class.highlighted]="index === highlighted()"
@@ -53,6 +56,7 @@
     @if (canCreate()) {
       <li
         class="palette-option palette-create"
+        data-testid="palette-create"
         role="option"
         [id]="optionId(results().length)"
         [class.highlighted]="highlighted() === results().length"
@@ -69,7 +73,7 @@
         </button>
       </li>
     } @else if (results().length === 0) {
-      <li class="palette-empty">{{ 'palette.empty' | transloco }}</li>
+      <li class="palette-empty" data-testid="palette-empty">{{ 'palette.empty' | transloco }}</li>
     }
   </ul>
 

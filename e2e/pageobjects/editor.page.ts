@@ -1,0 +1,200 @@
+import { $, $$ } from '@wdio/globals';
+
+import { blur, press, setNativeValue, submitFormOf, testid } from '../support/app.js';
+
+/**
+ * The editor overlay. Title, body and source commit on **blur**, so every setter here
+ * blurs before returning — a spec asserting persistence right after typing would be
+ * asserting on a draft nothing has saved.
+ */
+async function typeAndCommit(selector: string, text: string): Promise<void> {
+  const field = $(selector);
+  await field.click();
+  await field.setValue(text);
+  await blur();
+}
+
+async function rowAt(selector: string, index: number) {
+  const rows = await $$(selector).getElements();
+  const row = rows[index];
+  if (!row) {
+    throw new Error(`no row at ${index} for ${selector} — found ${rows.length}`);
+  }
+  return row;
+}
+
+export const editor = {
+  isOpen: () => $(testid('editor-title')).isExisting(),
+
+  setTitle: (text: string) => typeAndCommit(testid('editor-title'), text),
+  setBody: (text: string) => typeAndCommit(testid('editor-body'), text),
+  setSource: (text: string) => typeAndCommit(testid('editor-source'), text),
+
+  title: () => $(testid('editor-title')).getValue(),
+  body: () => $(testid('editor-body')).getValue(),
+
+  setLanguage: (language: string) => setNativeValue(testid('editor-language'), language),
+
+  /** `yyyy-MM-dd`, which the editor converts to the end of the local day. */
+  setDeadline: (isoDay: string) => setNativeValue(testid('editor-deadline'), isoDay),
+
+  async addTag(tag: string): Promise<void> {
+    const field = $(testid('editor-tag-add'));
+    await field.click();
+    await field.setValue(tag);
+    // The field commits by **submitting its form**, which Enter does natively and no
+    // synthetic key can — see `submitFormOf`.
+    await submitFormOf(testid('editor-tag-add'));
+  },
+
+  removeTag: (tag: string) => $(`${testid('editor-tag-remove')}[data-tag="${tag}"]`).click(),
+
+  async tags(): Promise<string[]> {
+    const found: string[] = [];
+    for await (const button of $$(testid('editor-tag-remove'))) {
+      found.push((await button.getAttribute('data-tag')) ?? '');
+    }
+    return found;
+  },
+
+  togglePin: () => $(testid('editor-pin')).click(),
+  isPinned: async () => (await $(testid('editor-pin')).getAttribute('aria-pressed')) === 'true',
+
+  footer: () => $(testid('editor-footer')).getText(),
+
+  toggleFullscreen: () => $(testid('editor-fullscreen')).click(),
+  isFullscreen: async () => (await $(testid('editor-fullscreen')).getAttribute('aria-pressed')) === 'true',
+
+  /** Only shown for a note carrying `{{fields}}`; a plain note gets the ordinary copy button. */
+  copyFilled: () => $(testid('editor-copy-filled')).click(),
+  hasCopyFilled: () => $(testid('editor-copy-filled')).isExisting(),
+
+  /**
+   * Escape, the backdrop and the close button all produce no `blur`, so the component
+   * commits the draft itself on the way out. Closing through the button is the path
+   * that exercises that.
+   */
+  async close(): Promise<void> {
+    await $(testid('editor-close')).click();
+    await $(testid('editor-title')).waitForExist({ reverse: true, timeout: 10_000 });
+  },
+
+  async deleteNote(): Promise<void> {
+    const remove = $(testid('editor-delete'));
+    await remove.click();
+    await remove.click();
+    await $(testid('editor-title')).waitForExist({ reverse: true, timeout: 10_000 });
+  },
+
+  // Checklists
+  items: () => $$(testid('checklist-row')),
+
+  async itemTexts(): Promise<string[]> {
+    const texts: string[] = [];
+    for await (const row of $$(testid('checklist-row'))) {
+      texts.push(await row.$(testid('checklist-text')).getValue());
+    }
+    return texts;
+  },
+
+  async itemChecks(): Promise<boolean[]> {
+    const states: boolean[] = [];
+    for await (const row of $$(testid('checklist-row'))) {
+      states.push((await row.$(testid('checklist-check')).getAttribute('aria-checked')) === 'true');
+    }
+    return states;
+  },
+
+  async addItem(text: string): Promise<void> {
+    await $(testid('checklist-add')).click();
+    const rows = await $$(testid('checklist-row')).getElements();
+    const last = rows[rows.length - 1];
+    if (!last) {
+      throw new Error('the checklist gained no row');
+    }
+    await last.$(testid('checklist-text')).setValue(text);
+    await blur();
+  },
+
+  async toggleItem(index: number): Promise<void> {
+    await (await rowAt(testid('checklist-row'), index)).$(testid('checklist-check')).click();
+    await blur();
+  },
+
+  async removeItem(index: number): Promise<void> {
+    await (await rowAt(testid('checklist-row'), index)).$(testid('checklist-remove')).click();
+    await blur();
+  },
+
+  /**
+   * ⚠️ Asserted on, not dragged. The grip is a pointer-drag handle
+   * (`pointerdown` + `setPointerCapture` + `pointermove`), and synthesising a capture
+   * through WebDriver is both unreliable and beside the point: `Alt+↑/↓` is its
+   * keyboard twin, it has to work anyway for the linter, and it is what `moveItemUp`
+   * drives. This only holds that the handle exists and says what it moves.
+   */
+  grip: (index: number) =>
+    rowAt(testid('checklist-row'), index).then((row) => row.$(testid('checklist-grip'))),
+
+  async moveItemUp(index: number): Promise<void> {
+    const row = await rowAt(testid('checklist-row'), index);
+    await row.$(testid('checklist-text')).click();
+    await press('ArrowUp', ['Alt']);
+    await blur();
+  },
+
+  // Fields
+  fieldsPanelToggle: () => $(testid('placeholder-panel-toggle')),
+
+  /** Trimmed: the count sits on its own line in the template, so `getText()` pads it. */
+  fieldsPanelCount: async () => (await $(testid('placeholder-panel-count')).getText()).trim(),
+
+  isFieldsPanelOpen: async () =>
+    (await $(testid('placeholder-panel-toggle')).getAttribute('aria-expanded')) === 'true',
+
+  /**
+   * ⚠️ Scoped to the overlay. `placeholder-input` is the same hook in two places — this
+   * panel and the fill form — and a bare `$()` returns whichever comes first in the DOM.
+   * Unscoped, a spec that meant the form typed into the editor's panel instead, which
+   * commits on `focusout`: the value was written by the test that meant to discard it.
+   */
+  field: (name: string) => $(`app-note-editor-overlay ${testid('placeholder-input')}[data-field="${name}"]`),
+
+  async toggleFieldsPanel(): Promise<void> {
+    await $(testid('placeholder-panel-toggle')).click();
+  },
+
+  /** Open by default — a folded panel would hide the feature from anyone who has not met it. */
+  async openFieldsPanel(): Promise<void> {
+    if (!(await editor.isFieldsPanelOpen())) {
+      await editor.toggleFieldsPanel();
+    }
+  },
+
+  // Attachments
+  attachments: () => $$(testid('attachment-item')),
+  attachmentEmpty: () => $(testid('attachment-empty')),
+
+  async attachmentNames(): Promise<string[]> {
+    const names: string[] = [];
+    for await (const item of $$(testid('attachment-item'))) {
+      names.push((await item.getAttribute('data-file-name')) ?? '');
+    }
+    return names;
+  },
+
+  /**
+   * ⚠️ Asserted on, never clicked — both of them open OS UI. "Add" raises the file
+   * picker, which blocks the application until a human answers it, and "open" hands the
+   * file to the desktop's default application. See `support/app.ts`.
+   */
+  attachmentAdd: () => $(testid('attachment-add')),
+  attachmentOpen: (fileName: string) =>
+    $(`${testid('attachment-item')}[data-file-name="${fileName}"]`).$(testid('attachment-open')),
+
+  async removeAttachment(): Promise<void> {
+    const remove = $(testid('attachment-remove'));
+    await remove.click();
+    await remove.click();
+  },
+};

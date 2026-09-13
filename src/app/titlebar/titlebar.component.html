@@ -7,13 +7,15 @@
     <app-about-menu />
   </div>
 
-  <div class="titlebar-title">{{ title }}</div>
+  <div class="titlebar-title" data-testid="titlebar-title">{{ title }}</div>
 
   <div class="locale-switch" role="group" [attr.aria-label]="'locale.groupLabel' | transloco">
     @for (locale of locales; track locale) {
       <button
         type="button"
         class="locale-option"
+        data-testid="locale-option"
+        [attr.data-locale]="locale"
         [class.active]="locale === localeService.activeLocale()"
         [attr.aria-pressed]="locale === localeService.activeLocale()"
         [attr.aria-label]="'locale.' + locale | transloco"

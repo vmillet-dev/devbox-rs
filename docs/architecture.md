@@ -1590,7 +1590,9 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   signal representing time, so it never re-evaluates and a card shows "4 min ago" forever.
   Injecting `now()` makes those computeds both pure and self-refreshing.
 - **`PreferencesService`** (`core/services/preferences/`) stores UI preferences in a real file through
-  `tauri-plugin-store` (`preferences.json` in `app_config_dir()`), readable from Rust and
+  `tauri-plugin-store` (`preferences.json` in `app_data_dir()`, next to the database — the plugin
+  resolves against `BaseDirectory::AppData`; ⚠️ that is indistinguishable from `app_config_dir()`
+  on Windows, where both are `%APPDATA%\<identifier>`), readable from Rust and
   immune to a WebView cache wipe — unlike the `localStorage` it replaced. Two consumers:
   `LocaleService`, and the editor overlay's two display toggles — fullscreen
   (`devbox.editorFullscreen`) and the fields drawer (`devbox.editorFieldsPanel`, open by
@@ -1901,3 +1903,148 @@ The tests split by what they need in order to run:
 
 Test names and comments are in English, like the front-end specs. `notes::store::list`
 survives only as a `#[cfg(test)]` helper — no command returns a raw list.
+
+### End to end
+
+`npm run test:e2e` drives the **assembled application**: the real binary, a real WebView, the
+real IPC bridge and a real SQLite file. It is the only suite that can see a missing capability,
+a command registered but unreachable, an argument renamed on one side only, a CSP that blocks
+what it should not, or a front end that fails to boot at all — none of which is visible to
+jsdom or to `open_in_memory()`.
+
+The runner is WebdriverIO with `@wdio/tauri-service`, configured in `e2e/wdio.conf.ts`. Specs
+live in `e2e/specs/`, one file per scenario; every selector is held in `e2e/pageobjects/`, and
+`e2e/support/` holds the bridge helper, the application helpers and the profile paths.
+
+**Nothing of the harness ships.** Three seams keep it out of the release binary, and each one
+is checkable:
+
+- The `e2e` Cargo feature, off by default, gates the two `tauri-plugin-wdio*` plugins.
+- `src-tauri/tauri.e2e.conf.json`, merged at build time by `npm run e2e:build`, adds
+  `withGlobalTauri`, declares the `wdio` capability **inline** so no file under
+  `capabilities/` can leak into a release, and changes the identifier.
+- The `e2e` Angular configuration in `angular.json`, whose only difference is
+  `"polyfills": ["@wdio/tauri-plugin"]` — no production source file mentions the harness.
+
+⚠️ The Rust half and the npm half go **together**. With the crates but no polyfill the runner
+never sees `window.wdioTauri` and hangs before opening a session; with the polyfill but no
+crates the front end invokes `plugin:wdio|…` commands nothing answers, and the error banner
+comes up on launch.
+
+#### One application, fifteen spec files
+
+**⚠️ `driverProvider: 'embedded'`, and that decides the shape of every scenario.** The
+WebDriver server lives _inside_ the application, reached through
+`tauri-plugin-wdio-webdriver`, so there is no `tauri-driver`, no msedgedriver and no Chrome
+DevTools protocol. That is what made the suite runnable on CI at all: the external chain drives
+the WebView through msedgedriver, which launches the binary expecting Chromium's handshake and
+gives up on `DevToolsActivePort file doesn't exist`.
+
+The cost is that the provider spawns the application **once**, from its own `onPrepare`, and
+never again. Reading `@wdio/tauri-service`: `startEmbeddedDriver` is called there and from
+`restartEmbeddedServer`, which only fires when a health check finds the server already dead;
+`onWorkerStart` — the per-spec-file hook — does nothing else. Raising `maxInstances` would not
+change it either, because the service skips its per-worker spawn for this provider
+(`if (this.perWorkerMode && !instanceId && !this.isEmbeddedMode)`).
+
+So **every spec file shares one process, one SQLite file and one `preferences.json`**. Three
+consequences, and they are rules rather than observations:
+
+- **The profile is wiped once per run, before the runner starts** — `npm run test:e2e` is
+  `tsx e2e/reset-profile.ts && wdio run …`. Not from a hook: nothing orders a wdio hook against
+  the service's own `onPrepare`, and a wipe from inside meets a living process, a locked
+  database and an open WAL. A separate process beforehand has no ordering to get wrong.
+- **`before()` buys each file a fresh front end and nothing more.** `browser.refresh()` reboots
+  Angular and every store over the same database; it resets no data.
+- **A spec file establishes its own preconditions.** It seeds what it needs, and it does not
+  assume a clean corpus. `05-spaces` deletes the spaces an earlier file left before asserting
+  on "the only space there is", and puts the canvas back on "all spaces" in its `after`.
+
+The numeric prefix on each file is therefore load-bearing: it is the run order.
+`01-first-launch` is the only file that meets a virgin profile, which is why it is also the one
+that resolves the seeded space — `homeSpaceId()` records it while exactly one exists and writes
+it to a marker file, because WebdriverIO gives each spec file its own worker process and a
+module-level cache would be empty again in the next one. ⚠️ It cannot be `listSpaces()[0]`:
+`list_spaces` orders by `name COLLATE NOCASE`, so after another file creates `Ops` the first
+row is no longer the seeded space.
+
+**⚠️ There is no restart, and no spec may claim one.** `reopenSession()` is a
+`browser.reloadSession()`: it tears the session down and opens a new one against the same
+living process — which has to stay up, since it _is_ the server. The Rust side, its SQLite
+connection and `tauri-plugin-store`'s in-memory map all survive. What it proves is that the
+interface was rebuilt from what the commands answer rather than from a signal it was still
+holding; what it cannot prove is that anything reached the disk. For preferences specifically
+the distinction matters: the store plugin caches in the Rust process and flushes on a 300 ms
+debounce, so a reloaded page reads the map, not the file. `15-preferences-on-disk` reads
+`preferences.json` from Node for that, which is outside the application entirely.
+
+**Seeding goes through the bridge.** `e2e/support/bridge.ts` calls the real commands with the
+types generated in `bindings.ts`, so a Rust signature that moves stops the harness compiling.
+It goes through `window.__TAURI__` rather than `browser.tauri.execute`, which the service
+resolves through an HTTP endpoint it loses after a `reloadSession`. Writing the SQLite file
+directly from Node would bypass the migrations and the model rules, and would let a test pass
+against a state the application cannot produce.
+
+#### Driving the interface
+
+**Selectors are `data-testid`, and page objects own them.** Every `aria-label` and every
+visible string goes through `transloco`, and the default locale follows the machine — a text
+selector would depend on the runner. Repeated elements carry the identifying value beside the
+hook (`data-testid="note-card" data-note-id="…"`), because picking a card by position is the
+brittleness the attribute exists to remove. The preference controls are the exception: they are
+addressed by the `id` their own `<label for>` needs, which cannot be renamed without breaking
+the association.
+
+Three things the embedded WebDriver server will not do, each with a helper in `support/app.ts`:
+
+- **Keyboard.** It answers `POST /session/:id/actions` with a 200 and dispatches nothing, so
+  `browser.keys` silently did nothing at all. `press()` dispatches a synthetic `KeyboardEvent`,
+  which reaches the same handlers — they all listen in the DOM. It fills `code` as carefully as
+  `key`, because the shortcut field reads the physical key.
+- **`<select>` and `<input type="date">`.** `selectByAttribute` moves the selection without the
+  `change` the components listen to, so the model kept the old value while the control showed
+  the new one. `setNativeValue()` assigns and dispatches. A date input is the same helper for a
+  different reason: typed keystrokes go in the _display_ format, which follows the WebView's
+  locale.
+- **Implicit form submission.** Enter in a text input submits its form natively, and the
+  browser reserves that for real user input. `submitFormOf()` calls `requestSubmit()`.
+
+**What the suite deliberately does not cover**, because a WebView cannot reach it. In each
+case the control is asserted on — it exists, it is labelled — and never clicked:
+
+- The OS-level global accelerator. WebDriver types into the WebView, not into the machine, so
+  the palette is opened by emitting the same `devbox:action` event the accelerator sends.
+- The native file picker. `window.__TAURI_INTERNALS__.invoke` — the funnel every `invoke` goes
+  through — is `writable: false, configurable: false`, so nothing can stand in front of it and
+  a picker opened by a click would block the application until a human clicked it. Import,
+  export and attaching a file are exercised through their commands, which take a path.
+- Handing a file to the desktop (`open_attachment`), and `Quit` — one launches whatever the
+  runner has registered, the other takes the application down mid-run.
+- The tray menu, which is native.
+- The pointer-drag handle on a checklist item. `Alt+↑/↓` is its keyboard twin, it has to work
+  anyway for the linter, and it is the testable one.
+- The system clipboard where the machine will not release it: on Windows a clipboard manager
+  can hold the lock indefinitely, and a headless Linux runner may have no selection owner at
+  all. `clipboardText()` answers `null` and the scenario calls `this.skip()` — skipped rather
+  than passed, because a bare `return` is a green test that asserted nothing. What DevBox owns
+  is asserted anyway, through `DisplayNote.copyText`.
+
+#### In CI
+
+The suite is a job of its own, on a matrix of `windows-latest` and `ubuntu-22.04`, kept
+`continue-on-error` until it has proved itself — a flaky E2E job that everybody ignores is
+worse than no job. The two platforms do not break the same way, and **Linux is the one that
+can tell paths apart**: the WebView is WebView2 on one and WebKitGTK on the other, and
+`dirs::data_dir()` and `dirs::config_dir()` are the same `%APPDATA%\<identifier>` on Windows
+but `~/.local/share` against `~/.config` on Linux.
+
+That is not theoretical. `preferences.json` goes to `app_data_dir()` — `tauri-plugin-store`
+resolves against `BaseDirectory::AppData` — and both the service's own comment and the first
+version of `15-preferences-on-disk` said `app_config_dir()`. Windows agreed with the mistake
+because the two resolve to one folder there; the Linux job is what produced a
+`no preferences file at /home/runner/.config/…` and settled it.
+
+On Linux the runner is wrapped in `xvfb-run`: WebKitGTK needs an X server, and it is the wdio
+service that spawns the application, so the `DISPLAY` has to exist for the whole process rather
+than for one command. `logLevel` defaults to `warn`; a session that refuses to open is
+diagnosed by re-running the job with `E2E_LOG_LEVEL=trace`.

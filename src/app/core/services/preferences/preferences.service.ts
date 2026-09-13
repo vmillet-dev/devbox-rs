@@ -14,7 +14,14 @@ export const PREFERENCES_STORE_LOADER = new InjectionToken<PreferencesStoreLoade
   { providedIn: 'root', factory: () => load },
 );
 
-/** Created in `app_config_dir()`, like the SQLite database. */
+/**
+ * Created in `app_data_dir()`, next to the SQLite database: `tauri-plugin-store`
+ * resolves a relative path against `BaseDirectory::AppData`.
+ *
+ * ⚠️ Not `app_config_dir()`, which this said for a long time without being wrong on
+ * anyone's machine — the two are the same `%APPDATA%\<identifier>` on Windows, and only
+ * Linux splits them (`~/.local/share` against `~/.config`).
+ */
 const STORE_FILE = 'preferences.json';
 
 /** A preference toggles on a click, never in a burst. */

@@ -13,6 +13,7 @@
     @for (item of draft(); track $index) {
       <li
         class="checklist-row"
+        data-testid="checklist-row"
         [class.dragging]="dragging()?.from === $index"
         [style.order]="displayIndex($index)"
       >
@@ -21,6 +22,7 @@
         <button
           type="button"
           class="row-grip"
+          data-testid="checklist-grip"
           [attr.aria-label]="'editor.moveItem' | transloco: { text: item.text }"
           (pointerdown)="onPointerDown($event, $index)"
           (pointermove)="onPointerMove($event)"
@@ -36,6 +38,7 @@
         <button
           type="button"
           class="row-check"
+          data-testid="checklist-check"
           role="checkbox"
           [attr.aria-checked]="item.done"
           [attr.aria-label]="'editor.toggleItem' | transloco: { text: item.text }"
@@ -48,6 +51,7 @@
           #row
           type="text"
           class="row-text"
+          data-testid="checklist-text"
           spellcheck="false"
           [class.done]="item.done"
           [attr.aria-label]="'editor.itemLabel' | transloco: { position: $index + 1 }"
@@ -64,6 +68,7 @@
         <button
           type="button"
           class="row-remove"
+          data-testid="checklist-remove"
           [attr.aria-label]="'editor.removeItem' | transloco: { text: item.text }"
           (click)="remove($index)"
         >
@@ -73,7 +78,7 @@
     }
   </ul>
 
-  <button type="button" class="checklist-add" (click)="append()">
+  <button type="button" class="checklist-add" data-testid="checklist-add" (click)="append()">
     <span aria-hidden="true">+</span>
     {{ 'editor.addItem' | transloco }}
   </button>

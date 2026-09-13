@@ -1,6 +1,7 @@
 <button
   type="button"
   class="copy-btn"
+  data-testid="copy-button"
   [class.with-label]="showLabel()"
   [class.copied]="copied()"
   [attr.aria-label]="label() | transloco"
