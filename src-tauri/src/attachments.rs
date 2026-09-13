@@ -251,9 +251,7 @@ pub fn sweep_orphan_files(app: &AppHandle, db: &Db) -> Result<usize, StorageErro
     let directory = directory(app)?;
 
     let known = {
-        let mut connection = db.lock().map_err(|_| {
-            StorageError::File("attachments sweep: poisoned connection".to_string())
-        })?;
+        let mut connection = lock(db)?;
         store::all_stored_names(&mut connection)?
     };
 

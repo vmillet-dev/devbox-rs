@@ -424,13 +424,13 @@ mod tests {
     fn a_patch_only_touches_the_fields_it_carries() {
         let mut note = sample();
         let patch = NotePatch {
-            title: Some("Nouveau".to_string()),
+            title: Some("New".to_string()),
             ..NotePatch::default()
         };
 
         patch.apply(&mut note, at("2026-07-25T10:00:00.000Z"));
 
-        assert_eq!(note.title, "Nouveau");
+        assert_eq!(note.title, "New");
         assert_eq!(note.content, "Content");
         assert_eq!(note.tags, ["auth"]);
         assert_eq!(note.updated_at, at("2026-07-25T10:00:00.000Z"));

@@ -1,17 +1,22 @@
-// Public: `tests/` is a separate crate, and sees nothing of the binary but its API.
-pub mod app_info;
+// `pub` is what `tests/` reaches — it is a separate crate and sees nothing else — and
+// what `#[specta::specta]` requires of a module holding commands, since the macro it
+// generates for each one is resolved from the crate root by `collect_commands!`.
+//
+// Everything else is `pub(crate)`, deliberately: `unreachable_pub` and `dead_code` only
+// have something to say about what is not published, and a blanket `pub` silenced both
+// across the whole back end.
 pub mod attachments;
 pub mod changelog;
-pub(crate) mod closed_enum;
-pub(crate) mod count;
 pub mod db;
+pub mod desktop;
 pub mod error;
 pub mod notes;
 pub mod spaces;
 pub mod transfer;
 
-#[cfg(desktop)]
-pub mod desktop;
+pub(crate) mod app_info;
+pub(crate) mod closed_enum;
+pub(crate) mod count;
 
 use tauri::Manager;
 use tauri_specta::{Builder, collect_commands};
@@ -98,34 +103,19 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         .constant("APP_METADATA", app_info::METADATA)
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    let builder = ipc_builder();
-
-    // Not in release: the front-end `src/` does not exist next to an installed binary.
-    // Not fatal either — a debug build launched where that path is not writable has no
-    // reason to die without a window rather than run against the committed bindings.
-    #[cfg(debug_assertions)]
-    if let Err(error) = export_bindings() {
-        log::warn!("TypeScript bindings not regenerated: {error}");
-    }
-
+/// Order matters here, and only here: `single_instance` has to come before every
+/// other plugin, and `log` before the plugins that already log during their own
+/// initialisation.
+fn with_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
     #[allow(unused_mut)]
-    let mut tauri_builder = tauri::Builder::default();
-
-    // ⚠️ Before every other plugin, as the plugin requires. A second launch — from the
-    // autostart entry, a desktop shortcut, the installer's "run now" — would otherwise
-    // open a second process on the same SQLite file, and silently lose every global
-    // shortcut to the instance already holding it.
-    #[cfg(desktop)]
-    {
-        tauri_builder = tauri_builder.plugin(tauri_plugin_single_instance::init(|app, _, _| {
+    let mut builder = builder
+        // A second launch — from the autostart entry, a desktop shortcut, the
+        // installer's "run now" — would otherwise open a second process on the same
+        // SQLite file, and silently lose every global shortcut to the instance
+        // already holding it.
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             desktop::reveal(app);
-        }));
-    }
-
-    tauri_builder = tauri_builder
-        // First: the plugins that follow already log.
+        }))
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(tauri_plugin_log::Target::new(
@@ -143,85 +133,101 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init());
 
-    // The end-to-end harness. `tauri_plugin_log` has already taken the global
-    // logger, so the plugin's own `set_boxed_logger` fails and WDIO captures no
-    // backend log — the log plugin's targets are what to read instead.
+    // The end-to-end harness. `tauri_plugin_log` has already taken the global logger,
+    // so the plugin's own `set_boxed_logger` fails and WDIO captures no backend log —
+    // the log plugin's targets are what to read instead.
     #[cfg(feature = "e2e")]
     {
-        tauri_builder = tauri_builder
+        builder = builder
             .plugin(tauri_plugin_wdio::init())
             .plugin(tauri_plugin_wdio_webdriver::init());
     }
 
-    tauri_builder
-        .setup(|app| {
-            // `tauri.conf.json` carries the product name, which is the crate's and is
-            // lowercase; the window wears the name the user is shown everywhere else.
-            if let Some(window) = app.get_webview_window("main") {
-                window.set_title(app_info::METADATA.name)?;
-            }
+    builder
+}
 
-            // Absent from the mobile targets (see Cargo.toml).
-            #[cfg(desktop)]
-            app.handle()
-                .plugin(tauri_plugin_updater::Builder::new().build())?;
+/// The plugins that need a handle rather than a builder, the native state, and the
+/// database — in that order, because everything after the connection assumes it.
+fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    // `tauri.conf.json` carries the product name, which is the crate's and is
+    // lowercase; the window wears the name the user is shown everywhere else.
+    if let Some(window) = app.get_webview_window("main") {
+        window.set_title(app_info::METADATA.name)?;
+    }
 
-            // "Start with Windows". No launch argument: DevBox started by the system
-            // opens as if started by hand.
-            #[cfg(desktop)]
-            app.handle().plugin(tauri_plugin_autostart::init(
-                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-                None,
-            ))?;
+    app.handle()
+        .plugin(tauri_plugin_updater::Builder::new().build())?;
 
-            // The tray waits for its translated labels to arrive from the front end.
-            #[cfg(desktop)]
-            desktop::init(app.handle())?;
+    // "Start with Windows". No launch argument: DevBox started by the system opens as
+    // if started by hand.
+    app.handle().plugin(tauri_plugin_autostart::init(
+        tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+        None,
+    ))?;
 
-            // The only writable location guaranteed once the app is installed.
-            let directory = app.path().app_data_dir()?;
-            std::fs::create_dir_all(&directory)?;
+    // The tray waits for its translated labels to arrive from the front end.
+    desktop::init(app.handle())?;
 
-            let connection = db::open(&directory.join(db::DB_FILE_NAME))?;
-            app.manage(db::Db::new(connection));
+    // The only writable location guaranteed once the app is installed.
+    let directory = app.path().app_data_dir()?;
+    std::fs::create_dir_all(&directory)?;
 
-            // Retention applies even if nobody opens the panel, and the sweep collects
-            // files an interrupted copy left behind. Neither is fatal.
-            let handle = app.handle().clone();
-            let db = handle.state::<db::Db>();
-            notes::sweep_trash_at_startup(&handle, &db);
-            if let Err(error) = attachments::sweep_orphan_files(&handle, &db) {
-                log::warn!("Orphan attachment files not swept: {error}");
-            }
+    let connection = db::open(&directory.join(db::DB_FILE_NAME))?;
+    app.manage(db::Db::new(connection));
 
-            Ok(())
-        })
-        // Closing — and, if asked for, minimizing — files the window into the tray:
-        // both are preferences, and both are refused when there is no tray to find
-        // the window in (see `desktop`).
-        .on_window_event(
-            // The `_` prefix keeps the mobile build quiet.
-            #[allow(clippy::used_underscore_binding)]
-            |_window, _event| {
-                #[cfg(desktop)]
-                match _event {
-                    tauri::WindowEvent::CloseRequested { api, .. }
-                        if desktop::hides_on_close(_window.app_handle()) =>
-                    {
-                        api.prevent_close();
-                        let _ = _window.hide();
-                    }
-                    // Tauri emits nothing for "minimized": `Resized` is the only way through.
-                    tauri::WindowEvent::Resized(_)
-                        if desktop::hides_on_minimize(_window.app_handle())
-                            && _window.is_minimized().unwrap_or(false) =>
-                    {
-                        let _ = _window.hide();
-                    }
-                    _ => {}
-                }
-            },
-        )
+    sweep(app.handle());
+
+    Ok(())
+}
+
+/// Retention applies even if nobody opens the trash, and the second sweep collects
+/// files an interrupted copy left behind. Neither is fatal: the application has to
+/// start.
+fn sweep(handle: &tauri::AppHandle) {
+    let db = handle.state::<db::Db>();
+
+    notes::trash::sweep_at_startup(handle, &db);
+    if let Err(error) = attachments::sweep_orphan_files(handle, &db) {
+        log::warn!("Orphan attachment files not swept: {error}");
+    }
+}
+
+/// Closing — and, if asked for, minimizing — files the window into the tray: both are
+/// preferences, and both are refused when there is no tray to find the window in
+/// (see `desktop`).
+fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    match event {
+        tauri::WindowEvent::CloseRequested { api, .. }
+            if desktop::hides_on_close(window.app_handle()) =>
+        {
+            api.prevent_close();
+            let _ = window.hide();
+        }
+        // Tauri emits nothing for "minimized": `Resized` is the only way through.
+        tauri::WindowEvent::Resized(_)
+            if desktop::hides_on_minimize(window.app_handle())
+                && window.is_minimized().unwrap_or(false) =>
+        {
+            let _ = window.hide();
+        }
+        _ => {}
+    }
+}
+
+pub fn run() {
+    let builder = ipc_builder();
+
+    // Not in release: the front-end `src/` does not exist next to an installed binary.
+    // Not fatal either — a debug build launched where that path is not writable has no
+    // reason to die without a window rather than run against the committed bindings.
+    #[cfg(debug_assertions)]
+    if let Err(error) = export_bindings() {
+        log::warn!("TypeScript bindings not regenerated: {error}");
+    }
+
+    with_plugins(tauri::Builder::default())
+        .setup(|app| setup(app))
+        .on_window_event(on_window_event)
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while launching the Tauri application");

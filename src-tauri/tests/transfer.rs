@@ -7,8 +7,8 @@ use devbox_lib::notes::language::Language;
 use devbox_lib::notes::model::{NoteDraft, NoteLifecycle};
 use devbox_lib::notes::store as notes;
 use devbox_lib::spaces::store as spaces;
+use devbox_lib::transfer::bundle::{collect, merge};
 use devbox_lib::transfer::model::{self, Bundle};
-use devbox_lib::transfer::{collect, merge};
 
 fn t0() -> DateTime<Utc> {
     iso8601::parse("2026-07-25T09:00:00.000Z").unwrap()
@@ -142,7 +142,7 @@ fn a_note_whose_space_is_missing_from_the_file_is_skipped_not_misfiled() {
 fn a_trashed_note_does_not_leave_with_the_export() {
     let mut source = library();
     let thrown = notes::all(&mut source, None).unwrap()[0].id.clone();
-    notes::delete(&mut source, &thrown, t0()).unwrap();
+    notes::trash::trash(&mut source, &thrown, t0()).unwrap();
 
     let bundle = exported(&mut source);
 

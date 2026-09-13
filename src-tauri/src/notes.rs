@@ -55,7 +55,7 @@ use diesel::SqliteConnection;
 use tauri::{AppHandle, State};
 
 use crate::attachments;
-use crate::count::saturating_u32 as count;
+use crate::count::saturating_u32;
 use crate::db::{Db, lock};
 use crate::error::{AppError, StorageError};
 use model::{DisplayNote, NoteDraft, NotePatch, TagUsage};
@@ -108,7 +108,7 @@ pub fn update_note(
 pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
     let mut connection = lock(&db)?;
 
-    Ok(store::delete(&mut connection, &id, Utc::now())?)
+    Ok(store::trash::trash(&mut connection, &id, Utc::now())?)
 }
 
 #[tauri::command(async)]
@@ -116,7 +116,7 @@ pub fn delete_note(id: String, db: State<'_, Db>) -> Result<(), AppError> {
 pub fn delete_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
 
-    Ok(count(store::delete_many(
+    Ok(saturating_u32(store::trash::trash_many(
         &mut connection,
         &ids,
         Utc::now(),
@@ -128,7 +128,10 @@ pub fn delete_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError
 pub fn restore_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
 
-    Ok(count(store::restore_many(&mut connection, &ids)?))
+    Ok(saturating_u32(store::trash::restore_many(
+        &mut connection,
+        &ids,
+    )?))
 }
 
 /// Purges what retention has caught up with **first**: the trash must never
@@ -136,11 +139,11 @@ pub fn restore_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppErro
 #[tauri::command(async)]
 #[specta::specta]
 pub fn list_trash(app: AppHandle, db: State<'_, Db>) -> Result<Vec<TrashedNote>, AppError> {
-    purge_expired(&app, &db)?;
+    trash::purge_expired(&app, &db)?;
 
     let mut connection = lock(&db)?;
 
-    Ok(store::list_trashed(&mut connection)?
+    Ok(store::trash::list_trashed(&mut connection)?
         .into_iter()
         .map(|(note, deleted_at)| trash::trashed(note, deleted_at))
         .collect())
@@ -149,7 +152,7 @@ pub fn list_trash(app: AppHandle, db: State<'_, Db>) -> Result<Vec<TrashedNote>,
 #[tauri::command(async)]
 #[specta::specta]
 pub fn purge_notes(ids: Vec<String>, app: AppHandle, db: State<'_, Db>) -> Result<u32, AppError> {
-    Ok(count(purge(&app, &db, ids)?))
+    Ok(saturating_u32(trash::purge(&app, &db, ids)?))
 }
 
 #[tauri::command(async)]
@@ -157,10 +160,10 @@ pub fn purge_notes(ids: Vec<String>, app: AppHandle, db: State<'_, Db>) -> Resul
 pub fn empty_trash(app: AppHandle, db: State<'_, Db>) -> Result<u32, AppError> {
     let ids = {
         let mut connection = lock(&db)?;
-        store::trashed_ids(&mut connection)?
+        store::trash::trashed_ids(&mut connection)?
     };
 
-    Ok(count(purge(&app, &db, ids)?))
+    Ok(saturating_u32(trash::purge(&app, &db, ids)?))
 }
 
 #[tauri::command(async)]
@@ -168,7 +171,7 @@ pub fn empty_trash(app: AppHandle, db: State<'_, Db>) -> Result<u32, AppError> {
 pub fn move_notes(ids: Vec<String>, space_id: String, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
 
-    Ok(count(store::move_many(
+    Ok(saturating_u32(store::move_many(
         &mut connection,
         &ids,
         &space_id,
@@ -185,7 +188,7 @@ pub fn tag_notes(ids: Vec<String>, tags: Vec<String>, db: State<'_, Db>) -> Resu
 
     let mut connection = lock(&db)?;
 
-    Ok(count(store::tag_many(
+    Ok(saturating_u32(store::tag_many(
         &mut connection,
         &ids,
         &normalized,
@@ -202,7 +205,7 @@ pub fn list_tags(db: State<'_, Db>) -> Result<Vec<TagUsage>, AppError> {
         .into_iter()
         .map(|(tag, notes)| TagUsage {
             tag,
-            note_count: count(notes),
+            note_count: saturating_u32(notes),
         })
         .collect())
 }
@@ -215,7 +218,11 @@ pub fn rename_tag(tag: String, into: String, db: State<'_, Db>) -> Result<u32, A
 
     let mut connection = lock(&db)?;
 
-    Ok(count(store::retag(&mut connection, &[tag], &target)?))
+    Ok(saturating_u32(store::retag(
+        &mut connection,
+        &[tag],
+        &target,
+    )?))
 }
 
 #[tauri::command(async)]
@@ -225,7 +232,11 @@ pub fn merge_tags(tags: Vec<String>, into: String, db: State<'_, Db>) -> Result<
 
     let mut connection = lock(&db)?;
 
-    Ok(count(store::retag(&mut connection, &tags, &target)?))
+    Ok(saturating_u32(store::retag(
+        &mut connection,
+        &tags,
+        &target,
+    )?))
 }
 
 /// A list rather than one tag at a time: the panel deletes a whole selection, and
@@ -235,7 +246,7 @@ pub fn merge_tags(tags: Vec<String>, into: String, db: State<'_, Db>) -> Result<
 pub fn delete_tags(tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
     let mut connection = lock(&db)?;
 
-    Ok(count(store::drop_tags(&mut connection, &tags)?))
+    Ok(saturating_u32(store::drop_tags(&mut connection, &tags)?))
 }
 
 /// ⚠️ A command of its own rather than a `NotePatch` field: filling a field is not
@@ -297,44 +308,6 @@ pub fn set_global_placeholders(
     Ok(retained)
 }
 
-/// ⚠️ The file names are collected before the `DELETE`: afterwards the cascade has
-/// taken the records that carried them.
-fn purge(app: &AppHandle, db: &Db, ids: Vec<String>) -> Result<usize, AppError> {
-    if ids.is_empty() {
-        return Ok(0);
-    }
-
-    let directory = attachments::directory(app)?;
-
-    let mut connection = lock(db)?;
-    let files = attachments::store::stored_names_of(&mut connection, &ids)?;
-    let purged = store::purge(&mut connection, &ids)?;
-    drop(connection);
-
-    attachments::remove_files(&directory, &files);
-
-    Ok(purged)
-}
-
-fn purge_expired(app: &AppHandle, db: &Db) -> Result<(), AppError> {
-    let expired = {
-        let mut connection = lock(db)?;
-        store::expired_ids(&mut connection, Utc::now())?
-    };
-
-    purge(app, db, expired)?;
-
-    Ok(())
-}
-
-/// Retention applies even if nobody opens the trash. A failure is logged, never
-/// fatal — the application has to start.
-pub fn sweep_trash_at_startup(app: &AppHandle, db: &Db) {
-    if let Err(error) = purge_expired(app, db) {
-        log::warn!("Expired trash not purged: {}", error.detail);
-    }
-}
-
 /// What only the database knows: the attachment count, and the global variables
 /// laid on the fields as proposed values. Both are queries of their own, which is
 /// why neither lives in [`model::decorate`].
@@ -343,7 +316,7 @@ fn display(
     note: model::Note,
 ) -> Result<DisplayNote, StorageError> {
     let mut decorated = model::decorate_now(note);
-    decorated.attachment_count = count(attachments::store::list(connection, &decorated.id)?.len());
+    decorated.attachment_count = attachments::store::count_for(connection, &decorated.id)?;
     model::apply_global_defaults(
         &mut decorated,
         &store::global_placeholder_values(connection)?,

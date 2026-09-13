@@ -368,7 +368,7 @@ mod tests {
             vec![note("a", "Un")],
             Facets::default(),
             &NotesQuery {
-                search: "introuvable".to_string(),
+                search: "no-such-thing".to_string(),
                 ..request()
             },
         );
@@ -386,7 +386,7 @@ mod tests {
                 languages: vec![Language::Json, Language::Txt],
             },
             &NotesQuery {
-                search: "introuvable".to_string(),
+                search: "no-such-thing".to_string(),
                 ..request()
             },
         );

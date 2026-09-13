@@ -143,6 +143,17 @@ pub fn all_stored_names(connection: &mut SqliteConnection) -> Result<Vec<String>
         .collect())
 }
 
+/// One note. [`counts`] answers for the whole corpus at once; reading the records
+/// back only to call `.len()` on them was a row per attachment for a number.
+pub fn count_for(connection: &mut SqliteConnection, note_id: &str) -> Result<u32, StorageError> {
+    let total: i64 = attachments::table
+        .filter(attachments::note_id.eq(note_id))
+        .count()
+        .get_result(connection)?;
+
+    Ok(saturating_u32(total))
+}
+
 pub fn counts(connection: &mut SqliteConnection) -> Result<HashMap<String, u32>, StorageError> {
     let rows = attachments::table
         .group_by(attachments::note_id)
@@ -227,8 +238,8 @@ mod tests {
         create(&mut connection, &sample("a-1", &note_id)).unwrap();
 
         let files = stored_names_of(&mut connection, std::slice::from_ref(&note_id)).unwrap();
-        crate::notes::store::delete(&mut connection, &note_id, Utc::now()).unwrap();
-        crate::notes::store::purge(&mut connection, std::slice::from_ref(&note_id)).unwrap();
+        crate::notes::store::trash::trash(&mut connection, &note_id, Utc::now()).unwrap();
+        crate::notes::store::trash::purge(&mut connection, std::slice::from_ref(&note_id)).unwrap();
 
         assert_eq!(files, ["a-1.png"]);
         assert!(list(&mut connection, &note_id).unwrap().is_empty());

@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::closed_enum::closed_enum;
-use crate::count::saturating_u32 as count;
 
 closed_enum! {
     /// **Closed**, like `Language`: the front end receives it as a generated
@@ -38,13 +37,6 @@ pub fn normalize_items(items: &[ChecklistItem]) -> Vec<ChecklistItem> {
             })
         })
         .collect()
-}
-
-/// `u32` rather than `usize`: Specta refuses to export the latter.
-pub fn progress(items: &[ChecklistItem]) -> (u32, u32) {
-    let done = items.iter().filter(|item| item.done).count();
-
-    (count(done), count(items.len()))
 }
 
 /// GitHub-flavoured task list — what a checklist must look like once pasted into
@@ -114,18 +106,6 @@ mod tests {
             items.iter().map(|i| i.text.as_str()).collect::<Vec<_>>(),
             ["b", "a", "c"]
         );
-    }
-
-    #[test]
-    fn progress_counts_what_is_ticked() {
-        let items = [item("a", true), item("b", false), item("c", true)];
-
-        assert_eq!(progress(&items), (2, 3));
-    }
-
-    #[test]
-    fn an_empty_list_has_no_progress_rather_than_being_complete() {
-        assert_eq!(progress(&[]), (0, 0));
     }
 
     #[test]
