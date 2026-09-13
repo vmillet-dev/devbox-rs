@@ -1,5 +1,14 @@
 @use 'mixins' as *;
 
+// Every band of the editor carries the panel's 20px inset itself, because the body must
+// reach the edges. This component is two sibling roots — the strip, and the preview that
+// opens under it — so the inset sits on the host: put on either rule alone, the other
+// slides out from under it.
+:host {
+  display: block;
+  padding: 0 20px;
+}
+
 .strip {
   display: flex;
   align-items: center;
