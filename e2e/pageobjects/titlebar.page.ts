@@ -15,12 +15,17 @@ export const titlebar = {
   /** One of the few untranslated labels, so a scenario can pin the language it asserts in. */
   setLocale: (locale: 'fr' | 'en') => $(`${testid('locale-option')}[data-locale="${locale}"]`).click(),
 
-  activeLocale: async (): Promise<string> => {
-    const pressed = await readEach(testid('locale-option'), '@aria-pressed');
-    const locales = await readEach(testid('locale-option'), '@data-locale');
-
-    return locales[pressed.indexOf('true')] ?? '';
-  },
+  /** One call: two reads leave a window in which the pressed option can change. */
+  activeLocale: async (): Promise<string> =>
+    (
+      await browser.execute(
+        (selector: string) =>
+          [...document.querySelectorAll(selector)]
+            .filter((option) => option.getAttribute('aria-pressed') === 'true')
+            .map((option) => option.getAttribute('data-locale') ?? ''),
+        testid('locale-option'),
+      )
+    )[0] ?? '',
 };
 
 export const fileMenu = {
@@ -82,6 +87,14 @@ export const variables = {
   },
 
   async remove(name: string): Promise<void> {
+    // The row has to **be there** before it can be found. Reading once and giving up is
+    // how this reported `no variable row named "port" — found ["port"]`: the second read,
+    // the one in the error message, saw the row the first had missed.
+    await browser.waitUntil(async () => (await variables.names()).includes(name), {
+      timeout: 10_000,
+      timeoutMsg: `no variable row named "${name}" ever appeared`,
+    });
+
     const index = (await variables.names()).indexOf(name);
     if (index >= 0) {
       const rows = await $$(testid('variable-row')).getElements();

@@ -88,6 +88,13 @@ export const trash = {
    * trip at a time compares them across a re-render.
    */
   async rowWithTitle(title: string) {
+    // Waited for, not read once: the panel fetches its rows across the bridge, and a
+    // single read that lands early reports a row missing that is merely late.
+    await browser.waitUntil(async () => (await trash.titles()).includes(title), {
+      timeout: 10_000,
+      timeoutMsg: `no trash row titled "${title}" ever appeared`,
+    });
+
     const titles = await trash.titles();
     const index = titles.indexOf(title);
     if (index < 0) {
