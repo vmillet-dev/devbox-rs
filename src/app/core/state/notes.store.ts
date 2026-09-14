@@ -202,7 +202,22 @@ export class NotesStore {
    */
   private draftMaterialisation: Promise<string | null> | null = null;
 
+  /**
+   * ⚠️ The row a draft became, held until the editor moves on to another note.
+   *
+   * `requestClose()` fires the title, the source and the content back to back and then
+   * closes, so commits are still in flight when the overlay goes. Once the row exists
+   * the draft is gone, and a closed editor adopts nothing — which left `find()` with
+   * only the canvas view to answer with, and that view is a round trip behind the write
+   * that created the note. The commits resolved against nothing and were **dropped**:
+   * the note kept the title its creation payload carried and lost the body typed after
+   * it. Windows won that race and Linux lost it, which is what made the end-to-end
+   * suite look flaky rather than wrong.
+   */
+  private materialisedNote: Note | null = null;
+
   openNote(id: string): void {
+    this.materialisedNote = null;
     this.discardDraft();
     this._editorSession.update((session) => session + 1);
     this._selectedNote.set(this.find(id));
@@ -252,6 +267,7 @@ export class NotesStore {
     const spaceId = this.spaceForNewNote();
     if (!spaceId) return;
 
+    this.materialisedNote = null;
     this._selectedNote.set(null);
     this.draftMaterialisation = null;
     this._editorSession.update((session) => session + 1);
@@ -406,6 +422,9 @@ export class NotesStore {
       return null;
     }
 
+    // Before the draft is dropped: between the two, `find()` would know the note by
+    // neither name.
+    this.materialisedNote = created;
     this._draftNote.set(null);
 
     return created.id;
@@ -526,6 +545,11 @@ export class NotesStore {
     if (this.persistedNoteId() === id) {
       this._selectedNote.set(saved);
     }
+    // Kept current, so the commits that follow compare against what was written and not
+    // against the payload the row was created with.
+    if (this.materialisedNote?.id === id) {
+      this.materialisedNote = saved;
+    }
     this.notes.reload();
   }
 
@@ -539,6 +563,9 @@ export class NotesStore {
 
     const selected = this._selectedNote();
     if (selected?.id === id) return selected;
+
+    const materialised = this.materialisedNote;
+    if (materialised?.id === id) return materialised;
 
     return this.notes.findVisible(id);
   }
