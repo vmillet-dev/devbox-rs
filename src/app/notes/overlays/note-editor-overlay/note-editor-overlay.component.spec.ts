@@ -214,10 +214,13 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('resets the draft when another note is opened', async () => {
+      fixture.componentRef.setInput('session', 1);
       fixture.componentRef.setInput('note', createNote({ id: 'a', title: 'First' }));
       await fixture.whenStable();
       await type(titleInput(), 'Typed but not confirmed');
 
+      // Opening another note is what moves the session; saving this one is not.
+      fixture.componentRef.setInput('session', 2);
       fixture.componentRef.setInput('note', createNote({ id: 'b', title: 'Second' }));
       await fixture.whenStable();
 
@@ -406,10 +409,12 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('resets the draft when another note is opened', async () => {
+      fixture.componentRef.setInput('session', 1);
       fixture.componentRef.setInput('note', createNote({ id: 'a', source: 'First' }));
       await fixture.whenStable();
       await type(sourceInput(), 'Edited');
 
+      fixture.componentRef.setInput('session', 2);
       fixture.componentRef.setInput('note', createNote({ id: 'b', source: 'Second' }));
       await fixture.whenStable();
 
@@ -604,11 +609,13 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('drops the pending confirmation when another note is opened', async () => {
+      fixture.componentRef.setInput('session', 1);
       fixture.componentRef.setInput('note', createNote({ id: 'a' }));
       await fixture.whenStable();
       toolbarButton('.delete-btn').click();
       await fixture.whenStable();
 
+      fixture.componentRef.setInput('session', 2);
       fixture.componentRef.setInput('note', createNote({ id: 'b' }));
       await fixture.whenStable();
 
@@ -909,6 +916,52 @@ describe('NoteEditorOverlayComponent', () => {
       await fixture.whenStable();
 
       expect(bodyEditor()).not.toBeNull();
+    });
+  });
+
+  describe('a draft that becomes a note', () => {
+    /**
+     * ⚠️ The sequence every new note goes through, and the one that used to lose the
+     * body. Committing the title materialises the draft, which gives it a **real id**
+     * and hands the editor back a note the store has only just created — title set,
+     * content still empty. Keyed on that id, the body draft was replayed from it and
+     * the text typed a moment earlier disappeared; the commit on close then wrote the
+     * empty string to the note.
+     *
+     * The drafts key on the **session** instead, which does not move when a note is
+     * merely saved.
+     */
+    it('keeps the body typed while the note was still a draft', async () => {
+      fixture.componentRef.setInput('session', 1);
+      fixture.componentRef.setInput('note', createNote({ id: 'draft', title: '', content: '' }));
+      await fixture.whenStable();
+
+      const body = fixture.nativeElement.querySelector('[data-testid="editor-body"]');
+      await type(body, 'openssl req -new');
+
+      // The materialisation lands: a real id, the committed title, and no content yet —
+      // the write that carries it has not come back.
+      fixture.componentRef.setInput(
+        'note',
+        createNote({ id: 'note-42', title: 'Rotate the certificate', content: '' }),
+      );
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="editor-body"]').value).toBe(
+        'openssl req -new',
+      );
+    });
+
+    it('still starts from the new note when a different one is opened', async () => {
+      fixture.componentRef.setInput('session', 1);
+      fixture.componentRef.setInput('note', createNote({ id: 'a', content: 'first' }));
+      await fixture.whenStable();
+
+      fixture.componentRef.setInput('session', 2);
+      fixture.componentRef.setInput('note', createNote({ id: 'b', content: 'second' }));
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="editor-body"]').value).toBe('second');
     });
   });
 });
