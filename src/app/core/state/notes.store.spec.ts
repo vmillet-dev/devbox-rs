@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { IpcError } from '@core/ipc/ipc.error';
 import { FakeClipboard } from '@testing/fake-clipboard';
+import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { createNote } from '@testing/note.fixture';
 import { HARNESS_SPACES, awaitQuery, createNotesHarness, visibleIds } from '@testing/notes-harness';
 import { DRAFT_ID, UNDO_WINDOW_MS } from './notes.store';
@@ -18,6 +19,27 @@ describe('NotesStore', () => {
 
   describe('a draft closed while it was being written', () => {
     /**
+     * Holds the repository's own `create` open: the editor can then be closed with the
+     * write in flight, and a row is still left behind — which is what the reload has to
+     * find. A detached promise would prove only half of it.
+     */
+    function holdCreate(repository: FakeNotesRepository) {
+      const write = repository.create.bind(repository);
+      let open!: () => void;
+      const held = new Promise<void>((resolve) => (open = resolve));
+
+      const create = vi.spyOn(repository, 'create').mockImplementation(async (draft) => {
+        await held;
+        return write(draft);
+      });
+
+      return {
+        inFlight: () => vi.waitFor(() => expect(create).toHaveBeenCalled()),
+        land: () => open(),
+      };
+    }
+
+    /**
      * ⚠️ Materialising a draft takes a round trip, and the editor can be closed inside
      * it. Adopting the created note unconditionally put the overlay **back on screen**,
      * on a note carrying only the field whose commit started the write — so the close the
@@ -25,22 +47,38 @@ describe('NotesStore', () => {
      */
     it('does not put the editor back on screen', async () => {
       const { store, repository } = await createNotesHarness([]);
-
-      let land!: (note: ReturnType<typeof createNote>) => void;
-      vi.spyOn(repository, 'create').mockReturnValue(
-        new Promise<ReturnType<typeof createNote>>((resolve) => {
-          land = resolve;
-        }),
-      );
+      const write = holdCreate(repository);
 
       store.createNote('snippet');
       const writing = store.applyPatch(DRAFT_ID, { title: 'Rotate the certificate' });
+      await write.inFlight();
 
       store.closeOverlay();
-      land(createNote({ id: 'written', title: 'Rotate the certificate', content: '' }));
+      write.land();
       await writing;
 
       expect(store.selectedNote()).toBeNull();
+    });
+
+    /**
+     * ⚠️ The note is still **written**, and the canvas has to hear about it. Making the
+     * reload conditional along with the adoption left a note in the database and nothing
+     * on screen until something else happened to reload — closing a new note quickly was
+     * enough to lose sight of it.
+     */
+    it('still puts the note on the canvas', async () => {
+      const { store, canvas, repository } = await createNotesHarness([]);
+      const write = holdCreate(repository);
+
+      store.createNote('snippet');
+      const writing = store.applyPatch(DRAFT_ID, { title: 'Rotate the certificate' });
+      await write.inFlight();
+
+      store.closeOverlay();
+      write.land();
+      await writing;
+
+      await vi.waitFor(() => expect(visibleIds(canvas)).toHaveLength(1));
     });
   });
 

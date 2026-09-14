@@ -424,10 +424,15 @@ export class NotesStore {
     );
     if (!created) return null;
 
-    if (this._editorSession() !== session) return created;
+    // Only the **adoption** is conditional. The canvas has to learn about the note either
+    // way: skipping the reload with it left a note written to the database and absent from
+    // the screen until something else happened to reload — which is what closing a new note
+    // quickly did.
+    if (this._editorSession() === session) {
+      this._selectedNote.set(created);
+      this.selection.focusNote(created.id);
+    }
 
-    this._selectedNote.set(created);
-    this.selection.focusNote(created.id);
     this.notes.reload();
     return created;
   }
