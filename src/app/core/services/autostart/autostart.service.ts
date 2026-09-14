@@ -47,8 +47,8 @@ export class AutostartService {
 
   private async push(enabled: boolean): Promise<void> {
     try {
-      // Read back first: `enable()` would rewrite the system entry on every
-      // start, and on macOS a re-registered agent loses its state.
+      // Read back first: `enable()` would rewrite the system entry on every start,
+      // for a value the system already holds.
       if ((await this.adapter.isEnabled()) === enabled) return;
 
       await (enabled ? this.adapter.enable() : this.adapter.disable());

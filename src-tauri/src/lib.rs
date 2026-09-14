@@ -186,6 +186,10 @@ fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     // "Start with Windows". No launch argument: DevBox started by the system opens as
     // if started by hand.
+    //
+    // ⚠️ `MacosLauncher` is not macOS code that slipped in — DevBox ships for Windows and
+    // Linux only. The plugin takes it on every platform and ignores it off macOS, so it is
+    // a required argument rather than a dead branch, and deleting it would not compile.
     app.handle().plugin(tauri_plugin_autostart::init(
         tauri_plugin_autostart::MacosLauncher::LaunchAgent,
         None,
