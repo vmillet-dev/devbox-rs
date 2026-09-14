@@ -2227,9 +2227,18 @@ case the control is asserted on — it exists, it is labelled — and never clic
 
 #### In CI
 
-The suite is a job of its own, on a matrix of `windows-latest` and `ubuntu-22.04`, kept
-`continue-on-error` until it has proved itself — a flaky E2E job that everybody ignores is
-worse than no job. The two platforms do not break the same way, and **Linux is the one that
+The suite is a job of its own, on a matrix of `windows-latest` and `ubuntu-22.04`, and it
+**blocks**. It did not always: `continue-on-error: true` stood on it while it earned its
+keep, on the reasoning that a flaky E2E job everybody ignores is worse than no job. That
+reasoning turned out to have a worse failure mode than the one it was avoiding. On `main`
+at `e4ed5d9` the Ubuntu leg failed on a real bug — a note keeping its title and losing the
+body typed after it — and the run was reported `success` regardless: `gh run list` said
+success, the badge said passing, and the failure sat there across three merges until it was
+looked for by hand. ⚠️ A job whose failure reads as a pass is not a weak signal, it is a
+false one. The flag is gone, and the price it was paying — a flaky run blocking a merge
+until it is re-run — is the one worth paying.
+
+The two platforms do not break the same way, and **Linux is the one that
 can tell paths apart**: the WebView is WebView2 on one and WebKitGTK on the other, and
 `dirs::data_dir()` and `dirs::config_dir()` are the same `%APPDATA%\<identifier>` on Windows
 but `~/.local/share` against `~/.config` on Linux.
