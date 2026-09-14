@@ -1,6 +1,18 @@
 import { $, $$ } from '@wdio/globals';
 
-import { blur, press, setNativeValue, submitFormOf, testid } from '../support/app.js';
+import {
+  blur,
+  clickToAddRow,
+  confirmTwice,
+  press,
+  readEach,
+  setField,
+  toggleAndWait,
+  waitForCanvas,
+  setNativeValue,
+  submitFormOf,
+  testid,
+} from '../support/app.js';
 
 /**
  * The editor overlay. Title, body and source commit on **blur**, so every setter here
@@ -8,9 +20,7 @@ import { blur, press, setNativeValue, submitFormOf, testid } from '../support/ap
  * asserting on a draft nothing has saved.
  */
 async function typeAndCommit(selector: string, text: string): Promise<void> {
-  const field = $(selector);
-  await field.click();
-  await field.setValue(text);
+  await setField(selector, text);
   await blur();
 }
 
@@ -39,30 +49,46 @@ export const editor = {
   setDeadline: (isoDay: string) => setNativeValue(testid('editor-deadline'), isoDay),
 
   async addTag(tag: string): Promise<void> {
-    const field = $(testid('editor-tag-add'));
-    await field.click();
-    await field.setValue(tag);
+    // `setField` and not a bare `setValue`: submitting a field whose value never landed
+    // adds an empty tag, silently, and the assertion blames the normalisation.
+    await setField(testid('editor-tag-add'), tag);
     // The field commits by **submitting its form**, which Enter does natively and no
     // synthetic key can — see `submitFormOf`.
     await submitFormOf(testid('editor-tag-add'));
+
+    // ⚠️ The field clearing only says the form was submitted. The **list** comes from the
+    // note, so it appears after the write has crossed the bridge and come back: asserting
+    // on the next line read `[]` where the tag was on its way.
+    //
+    // The comparison is loose on purpose — `#` and case are what
+    // `notes::model::normalize_tags` decides, and the harness has no business deciding
+    // it too. This is a wait for the gesture to have landed; the scenario still asserts
+    // the exact list Rust produced.
+    const expected = tag.trim().replace(/^#/, '').toLowerCase();
+    await browser.waitUntil(
+      async () => (await editor.tags()).some((each) => each.toLowerCase() === expected),
+      { timeout: 10_000, timeoutMsg: `the tag "${tag}" never reached the editor` },
+    );
   },
 
-  removeTag: (tag: string) => $(`${testid('editor-tag-remove')}[data-tag="${tag}"]`).click(),
+  /** Waits for it to be **gone**: the list follows the write, not the click. */
+  async removeTag(tag: string): Promise<void> {
+    await $(`${testid('editor-tag-remove')}[data-tag="${tag}"]`).click();
 
-  async tags(): Promise<string[]> {
-    const found: string[] = [];
-    for await (const button of $$(testid('editor-tag-remove'))) {
-      found.push((await button.getAttribute('data-tag')) ?? '');
-    }
-    return found;
+    await browser.waitUntil(async () => !(await editor.tags()).includes(tag), {
+      timeout: 10_000,
+      timeoutMsg: `the tag "${tag}" is still on the note`,
+    });
   },
 
-  togglePin: () => $(testid('editor-pin')).click(),
+  tags: (): Promise<string[]> => readEach(testid('editor-tag-remove'), '@data-tag'),
+
+  togglePin: () => toggleAndWait(testid('editor-pin')),
   isPinned: async () => (await $(testid('editor-pin')).getAttribute('aria-pressed')) === 'true',
 
   footer: () => $(testid('editor-footer')).getText(),
 
-  toggleFullscreen: () => $(testid('editor-fullscreen')).click(),
+  toggleFullscreen: () => toggleAndWait(testid('editor-fullscreen')),
   isFullscreen: async () => (await $(testid('editor-fullscreen')).getAttribute('aria-pressed')) === 'true',
 
   /**
@@ -83,42 +109,33 @@ export const editor = {
   async close(): Promise<void> {
     await $(testid('editor-close')).click();
     await $(testid('editor-title')).waitForExist({ reverse: true, timeout: 10_000 });
+
+    // ⚠️ Closing **commits**: the title, the source and the content all leave on the way
+    // out, and the dialog disappears without waiting for any of them. A scenario that
+    // reads the note back through the bridge on the next line reads it before the write.
+    // Settling the canvas is the observable end of that round trip — the store reloads it
+    // once the write has come back.
+    await waitForCanvas();
   },
 
   async deleteNote(): Promise<void> {
-    const remove = $(testid('editor-delete'));
-    await remove.click();
-    await remove.click();
+    await confirmTwice($(testid('editor-delete')));
     await $(testid('editor-title')).waitForExist({ reverse: true, timeout: 10_000 });
   },
 
   // Checklists
   items: () => $$(testid('checklist-row')),
 
-  async itemTexts(): Promise<string[]> {
-    const texts: string[] = [];
-    for await (const row of $$(testid('checklist-row'))) {
-      texts.push(await row.$(testid('checklist-text')).getValue());
-    }
-    return texts;
-  },
+  itemTexts: (): Promise<string[]> => readEach(testid('checklist-row'), 'value', testid('checklist-text')),
 
   async itemChecks(): Promise<boolean[]> {
-    const states: boolean[] = [];
-    for await (const row of $$(testid('checklist-row'))) {
-      states.push((await row.$(testid('checklist-check')).getAttribute('aria-checked')) === 'true');
-    }
-    return states;
+    const states = await readEach(testid('checklist-row'), '@aria-checked', testid('checklist-check'));
+    return states.map((state) => state === 'true');
   },
 
   async addItem(text: string): Promise<void> {
-    await $(testid('checklist-add')).click();
-    const rows = await $$(testid('checklist-row')).getElements();
-    const last = rows[rows.length - 1];
-    if (!last) {
-      throw new Error('the checklist gained no row');
-    }
-    await last.$(testid('checklist-text')).setValue(text);
+    const row = await clickToAddRow(testid('checklist-add'), testid('checklist-row'));
+    await row.$(testid('checklist-text')).setValue(text);
     await blur();
   },
 
@@ -181,13 +198,7 @@ export const editor = {
   attachments: () => $$(testid('attachment-item')),
   attachmentEmpty: () => $(testid('attachment-empty')),
 
-  async attachmentNames(): Promise<string[]> {
-    const names: string[] = [];
-    for await (const item of $$(testid('attachment-item'))) {
-      names.push((await item.getAttribute('data-file-name')) ?? '');
-    }
-    return names;
-  },
+  attachmentNames: (): Promise<string[]> => readEach(testid('attachment-item'), '@data-file-name'),
 
   /**
    * ⚠️ Asserted on, never clicked — both of them open OS UI. "Add" raises the file

@@ -74,6 +74,121 @@ export async function cursorOf(selector: string): Promise<string> {
   }, selector);
 }
 
+/**
+ * Sets a field and **checks it took**, retrying if it did not.
+ *
+ * ⚠️ The editor's drafts are `linkedSignal`s keyed on the note. A render landing between
+ * the click and the keystrokes rewrites `[value]` from the note and wipes what was just
+ * typed, leaving a field the spec believes it filled and a note nothing kept — which is
+ * how "no card titled … appeared" was reached with the write never attempted.
+ */
+export async function setField(selector: string, text: string): Promise<void> {
+  const field = $(selector);
+  await field.waitForExist({ timeout: 10_000 });
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await field.click();
+    await field.setValue(text);
+
+    if ((await field.getValue()) === text) return;
+  }
+
+  throw new Error(
+    `${selector} would not hold ${JSON.stringify(text)} — it reads ${JSON.stringify(await field.getValue())}`,
+  );
+}
+
+/**
+ * Clicks a control that appends a row, and waits for the row to **arrive** before handing
+ * it back. The click crosses the bridge and comes back through a re-render; reading the
+ * list on the next line reads it as it was before the click.
+ */
+export async function clickToAddRow(button: string, row: string) {
+  const before = await $$(row).length;
+  await $(button).click();
+
+  await browser.waitUntil(async () => (await $$(row).length) > before, {
+    timeout: 10_000,
+    timeoutMsg: `no new ${row} after clicking ${button}`,
+  });
+
+  const rows = await $$(row).getElements();
+  const last = rows.at(-1);
+  if (!last) {
+    throw new Error(`no ${row} to fill`);
+  }
+
+  return last;
+}
+
+/** What `confirmTwice` needs of a button, so a chainable and an element both fit. */
+interface Confirmable {
+  click(): Promise<void>;
+  getAttribute(name: string): Promise<string | null>;
+}
+
+/**
+ * Every destructive control here confirms on a second click and says so with a
+ * `confirming` class. Clicking twice in a row bets the first click's render has landed —
+ * and that render is exactly what moves the button out from under the second click.
+ */
+export async function confirmTwice(button: Confirmable): Promise<void> {
+  await button.click();
+
+  await browser.waitUntil(async () => ((await button.getAttribute('class')) ?? '').includes('confirming'), {
+    timeout: 10_000,
+    timeoutMsg: 'the control never asked for confirmation',
+  });
+
+  await button.click();
+}
+
+/** What to take off each match: its text, an input's value, or `@some-attribute`. */
+type Extract = 'text' | 'value' | `@${string}`;
+
+/**
+ * Reads one thing off **every** match, in a single call.
+ *
+ * ⚠️ A walk that fetches one element per round trip leaves a window in which the page
+ * re-renders, and the list that comes back mixes two states: the same row read twice, an
+ * element that no longer exists, or — the one CI caught — a card compared against a title
+ * from a view that has since been replaced. `canvas.titles()` was already written this
+ * way and says why; thirteen other walks were not.
+ */
+export async function readEach(selector: string, extract: Extract, child?: string): Promise<string[]> {
+  return browser.execute(
+    (parent: string, how: string, kid: string | null) =>
+      [...document.querySelectorAll(parent)].map((element) => {
+        const target = kid ? element.querySelector(kid) : element;
+        if (!target) return '';
+        if (how === 'text') return (target.textContent ?? '').trim();
+        if (how === 'value') return (target as HTMLInputElement).value ?? '';
+        return target.getAttribute(how.slice(1)) ?? '';
+      }),
+    selector,
+    extract,
+    child ?? null,
+  );
+}
+
+/**
+ * Clicks a toggle and waits for it to **report** the new state.
+ *
+ * Pinning crosses the bridge and comes back through the store — writes here are not
+ * optimistic — so `aria-pressed` read on the line after the click is the state before it.
+ */
+export async function toggleAndWait(selector: string, attribute = 'aria-pressed'): Promise<void> {
+  const button = $(selector);
+  const before = await button.getAttribute(attribute);
+
+  await button.click();
+
+  await browser.waitUntil(async () => (await button.getAttribute(attribute)) !== before, {
+    timeout: 10_000,
+    timeoutMsg: `${selector} never reported a new ${attribute}`,
+  });
+}
+
 export type Modifier = 'Control' | 'Alt' | 'Shift' | 'Meta';
 
 /** `KeyboardEvent.code`: a letter is its physical key, a digit its own. */

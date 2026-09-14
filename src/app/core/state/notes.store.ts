@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 import { NotesRepository } from '../data/notes.repository';
 import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
@@ -161,12 +161,26 @@ export class NotesStore {
 
   private readonly _selectedNote = signal<Note | null>(null);
   private readonly _draftNote = signal<Note | null>(null);
+
+  /**
+   * Bumped when the editor is pointed at a **different** note, and at nothing else.
+   *
+   * ⚠️ The editor's drafts used to key on the note's id, which is right until the one
+   * moment it is not: materialising a draft changes that id for the *same* note, so the
+   * drafts were replayed from a note that had only just been created — and the body
+   * typed a moment earlier was wiped, on screen and then, on close, in the database.
+   * Adopting the created note is what this signal deliberately does not react to.
+   */
+  private readonly _editorSession = signal(0);
   private readonly _lastDeletion = signal<Deletion | null>(null);
   private readonly _undoVisible = signal(false);
 
   /** The draft wins: while it exists, it is what the editor shows. */
   readonly selectedNote = computed<Note | null>(() => this._draftNote() ?? this._selectedNote());
   readonly selectedNoteId = computed<string | null>(() => this.selectedNote()?.id ?? null);
+
+  /** What the editor's local drafts are keyed on — see [`_editorSession`]. */
+  readonly editorSession: Signal<number> = this._editorSession.asReadonly();
 
   /** The id actually in the database, or `null` while the open note is only a draft. */
   readonly persistedNoteId = computed<string | null>(() => this._selectedNote()?.id ?? null);
@@ -190,6 +204,7 @@ export class NotesStore {
 
   openNote(id: string): void {
     this.discardDraft();
+    this._editorSession.update((session) => session + 1);
     this._selectedNote.set(this.find(id));
     this.selection.focusNote(id);
   }
@@ -197,6 +212,7 @@ export class NotesStore {
   /** A draft still empty on close is abandoned, not saved. */
   closeOverlay(): void {
     this.discardDraft();
+    this._editorSession.update((session) => session + 1);
     this._selectedNote.set(null);
   }
 
@@ -238,6 +254,7 @@ export class NotesStore {
 
     this._selectedNote.set(null);
     this.draftMaterialisation = null;
+    this._editorSession.update((session) => session + 1);
     this._draftNote.set(emptyNote(spaceId, this.clock.now(), kind));
   }
 
@@ -395,10 +412,19 @@ export class NotesStore {
   }
 
   private async persistNew(payload: NoteDraft): Promise<Note | null> {
+    // ⚠️ Read **before** the write leaves. Materialising a draft takes a round trip, and
+    // the editor can be closed inside it — in which case adopting the created note here
+    // would put the overlay back on screen, showing a note that carries only the field
+    // whose commit started this write. The close then never takes: the dialog the user
+    // dismissed is replaced by a new one a moment later.
+    const session = this._editorSession();
+
     const created = await this.notifier.attempt('errors.noteCreateFailed', () =>
       this.repository.create(payload),
     );
     if (!created) return null;
+
+    if (this._editorSession() !== session) return created;
 
     this._selectedNote.set(created);
     this.selection.focusNote(created.id);

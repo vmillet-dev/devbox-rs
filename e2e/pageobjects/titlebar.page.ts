@@ -1,6 +1,6 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { blur, setNativeValue, testid } from '../support/app.js';
+import { blur, clickToAddRow, readEach, setNativeValue, testid } from '../support/app.js';
 
 /** The controls' `id`s, in one place: `select` needs the selector, the getters the element. */
 const CONTROL = {
@@ -15,14 +15,17 @@ export const titlebar = {
   /** One of the few untranslated labels, so a scenario can pin the language it asserts in. */
   setLocale: (locale: 'fr' | 'en') => $(`${testid('locale-option')}[data-locale="${locale}"]`).click(),
 
-  activeLocale: async (): Promise<string> => {
-    for await (const option of $$(testid('locale-option'))) {
-      if ((await option.getAttribute('aria-pressed')) === 'true') {
-        return (await option.getAttribute('data-locale')) ?? '';
-      }
-    }
-    return '';
-  },
+  /** One call: two reads leave a window in which the pressed option can change. */
+  activeLocale: async (): Promise<string> =>
+    (
+      await browser.execute(
+        (selector: string) =>
+          [...document.querySelectorAll(selector)]
+            .filter((option) => option.getAttribute('aria-pressed') === 'true')
+            .map((option) => option.getAttribute('data-locale') ?? ''),
+        testid('locale-option'),
+      )
+    )[0] ?? '',
 };
 
 export const fileMenu = {
@@ -73,21 +76,10 @@ export const variables = {
 
   rows: () => $$(testid('variable-row')),
 
-  async names(): Promise<string[]> {
-    const found: string[] = [];
-    for await (const row of $$(testid('variable-row'))) {
-      found.push(await row.$(testid('variable-name')).getValue());
-    }
-    return found;
-  },
+  names: (): Promise<string[]> => readEach(testid('variable-row'), 'value', testid('variable-name')),
 
   async add(name: string, value: string): Promise<void> {
-    await $(testid('variable-add')).click();
-    const rows = await $$(testid('variable-row')).getElements();
-    const last = rows[rows.length - 1];
-    if (!last) {
-      throw new Error('the variables page gained no row');
-    }
+    const last = await clickToAddRow(testid('variable-add'), testid('variable-row'));
     await last.$(testid('variable-name')).setValue(name);
     await last.$(testid('variable-value')).setValue(value);
     await blur();
@@ -95,14 +87,29 @@ export const variables = {
   },
 
   async remove(name: string): Promise<void> {
-    for await (const row of $$(testid('variable-row'))) {
-      if ((await row.$(testid('variable-name')).getValue()) === name) {
+    // The row has to **be there** before it can be found. Reading once and giving up is
+    // how this reported `no variable row named "port" — found ["port"]`: the second read,
+    // the one in the error message, saw the row the first had missed.
+    await browser.waitUntil(async () => (await variables.names()).includes(name), {
+      timeout: 10_000,
+      timeoutMsg: `no variable row named "${name}" ever appeared`,
+    });
+
+    const index = (await variables.names()).indexOf(name);
+    if (index >= 0) {
+      const rows = await $$(testid('variable-row')).getElements();
+      const row = rows[index];
+      if (row) {
         await row.$(testid('variable-remove')).click();
         await blur();
-        await browser.pause(200);
+        await browser.waitUntil(async () => !(await variables.names()).includes(name), {
+          timeout: 10_000,
+          timeoutMsg: `the variable "${name}" is still listed`,
+        });
         return;
       }
     }
+
     throw new Error(`no variable row named "${name}" — found ${JSON.stringify(await variables.names())}`);
   },
 };

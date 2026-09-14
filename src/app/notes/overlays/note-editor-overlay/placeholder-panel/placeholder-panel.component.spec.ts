@@ -50,7 +50,7 @@ describe('PlaceholderPanelComponent', () => {
   async function open(placeholders: readonly Placeholder[] = FIELDS): Promise<void> {
     fixture = TestBed.createComponent(PlaceholderPanelComponent);
     fixture.componentRef.setInput('placeholders', placeholders);
-    fixture.componentRef.setInput('noteId', 'note-1');
+    fixture.componentRef.setInput('session', 1);
     fixture.autoDetectChanges();
     await fixture.whenStable();
   }
@@ -242,7 +242,7 @@ describe('PlaceholderPanelComponent', () => {
     await type(0, 'db.internal');
 
     fixture.componentRef.setInput('placeholders', [{ name: 'host', defaultValue: '', value: '' }]);
-    fixture.componentRef.setInput('noteId', 'note-2');
+    fixture.componentRef.setInput('session', 2);
     await fixture.whenStable();
 
     expect(inputs()[0].value).toBe('');

@@ -170,7 +170,7 @@
     @if (hasPlaceholders()) {
       <app-placeholder-panel
         [placeholders]="placeholders()"
-        [noteId]="note.id"
+        [session]="session()"
         [open]="fieldsPanelOpen()"
         [previewing]="previewingFilled()"
         [rawContent]="draftContent()"
@@ -193,7 +193,7 @@
       } @else if (isChecklist()) {
         <app-checklist-editor
           [items]="note.items"
-          [noteId]="note.id"
+          [session]="session()"
           (itemsChanged)="requestPatch({ items: $event })"
         />
       } @else {

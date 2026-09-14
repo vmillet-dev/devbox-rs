@@ -99,6 +99,13 @@ export class NoteEditorOverlayComponent {
 
   readonly note = input<Note | null>(null);
 
+  /**
+   * Which note the editor is pointed at, as a number that changes only when it is
+   * pointed at a **different** one. The drafts below key on this rather than on the
+   * note id — see `noteId`.
+   */
+  readonly session = input(0);
+
   readonly closed = output<void>();
   /**
    * One output rather than one per field: the page used to wire nine of them, so adding
@@ -112,7 +119,14 @@ export class NoteEditorOverlayComponent {
 
   protected readonly languageOptions = LANGUAGE_OPTIONS;
 
-  private readonly noteId = computed(() => this.note()?.id ?? null);
+  /**
+   * ⚠️ The **session**, not the note's id. Committing the first field of a new note
+   * materialises it, which changes its id — and keying the drafts on the id replayed
+   * them from a note whose content the store had not written yet, emptying the body the
+   * user had just typed. The session changes when the editor is pointed at a different
+   * note, which is what these drafts actually mean to follow.
+   */
+  private readonly noteId = computed(() => this.session());
 
   protected readonly draftTitle = linkedSignal({
     source: this.noteId,
