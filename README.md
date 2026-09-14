@@ -49,12 +49,21 @@ Download from the [latest release](https://github.com/vmillet-dev/devbox-rs/rele
 
 **Linux**
 
-| File                              | Pick it if                                  |
-| --------------------------------- | ------------------------------------------- |
-| `devbox_<version>_amd64.AppImage` | Any distribution. `chmod +x` it and run it. |
-| `devbox_<version>_amd64.deb`      | Debian, Ubuntu and derivatives.             |
-| `devbox-<version>-1.x86_64.rpm`   | Fedora, RHEL and derivatives.               |
-| `devbox-<version>-linux`          | The bare executable, no packaging.          |
+| File                              | Pick it if                            |
+| --------------------------------- | ------------------------------------- |
+| `devbox_<version>_amd64.AppImage` | Any distribution, nothing to install. |
+| `devbox_<version>_amd64.deb`      | Debian, Ubuntu and derivatives.       |
+| `devbox-<version>-1.x86_64.rpm`   | Fedora, RHEL and derivatives.         |
+| `devbox-<version>-linux`          | The bare executable, no packaging.    |
+
+```bash
+chmod +x devbox_*_amd64.AppImage        # make the AppImage runnable, then launch it
+sudo apt install ./devbox_*_amd64.deb   # Debian and Ubuntu — pulls in what it needs
+sudo dnf install ./devbox-*.x86_64.rpm  # Fedora and RHEL
+```
+
+On Windows, the installer and the MSI are opened by double-clicking them; the standalone
+`.exe` needs nothing at all.
 
 Updates are offered inside the application, so you only download by hand once.
 
