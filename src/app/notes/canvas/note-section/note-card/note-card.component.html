@@ -72,7 +72,7 @@
       <!-- Space reserved for the items laid over the top: they carry buttons, and a
            <button> cannot contain another. -->
       <span class="card-items-space"></span>
-    } @else {
+    } @else if (snippetIsCode()) {
       <app-code-viewer
         class="card-snippet"
         [content]="snippet()"
@@ -80,6 +80,14 @@
         [showLineNumbers]="false"
         [compact]="true"
       />
+    } @else {
+      <!-- A tag or a checklist item put this note in the results, and neither is code. -->
+      <span class="card-snippet card-hit" data-testid="note-card-hit">
+        @if (searchHit()?.field === 'tag') {
+          <span class="hit-mark" aria-hidden="true">#</span>
+        }
+        {{ snippet() }}
+      </span>
     }
     <span class="card-footer">
       <!-- Compact on purpose: a line break between the interpolations would leave a stray space in the rendered text, which the prettier-ignore below keeps out. -->

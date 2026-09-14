@@ -90,6 +90,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
         placeholders: [],
         attachmentCount: 0,
         copyText: draft.kind === 'checklist' ? checklistMarkdown(draft.items) : null,
+        searchHit: null,
       };
       this.notes = [note, ...this.notes];
       return note;
@@ -135,6 +136,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
           placeholders: [],
           attachmentCount: 0,
           copyText: null,
+          searchHit: null,
           // The trash shape drops the items; a spec needing them restored uses `setView`.
           items: [],
         })),

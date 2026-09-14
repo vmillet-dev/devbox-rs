@@ -70,6 +70,7 @@ function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
     placeholders: [],
     attachmentCount: 0,
     copyText: null,
+    searchHit: null,
   };
 }
 

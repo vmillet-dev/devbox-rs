@@ -25,6 +25,13 @@ export class SearchBoxComponent {
    */
   readonly shortcutEnabled = input(true);
 
+  /**
+   * How many notes the query matched, `null` when nothing is being filtered. It takes the
+   * shortcut hint's place rather than a slot of its own: the hint is what you need before
+   * you search, the count is what you need once you have.
+   */
+  readonly matched = input<number | null>(null);
+
   protected readonly shortcutHint = platformShortcutHint();
 
   private readonly inputRef = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');

@@ -175,6 +175,12 @@ export type DisplayNote = {
 	 *  so `checklist::to_markdown` stays the only place the `- [x] ` syntax exists.
 	 */
 	copyText: string | null,
+	/**
+	 *  Why this note is in the results, when the card is not already showing it.
+	 *  Filled in afterwards by `view::build`, like the attachment count above it —
+	 *  `None` outside a search, and for a note found by its own title.
+	 */
+	searchHit: SearchHit | null,
 } & Note;
 
 /**
@@ -369,6 +375,25 @@ export type Placeholder = {
 	 *  here without being erased.
 	 */
 	value: string,
+};
+
+/**
+ *  Which part of a note a search found, when the card is not already showing it.
+ * 
+ *  ⚠️ No `Title` variant, deliberately: the title is the biggest thing on a card, so a
+ *  note found by it needs no explanation and an excerpt would repeat what the reader is
+ *  looking at. "Matched on the title" is [`SearchMatch::Title`], which carries nothing.
+ */
+export type SearchField = "tag" | "body" | "item";
+
+/**
+ *  What made a note match, and where — so a card can show the line that put it in the
+ *  results rather than its first three, which may have nothing to do with the query.
+ */
+export type SearchHit = {
+	field: SearchField,
+	/**  The matching **line**, not the whole body: a card has room for one. */
+	excerpt: string,
 };
 
 /**

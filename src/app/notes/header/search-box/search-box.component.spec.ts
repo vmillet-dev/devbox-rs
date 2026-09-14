@@ -55,6 +55,40 @@ describe('SearchBoxComponent', () => {
     expect(decorations.every((span: Element) => span.getAttribute('aria-hidden') === 'true')).toBe(true);
   });
 
+  /**
+   * The count was computed in Rust, crossed the bridge and was thrown away on arrival —
+   * `NotesView.matched` decided one boolean and was never shown.
+   */
+  describe('the count', () => {
+    it('replaces the shortcut hint while something is being filtered', async () => {
+      fixture.componentRef.setInput('matched', 12);
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="search-matched"]').textContent.trim()).toBe(
+        '12 résultat(s)',
+      );
+      expect(fixture.nativeElement.querySelector('.kbd')).toBeNull();
+    });
+
+    it('says zero rather than falling back to the hint', async () => {
+      // The answer that matters most, and the one a truthiness check would swallow.
+      fixture.componentRef.setInput('matched', 0);
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="search-matched"]').textContent.trim()).toBe(
+        '0 résultat(s)',
+      );
+    });
+
+    it('shows the hint again when nothing is being filtered', async () => {
+      fixture.componentRef.setInput('matched', null);
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="search-matched"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.kbd')).not.toBeNull();
+    });
+  });
+
   it('focuses the input on Ctrl/Cmd+K and prevents the browser default', () => {
     const event = pressShortcut();
 

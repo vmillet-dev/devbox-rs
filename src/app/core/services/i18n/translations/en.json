@@ -29,6 +29,7 @@
     "pinnedState": "Pinned note",
     "loading": "Loading notes…",
     "noResults": "No note matches this search.",
+    "searchMatched": "{{count}} result(s)",
     "attachmentsCount": "{{count}} attachment(s)",
     "placeholdersCount": "{{count}} field(s) to fill",
     "selectNote": "Select note {{title}}",
