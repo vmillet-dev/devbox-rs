@@ -34,7 +34,8 @@ export interface NoteActivation {
   readonly extendRange: boolean;
 }
 
-const SNIPPET_LINES = 3;
+/** What fits under a head that no longer spends a row on the language badge. */
+const SNIPPET_LINES = 4;
 const MAX_VISIBLE_TAGS = 2;
 /** What fits between the progress bar and the footer on a 150 px card. */
 const MAX_VISIBLE_ITEMS = 2;
