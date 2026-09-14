@@ -87,9 +87,32 @@ export class NoteCardComponent {
     });
   }
 
-  protected readonly snippet = computed(() =>
-    this.note().content.split('\n').slice(0, SNIPPET_LINES).join('\n'),
-  );
+  /**
+   * What the card shows in place of a body when a search put it here: the line that
+   * actually matched.
+   *
+   * ⚠️ The back end decides, as everywhere else — `null` outside a search **and** for a
+   * note found by its own title, which the card already shows in full. Without it the
+   * preview was the first three lines of the body, so a note matched at line forty came
+   * back with nothing explaining why it was in the list.
+   */
+  protected readonly searchHit = computed(() => this.note().searchHit);
+
+  protected readonly snippet = computed(() => {
+    const hit = this.searchHit();
+    if (hit) return hit.excerpt;
+
+    return this.note().content.split('\n').slice(0, SNIPPET_LINES).join('\n');
+  });
+
+  /**
+   * A body excerpt is still code and stays coloured; a tag or a checklist item is not,
+   * and the highlighter would paint its words as keywords.
+   */
+  protected readonly snippetIsCode = computed(() => {
+    const hit = this.searchHit();
+    return !hit || hit.field === 'body';
+  });
 
   protected readonly displayedTags = computed(() => this.note().tags.slice(0, MAX_VISIBLE_TAGS));
 

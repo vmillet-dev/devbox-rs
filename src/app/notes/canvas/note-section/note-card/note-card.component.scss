@@ -110,6 +110,18 @@ app-copy-button:focus-within {
   overflow: hidden;
 }
 
+// The line a search found, when it is not code: a tag or a checklist item. Prose rather
+// than a monospaced block, since that is what it is.
+.card-hit {
+  display: block;
+  font-family: inherit;
+  color: var(--text-1);
+}
+
+.hit-mark {
+  color: var(--text-2);
+}
+
 .card-footer {
   display: flex;
   align-items: center;

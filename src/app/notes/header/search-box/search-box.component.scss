@@ -37,3 +37,11 @@
   color: var(--text-1);
   margin-left: auto;
 }
+
+// Takes the shortcut hint's place, and its alignment with it.
+.count {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-2);
+}

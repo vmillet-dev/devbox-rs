@@ -29,6 +29,7 @@
     "pinnedState": "Note épinglée",
     "loading": "Chargement des notes…",
     "noResults": "Aucune note ne correspond à cette recherche.",
+    "searchMatched": "{{count}} résultat(s)",
     "attachmentsCount": "{{count}} pièce(s) jointe(s)",
     "placeholdersCount": "{{count}} champ(s) à remplir",
     "selectNote": "Sélectionner la note {{title}}",

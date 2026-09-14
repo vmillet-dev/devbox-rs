@@ -10,6 +10,9 @@ use specta::Type;
 use super::checklist::{self, ChecklistItem, NoteKind};
 use super::language::{self, Language};
 use super::placeholder::{self, Placeholder};
+// The search vocabulary lives with the matching, in `view`. The two modules name each
+// other, which inside one feature is a reference rather than a dependency.
+use super::view::SearchHit;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -204,6 +207,10 @@ pub struct DisplayNote {
     /// list travels as the Markdown of its items, a snippet as `None`. Decided here
     /// so `checklist::to_markdown` stays the only place the `- [x] ` syntax exists.
     pub copy_text: Option<String>,
+    /// Why this note is in the results, when the card is not already showing it.
+    /// Filled in afterwards by `view::build`, like the attachment count above it —
+    /// `None` outside a search, and for a note found by its own title.
+    pub search_hit: Option<SearchHit>,
 }
 
 impl std::ops::Deref for DisplayNote {
@@ -220,6 +227,7 @@ pub fn decorate(note: Note, now: DateTime<Utc>) -> DisplayNote {
         expiring_soon: expires_soon(&note, now),
         placeholders: placeholder::parse(&note.content, &note.placeholder_values),
         attachment_count: 0,
+        search_hit: None,
         copy_text: match note.kind {
             NoteKind::Checklist => Some(checklist::to_markdown(&note.items)),
             NoteKind::Snippet => None,

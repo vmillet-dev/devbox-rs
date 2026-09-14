@@ -1,8 +1,11 @@
-import type { ExportReport, ImportReport } from '@core/ipc/bindings';
+import type { ExportReport, ImportReport, SearchHit } from '@core/ipc/bindings';
 import { LanguageTag } from '@core/model/language.model';
 import { ChecklistItem, NoteKind } from './checklist.model';
 
 export { type ChecklistItem, type NoteKind } from './checklist.model';
+
+/** Generated: a variant added in Rust stops the card compiling until it is handled. */
+export type { SearchField, SearchHit } from '@core/ipc/bindings';
 
 export type NoteLifecycle = { readonly kind: 'permanent' } | { readonly kind: 'expires'; readonly at: Date };
 
@@ -16,8 +19,9 @@ export type NoteFooter =
   | { readonly kind: 'age'; readonly at: Date };
 
 /**
- * `footer`, `expiringSoon`, `placeholders`, `attachmentCount` and `copyText` are
- * **derived by the back end and never written** — they are what `DisplayNote` adds.
+ * `footer`, `expiringSoon`, `placeholders`, `attachmentCount`, `copyText` and
+ * `searchHit` are **derived by the back end and never written** — they are what
+ * `DisplayNote` adds.
  */
 export interface Note {
   readonly id: string;
@@ -45,6 +49,12 @@ export interface Note {
    * todo list's items. `null` for a snippet — see `noteCopyText`.
    */
   readonly copyText: string | null;
+  /**
+   * Why this note is in the results, when the card is not already showing it. `null`
+   * outside a search, and for a note found by its own title — quoting that back would
+   * repeat the biggest thing on the card.
+   */
+  readonly searchHit: SearchHit | null;
 }
 
 /** The id and the timestamps are assigned by persistence; the rest is derived. */
@@ -58,6 +68,7 @@ export type NoteDraft = Omit<
   | 'placeholders'
   | 'attachmentCount'
   | 'copyText'
+  | 'searchHit'
 >;
 
 export type NotePatch = Partial<NoteDraft>;

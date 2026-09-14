@@ -57,6 +57,29 @@ pub struct NotesView {
     pub matched: u32,
 }
 
+/// Which part of a note a search found, when the card is not already showing it.
+///
+/// ⚠️ No `Title` variant, deliberately: the title is the biggest thing on a card, so a
+/// note found by it needs no explanation and an excerpt would repeat what the reader is
+/// looking at. "Matched on the title" is [`SearchMatch::Title`], which carries nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum SearchField {
+    Tag,
+    Body,
+    Item,
+}
+
+/// What made a note match, and where — so a card can show the line that put it in the
+/// results rather than its first three, which may have nothing to do with the query.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    pub field: SearchField,
+    /// The matching **line**, not the whole body: a card has room for one.
+    pub excerpt: String,
+}
+
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteSection {
@@ -106,8 +129,18 @@ pub fn apply_global_defaults(view: &mut NotesView, globals: &BTreeMap<String, St
 
 pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesView {
     let needle = fold(request.search.trim());
+    // Collected while filtering rather than looked for again afterwards: the match has
+    // just been found, and finding it twice on 800 notes is paid for twice.
+    let mut hits: HashMap<String, SearchHit> = HashMap::new();
     if !needle.is_empty() {
-        notes.retain(|note| matches_search(note, &needle));
+        notes.retain(|note| match find_match(note, &needle) {
+            None => false,
+            Some(SearchMatch::Title) => true,
+            Some(SearchMatch::Elsewhere(hit)) => {
+                hits.insert(note.id.clone(), hit);
+                true
+            }
+        });
     }
 
     // A quick filter restricts a view that stays chronological; a search or a
@@ -122,7 +155,7 @@ pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> Note
 
     let offset = offset_from_minutes(request.tz_offset_minutes);
 
-    NotesView {
+    let mut view = NotesView {
         sections: build_sections(
             notes,
             is_filtering,
@@ -134,6 +167,24 @@ pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> Note
         available_languages: facets.languages,
         is_filtering,
         matched,
+    };
+
+    // A pass of its own, like the attachment counter and the global defaults: the notes
+    // become `DisplayNote`s inside `build_sections`, and threading a second value
+    // through it would have cost every section-splitting test an argument.
+    apply_search_hits(&mut view, &mut hits);
+    view
+}
+
+fn apply_search_hits(view: &mut NotesView, hits: &mut HashMap<String, SearchHit>) {
+    if hits.is_empty() {
+        return;
+    }
+
+    for section in &mut view.sections {
+        for note in &mut section.notes {
+            note.search_hit = hits.remove(&note.id);
+        }
     }
 }
 
@@ -142,14 +193,56 @@ pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> Note
 /// ⚠️ Folded in Rust and not in SQL: without ICU, SQLite's `LOWER()` only handles
 /// ASCII, so `Étape` would not match `étape`. The items count as much as the
 /// content — a todo list has no body to be found by.
-fn matches_search(note: &Note, needle: &str) -> bool {
-    contains_folded(&note.title, needle)
-        || note.tags.iter().any(|tag| contains_folded(tag, needle))
-        || contains_folded(&note.content, needle)
-        || note
-            .items
-            .iter()
-            .any(|item| contains_folded(&item.text, needle))
+fn find_match(note: &Note, needle: &str) -> Option<SearchMatch> {
+    if contains_folded(&note.title, needle) {
+        return Some(SearchMatch::Title);
+    }
+
+    if let Some(tag) = note.tags.iter().find(|tag| contains_folded(tag, needle)) {
+        return Some(SearchMatch::elsewhere(SearchField::Tag, tag));
+    }
+
+    if let Some(line) = note
+        .content
+        .lines()
+        .find(|line| contains_folded(line, needle))
+    {
+        return Some(SearchMatch::elsewhere(SearchField::Body, line.trim()));
+    }
+
+    note.items
+        .iter()
+        .find(|item| contains_folded(&item.text, needle))
+        .map(|item| SearchMatch::elsewhere(SearchField::Item, &item.text))
+}
+
+/// Answered by [`find_match`]: a note either fails to match, matches on something the
+/// card already shows, or matches on something it does not and can quote.
+enum SearchMatch {
+    Title,
+    Elsewhere(SearchHit),
+}
+
+impl SearchMatch {
+    fn elsewhere(field: SearchField, text: &str) -> Self {
+        Self::Elsewhere(SearchHit {
+            field,
+            excerpt: clip(text),
+        })
+    }
+}
+
+/// A card shows one line, and a body is free to hold a minified payload on one of them.
+/// Without this the whole of it would cross the bridge to be thrown away by `overflow`.
+const EXCERPT_CHARS: usize = 160;
+
+/// Characters and not bytes: `s[..160]` panics in the middle of a `é`.
+fn clip(text: &str) -> String {
+    let mut clipped: String = text.chars().take(EXCERPT_CHARS).collect();
+    if text.chars().nth(EXCERPT_CHARS).is_some() {
+        clipped.push('…');
+    }
+    clipped
 }
 
 /// Lowercase **and** accent-free, so `etape` finds `Étape`. Both sides go through
@@ -451,6 +544,12 @@ mod tests {
     mod search {
         use super::*;
 
+        /// The rule these assert on is "does it match at all", which is what
+        /// [`find_match`] answers on its way to saying where.
+        fn matches_search(note: &Note, needle: &str) -> bool {
+            find_match(note, needle).is_some()
+        }
+
         #[test]
         fn the_title_the_tags_and_the_content_are_all_searched() {
             let note = Note {
@@ -543,6 +642,119 @@ mod tests {
             assert!(matches_search(&note, &fold("migration")));
             assert!(matches_search(&note, &fold("equipe")));
             assert!(!matches_search(&note, &fold("terraform")));
+        }
+    }
+
+    /// A card's preview is the head of the body, which has nothing to do with the
+    /// query when the match sits at line forty. What the view answers with is the
+    /// line that actually matched.
+    mod hits {
+        use super::*;
+
+        fn hit_for(note: Note, search: &str) -> Option<SearchHit> {
+            let view = build(
+                vec![note],
+                Facets::default(),
+                &NotesQuery {
+                    search: search.to_string(),
+                    ..request()
+                },
+            );
+
+            view.sections
+                .into_iter()
+                .flat_map(|section| section.notes)
+                .next()
+                .and_then(|note| note.search_hit)
+        }
+
+        #[test]
+        fn quotes_the_line_that_matched_and_not_the_first_one() {
+            let note = Note {
+                content: "first\nsecond\n  kubectl rollout restart\nfourth".to_string(),
+                ..sample()
+            };
+
+            let hit = hit_for(note, "rollout").expect("a body match is worth quoting");
+            assert_eq!(hit.field, SearchField::Body);
+            // Trimmed: a card shows one line and it should start with the code.
+            assert_eq!(hit.excerpt, "kubectl rollout restart");
+        }
+
+        #[test]
+        fn says_nothing_when_the_title_is_what_matched() {
+            let note = Note {
+                title: "Rollout".to_string(),
+                content: "kubectl apply".to_string(),
+                ..sample()
+            };
+
+            // The title is the biggest thing on the card: quoting it back would
+            // repeat what the reader is already looking at.
+            assert!(hit_for(note, "rollout").is_none());
+        }
+
+        #[test]
+        fn quotes_the_tag_and_the_item_the_card_does_not_show() {
+            let tagged = Note {
+                tags: vec!["urgent".to_string()],
+                ..sample()
+            };
+            let hit = hit_for(tagged, "urgen").expect("a tag match is worth quoting");
+            assert_eq!(hit.field, SearchField::Tag);
+            assert_eq!(hit.excerpt, "urgent");
+
+            let listed = Note {
+                items: vec![
+                    ChecklistItem {
+                        text: "Bump the version".to_string(),
+                        done: false,
+                    },
+                    ChecklistItem {
+                        text: "Push the tag".to_string(),
+                        done: false,
+                    },
+                ],
+                ..sample()
+            };
+            let hit = hit_for(listed, "push").expect("an item match is worth quoting");
+            assert_eq!(hit.field, SearchField::Item);
+            assert_eq!(hit.excerpt, "Push the tag");
+        }
+
+        #[test]
+        fn clips_a_line_long_enough_to_be_a_payload() {
+            let note = Note {
+                content: format!("{}needle", "x".repeat(400)),
+                ..sample()
+            };
+
+            let hit = hit_for(note, "needle").expect("it still matches");
+            // 160 characters and the ellipsis that says there were more.
+            assert_eq!(hit.excerpt.chars().count(), EXCERPT_CHARS + 1);
+            assert!(hit.excerpt.ends_with('…'));
+        }
+
+        #[test]
+        fn clips_on_characters_rather_than_bytes() {
+            let note = Note {
+                content: format!("{}needle", "é".repeat(400)),
+                ..sample()
+            };
+
+            // A byte slice would have panicked in the middle of one of these.
+            let hit = hit_for(note, "needle").expect("an accented needle still matches");
+            assert_eq!(hit.excerpt.chars().count(), EXCERPT_CHARS + 1);
+        }
+
+        #[test]
+        fn carries_nothing_when_nothing_is_searched() {
+            let note = Note {
+                content: "kubectl apply".to_string(),
+                ..sample()
+            };
+
+            assert!(hit_for(note, "   ").is_none());
         }
     }
 

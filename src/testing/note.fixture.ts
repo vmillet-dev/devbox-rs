@@ -24,6 +24,7 @@ export function createNote(overrides: Partial<Note> = {}): Note {
     placeholders: [],
     attachmentCount: 0,
     copyText: null,
+    searchHit: null,
     ...overrides,
   };
 

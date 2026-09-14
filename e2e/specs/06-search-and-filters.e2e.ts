@@ -1,4 +1,4 @@
-import { expect } from '@wdio/globals';
+import { $, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { cursorOf, reloadCanvas, testid } from '../support/app.js';
@@ -80,6 +80,73 @@ describe('Search, filters and facets', () => {
   it('says so when nothing matches', async () => {
     await canvas.search('nothing matches this');
     expect(await canvas.noResults().isExisting()).toBe(true);
+  });
+
+  /**
+   * The count was already computed in Rust and thrown away on arrival; the excerpt is
+   * new. Both answer the same question — how big is this result, and why is that card
+   * in it — which a canvas full of first-three-lines previews could not.
+   */
+  describe('what a search says about itself', () => {
+    /**
+     * ⚠️ Mocha runs a suite's own tests **before** its nested suites, so this block is
+     * the last thing in the file whatever its position in it — and one process serves
+     * the whole run, so a search left in the field is a search `07-checklists` inherits.
+     * It did, and every one of its scenarios failed on a canvas holding one card.
+     */
+    after(async () => {
+      await canvas.clearSearch();
+    });
+
+    it('counts the results, and says zero rather than going quiet', async () => {
+      await canvas.search('Docker');
+      // Against what is on screen rather than a number written down here: the corpus is
+      // shared with every spec file that ran before this one.
+      expect(await canvas.matchedCount()).toContain(String((await canvas.titles()).length));
+
+      await canvas.search('nothing matches this');
+      expect(await canvas.matchedCount()).toContain('0');
+    });
+
+    it('hides the count again once nothing is being filtered', async () => {
+      await canvas.clearSearch();
+      expect(await $(testid('search-matched')).isExisting()).toBe(false);
+    });
+
+    it('quotes the line that matched rather than the head of the body', async () => {
+      const spaceId = await homeSpaceId();
+      await bridge.createNote(
+        draft({
+          spaceId,
+          title: 'Deployment runbook',
+          // The needle is on the last line: a preview of the first three explains nothing.
+          content: ['# preamble', 'nothing to see', 'still nothing', '  helm upgrade gateway'].join(
+            String.fromCharCode(10),
+          ),
+          language: 'sh',
+        }),
+      );
+      await reloadCanvas();
+
+      await canvas.search('helm');
+      const card = await canvas.cardWithTitle('Deployment runbook');
+      // Trimmed of its indentation: a card shows one line and it starts with the code.
+      expect(await card.$('.card-snippet').getText()).toBe('helm upgrade gateway');
+    });
+
+    it('quotes the tag when that is what matched, since no preview ever showed it', async () => {
+      await canvas.search('db');
+      const card = await canvas.cardWithTitle('Étape de migration');
+      expect(await card.$(testid('note-card-hit')).getText()).toContain('db');
+    });
+
+    it('quotes nothing when the title is what matched, the card showing it already', async () => {
+      await canvas.search('Docker');
+      const card = await canvas.cardWithTitle('Docker compose');
+      expect(await card.$(testid('note-card-hit')).isExisting()).toBe(false);
+      // Back to the head of the body, which is what the card shows outside a search.
+      expect(await card.$('.card-snippet').getText()).toContain('docker compose up -d');
+    });
   });
 
   it('goes back to the chronological sections when the search is cleared', async () => {

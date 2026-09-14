@@ -138,10 +138,17 @@ export class NotesQueryStore {
   readonly allLanguages = computed<readonly LanguageTag[]>(() => this.view()?.availableLanguages ?? []);
   readonly isFiltering = computed(() => this.view()?.isFiltering ?? false);
 
-  readonly hasNoResults = computed(() => {
+  /**
+   * How many notes the query matched, `null` when nothing is being filtered. Counted in
+   * Rust and crossing the bridge since `NotesView` existed — it decided a boolean and
+   * was thrown away, which is why a search said nothing about its own size.
+   */
+  readonly matched = computed<number | null>(() => {
     const view = this.view();
-    return view !== null && view.isFiltering && view.matched === 0;
+    return view !== null && view.isFiltering ? view.matched : null;
   });
+
+  readonly hasNoResults = computed(() => this.matched() === 0);
 
   /**
    * ⚠️ `view()` is read **before** the resource state: an `&&` the other way round

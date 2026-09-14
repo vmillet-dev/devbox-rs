@@ -89,6 +89,51 @@ describe('NoteCardComponent', () => {
     expect(lines.map((line) => line.nativeElement.textContent)).toEqual(['one', 'two', 'three', 'four']);
   });
 
+  /**
+   * A card's preview is the head of the body, which explains nothing when the match sits
+   * at line forty — or in a tag, which the preview never showed at all.
+   */
+  describe('what a search put it here for', () => {
+    it('shows the matching line instead of the head of the body', async () => {
+      fixture.componentRef.setInput(
+        'note',
+        createNote({
+          content: 'one\ntwo\nthree\nfour',
+          searchHit: { field: 'body', excerpt: 'kubectl rollout restart' },
+        }),
+      );
+      await fixture.whenStable();
+
+      const lines = fixture.debugElement.queryAll(By.css('.card-snippet .line-content'));
+      expect(lines.map((line) => line.nativeElement.textContent)).toEqual(['kubectl rollout restart']);
+    });
+
+    it('renders a tag or an item as prose, which is what they are', async () => {
+      fixture.componentRef.setInput('note', createNote({ searchHit: { field: 'tag', excerpt: 'urgent' } }));
+      await fixture.whenStable();
+
+      // Not through the highlighter: it would paint the words of a tag as keywords.
+      expect(fixture.debugElement.query(By.css('.card-snippet .line-content'))).toBeNull();
+      expect(text('[data-testid="note-card-hit"]')).toBe('# urgent');
+
+      fixture.componentRef.setInput(
+        'note',
+        createNote({ searchHit: { field: 'item', excerpt: 'Push the tag' } }),
+      );
+      await fixture.whenStable();
+
+      expect(text('[data-testid="note-card-hit"]')).toBe('Push the tag');
+    });
+
+    it('keeps the head of the body when the back end quoted nothing', async () => {
+      fixture.componentRef.setInput('note', createNote({ content: 'one\ntwo', searchHit: null }));
+      await fixture.whenStable();
+
+      const lines = fixture.debugElement.queryAll(By.css('.card-snippet .line-content'));
+      expect(lines.map((line) => line.nativeElement.textContent)).toEqual(['one', 'two']);
+    });
+  });
+
   it('colours the snippet according to the note language', async () => {
     fixture.componentRef.setInput('note', createNote({ language: 'json', content: '{"a": 1}' }));
     await fixture.whenStable();

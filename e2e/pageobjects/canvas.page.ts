@@ -174,6 +174,9 @@ export const canvas = {
 
   noResults: () => $(testid('canvas-no-results')),
 
+  /** What the search field says instead of its shortcut hint while filtering. */
+  matchedCount: () => $(testid('search-matched')).getText(),
+
   async openTagManager(): Promise<void> {
     await $(testid('tag-manage')).click();
     await $(testid('tag-manager-close')).waitForExist({ timeout: 10_000 });

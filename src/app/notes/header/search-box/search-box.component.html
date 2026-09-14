@@ -11,5 +11,12 @@
     [value]="query()"
     (input)="onInput(searchInput.value)"
   />
-  <span class="kbd" aria-hidden="true">{{ shortcutHint }}</span>
+  <!-- `!== null` and not a truthiness check: zero results is the answer that matters most. -->
+  @if (matched() !== null) {
+    <span class="count" data-testid="search-matched">{{
+      'notes.searchMatched' | transloco: { count: matched() }
+    }}</span>
+  } @else {
+    <span class="kbd" aria-hidden="true">{{ shortcutHint }}</span>
+  }
 </label>
