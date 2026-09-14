@@ -80,6 +80,33 @@ describe('NotesStore', () => {
 
       await vi.waitFor(() => expect(visibleIds(canvas)).toHaveLength(1));
     });
+
+    /**
+     * ⚠️ The commits that were still in flight have to land on the row too.
+     *
+     * Closing fires the title, the source and the content back to back and the close
+     * lands between them. Once the write comes back the draft is gone, and a closed
+     * editor adopts nothing — so the later commits could only resolve the note through
+     * the canvas view, which is a round trip behind. They were dropped, and the note
+     * kept the title its creation payload carried and lost the body typed after it:
+     * `02-note-lifecycle` read `""` back on a Linux runner.
+     */
+    it('lands the commits the close itself fired', async () => {
+      const { store, repository } = await createNotesHarness([]);
+      store.createNote('snippet');
+      // The title is what materialises the row, and it is done being written.
+      await store.applyPatch(DRAFT_ID, { title: 'Rotate the certificate' });
+
+      const update = vi.spyOn(repository, 'update');
+
+      // `requestClose()` fires the commits and closes **in the same turn**, so the close
+      // lands while they are still suspended on the draft's resolution.
+      const writing = store.applyPatch(DRAFT_ID, { content: 'openssl req -new' });
+      store.closeOverlay();
+      await writing;
+
+      expect(update).toHaveBeenCalledWith(expect.any(String), { content: 'openssl req -new' });
+    });
   });
 
   describe('selection', () => {

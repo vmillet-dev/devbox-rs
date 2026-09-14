@@ -19,6 +19,25 @@ function e2eDataDir(): string {
 }
 
 /**
+ * ⚠️ A second directory, and on Linux it is **not** the first one.
+ *
+ * `tauri-plugin-window-state` writes `.window-state.json` under `app_config_dir()`,
+ * while everything else the application writes lives under `app_data_dir()`. Windows
+ * cannot tell the two apart — both are `%APPDATA%\<identifier>` — which is why wiping
+ * only the data directory looked complete: on Linux the geometry survived the wipe, so
+ * a run inherited the window of the run before it and the first one to end on an
+ * unusual size handed it to every run after. CI never saw it, its runners being new
+ * each time; a developer running the suite twice did.
+ */
+function e2eConfigDir(): string {
+  if (process.platform === 'win32') {
+    return join(process.env['APPDATA'] ?? '', IDENTIFIER);
+  }
+  const xdg = process.env['XDG_CONFIG_HOME'];
+  return xdg ? join(xdg, IDENTIFIER) : join(process.env['HOME'] ?? '', '.config', IDENTIFIER);
+}
+
+/**
  * ⚠️ Under the **data** directory, not the config one. `tauri-plugin-store` resolves a
  * relative path against `BaseDirectory::AppData`, and `PreferencesService` passes it no
  * base of its own.
@@ -49,9 +68,12 @@ export function homeSpaceMarker(): string {
  * no ordering to get wrong.
  */
 export function resetProfile(): void {
-  const directory = e2eDataDir();
+  // Both, and `new Set` because on Windows they are the same path.
+  const directories = [...new Set([e2eDataDir(), e2eConfigDir()])];
 
-  rmSync(directory, { recursive: true, force: true });
+  for (const directory of directories) {
+    rmSync(directory, { recursive: true, force: true });
+  }
   rmSync(homeSpaceMarker(), { force: true });
 
   // ⚠️ `force` covers "it was not there", which is the ordinary case — but it also
@@ -62,9 +84,10 @@ export function resetProfile(): void {
   // the first-launch scenario, the only one that can resolve it, had already failed.
   //
   // Say so here rather than let fifteen files disagree about why.
-  if (existsSync(directory)) {
+  const survivor = directories.find((directory) => existsSync(directory));
+  if (survivor) {
     throw new Error(
-      `the e2e profile at ${directory} could not be wiped — an application from a previous run is probably still holding it open`,
+      `the e2e profile at ${survivor} could not be wiped — an application from a previous run is probably still holding it open`,
     );
   }
 }
