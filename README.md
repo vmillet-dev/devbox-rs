@@ -9,10 +9,10 @@ by tag or by full text, and paste it into any application from a global shortcut
 
 ![The DevBox canvas: spaces, search, tag rail and note cards](docs/screenshot.png)
 
-Quick paste, from any application — `Ctrl+Alt+P`, type, `Enter` copies and the window
-steps aside:
+Search it, narrow it by tag, open it — and from any application, `Ctrl+Alt+P` brings up the
+palette, where `Enter` copies and the window steps aside:
 
-![The quick-paste palette: a search field, matching snippets, and the fields a snippet asks for](docs/quick-paste.gif)
+![A tour of DevBox: a search narrowing the board, a tag filter, a note open in the editor, then the quick-paste palette asking a snippet for its fields](docs/quick-paste.gif)
 
 Everything stays on your machine, in a SQLite file you can copy. Nothing is uploaded, there
 is no account, and the application works with the network off.
