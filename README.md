@@ -7,12 +7,10 @@
 A notes and snippets manager for developers, on the desktop. Write a snippet once, find it
 by tag or by full text, and paste it into any application from a global shortcut.
 
-![The DevBox canvas: spaces, search, tag rail and note cards](docs/screenshot.png)
-
 Search it, narrow it by tag, open it — and from any application, `Ctrl+Alt+P` brings up the
 palette, where `Enter` copies and the window steps aside:
 
-![A tour of DevBox: a search narrowing the board, a tag filter, a note open in the editor, then the quick-paste palette asking a snippet for its fields](docs/quick-paste.gif)
+![A tour of DevBox: the board of notes, a search narrowing it and quoting the line that matched, a tag filter, a note open in the editor, then the quick-paste palette asking a snippet for its fields](docs/quick-paste.gif)
 
 Everything stays on your machine, in a SQLite file you can copy. Nothing is uploaded, there
 is no account, and the application works with the network off.
