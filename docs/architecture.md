@@ -2145,6 +2145,11 @@ consequences, and they are rules rather than observations:
   `tsx e2e/reset-profile.ts && wdio run …`. Not from a hook: nothing orders a wdio hook against
   the service's own `onPrepare`, and a wipe from inside meets a living process, a locked
   database and an open WAL. A separate process beforehand has no ordering to get wrong.
+  ⚠️ The profile is **two** directories, not one: `tauri-plugin-window-state` writes
+  `.window-state.json` under `app_config_dir()` while everything else the application
+  writes lives under `app_data_dir()`. Windows cannot tell them apart, so wiping only the
+  data directory passed there and left the window geometry behind on Linux — where a run
+  then opened on the window the previous one closed with.
 - **`before()` buys each file a fresh front end and nothing more.** `browser.refresh()` reboots
   Angular and every store over the same database; it resets no data.
 - **A spec file establishes its own preconditions.** It seeds what it needs, and it does not
