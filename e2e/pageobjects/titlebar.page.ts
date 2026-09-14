@@ -1,6 +1,7 @@
 import { $, $$, browser } from '@wdio/globals';
 
 import { blur, clickToAddRow, readEach, setNativeValue, testid } from '../support/app.js';
+import { bridge } from '../support/bridge.js';
 
 /** The controls' `id`s, in one place: `select` needs the selector, the getters the element. */
 const CONTROL = {
@@ -78,12 +79,23 @@ export const variables = {
 
   names: (): Promise<string[]> => readEach(testid('variable-row'), 'value', testid('variable-name')),
 
+  /**
+   * ⚠️ Waits for the value to **reach the back end**, not for a plausible number of
+   * milliseconds. The panel commits on blur and the write crosses the bridge, so the
+   * 200 ms sleep that used to stand here was a bet — and a Windows runner lost it: the
+   * note was re-read before the variable existed and reported the snippet's own default
+   * (`5432` where `6543` was expected), then the next scenario found no row to remove.
+   */
   async add(name: string, value: string): Promise<void> {
     const last = await clickToAddRow(testid('variable-add'), testid('variable-row'));
     await last.$(testid('variable-name')).setValue(name);
     await last.$(testid('variable-value')).setValue(value);
     await blur();
-    await browser.pause(200);
+
+    await browser.waitUntil(async () => (await bridge.listGlobalPlaceholders())[name] === value, {
+      timeout: 10_000,
+      timeoutMsg: `the variable "${name}" never reached the back end as ${JSON.stringify(value)}`,
+    });
   },
 
   async remove(name: string): Promise<void> {
@@ -105,6 +117,11 @@ export const variables = {
         await browser.waitUntil(async () => !(await variables.names()).includes(name), {
           timeout: 10_000,
           timeoutMsg: `the variable "${name}" is still listed`,
+        });
+        // Gone from the panel is not gone from the database — same bridge, same wait.
+        await browser.waitUntil(async () => !(name in (await bridge.listGlobalPlaceholders())), {
+          timeout: 10_000,
+          timeoutMsg: `the variable "${name}" is still stored`,
         });
         return;
       }
