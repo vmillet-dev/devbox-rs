@@ -57,6 +57,23 @@ describe('NoteCardComponent', () => {
     expect(badge.language()).toBe('json');
   });
 
+  /**
+   * The badge used to own a row of its own above the title — ~17px plus an 8px margin out
+   * of the 122px a card has, spent before a character of body. Structural rather than
+   * visual on purpose: jsdom lays nothing out, so what is asserted is that the three share
+   * one parent, which is what makes them one line.
+   */
+  it('puts the badge, the title and the marks on a single line', async () => {
+    fixture.componentRef.setInput('note', createNote({ title: 'My note', pinned: true, attachmentCount: 2 }));
+    await fixture.whenStable();
+
+    const head = fixture.nativeElement.querySelector('.card-head');
+    expect(head.querySelector('app-language-badge')).not.toBeNull();
+    expect(head.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
+    expect(head.querySelector('[data-testid="note-card-clip"]')).not.toBeNull();
+    expect(head.querySelector('[data-testid="note-card-pin"]')).not.toBeNull();
+  });
+
   it('falls back to a translated placeholder for an untitled note', async () => {
     fixture.componentRef.setInput('note', createNote({ title: '' }));
     await fixture.whenStable();
@@ -64,12 +81,12 @@ describe('NoteCardComponent', () => {
     expect(text('.card-title')).toBe('Sans titre');
   });
 
-  it('shows only the first 3 lines of content as a snippet', async () => {
-    fixture.componentRef.setInput('note', createNote({ content: 'one\ntwo\nthree\nfour' }));
+  it('shows only the first 4 lines of content as a snippet', async () => {
+    fixture.componentRef.setInput('note', createNote({ content: 'one\ntwo\nthree\nfour\nfive' }));
     await fixture.whenStable();
 
     const lines = fixture.debugElement.queryAll(By.css('.card-snippet .line-content'));
-    expect(lines.map((line) => line.nativeElement.textContent)).toEqual(['one', 'two', 'three']);
+    expect(lines.map((line) => line.nativeElement.textContent)).toEqual(['one', 'two', 'three', 'four']);
   });
 
   it('colours the snippet according to the note language', async () => {
