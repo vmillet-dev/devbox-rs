@@ -8,6 +8,7 @@ import {
   readEach,
   setField,
   toggleAndWait,
+  waitForCanvas,
   setNativeValue,
   submitFormOf,
   testid,
@@ -54,13 +55,31 @@ export const editor = {
     // The field commits by **submitting its form**, which Enter does natively and no
     // synthetic key can — see `submitFormOf`.
     await submitFormOf(testid('editor-tag-add'));
-    await browser.waitUntil(async () => (await $(testid('editor-tag-add')).getValue()) === '', {
-      timeout: 10_000,
-      timeoutMsg: 'the tag field never cleared, so the submit never landed',
-    });
+
+    // ⚠️ The field clearing only says the form was submitted. The **list** comes from the
+    // note, so it appears after the write has crossed the bridge and come back: asserting
+    // on the next line read `[]` where the tag was on its way.
+    //
+    // The comparison is loose on purpose — `#` and case are what
+    // `notes::model::normalize_tags` decides, and the harness has no business deciding
+    // it too. This is a wait for the gesture to have landed; the scenario still asserts
+    // the exact list Rust produced.
+    const expected = tag.trim().replace(/^#/, '').toLowerCase();
+    await browser.waitUntil(
+      async () => (await editor.tags()).some((each) => each.toLowerCase() === expected),
+      { timeout: 10_000, timeoutMsg: `the tag "${tag}" never reached the editor` },
+    );
   },
 
-  removeTag: (tag: string) => $(`${testid('editor-tag-remove')}[data-tag="${tag}"]`).click(),
+  /** Waits for it to be **gone**: the list follows the write, not the click. */
+  async removeTag(tag: string): Promise<void> {
+    await $(`${testid('editor-tag-remove')}[data-tag="${tag}"]`).click();
+
+    await browser.waitUntil(async () => !(await editor.tags()).includes(tag), {
+      timeout: 10_000,
+      timeoutMsg: `the tag "${tag}" is still on the note`,
+    });
+  },
 
   tags: (): Promise<string[]> => readEach(testid('editor-tag-remove'), '@data-tag'),
 
@@ -90,6 +109,13 @@ export const editor = {
   async close(): Promise<void> {
     await $(testid('editor-close')).click();
     await $(testid('editor-title')).waitForExist({ reverse: true, timeout: 10_000 });
+
+    // ⚠️ Closing **commits**: the title, the source and the content all leave on the way
+    // out, and the dialog disappears without waiting for any of them. A scenario that
+    // reads the note back through the bridge on the next line reads it before the write.
+    // Settling the canvas is the observable end of that round trip — the store reloads it
+    // once the write has come back.
+    await waitForCanvas();
   },
 
   async deleteNote(): Promise<void> {
