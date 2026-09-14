@@ -1936,6 +1936,15 @@ update.
 One button: **Actions → Release → Run workflow**, with a `dry_run` checkbox. `release.yml`
 carries the whole path — `prepare`, `release-build`, `publish` — and `ci.yml` is only CI.
 
+**Two platforms, deliberately: Windows and Linux.** The release matrix builds
+`windows-latest` and `ubuntu-22.04`, the CI matrix tests the same two, and that is the whole
+list. macOS is out of scope and stays out: nothing here can test it, and Gatekeeper wants a
+paid Apple Developer account with no free bypass on recent versions — a build that can be
+neither tested nor distributed is a liability wearing the costume of a feature. The bundle
+therefore declares no `.icns`, and the README says which platforms it ships. ⚠️ One macOS
+name survives and is meant to: `tauri_plugin_autostart::init` takes a `MacosLauncher` on
+every platform and ignores it off macOS, so it is a required argument, not a dead branch.
+
 Two facts shape that, and neither is negotiable:
 
 - **`CHANGELOG.md` is baked in at compile time.** `include_str!` reads it when the crate is

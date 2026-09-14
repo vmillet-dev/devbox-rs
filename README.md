@@ -37,6 +37,11 @@ English, and it ships with a light and a dark theme.
 
 ## Install
 
+DevBox runs on **Windows and Linux**. There is no macOS build: it cannot be tested here,
+and Gatekeeper wants a paid Apple Developer account with no free way around it on recent
+versions — shipping for a platform that can be neither tested nor distributed would be a
+promise nobody can keep.
+
 Download from the [latest release](https://github.com/vmillet-dev/devbox-rs/releases/latest).
 
 **Windows**
