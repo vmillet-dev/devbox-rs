@@ -48,57 +48,58 @@ app-copy-button:focus-within {
   box-shadow: 0 0 0 1px var(--amber-dim);
 }
 
-// The children are <span>s — the parent <button> allows nothing else — so they need
-// their block behaviour handed back explicitly.
+// The badge, the title and the marks, together. The badge used to own a row of its own:
+// ~17px plus an 8px margin out of the 122px a card has, spent before a character of body.
 //
-// One line carrying the badge, the title and the marks. The badge used to own a row of
-// its own: ~17px plus an 8px margin out of the 122px a card has, spent before a character
-// of body. `baseline` and not `center` so the badge and the glyphs sit on the title's
-// first line whether it takes one line or two.
+// ⚠️ A text block, not a flex row, and that is the whole point of this rule.
+//
+// As a row the title was a column between the badge and the marks, so it wrapped inside
+// 76px of a 224px card — where before the badge had a row of its own it had the full
+// width. Merging the rows bought the body two lines and charged the title for them.
+//
+// Here the badge and the marks are **inline**, so the title flows past them: it starts
+// after the badge and its second line runs from the left edge, full width. The clamp
+// moves up with it — it is the whole head that is two lines now, which is also the line
+// budget the ticket asked for.
 .card-head {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  margin-bottom: 8px;
-  // Reserves room for the copy and ⋯ buttons floating over the top-right corner.
-  padding-right: 50px;
-  // ⚠️ And for the selection tick on the left, which floats at `left: 8px` while the card's
-  // own padding starts at 14px. It therefore lands on whatever begins this line — and it is
-  // not a hover-only concern: `checked` keeps it on with no pointer at all, which is the
-  // state a multiple selection leaves every card in. Unreserved, it sat squarely on the
-  // language badge, and on a todo list, which has no badge, it would sit on the title.
-  // A permanent gutter rather than one that appears with the tick: the second would shift
-  // the title sideways under the pointer.
-  padding-left: 14px;
-}
-
-.card-pin {
-  font-size: 11px;
-}
-
-.card-title {
-  flex: 1;
-  // Without it a flex item refuses to shrink below its content, and a long unbroken
-  // title would push the marks out past the card.
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-0);
-  line-height: 1.3;
-  // ⚠️ A budget, not a nicety. The title had none: a long one took three lines and ate
-  // the body, so two cards side by side showed different amounts of it for no reason the
-  // user had chosen.
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.3;
+  // Reserves room for the copy and ⋯ buttons floating over the top-right corner. Measured
+  // rather than guessed: on a 224px card they start 6px past where this edge lands.
+  padding-right: 46px;
+  // ⚠️ And for the selection tick on the left, which floats over the card's own padding.
+  // Not a hover-only concern: `checked` keeps it on with no pointer at all, which is the
+  // state a multiple selection leaves every card in. Unreserved it sat squarely on the
+  // language badge, and on a todo list, which has no badge, it would sit on the title.
+  // A permanent gutter rather than one that appears with the tick: the second would shift
+  // the title sideways under the pointer.
+  padding-left: 8px;
 }
 
+.card-title {
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+// Inline so the title flows past them rather than around a column of their own, and
+// before it so that no glyph can end up alone on a line of its own. The nowrap keeps the
+// cluster from being split across the two.
 .card-marks {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+app-language-badge,
+.card-marks {
+  margin-right: 5px;
+}
+
+.card-marks > * + * {
+  margin-left: 5px;
 }
 
 // `app-code-viewer` brings the colouring only; the typography stays decided here.
@@ -254,11 +255,26 @@ app-copy-button:focus-within {
   color: var(--text-2);
 }
 
+// ⚠️ Outside the card, into the grid gap, which is what keeps it clear of the copy and ⋯
+// buttons: those sit inside at 8px and 34px from the right edge, and anything drawn in
+// that band would be covered the moment the pointer arrived.
+.card-pin {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  z-index: 2;
+  font-size: 13px;
+  pointer-events: none;
+}
+
 .card-check {
   @include unstyled-control;
   position: absolute;
   top: 8px;
-  left: 8px;
+  // Tight into the corner, so the gutter the head reserves for it can be 8px rather than
+  // the 14 it needed at `left: 8px` — six pixels of a 224px card, on the line that wanted
+  // them most.
+  left: 2px;
   z-index: 1;
   padding: 2px 4px;
   font-size: 12px;

@@ -60,18 +60,34 @@ describe('NoteCardComponent', () => {
   /**
    * The badge used to own a row of its own above the title — ~17px plus an 8px margin out
    * of the 122px a card has, spent before a character of body. Structural rather than
-   * visual on purpose: jsdom lays nothing out, so what is asserted is that the three share
-   * one parent, which is what makes them one line.
+   * visual on purpose: jsdom lays nothing out, so what is asserted is that they share one
+   * parent, which is what makes them one block of text.
    */
-  it('puts the badge, the title and the marks on a single line', async () => {
-    fixture.componentRef.setInput('note', createNote({ title: 'My note', pinned: true, attachmentCount: 2 }));
+  it('puts the badge, the marks and the title in one block', async () => {
+    fixture.componentRef.setInput('note', createNote({ title: 'My note', attachmentCount: 2 }));
     await fixture.whenStable();
 
     const head = fixture.nativeElement.querySelector('.card-head');
     expect(head.querySelector('app-language-badge')).not.toBeNull();
-    expect(head.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
     expect(head.querySelector('[data-testid="note-card-clip"]')).not.toBeNull();
-    expect(head.querySelector('[data-testid="note-card-pin"]')).not.toBeNull();
+    expect(head.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
+  });
+
+  /**
+   * ⚠️ Outside the head, and outside the card button with it. The head is text now, so a
+   * glyph inline with the title wrapped onto a line of its own whenever the title ended
+   * near the edge — and that second line cost the body one of its own.
+   */
+  it('drives the pin into the card corner rather than the line of text', async () => {
+    fixture.componentRef.setInput('note', createNote({ title: 'My note', pinned: true }));
+    await fixture.whenStable();
+
+    const pin = fixture.nativeElement.querySelector('[data-testid="note-card-pin"]');
+    expect(pin).not.toBeNull();
+    expect(pin.closest('.card-head')).toBeNull();
+    expect(pin.closest('.card-shell')).not.toBeNull();
+    // The state still reaches a screen reader, from inside the card where it belongs.
+    expect(fixture.nativeElement.querySelector('.card .visually-hidden').textContent).toBe('Note épinglée');
   });
 
   it('falls back to a translated placeholder for an untitled note', async () => {

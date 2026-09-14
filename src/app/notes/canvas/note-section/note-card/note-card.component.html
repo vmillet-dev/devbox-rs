@@ -24,21 +24,16 @@
            information does not exist for a screen reader. -->
       <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
     }
-    <!-- One line for the badge, the title and the glyphs. It was two, and the first of
-         them was a whole row spent on a badge and three small marks. -->
+    <!-- The badge and the glyphs, then the title flowing past them. They were a row of
+         their own above it. ⚠️ The glyphs come **before** the title and not after: a
+         mark trailing it wraps onto a second line of its own when the title ends near
+         the edge, and that second line costs the body one of its own. -->
     <span class="card-head">
       <!-- No format for a todo list: a "TXT" badge would announce a language nothing
            shows. -->
       @if (!isChecklist()) {
         <app-language-badge [language]="note().language" />
       }
-      <span class="card-title" data-testid="note-card-title">
-        @if (note().title) {
-          {{ note().title }}
-        } @else {
-          {{ 'notes.untitled' | transloco }}
-        }
-      </span>
       <span class="card-marks">
         @if (hasPlaceholders()) {
           <span class="card-fields" data-testid="note-card-fields" aria-hidden="true">⚡</span>
@@ -54,8 +49,12 @@
             {{ 'notes.attachmentsCount' | transloco: { count: note().attachmentCount } }}
           </span>
         }
-        @if (note().pinned) {
-          <span class="card-pin" data-testid="note-card-pin" aria-hidden="true">📌</span>
+      </span>
+      <span class="card-title" data-testid="note-card-title">
+        @if (note().title) {
+          {{ note().title }}
+        } @else {
+          {{ 'notes.untitled' | transloco }}
         }
       </span>
     </span>
@@ -102,6 +101,14 @@
       </span>
     </span>
   </button>
+
+  <!-- Driven into the card's corner, over its border. A sibling of the button and not a
+       child: the head is text now, and a glyph inline with the title wrapped onto a line
+       of its own whenever the title ended near the edge — costing the body a line. Its
+       text twin stays inside the card, next to the title it belongs to. -->
+  @if (note().pinned) {
+    <span class="card-pin" data-testid="note-card-pin" aria-hidden="true">📌</span>
+  }
 
   <!-- A button with `aria-pressed` rather than an `<input type=checkbox>`: the parent
        card is a button, and a native control would inherit its styles. -->
