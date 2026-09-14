@@ -9,6 +9,11 @@ by tag or by full text, and paste it into any application from a global shortcut
 
 ![The DevBox canvas: spaces, search, tag rail and note cards](docs/screenshot.png)
 
+Quick paste, from any application — `Ctrl+Alt+P`, type, `Enter` copies and the window
+steps aside:
+
+![The quick-paste palette: a search field, matching snippets, and the fields a snippet asks for](docs/quick-paste.gif)
+
 Everything stays on your machine, in a SQLite file you can copy. Nothing is uploaded, there
 is no account, and the application works with the network off.
 
@@ -51,42 +56,12 @@ Download from the [latest release](https://github.com/vmillet-dev/devbox-rs/rele
 | `devbox-<version>-1.x86_64.rpm`   | Fedora, RHEL and derivatives.               |
 | `devbox-<version>-linux`          | The bare executable, no packaging.          |
 
-Updates are offered inside the application; you only download by hand once.
+Updates are offered inside the application, so you only download by hand once.
 
-### Verifying what you downloaded
-
-Every release publishes `SHA256SUMS.txt`. Download it next to the file and compare:
-
-```bash
-sha256sum --ignore-missing --check SHA256SUMS.txt
-```
-
-```powershell
-(Get-FileHash .\devbox_0.1.3_x64-setup.exe -Algorithm SHA256).Hash
-```
-
-On Windows, compare that against the matching line in `SHA256SUMS.txt`; the hashes match
-case-insensitively.
-
-### Why Windows warns you on the first run
-
-DevBox is not signed with a Microsoft-recognised code-signing certificate, so SmartScreen
-shows **"Windows protected your PC"** the first time you run the installer. Choose
-**More info**, then **Run anyway**.
-
-That warning is about the _identity of the publisher_, not about the file being altered.
-A certificate costs a few hundred euros a year and is issued to a company, which is why a
-project of this size does not have one. What DevBox does instead:
-
-- Every release publishes `SHA256SUMS.txt`, so you can check that the file you downloaded is
-  the file that was built.
-- **Updates are signed with minisign and verified before they install.** The public key is
-  in `tauri.conf.json`, the private half never leaves the release workflow, and a release
-  build fails outright without it. An update that was tampered with is refused by the
-  updater, not by your judgement.
-
-So the warning is a first-install event. It does not come back, and updates after it are
-verified cryptographically.
+Windows shows a SmartScreen warning the first time — choose **More info**, then **Run
+anyway**. It is about the identity of the publisher, not about the file: DevBox has no
+code-signing certificate, while its updates are signed with minisign and verified before
+they install. Every release also publishes `SHA256SUMS.txt`.
 
 ## Build from source
 
