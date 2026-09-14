@@ -38,14 +38,20 @@ interface Drag {
 })
 export class ChecklistEditorComponent {
   readonly items = input.required<readonly ChecklistItem[]>();
-  readonly noteId = input.required<string>();
+  /**
+   * ⚠️ The editor **session**, not the note's id. Materialising a draft changes that id
+   * for the same note, and a draft keyed on it was replayed from a note the store had
+   * only just created — losing whatever had been typed into it a moment earlier, with no
+   * later update able to bring it back, since only a change of source replays it.
+   */
+  readonly session = input.required<number>();
 
   readonly itemsChanged = output<readonly ChecklistItem[]>();
 
   private readonly rows = viewChildren<ElementRef<HTMLInputElement>>('row');
 
-  protected readonly draft = linkedSignal<string, ChecklistItem[]>({
-    source: this.noteId,
+  protected readonly draft = linkedSignal<number, ChecklistItem[]>({
+    source: this.session,
     computation: () => untracked(() => this.items().map((item) => ({ ...item }))),
   });
 

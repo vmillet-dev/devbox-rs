@@ -38,7 +38,7 @@ describe('ChecklistEditorComponent', () => {
     fixture = TestBed.createComponent(ChecklistEditorComponent);
     document.body.appendChild(fixture.nativeElement);
     fixture.componentRef.setInput('items', ITEMS);
-    fixture.componentRef.setInput('noteId', 'note-1');
+    fixture.componentRef.setInput('session', 1);
     fixture.autoDetectChanges();
     await fixture.whenStable();
 
@@ -227,9 +227,44 @@ describe('ChecklistEditorComponent', () => {
     await fixture.whenStable();
     expect(rows()[0].value).toBe('En cours de frappe');
 
-    fixture.componentRef.setInput('noteId', 'note-2');
+    fixture.componentRef.setInput('session', 2);
     fixture.componentRef.setInput('items', [{ text: 'Autre', done: false }]);
     await fixture.whenStable();
     expect(rows().map((row) => row.value)).toEqual(['Autre']);
+  });
+
+  /**
+   * ⚠️ The sequence every new todo list goes through. The editor opens on a **draft**;
+   * the first committed field materialises the note, which then receives its real id.
+   * Keyed on that id, this draft was replayed from `items()` — whatever the server last
+   * knew, which for a row added a moment earlier is nothing. Worse, only a change of
+   * source replays it, so the write that carried the row never brought it back either:
+   * the note had the item and the editor showed none.
+   *
+   * The session does not move when a note is merely saved.
+   */
+  it('keeps a row added while the note was still a draft', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ChecklistEditorComponent],
+      providers: [provideTranslocoTesting()],
+    });
+    const created = TestBed.createComponent(ChecklistEditorComponent);
+    document.body.appendChild(created.nativeElement);
+    created.componentRef.setInput('items', []);
+    created.componentRef.setInput('session', 1);
+    created.autoDetectChanges();
+    await created.whenStable();
+
+    created.nativeElement.querySelector('.checklist-add').click();
+    await created.whenStable();
+    expect(created.nativeElement.querySelectorAll('.row-text')).toHaveLength(1);
+
+    // The materialisation lands: the note is saved and swaps its id, while `items` is
+    // still empty because the write carrying the new row has not come back yet.
+    created.componentRef.setInput('items', []);
+    await created.whenStable();
+
+    expect(created.nativeElement.querySelectorAll('.row-text')).toHaveLength(1);
   });
 });

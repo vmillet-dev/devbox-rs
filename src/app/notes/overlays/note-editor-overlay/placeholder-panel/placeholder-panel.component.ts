@@ -46,7 +46,13 @@ function sameValues(a: Record<string, string>, b: Record<string, string>): boole
 export class PlaceholderPanelComponent {
   readonly placeholders = input.required<readonly Placeholder[]>();
 
-  readonly noteId = input.required<string>();
+  /**
+   * ⚠️ The editor **session**, not the note's id. Materialising a draft changes that id
+   * for the same note, and a draft keyed on it was replayed from a note the store had
+   * only just created — losing whatever had been typed into it a moment earlier, with no
+   * later update able to bring it back, since only a change of source replays it.
+   */
+  readonly session = input.required<number>();
 
   /** A display preference, held by the editor: it outlives the note. */
   readonly open = input(true);
@@ -63,7 +69,7 @@ export class PlaceholderPanelComponent {
   readonly valuesCommitted = output<Record<string, string>>();
 
   private readonly draft = linkedSignal({
-    source: this.noteId,
+    source: this.session,
     computation: () => untracked(() => storedValues(this.placeholders())),
   });
 
@@ -74,7 +80,7 @@ export class PlaceholderPanelComponent {
    * the back end's answer the open note still carries the old ones.
    */
   private readonly committed = linkedSignal({
-    source: this.noteId,
+    source: this.session,
     computation: () => untracked(() => storedValues(this.placeholders())),
   });
 
