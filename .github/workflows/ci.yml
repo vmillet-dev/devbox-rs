@@ -223,13 +223,19 @@ jobs:
   # keeps them apart. It is the only runner able to disprove a path — it has already caught a
   # `preferences.json` looked for in the wrong place.
   #
-  # `continue-on-error` on purpose: a flaky E2E job everyone ignores is worth less than no job
-  # at all. To be removed once it has proven itself over a few dozen runs.
+  # ⚠️ Blocking, and it was not always. `continue-on-error: true` stood here to buy the suite
+  # time to prove itself, and the bill came due: on `main` at `e4ed5d9` the Ubuntu leg failed
+  # on a real bug — a note keeping its title and losing the body typed after it — and the run
+  # was reported `success` all the same. `gh run list` said success, the badge said passing,
+  # and the failure sat there across three merges until someone went looking for it by hand.
+  #
+  # A job whose failure reads as a pass is worse than no job: it is a claim that nothing is
+  # wrong. So the flag is gone. The cost is the one it was avoiding — a genuinely flaky run
+  # blocks a merge until it is re-run — and that is the right way round.
   test-e2e:
     name: Test E2E (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
