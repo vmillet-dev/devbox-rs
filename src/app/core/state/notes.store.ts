@@ -212,6 +212,7 @@ export class NotesStore {
   /** A draft still empty on close is abandoned, not saved. */
   closeOverlay(): void {
     this.discardDraft();
+    this._editorSession.update((session) => session + 1);
     this._selectedNote.set(null);
   }
 
@@ -411,10 +412,19 @@ export class NotesStore {
   }
 
   private async persistNew(payload: NoteDraft): Promise<Note | null> {
+    // ⚠️ Read **before** the write leaves. Materialising a draft takes a round trip, and
+    // the editor can be closed inside it — in which case adopting the created note here
+    // would put the overlay back on screen, showing a note that carries only the field
+    // whose commit started this write. The close then never takes: the dialog the user
+    // dismissed is replaced by a new one a moment later.
+    const session = this._editorSession();
+
     const created = await this.notifier.attempt('errors.noteCreateFailed', () =>
       this.repository.create(payload),
     );
     if (!created) return null;
+
+    if (this._editorSession() !== session) return created;
 
     this._selectedNote.set(created);
     this.selection.focusNote(created.id);

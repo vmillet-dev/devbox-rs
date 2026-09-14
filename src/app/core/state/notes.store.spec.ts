@@ -16,6 +16,34 @@ describe('NotesStore', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
+  describe('a draft closed while it was being written', () => {
+    /**
+     * ⚠️ Materialising a draft takes a round trip, and the editor can be closed inside
+     * it. Adopting the created note unconditionally put the overlay **back on screen**,
+     * on a note carrying only the field whose commit started the write — so the close the
+     * user asked for never took, and the body they had typed was nowhere in it.
+     */
+    it('does not put the editor back on screen', async () => {
+      const { store, repository } = await createNotesHarness([]);
+
+      let land!: (note: ReturnType<typeof createNote>) => void;
+      vi.spyOn(repository, 'create').mockReturnValue(
+        new Promise<ReturnType<typeof createNote>>((resolve) => {
+          land = resolve;
+        }),
+      );
+
+      store.createNote('snippet');
+      const writing = store.applyPatch(DRAFT_ID, { title: 'Rotate the certificate' });
+
+      store.closeOverlay();
+      land(createNote({ id: 'written', title: 'Rotate the certificate', content: '' }));
+      await writing;
+
+      expect(store.selectedNote()).toBeNull();
+    });
+  });
+
   describe('selection', () => {
     it('exposes the selected note and clears it on close', async () => {
       const note = createNote({ id: 'selected' });
