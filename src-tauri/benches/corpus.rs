@@ -1,15 +1,10 @@
-//! The corpus the benchmarks run against, and the shape of it is a decision.
+//! The corpus the benchmarks run against.
 //!
-//! **800 notes of ~13 kB.** Not a round number picked for looks: it is the shape already
-//! quoted in `notes/view.rs`, where the accent fold is measured at 6.3 ms and the
-//! streaming NFD version at 76 ms. Numbers produced here are comparable to those, and
-//! #30 needs the same fixture to defend them — whichever of the two lands first builds
-//! it, and this is it.
+//! **8000 notes of ~13 kB**, the shape quoted in `notes/view.rs` taken to the size #21 is
+//! about — a corpus big enough that a linear cost shows up as one.
 //!
-//! ⚠️ **File-backed, never `open_in_memory`.** The 295 tests use the in-memory database
-//! and it would be natural to reuse it here. An in-memory database has no pager backed by
-//! a file, no page cache doing real work and no I/O at all, so it measures something the
-//! application never does. The numbers would be pleasant and useless.
+//! ⚠️ **File-backed, never `open_in_memory`.** An in-memory database has no pager behind a
+//! file, no page cache and no I/O, so it measures something the application never does.
 
 use std::path::PathBuf;
 
@@ -23,26 +18,31 @@ use devbox_lib::notes::model::{NoteDraft, NoteLifecycle};
 use devbox_lib::notes::store;
 use devbox_lib::spaces::store as spaces;
 
-pub(crate) const NOTES: usize = 800;
-/// Roughly 13 kB of body, the size the quoted measurements were taken at.
+pub(crate) const NOTES: usize = 8000;
+/// Roughly 13 kB of body.
 const LINES_PER_NOTE: usize = 200;
 const SPACES: usize = 4;
 const TAGS: &[&str] = &[
     "angular", "api", "ci", "db", "docker", "git", "ops", "rust", "sql", "ssh",
 ];
 
-/// A database file of its own per run, dropped with the guard.
+/// A database file of its own per group, erased with the guard.
 pub(crate) struct Corpus {
     pub(crate) connection: SqliteConnection,
     pub(crate) space_ids: Vec<String>,
     pub(crate) note_ids: Vec<String>,
-    directory: PathBuf,
+    /// ⚠️ Last, and the erasure lives on this field rather than on `Corpus`: fields drop
+    /// in declaration order, but a `Drop` on the struct runs *before* all of them — with
+    /// the connection still open, which Windows refuses to delete over.
+    _directory: TempDir,
 }
 
-impl Drop for Corpus {
+struct TempDir(PathBuf);
+
+impl Drop for TempDir {
     fn drop(&mut self) {
         // The WAL and the shm sit beside it; the whole directory goes.
-        let _ = std::fs::remove_dir_all(&self.directory);
+        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 
@@ -50,9 +50,8 @@ pub(crate) fn now() -> DateTime<Utc> {
     db::iso8601::parse("2026-07-25T09:00:00.000Z").expect("a valid instant")
 }
 
-/// ⚠️ Accented on purpose, and not decoration: search folds every byte it reads, and a
-/// pure-ASCII corpus would measure the fast path only — which is the one branch of `fold`
-/// that was never in question.
+/// ⚠️ Accented on purpose: `fold` has a fast path for pure ASCII, and a corpus that only
+/// took it would measure the one branch that was never in question.
 fn body(seed: usize) -> String {
     let mut text = String::with_capacity(LINES_PER_NOTE * 70);
     for line in 0..LINES_PER_NOTE {
@@ -105,8 +104,7 @@ fn draft(seed: usize, space_id: &str) -> NoteDraft {
     }
 }
 
-/// Seeded once per benchmark group. Writing 800 notes takes a few seconds, which is why
-/// it is never inside a `b.iter`.
+/// Seeded once per benchmark group, never inside a `b.iter`.
 pub(crate) fn build() -> Corpus {
     let directory = std::env::temp_dir().join(format!("devbox-bench-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&directory).expect("a writable temporary directory");
@@ -135,6 +133,6 @@ pub(crate) fn build() -> Corpus {
         connection,
         space_ids,
         note_ids,
-        directory,
+        _directory: TempDir(directory),
     }
 }

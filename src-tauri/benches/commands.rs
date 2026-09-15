@@ -1,21 +1,15 @@
 //! What the IPC surface costs, by class of command.
 //!
-//! ⚠️ **Below the command boundary, not through Tauri.** A command is meant to be four
-//! lines — validate, lock, delegate, translate the error — and that rule holds across the
-//! surface, so `store::*` plus `view::*` plus the serde round-trip of the payload captures
-//! nearly all of the cost. `tauri::test::mock_app` exists, but dragging the whole app
-//! lifecycle in buys only the IPC transport, which this codebase does not control.
+//! ⚠️ **Below the command boundary, not through Tauri.** A command is four lines — validate,
+//! lock, delegate, translate the error — so `store::*` plus `view::*` plus the serde round
+//! trip captures nearly all of the cost. `tauri::test::mock_app` would drag the whole app
+//! lifecycle in and buy only the IPC transport, which this codebase does not control. So
+//! these numbers are not "the IPC is fast": they are what the work behind a command costs.
 //!
-//! **So these numbers are not "the IPC is fast".** They are what the work behind a command
-//! costs. Serialisation *is* included and deliberately so: a `NotesView` over 800 notes is
-//! a real `serde_json` cost paid on every keystroke, and it belongs in the number.
-//!
-//! The three commands in `desktop.rs` are out of scope: they touch no database and stay on
-//! the main thread on purpose.
+//! The three commands in `desktop.rs` are out of scope: they touch no database.
 //!
 //! ```
 //! cargo bench -- --save-baseline main
-//! # … whatever changes …
 //! cargo bench -- --baseline main
 //! ```
 
@@ -64,6 +58,9 @@ fn run_query(corpus: &mut Corpus, request: &NotesQuery) -> String {
 fn whole_corpus_read(c: &mut Criterion) {
     let mut corpus = build();
     let mut group = c.benchmark_group("whole-corpus read");
+    // A pass over 8000 notes is long enough that criterion's hundred samples would make
+    // this group most of the run.
+    group.sample_size(20);
 
     group.bench_function("query_notes, unfiltered", |b| {
         b.iter(|| black_box(run_query(&mut corpus, &query(""))));
@@ -195,8 +192,7 @@ fn corpus_rewrite(c: &mut Criterion) {
 fn disk(c: &mut Criterion) {
     let mut corpus = build();
     let mut group = c.benchmark_group("disk");
-    // 800 notes of 13 kB is a ~10 MB bundle: long enough that these two want their own
-    // sample size rather than criterion's hundred.
+    // The bundle is ~100 MB, so these two want their own sample size.
     group.sample_size(10);
 
     let path = std::env::temp_dir().join("devbox-bench-export.json");

@@ -2022,54 +2022,70 @@ cargo bench -- --baseline main        # after
 ```
 
 That comparison is the whole reason the harness is **criterion** and not divan, which is
-lighter and pleasanter but does not offer it out of the box.
+lighter and pleasanter but does not offer it out of the box. ⚠️ The baseline it writes lives
+in `src-tauri/target/criterion/`, which is gitignored: it is local to one machine and dies
+with `cargo clean`. The table below is the durable record.
 
 ⚠️ **They run below the command boundary, not through Tauri.** A command is four lines —
 validate, lock, delegate, translate the error — so `store::*` plus `view::*` plus the serde
 round-trip captures nearly all of the cost. `tauri::test::mock_app` would drag the whole app
 lifecycle in and buy only the IPC transport, which this codebase does not control. So these
 numbers are **not** "the IPC is fast": they are what the work behind a command costs.
-Serialisation is included on purpose — a `NotesView` over 800 notes is a real `serde_json`
+Serialisation is included on purpose — a `NotesView` over 8000 notes is a real `serde_json`
 cost paid on every keystroke.
 
 ⚠️ **The corpus is file-backed, never `open_in_memory`.** An in-memory database has no pager
 behind a file, no page cache doing real work and no I/O at all — it measures something the
-application never does. `benches/corpus.rs` writes 800 notes of ~13 kB into a temporary file
-database, the shape already quoted in `notes/view.rs`, and its bodies are accented on
-purpose: a pure-ASCII corpus would exercise only `fold`'s fast path.
+application never does. `benches/corpus.rs` writes 8000 notes of ~13 kB into a temporary file
+database — about 104 MB, seeded once per group — and its bodies are accented on purpose: a
+pure-ASCII corpus would exercise only `fold`'s fast path.
 
-Two Cargo details exist solely to make this work, both commented in `Cargo.toml`:
-`autobenches = false` (or the shared corpus module is discovered as a benchmark of its own
-and reported as entirely unused) and `bench = false` on the lib and both bins (or cargo runs
-their built-in harness first, which rejects criterion's own flags).
+⚠️ **`Corpus` does not implement `Drop`; its `TempDir` field does, and is declared last.**
+Fields drop in declaration order but a `Drop` on the struct runs before all of them, so the
+erasure fired while SQLite still held the file open — which Windows refuses to delete over,
+and `let _ =` swallowed the error. Six groups leaked a corpus each, 600 MB a run.
 
-#### The first baseline
+Two Cargo details exist solely to make this work, and they are documented here rather than in
+`Cargo.toml`: `autobenches = false` (or the shared corpus module is discovered as a benchmark
+of its own and reported as entirely unused) and `bench = false` on the lib and both bins (or
+cargo runs their built-in harness first, which rejects criterion's own flags).
 
-Taken on 800 notes, Windows, release profile with `lto = true`:
+#### The baseline
 
-| Command                                        | Cost             |
-| ---------------------------------------------- | ---------------- |
-| `query_notes`, unfiltered                      | **27.3 ms**      |
-| `query_notes`, search matching nothing         | 26.8 ms          |
-| `query_notes`, search folding accents          | 25.8 ms          |
-| `delete_notes` then `restore_notes`, 100 notes | 9.0 ms           |
-| `export_notes` / `import_notes`                | 26.7 ms / 8.3 ms |
-| `rename_tag` across the corpus                 | 3.8 ms           |
-| `move_notes` / `tag_notes`, 100 notes          | 2.7 ms / 2.3 ms  |
-| `update_note`                                  | 1.5 ms           |
-| `list_tags` / `list_trash`                     | 591 µs / 424 µs  |
-| `list_global_placeholders`                     | 1.6 µs           |
+8000 notes, Windows, release profile with `lto = true`. The last column is the same benchmark
+against the 800-note corpus this suite started on, which is what says whether a cost is linear
+in the corpus or worse.
 
-Two things worth reading off that table.
+| Command                                        | Cost            | 800 → 8000    |
+| ---------------------------------------------- | --------------- | ------------- |
+| `query_notes`, search matching nothing         | 406 ms          | ×15.1         |
+| `query_notes`, unfiltered                      | **403 ms**      | ×14.7         |
+| `query_notes`, search folding accents          | 392 ms          | ×15.2         |
+| `export_notes` / `import_notes`                | 377 ms / 98 ms  | ×14.1 / ×11.8 |
+| `list_tags`                                    | 37.9 ms         | **×64**       |
+| `delete_notes` then `restore_notes`, 100 notes | 10.4 ms         | ×1.2          |
+| `rename_tag` across the corpus                 | 8.2 ms          | ×2.2          |
+| `move_notes` / `tag_notes`, 100 notes          | 5.1 ms / 4.2 ms | ×1.9 / ×1.8   |
+| `list_trash`                                   | 4.5 ms          | ×10.5         |
+| `update_note`                                  | 1.5 ms          | ×1.0          |
+| `list_global_placeholders`                     | 1.5 µs          | ×1.0          |
 
-**`query_notes` costs 27 ms and runs on every keystroke**, behind the 150 ms debounce. It is
-comfortably inside the debounce at this size, and it is the number #21 is about: the cost is
-linear in the corpus, so five thousand notes would put it past a tenth of a second.
+Three things worth reading off that table.
 
-**The search is not what costs.** Filtering is _slightly cheaper_ than not filtering — fewer
-notes to serialise — so the accent fold is not the dominant term at all. Fetching 800 × 13 kB
-out of SQLite and turning the view into JSON is. Work aimed at making search faster would be
-aimed at the wrong half.
+**`query_notes` has gone past the debounce.** It runs on every keystroke behind a 150 ms
+debounce, and at 800 notes its 27 ms sat comfortably inside it. At 8000 it costs 403 ms: the
+query fired for one keystroke is still running when the third one after it arrives. That is
+what #21 is about, and this is the number that says the problem has stopped being theoretical.
+
+**The search is still not what costs.** Folding accents is the _cheapest_ of the three
+variants (392 ms against 403 ms unfiltered) — fewer notes survive to be serialised. Fetching
+8000 × 13 kB out of SQLite and turning the view into JSON is the whole cost, and work aimed at
+making the match faster would be aimed at the wrong half.
+
+**`list_tags` is the one that degrades faster than the corpus.** ×64 for ×10 the data, the only
+entry on the table that is markedly super-linear, and invisible at 800 notes where it cost
+591 µs. It joins `note_tags` to `notes` to read one nullable column, so each of the 16 000 tag
+rows dereferences a ~13 kB note row; the notes table was 10 MB at 800 notes and is ~104 MB at 8000. ⚠️ That is the likely cause and it is **not confirmed** — no query plan was taken.
 
 Unit tests run with Vitest through the `@angular/build:unit-test` builder in a jsdom
 environment (configured in `angular.json`'s `test` target and `vitest-base.config.ts`), so
