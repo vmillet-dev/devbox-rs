@@ -33,7 +33,7 @@ async function invoke<T>(command: string, args: Record<string, unknown> = {}): P
       tauri.core
         .invoke(name, payload)
         .then((value: unknown) => done({ ok: value }))
-        .catch((error: unknown) => done({ err: String(error) }));
+        .catch((error: unknown) => done({ err: typeof error === 'string' ? error : JSON.stringify(error) }));
     },
     command,
     args,
@@ -71,9 +71,11 @@ export const bridge = {
   setGlobalPlaceholders: (values: Record<string, string>) =>
     invoke<Record<string, string>>('set_global_placeholders', { values }),
 
-  exportNotes: (path: string, spaceId: string | null = null) =>
-    invoke<ExportReport>('export_notes', { path, spaceId }),
-  importNotes: (path: string) => invoke<ImportReport>('import_notes', { path }),
+  exportNotes: (path: string, spaceId: string | null = null, passphrase: string | null = null) =>
+    invoke<ExportReport>('export_notes', { path, spaceId, passphrase }),
+  importNotes: (path: string, passphrase: string | null = null) =>
+    invoke<ImportReport>('import_notes', { path, passphrase }),
+  exportIsProtected: (path: string) => invoke<boolean>('export_is_protected', { path }),
 } as const;
 
 /** A `NoteDraft` is exhaustive on the wire; a scenario cares about two or three fields. */

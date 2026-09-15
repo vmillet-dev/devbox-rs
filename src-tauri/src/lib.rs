@@ -251,8 +251,18 @@ pub fn run() {
         .setup(|app| setup(app))
         .on_window_event(on_window_event)
         .invoke_handler(builder.invoke_handler())
-        .run(tauri::generate_context!())
-        .expect("error while launching the Tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while launching the Tauri application")
+        .run(|_handle, event| {
+            // ⚠️ Built and run rather than `run` alone, for this one event: a decrypted
+            // copy handed to another application should not outlive the session that
+            // asked for it. Best effort by design — one the desktop still holds is
+            // locked and stays, and a crash reaches none of this, which is what the
+            // sweep at launch is for.
+            if matches!(event, tauri::RunEvent::Exit) {
+                attachments::sealed::sweep_plaintext();
+            }
+        });
 }
 
 #[cfg(test)]

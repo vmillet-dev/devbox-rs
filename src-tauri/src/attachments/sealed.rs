@@ -65,9 +65,10 @@ pub fn plaintext_directory() -> std::path::PathBuf {
     std::env::temp_dir().join(PLAINTEXT_DIRECTORY)
 }
 
-/// ⚠️ Run at every launch, beside the orphan-file sweep. A copy handed to another
-/// application cannot be deleted while that application holds it, and a crash deletes
-/// nothing at all — so the guarantee is "gone by the next launch", not "gone on close".
+/// ⚠️ Run on the way out *and* at every launch. A copy handed to another application
+/// cannot be deleted while that application holds it, and a crash reaches neither path —
+/// so the guarantee is "gone by the next launch", with the exit sweep narrowing the
+/// window to the session for everything not still open.
 pub fn sweep_plaintext() {
     let directory = plaintext_directory();
     if let Err(error) = std::fs::remove_dir_all(&directory)

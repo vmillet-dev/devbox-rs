@@ -1147,6 +1147,23 @@ about samples nobody asked for would only add noise.
   duplicating them, so a field added to `Note` is exported without anyone thinking about it.
   Only the spaces actually cited travel: exporting one space should not recreate a whole tree
   on the other side.
+- **⚠️ An export can be sealed, and with a key of its own.** The library key is derived
+  from the passphrase typed at launch and never leaves the machine; an export is the one
+  file meant to reach another one, so `transfer/protect.rs` derives a second key from a
+  phrase the user gives that file, and writes the recipe (version, algorithm, cost, salt)
+  in the clear beside the payload — a salt is not a secret, and a reader has to know how
+  to derive before it can ask anything else. The sealed `bundle.sealed` **replaces**
+  `bundle.json` rather than sitting beside it, or a reader that could not open it would
+  quietly fall back on a bundle in the clear. Attachments are opened under the library key
+  and resealed under the export’s, so the file is openable by whoever was given the
+  phrase and by nobody else.
+- **⚠️ An unprotected export is still written, and is still plaintext.** Refusing one would
+  break the portability the exchange format exists for. What the interface owes the user
+  instead is to ask which of the two it is about to write (`PassphrasePromptComponent`,
+  with the warning beside the button) and to say which one it wrote — `ExportReport.protected`
+  picks the message. On the way in, `export_is_protected` is what lets the prompt appear
+  before the import starts rather than as a failure after it; a refused phrase asks again
+  rather than failing, since it is the ordinary answer to a typo.
 - **⚠️ Base64 inside the JSON was the obvious alternative and was refused.** It costs a third
   more bytes, and the import path holds the file as a `String`, then a `serde_json::Value`,
   then a `Bundle` — three copies of every screenshot in memory, which a library of a hundred
@@ -1593,6 +1610,83 @@ whitespace, so `"Personal "` would otherwise sit beside `"Personal"`, identical 
 `NotesQuery.now` as a parseable instant — falling back to the server clock would silently
 re-cut every section on a different day.
 
+## Encryption at rest
+
+The library is sealed with a key derived from a passphrase typed once per launch. Nothing
+is kept of it: no keychain, no "remember me", no recovery — the semantics of a KeePass file,
+and the same consequence.
+
+### Why not SQLCipher
+
+Measured rather than assumed. SQLCipher encrypts every 4 KiB page with AES-256-CBC and
+authenticates it with HMAC-SHA512; on the 8000-note benchmark corpus that costs ~112 ms on
+`query_notes`, 88% of it in the HMAC. It also has to be built — the crate wants a vendored
+OpenSSL, which means a C toolchain in CI on every platform, for every build.
+
+Sealing values instead costs ~28 ms on the same corpus, four times less, because it seals
+what a reader would want rather than every byte the file system moves. The crates are pure
+Rust (`aes-gcm`, `argon2`, `getrandom`, `zeroize`): no `build.rs`, no C, nothing added to a
+CI build. On a realistic library (~2 MB) the sealing costs well under a millisecond.
+
+### What is sealed, and what is not
+
+Sealed: note titles, bodies and sources, checklist item texts, space names, `{{field}}`
+values and their global defaults, attachment file names — and the attachment files
+themselves, bytes and all.
+
+Not sealed, deliberately: tags, instants, ids, `kind`, `language` and the foreign keys.
+They are what SQL filters, sorts, groups and joins on, and sealing them would move every
+query into Rust over the whole corpus. ⚠️ Tag names are the visible cost of that line, and
+the one thing a reader of the raw file learns.
+`a_note_is_not_readable_in_the_file_it_was_written_to` (`tests/notes.rs`) greps a freshly
+written database and asserts exactly that split — the only test here that reads the file
+rather than the API.
+
+### The pieces
+
+- **`vault/key.rs`** — `Vault`: the key, and the two operations. Argon2id (`Cost`: 64 MiB,
+  3 passes, 1 lane — 1.16 s on the development machine, which is the point of it) and
+  AES-256-GCM with a fresh 96-bit nonce per write, laid out `nonce || ciphertext || tag`,
+  base64 for a TEXT column and raw bytes for a file. The key is a `Zeroizing<[u8; 32]>` and
+  the hand-written `Debug` prints `Vault(…)`, so it cannot reach a log line.
+- **`vault/file.rs`** — `vault.json` beside the database: format version, KDF parameters,
+  salt, and a check value. Opening that check value is what tells a wrong passphrase from a
+  corrupt file. Written staged-then-renamed, and `create` refuses to overwrite one.
+- **`vault/migrate.rs`** — `seal_existing`, one transaction that seals a library written
+  before any of this. ⚠️ It runs from `create_vault` **after** the library is open and
+  **before** the startup sweeps: the orphan-attachment sweep reads stored file names and
+  would meet them in the clear if it ran first.
+- **`db.rs`** — `Library` carries the `SqliteConnection` **and** the `Vault`, and derefs to
+  the connection so the store functions did not have to grow an argument. `split()` hands
+  the two fields over separately where the borrow checker needs both at once, and
+  `Db = Mutex<Option<Library>>` is empty until `unlock_vault` fills it — a command that
+  runs before the unlock answers `StorageError::Locked` rather than reading a database
+  nobody opened.
+
+### The gate
+
+`vault_state` answers `absent` / `locked` / `unlocked`; `app.config.ts` awaits it before the
+first render and `app.component.html` puts `VaultGateComponent` in front of the outlet. ⚠️ It
+does not hide the outlet, it never creates it — which is what keeps every store free of a
+"locked" branch: the canvas queries notes the moment it mounts, and nothing would be there
+to answer.
+
+⚠️ The unlocked state lives in Rust and not in the front end: a page reload must not ask
+again for a library this process already has open. That is also what keeps `reopenSession()`
+working in the end-to-end suite, where the front end reboots and the process does not.
+
+### Attachments, and the one plaintext copy
+
+The bytes are sealed on the way in (`attachments::copy_within_limit`) and opened in memory
+on the way out: `read_attachment` decrypts into the `data:` URI the preview already used,
+and `save_attachment` writes plaintext where the user chose to put it.
+
+⚠️ `open_attachment` is the exception, and a deliberate one: the program that opens a
+document reads it from disk, so DevBox writes a decrypted copy under `temp/devbox-open/`
+and opens that — one click, as before. Those copies are swept on the way out
+(`RunEvent::Exit`) and again at every launch, which is what covers one another application
+still held, and a crash.
+
 ## Persistence (Rust)
 
 Storage is **SQLite**, queried through **Diesel** and embedded via `libsqlite3-sys` with the
@@ -1612,7 +1706,8 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   the migration SQL. Diesel obeys those; it does not own them.
 - **Concurrency.** A `SqliteConnection` is not `Sync`, and Diesel takes it exclusively for
   every query, reads included. A single connection is shared as `tauri::State<Db>`
-  (`Db = Mutex<SqliteConnection>`), registered with `.manage()` in `lib.rs` — never a global.
+  (`Db = Mutex<Option<Library>>`, the connection and the key together), registered with
+  `.manage()` in `lib.rs` — never a global, and empty until the library is unlocked.
   Overlapping commands serialize on that mutex, and each command holds `db::lock` for its
   whole body, so a check and the write that depends on it cannot be interleaved.
 - **⚠️ Commands that touch the database or the disk are `#[tauri::command(async)]`.** A plain

@@ -15,6 +15,13 @@ import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
  * ⚠️ The OS file picker is not driven here (see `support/app.ts`): the commands take a
  * path, and the path is where the real work happens.
  */
+/** The message rather than the throw: a refusal is what these two assertions are about. */
+async function failureOf(running: Promise<unknown>): Promise<string> {
+  return running.then(
+    () => 'it was not refused',
+    (error: Error) => error.message,
+  );
+}
 describe('Import, export and share', () => {
   const directory = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
 
@@ -132,6 +139,29 @@ describe('Import, export and share', () => {
     expect(view.sections[0]?.notes[0]?.language).toBe('txt');
   });
 
+  /**
+   * ⚠️ The export is the one file the library key does not protect: it is meant to reach
+   * another machine, so it carries a key of its own. Read from Node, against the bytes on
+   * disk rather than against what the application says about them.
+   */
+  it('seals an export with a phrase, and will not open it without that phrase', async () => {
+    const sealedPath = join(directory, 'sealed.devbox').replaceAll('\\', '/');
+
+    const written = await bridge.exportNotes(sealedPath, null, 'an export passphrase');
+    expect(written.protected).toBe(true);
+    expect(await bridge.exportIsProtected(sealedPath)).toBe(true);
+    expect(await bridge.exportIsProtected(bundlePath)).toBe(false);
+    expect(readFileSync(sealedPath).includes(Buffer.from('Worth exporting'))).toBe(false);
+
+    const refused = await failureOf(bridge.importNotes(sealedPath));
+    expect(refused).toContain('passphraseRequired');
+
+    const wrong = await failureOf(bridge.importNotes(sealedPath, 'not the phrase'));
+    expect(wrong).toContain('wrongPassphrase');
+
+    const report = await bridge.importNotes(sealedPath, 'an export passphrase');
+    expect(report.notesSkipped).toBeGreaterThan(0);
+  });
   it('greys out the menu entries that have nothing to act on', async () => {
     await fileMenu.open();
     // The entry stays in the DOM and clickable — it carries `aria-disabled`, not `disabled`.

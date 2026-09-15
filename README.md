@@ -12,26 +12,57 @@ palette, where `Enter` copies and the window steps aside:
 
 ![A tour of DevBox: the board of notes, a search narrowing it and quoting the line that matched, a tag filter, a note open in the editor, then the quick-paste palette asking a snippet for its fields](docs/quick-paste.gif)
 
-Everything stays on your machine, in a SQLite file you can copy. Nothing is uploaded, there
-is no account, and the application works with the network off.
+Everything stays on your machine, encrypted with a passphrase you choose and type once at
+launch. Nothing is uploaded, there is no account, and the application works with the network
+off.
 
 ## What it does
 
-| Feature              | What it gives you                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
-| **Quick paste**      | `Ctrl+Alt+P` from any application: search a snippet, `Enter` copies it and the window steps aside |
-| **`{{fields}}`**     | `psql -h {{host}} -p {{port=5432}}` asks for its values before landing in the clipboard           |
-| **Keyboard canvas**  | arrows to move, `Enter` to open, `C` to copy, `P` to pin, `X` to select, `Del` to trash           |
-| **Todo lists**       | a second kind of note: an ordered, tickable list instead of a body                                |
-| **Trash**            | deleting is undoable, and reversible for 30 days                                                  |
-| **Bulk actions**     | select several notes, then move, tag, export or trash them in one go                              |
-| **Tag management**   | rename, merge or drop a tag across the whole library                                              |
-| **Attachments**      | drop a file on the editor or paste an image; open it, save it elsewhere, preview it inline        |
-| **Import / export**  | a `.devbox` archive both ways, attachments included — everything, one space, or the selection     |
-| **Copy as Markdown** | the selection rendered for a pull request, a ticket or a chat message                             |
+| Feature               | What it gives you                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------- |
+| **Quick paste**       | `Ctrl+Alt+P` from any application: search a snippet, `Enter` copies it and the window steps aside |
+| **`{{fields}}`**      | `psql -h {{host}} -p {{port=5432}}` asks for its values before landing in the clipboard           |
+| **Keyboard canvas**   | arrows to move, `Enter` to open, `C` to copy, `P` to pin, `X` to select, `Del` to trash           |
+| **Todo lists**        | a second kind of note: an ordered, tickable list instead of a body                                |
+| **Trash**             | deleting is undoable, and reversible for 30 days                                                  |
+| **Bulk actions**      | select several notes, then move, tag, export or trash them in one go                              |
+| **Tag management**    | rename, merge or drop a tag across the whole library                                              |
+| **Attachments**       | drop a file on the editor or paste an image; open it, save it elsewhere, preview it inline        |
+| **Import / export**   | a `.devbox` archive both ways, attachments included — everything, one space, or the selection     |
+| **Copy as Markdown**  | the selection rendered for a pull request, a ticket or a chat message                             |
+| **Encrypted at rest** | one passphrase at launch; notes and attachments sealed on disk, exports optionally too            |
 
 Syntax highlighting covers eighteen languages, the interface is available in French and
 English, and it ships with a light and a dark theme.
+
+## Your library is encrypted
+
+DevBox asks for a passphrase the first time it runs, and once at every launch after that.
+It is what opens the library, and it is never stored anywhere — not in a keychain, not
+behind a "remember me". While the application runs the key lives in memory and nowhere
+else.
+
+What is sealed on disk: note titles, bodies and sources, checklist items, space names,
+`{{field}}` values, attachment file names, and the attachment files themselves.
+
+| What               | How                                                                                                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Key derivation** | Argon2id, 64 MiB and 3 passes, over a random salt kept beside the database                                                                                                                                         |
+| **Encryption**     | AES-256-GCM, a fresh nonce per write; the authentication tag refuses a tampered value rather than decrypting it into nonsense                                                                                      |
+| **Not sealed**     | tags, dates, ids and the links between rows — what the database filters, sorts and joins on. Sealing them would mean loading the whole library to answer a query, and tag names are the visible cost of that trade |
+
+⚠️ **There is no recovery.** No account, no escrow, no reset: a lost passphrase is a lost
+library. An export written in the clear is the only copy that does not depend on it.
+
+⚠️ **Opening an attachment** writes a decrypted copy to a temporary folder, because the
+program that opens it reads from disk. DevBox deletes those copies when it quits, and
+sweeps whatever survived — a file another application still held, a crash — at the next
+launch.
+
+An export is the one file meant to leave the machine, so it is offered a key of its own:
+give it a passphrase and it travels sealed, attachments included, or write it in the clear
+for a file any DevBox can read. The application asks which, every time, and says which one
+it wrote.
 
 ## Install
 
