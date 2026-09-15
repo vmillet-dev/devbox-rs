@@ -3,20 +3,15 @@ import type { ChainablePromiseElement } from 'webdriverio';
 
 import { readEach, setField, testid, toggleAndWait, waitForCanvas } from '../support/app.js';
 
-/**
- * The notes page: the header above the cards, and the cards themselves. Every selector
- * the scenarios use lives here, so a renamed `data-testid` is one edit.
- */
+/** Every selector the scenarios use lives here, so a renamed `data-testid` is one edit. */
 export const canvas = {
   open: waitForCanvas,
 
   cards: () => $$(testid('note-card')),
 
   /**
-   * ⚠️ Read in **one** call rather than a round trip per card. Enumerating the cards
-   * and then fetching each title leaves a window in which the canvas re-renders, and
-   * the list that comes back mixes two states — the same note read twice, or an
-   * element that no longer exists.
+   * ⚠️ Read in one call: a round trip per card leaves a window in which the canvas
+   * re-renders, and the list that comes back mixes two states.
    */
   async titles(): Promise<string[]> {
     return browser.execute(
@@ -30,15 +25,10 @@ export const canvas = {
   },
 
   /**
-   * ⚠️ Matched in **one** call, for the same reason `titles()` is: a round trip per card
-   * leaves a window in which the canvas re-renders, and the walk then compares titles from
-   * two different views. CI caught it saying `no card titled "Rollout under edit" — found
-   * ["Rollout under edit", …]` — the card it could not find, in the list it printed.
-   *
-   * The card is then addressed by its **id**, so what comes back is resolved against the
+   * ⚠️ The note id behind a title, matched in one call for the same reason `titles()` is.
+   * The card is then addressed by that id, so what comes back is resolved against the
    * canvas as it is now rather than against a position in a list that has moved.
    */
-  /** The note id behind a title, matched in one call. */
   async noteIdWithTitle(title: string): Promise<string> {
     await canvas.waitForCard(title);
 
@@ -59,10 +49,7 @@ export const canvas = {
     return id;
   },
 
-  /**
-   * The card as a **selector**, not as a resolved element: it re-resolves on every
-   * command, so a canvas that re-renders after the lookup costs nothing.
-   */
+  /** A selector and not a resolved element: it re-resolves on every command. */
   async cardWithTitle(title: string) {
     const id = await canvas.noteIdWithTitle(title);
     return $(`${testid('note-card')}[data-note-id="${id}"]`);
@@ -83,9 +70,8 @@ export const canvas = {
   },
 
   /**
-   * Clicks the **title** and not the card: a checklist card carries its tickable items
-   * on a layer over the card button, and a click aimed at the button's centre lands on
-   * an item instead.
+   * ⚠️ Clicks the title and not the card: a checklist card carries its tickable items on
+   * a layer over the card button, and a click at the centre lands on an item.
    */
   async openNote(title: string): Promise<void> {
     const card = await canvas.cardWithTitle(title);
@@ -93,13 +79,7 @@ export const canvas = {
     await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
   },
 
-  /**
-   * The card button itself, which is the click surface a snippet card is opened by.
-   *
-   * `ChainablePromiseElement` and not `Element`: `cardWithTitle` hands back a selector
-   * that re-resolves, so a canvas that re-renders between finding the card and reading it
-   * costs nothing. A resolved element would be the stale reference this used to carry.
-   */
+  /** `ChainablePromiseElement` and not `Element`: a resolved element would go stale. */
   cardButton: (card: ChainablePromiseElement) => card.$(testid('note-card-open')),
 
   cardTags: (card: ChainablePromiseElement) => card.$(testid('note-card-tags')),
@@ -122,25 +102,24 @@ export const canvas = {
     await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
   },
 
-  /** The empty card at the end of the `week` section, which is why that section is always emitted. */
+  /** The empty card at the end of the `week` section, which is why it is always emitted. */
   async createFromGhost(): Promise<void> {
     await $(testid('create-ghost')).click();
     await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
   },
 
   /**
-   * The search crosses the bridge behind a 150 ms debounce, so a spec that asserts
+   * ⚠️ The search crosses the bridge behind a 150 ms debounce, so a spec asserting
    * straight after typing reads the previous view.
    */
   async search(text: string): Promise<void> {
     await setField(testid('search-input'), text);
-    // The condition rather than a guess at how long the debounce plus the round trip
-    // takes: a sleep is either too short, which is a flake, or too long, which is a tax.
+    // The condition rather than a guess at the debounce plus the round trip.
     await waitForCanvas();
   },
 
   async clearSearch(): Promise<void> {
-    // `setValue('')` rather than select-all-then-Backspace: it goes through the element
+    // ⚠️ `setValue('')` rather than select-all-then-Backspace: it goes through the element
     // endpoint, which the embedded driver implements, where key actions are dropped.
     await setField(testid('search-input'), '');
     await waitForCanvas();
@@ -150,10 +129,7 @@ export const canvas = {
   tagPill: (tag: string) => $(`${testid('tag-pill')}[data-tag="${tag}"]`),
   languageChip: (language: string) => $(`${testid('language-chip')}[data-language="${language}"]`),
 
-  /**
-   * The three controls that re-run the query. Clicking them and sleeping is the bet the
-   * flaky failures lost — too short and the spec asserts on the view it replaced.
-   */
+  /** The three controls that re-run the query, each waited on rather than slept past. */
   async applyFilter(key: 'all' | 'pinned' | 'untriaged'): Promise<void> {
     await canvas.filter(key).click();
     await waitForCanvas();

@@ -7,13 +7,7 @@ function typedValue(event: Event): string {
   return (event.target as HTMLInputElement).value;
 }
 
-/**
- * In `features/notes/` and not in `layout/`: a `{{field}}` is notes vocabulary. The
- * panel shows the page without knowing it, through [`SettingsRegistry`].
- *
- * These values are only a **suggestion**: what was typed on a note wins, and a field
- * left empty in the editor shows the variable in grey rather than copying it.
- */
+/** These values are only a suggestion: what was typed on a note wins. */
 @Component({
   selector: 'app-variables-page',
   imports: [TranslocoPipe],

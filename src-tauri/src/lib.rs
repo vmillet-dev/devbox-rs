@@ -1,10 +1,6 @@
-// `pub` is what `tests/` reaches — it is a separate crate and sees nothing else — and
-// what `#[specta::specta]` requires of a module holding commands, since the macro it
-// generates for each one is resolved from the crate root by `collect_commands!`.
-//
-// Everything else is `pub(crate)`, deliberately: `unreachable_pub` and `dead_code` only
-// have something to say about what is not published, and a blanket `pub` silenced both
-// across the whole back end.
+// A module holding commands is `pub` — `#[specta::specta]` resolves its generated macro
+// from the crate root, and `tests/` is a separate crate. Everything else is `pub(crate)`,
+// which is what gives `unreachable_pub` and `dead_code` something to say.
 pub mod attachments;
 pub mod changelog;
 pub mod db;
@@ -37,8 +33,8 @@ use notes::{
 use spaces::{create_space, delete_space, list_spaces, pin_space, rename_space};
 use transfer::{export_notes, export_selection, import_notes, share_notes};
 
-/// Resolved from the manifest and not from the current directory: a relative path
-/// used to write the file next to the repository without saying a word.
+/// ⚠️ Resolved from the manifest: a relative path writes the file next to whatever the
+/// current directory happens to be, without saying a word.
 const BINDINGS_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../src/app/core/ipc/bindings.ts"
@@ -46,13 +42,13 @@ const BINDINGS_PATH: &str = concat!(
 
 /// ⚠️ Not a `#[cfg(test)]`: on Windows the test executable lives in
 /// `target/debug/deps/`, without the `WebView2Loader.dll` that linking `export`
-/// then requires — the test binary no longer starts at all.
+/// then requires — the whole test binary stops starting.
 pub fn export_bindings() -> Result<(), specta_typescript::Error> {
     ipc_builder().export(specta_typescript::Typescript::default(), BINDINGS_PATH)
 }
 
-/// The **single** source of the signatures: this list registers with Tauri
-/// *and* writes `bindings.ts`. A command absent from it exists nowhere.
+/// The single source of the signatures: it registers with Tauri *and* writes
+/// `bindings.ts`. A command absent from it exists nowhere.
 fn ipc_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -96,37 +92,29 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             set_global_shortcuts,
             set_window_behavior,
         ])
-        // Reachable from no command, so exported on its own — with the topic it
-        // travels on, which neither side then spells twice.
+        // Reachable from no command, so exported on its own — with the topic it travels
+        // on, which neither side then spells twice.
         .typ::<desktop::GlobalAction>()
         .constant("GLOBAL_ACTION_EVENT", desktop::ACTION_EVENT)
-        // From `Cargo.toml`, so the front does not keep a second copy of the name,
-        // the author and the repository URL.
+        // From `Cargo.toml`, so the front keeps no second copy of the name.
         .constant("APP_METADATA", app_info::METADATA)
 }
 
-/// ⚠️ **Not** the plugin's default, which is `all()` — and `all()` carries `VISIBLE`.
-/// Quitting from the tray saves a window that is hidden, and the next launch would
-/// restore it hidden: an application that starts with nothing on screen and only a tray
-/// icon to be found by. `DECORATIONS` and `FULLSCREEN` are left out for the opposite
-/// reason — nothing here changes either, so saving them stores noise.
-///
-/// A minimized window is the plugin's own problem and it handles it: its `Moved` and
-/// `Resized` handlers both skip one, which on Windows reports itself at -32000.
+/// ⚠️ Not the plugin's default `all()`, which carries `VISIBLE`: quitting from the tray
+/// saves a hidden window, and the next launch would restore it hidden — an application
+/// that starts with nothing on screen. `DECORATIONS` and `FULLSCREEN` never change here,
+/// so saving them would only store noise.
 const WINDOW_STATE_FLAGS: StateFlags = StateFlags::SIZE
     .union(StateFlags::POSITION)
     .union(StateFlags::MAXIMIZED);
 
-/// Order matters here, and only here: `single_instance` has to come before every
-/// other plugin, and `log` before the plugins that already log during their own
-/// initialisation.
+/// ⚠️ Order matters: `single_instance` before every other plugin, and `log` before the
+/// plugins that already log during their own initialisation.
 fn with_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
     #[allow(unused_mut)]
     let mut builder = builder
-        // A second launch — from the autostart entry, a desktop shortcut, the
-        // installer's "run now" — would otherwise open a second process on the same
-        // SQLite file, and silently lose every global shortcut to the instance
-        // already holding it.
+        // A second launch would otherwise open a second process on the same SQLite file,
+        // and silently lose every global shortcut to the instance already holding them.
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             desktop::reveal(app);
         }))
@@ -152,9 +140,8 @@ fn with_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
                 .build(),
         );
 
-    // The end-to-end harness. `tauri_plugin_log` has already taken the global logger,
-    // so the plugin's own `set_boxed_logger` fails and WDIO captures no backend log —
-    // the log plugin's targets are what to read instead.
+    // ⚠️ The end-to-end harness. `tauri_plugin_log` has already taken the global logger,
+    // so WDIO captures no backend log — read the log plugin's targets instead.
     #[cfg(feature = "e2e")]
     {
         builder = builder
@@ -168,15 +155,14 @@ fn with_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
 /// The plugins that need a handle rather than a builder, the native state, and the
 /// database — in that order, because everything after the connection assumes it.
 fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    // `tauri.conf.json` carries the product name, which is the crate's and is
-    // lowercase; the window wears the name the user is shown everywhere else.
+    // `tauri.conf.json` carries the crate's lowercase product name; the window wears the
+    // name the user is shown everywhere else.
     //
-    // ⚠️ The window is declared `"visible": false` and is shown **here**, because
-    // `tauri-plugin-window-state` restores the geometry from `on_webview_ready` — which
-    // has already run by the time `setup` does. Created visible, the window appeared at
-    // the config's size for ~190 ms and then jumped to the remembered one, measured.
-    // Showing it first, and here rather than from the front end, is also what keeps a
-    // front end that fails to boot from leaving a process with no window at all.
+    // ⚠️ The window is declared `"visible": false` and shown here, because
+    // `tauri-plugin-window-state` restores the geometry from `on_webview_ready`, which
+    // has already run by the time `setup` does — created visible, it shows the config
+    // size and then jumps. Here rather than from the front end, so a front end that
+    // fails to boot does not leave a process with no window at all.
     if let Some(window) = app.get_webview_window("main") {
         window.set_title(app_info::METADATA.name)?;
         window.show()?;
@@ -185,12 +171,8 @@ fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.handle()
         .plugin(tauri_plugin_updater::Builder::new().build())?;
 
-    // "Start with Windows". No launch argument: DevBox started by the system opens as
-    // if started by hand.
-    //
-    // ⚠️ `MacosLauncher` is not macOS code that slipped in — DevBox ships for Windows and
-    // Linux only. The plugin takes it on every platform and ignores it off macOS, so it is
-    // a required argument rather than a dead branch, and deleting it would not compile.
+    // ⚠️ `MacosLauncher` is not macOS code that slipped in: the plugin takes it on every
+    // platform and ignores it off macOS, so deleting it would not compile.
     app.handle().plugin(tauri_plugin_autostart::init(
         tauri_plugin_autostart::MacosLauncher::LaunchAgent,
         None,
@@ -211,9 +193,8 @@ fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Retention applies even if nobody opens the trash, and the second sweep collects
-/// files an interrupted copy left behind. Neither is fatal: the application has to
-/// start.
+/// What makes retention hold even if nobody opens the trash. Neither sweep is fatal:
+/// the application has to start.
 fn sweep(handle: &tauri::AppHandle) {
     let db = handle.state::<db::Db>();
 
@@ -223,9 +204,7 @@ fn sweep(handle: &tauri::AppHandle) {
     }
 }
 
-/// Closing — and, if asked for, minimizing — files the window into the tray: both are
-/// preferences, and both are refused when there is no tray to find the window in
-/// (see `desktop`).
+/// ⚠️ Both are refused when there is no tray to find the window in (see `desktop`).
 fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
     match event {
         tauri::WindowEvent::CloseRequested { api, .. }
@@ -234,7 +213,7 @@ fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
             api.prevent_close();
             let _ = window.hide();
         }
-        // Tauri emits nothing for "minimized": `Resized` is the only way through.
+        // ⚠️ Tauri emits nothing for "minimized": `Resized` is the only way through.
         tauri::WindowEvent::Resized(_)
             if desktop::hides_on_minimize(window.app_handle())
                 && window.is_minimized().unwrap_or(false) =>
@@ -249,12 +228,8 @@ pub fn run() {
     let builder = ipc_builder();
 
     // Not in release: the front-end `src/` does not exist next to an installed binary.
-    // Not fatal either — a debug build launched where that path is not writable has no
-    // reason to die without a window rather than run against the committed bindings.
-    //
     // ⚠️ `eprintln!` and not `log::warn!`: this runs before `tauri_plugin_log` has taken
-    // the global logger, so a logged line would reach the no-op default and vanish —
-    // leaving a stale `bindings.ts` to be discovered at the next compile error instead.
+    // the global logger, so a logged line would reach the no-op default and vanish.
     #[cfg(debug_assertions)]
     if let Err(error) = export_bindings() {
         eprintln!("TypeScript bindings not regenerated: {error}");

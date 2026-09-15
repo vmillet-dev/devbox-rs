@@ -19,15 +19,10 @@ interface Drag {
 }
 
 /**
- * ⚠️ **HTML5 drag and drop does not work here.** Tauri's `dragDropEnabled` is `true` —
- * which is what delivers files dropped on the window to `FileDropService` — so the
- * WebView never sees `dragstart` or `drop`. Reordering is written in pointer events
- * instead; turning the flag off would break attachments. `Alt+↑/↓` does the same from
- * the keyboard, which the linter requires anyway.
- *
- * Like the title and the body, the list is a **local draft** keyed on the note id and
- * not on its object. Ticking, adding, removing and moving commit at once — they are
- * discrete gestures; only typing waits for the `blur`.
+ * ⚠️ HTML5 drag and drop does not work here: Tauri's `dragDropEnabled` is `true` — it is
+ * what delivers dropped files to `FileDropService` — so the WebView never sees
+ * `dragstart` or `drop`. Reordering is pointer events instead, and turning the flag off
+ * would break attachments.
  */
 @Component({
   selector: 'app-checklist-editor',
@@ -39,10 +34,8 @@ interface Drag {
 export class ChecklistEditorComponent {
   readonly items = input.required<readonly ChecklistItem[]>();
   /**
-   * ⚠️ The editor **session**, not the note's id. Materialising a draft changes that id
-   * for the same note, and a draft keyed on it was replayed from a note the store had
-   * only just created — losing whatever had been typed into it a moment earlier, with no
-   * later update able to bring it back, since only a change of source replays it.
+   * ⚠️ The editor session, not the note's id: materialising a draft changes that id for
+   * the same note, and a draft keyed on it is replayed over what was just typed.
    */
   readonly session = input.required<number>();
 
@@ -73,10 +66,6 @@ export class ChecklistEditorComponent {
     this.draft.update((items) => items.map((item, at) => (at === index ? { ...item, text } : item)));
   }
 
-  /**
-   * Inserts after the current row and focuses it: typing a list must be possible
-   * without ever leaving the keyboard.
-   */
   protected insertAfter(index: number): void {
     this.draft.update((items) => [
       ...items.slice(0, index + 1),
@@ -100,10 +89,7 @@ export class ChecklistEditorComponent {
     this.commit();
   }
 
-  /**
-   * Backspace on an empty row removes it instead of doing nothing. `Event` and not
-   * `KeyboardEvent`: a modifier key binding is typed `Event` by the template compiler.
-   */
+  /** `Event` and not `KeyboardEvent`: a modifier binding is typed `Event` by the template compiler. */
   protected onBackspace(event: Event, index: number): void {
     const input = event.target as HTMLInputElement;
     if (input.value !== '' || this.draft().length === 0) return;
@@ -128,9 +114,8 @@ export class ChecklistEditorComponent {
   }
 
   /**
-   * `setPointerCapture` keeps the events on the handle even when the cursor leaves the
-   * row — without it a slightly quick gesture is lost. The call is optional: capture
-   * makes the gesture comfortable, and jsdom, which lacks it, must not fail the drag.
+   * `setPointerCapture` keeps the events on the handle when the cursor leaves the row.
+   * Optional-chained because jsdom lacks it and must not fail the drag.
    */
   protected onPointerDown(event: PointerEvent, index: number): void {
     if (event.button !== 0) return;
@@ -159,7 +144,6 @@ export class ChecklistEditorComponent {
     this.move(drag.from, drag.to);
   }
 
-  /** During a drag: the grabbed row follows the cursor, the others shift by one. */
   protected displayIndex(index: number): number {
     const drag = this.dragging();
     if (!drag) return index;
@@ -172,8 +156,8 @@ export class ChecklistEditorComponent {
   }
 
   /**
-   * Called on a field's `blur`, and by the editor before it closes: Escape, the backdrop
-   * and the close button produce no `blur`, so the last line typed would be lost.
+   * ⚠️ Called on `blur` and by the editor before it closes: Escape, the backdrop and
+   * the close button produce no `blur`, so the last line typed would be lost.
    */
   commit(): void {
     this.itemsChanged.emit(this.draft().map((item) => ({ ...item })));

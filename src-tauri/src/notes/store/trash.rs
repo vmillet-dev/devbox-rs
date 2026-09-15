@@ -1,8 +1,8 @@
-//! The trash's SQL. The retention itself, and what a purge does to the attachment
-//! files, live in `notes::trash` — this module only knows that `deleted_at` decides.
+//! The retention itself, and what a purge does to the attachment files, live in
+//! `notes::trash` — this module only knows that `deleted_at` decides.
 //!
-//! ⚠️ Every read elsewhere filters on `deleted_at IS NULL`, or a trashed note comes
-//! back editable without saying it is on borrowed time.
+//! ⚠️ Every read elsewhere filters on `deleted_at IS NULL`, or a trashed note comes back
+//! editable without saying it is on borrowed time.
 
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
@@ -14,9 +14,9 @@ use crate::error::StorageError;
 use crate::notes::model::Note;
 use crate::notes::trash;
 
-/// ⚠️ Stamps `deleted_at`; the row survives for [`trash::RETENTION`]. [`purge`] is
-/// what erases — `delete` was the same word `spaces::store` and `attachments::store`
-/// use for an irreversible one.
+/// ⚠️ Stamps `deleted_at`; the row survives for [`trash::RETENTION`]. [`purge`] is what
+/// erases — `delete` is the word `spaces::store` and `attachments::store` use for an
+/// irreversible one.
 pub fn trash(
     connection: &mut SqliteConnection,
     id: &str,
@@ -29,8 +29,8 @@ pub fn trash(
     Ok(())
 }
 
-/// Returns what was actually moved: a selection can hold an id gone stale, and
-/// failing the whole batch for one of them would be worse than a partial result.
+/// Returns what was actually moved: a selection can hold an id gone stale, and failing
+/// the whole batch for one of them would be worse than a partial result.
 pub fn trash_many(
     connection: &mut SqliteConnection,
     ids: &[String],
@@ -123,9 +123,8 @@ pub fn trashed_ids(connection: &mut SqliteConnection) -> Result<Vec<String>, Sto
         .load::<String>(connection)?)
 }
 
-/// **Permanent**. Tags and attachments leave by cascade — hence the
-/// `PRAGMA foreign_keys` in `db::configure`; the files on disk are the caller's.
-/// Restricted to trashed notes: nothing may short-circuit the 30-day reprieve.
+/// Permanent. Tags and attachments leave by cascade — hence the `PRAGMA foreign_keys` in
+/// `db::configure`. ⚠️ Restricted to trashed notes: nothing may short-circuit the reprieve.
 pub fn purge(connection: &mut SqliteConnection, ids: &[String]) -> Result<usize, StorageError> {
     if ids.is_empty() {
         return Ok(0);

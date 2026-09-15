@@ -1,8 +1,7 @@
-//! The bytes cross the bridge only on read, as a `data:` URI: the `WebView`'s CSP
-//! forbids loading a local file, and opening the `asset:` protocol to show a
-//! screenshot would be a wide door for a narrow need.
+//! ⚠️ The bytes cross the bridge only on read, as a `data:` URI: the `WebView`'s CSP
+//! forbids loading a local file, and opening the `asset:` protocol to show a screenshot
+//! would be a wide door for a narrow need.
 
-// Commands receive their arguments owned, deserialized from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod model;
@@ -39,8 +38,7 @@ pub(crate) fn directory(app: &AppHandle) -> Result<PathBuf, StorageError> {
     Ok(path)
 }
 
-/// Deletes without reporting: a file already gone is the intended result, and a
-/// purge must not fail because the disk was tidied by hand.
+/// Deletes without reporting: a file already gone is the intended result.
 pub(crate) fn remove_files(directory: &Path, stored_names: &[String]) {
     for name in stored_names {
         let path = directory.join(name);
@@ -52,9 +50,8 @@ pub(crate) fn remove_files(directory: &Path, stored_names: &[String]) {
     }
 }
 
-/// ⚠️ The limit is enforced by the copy itself. Reading `metadata().len()` first and
-/// copying afterwards left the two free to disagree: a file growing between them
-/// landed whole, whatever the limit said.
+/// ⚠️ The limit is enforced by the copy itself: reading `metadata().len()` first leaves
+/// the two free to disagree, and a file growing between them lands whole.
 fn copy_within_limit(source: &str, destination: &Path) -> Result<u32, AppError> {
     let mut reader = std::fs::File::open(source).map_err(|error| file_error(source, &error))?;
     let mut writer =
@@ -87,8 +84,8 @@ pub fn attach_file(
 
     let directory = directory(&app)?;
     let destination = directory.join(attachment.stored_name());
-    // Copy before the database write: a record without a file would show a
-    // broken thumbnail, where a file without a record is swept at startup.
+    // ⚠️ Copy before the database write: a record without a file shows a broken
+    // thumbnail, where a file without a record is swept at startup.
     match copy_within_limit(&path, &destination) {
         Ok(byte_size) => attachment.byte_size = byte_size,
         Err(error) => {
@@ -106,8 +103,8 @@ pub fn attach_file(
     Ok(attachment)
 }
 
-/// Checks the record exists first: opening or copying a file nothing refers to
-/// would be a leak out of the directory.
+/// ⚠️ Checks the record exists first: opening a file nothing refers to would be a leak
+/// out of the directory.
 fn locate(id: &str, app: &AppHandle, db: &Db) -> Result<PathBuf, AppError> {
     let stored_name = {
         let mut connection = lock(db)?;
@@ -178,8 +175,8 @@ pub fn read_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<
     ))
 }
 
-/// The call starts from **Rust**, not the `WebView`: opening a path from the front
-/// end would have meant allowing `opener:allow-open-path` over a whole directory.
+/// ⚠️ The call starts from Rust: opening a path from the front end would mean allowing
+/// `opener:allow-open-path` over a whole directory.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn open_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<(), AppError> {
@@ -192,8 +189,7 @@ pub fn open_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<
     Ok(())
 }
 
-/// The path comes from a native picker; the write stays here, the only place that
-/// knows the directory.
+/// The path comes from a native picker; the write stays here.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn save_attachment(
@@ -209,8 +205,7 @@ pub fn save_attachment(
     Ok(())
 }
 
-/// The bytes do **not** cross the bridge: the clipboard is read natively, where the
-/// image arrives as raw RGBA, then encoded to PNG.
+/// The bytes do not cross the bridge: the clipboard is read natively, as raw RGBA.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn attach_clipboard_image(
@@ -245,8 +240,8 @@ pub fn delete_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Resul
     Ok(())
 }
 
-/// Files no record claims any more: a copy interrupted between `fs::copy` and
-/// the insert leaves one, and so does a trash purge that fails in between.
+/// Files no record claims any more: a copy interrupted between `fs::copy` and the
+/// insert leaves one, and so does a purge that fails in between.
 pub fn sweep_orphan_files(app: &AppHandle, db: &Db) -> Result<usize, StorageError> {
     let directory = directory(app)?;
 
@@ -295,8 +290,7 @@ mod tests {
         std::fs::remove_dir_all(&directory).ok();
     }
 
-    /// The limit is applied by the copy, so a file that grew past it after any
-    /// earlier `metadata` read is still refused rather than stored whole.
+    /// The limit is applied by the copy, so a file that grew past it is still refused.
     #[test]
     fn a_file_over_the_limit_is_refused_and_leaves_nothing_behind() {
         let directory = scratch();

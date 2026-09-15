@@ -1,7 +1,7 @@
 //! ⚠️ The bytes are not here: the database holds a record, and the file lives in
-//! `app_data_dir()/attachments/` under a name **derived from the id** — two captures
-//! called `image.png` must not overwrite each other, and a name from outside has no
-//! business deciding a write path.
+//! `app_data_dir()/attachments/` under a name derived from the id — two captures called
+//! `image.png` must not overwrite each other, and a name from outside has no business
+//! deciding a write path.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -18,7 +18,7 @@ pub const MAX_BYTES: u64 = 10 * 1024 * 1024;
 pub struct Attachment {
     pub id: String,
     pub note_id: String,
-    /// The original name, the one displayed. Never used as a path.
+    /// The original name, the one displayed. ⚠️ Never used as a path.
     pub file_name: String,
     pub mime_type: String,
     /// `u32` and not `u64`: Specta refuses what JSON cannot carry without loss.
@@ -32,8 +32,8 @@ impl Attachment {
     }
 }
 
-/// The extension kept **lowercase and purely alphanumeric**: anything else
-/// (separators, `..`, colons) would escape the attachments directory.
+/// ⚠️ Lowercase and purely alphanumeric: anything else (separators, `..`, colons) would
+/// escape the attachments directory.
 fn extension_of(file_name: &str) -> Option<String> {
     let candidate = file_name.rsplit_once('.')?.1;
     if candidate.is_empty()
@@ -73,8 +73,8 @@ pub fn mime_of(file_name: &str) -> String {
     mime.to_string()
 }
 
-/// The original name, stripped of any path: an import must not be able to show
-/// `../../secrets/key.pem` as though the note had produced it.
+/// ⚠️ Stripped of any path: an import must not be able to show `../../secrets/key.pem`
+/// as though the note had produced it.
 pub fn display_name(path: &str) -> Result<String, ValidationError> {
     let trimmed = path
         .rsplit(['/', '\\'])
@@ -90,8 +90,8 @@ pub fn display_name(path: &str) -> Result<String, ValidationError> {
     Ok(trimmed)
 }
 
-/// The caller supplies a readable timestamp, this guarantees the extension: without
-/// it `mime_of` would answer `application/octet-stream` and skip the preview.
+/// The caller supplies a readable timestamp, this guarantees the extension: without it
+/// `mime_of` would answer `application/octet-stream` and skip the preview.
 pub fn png_name(base: &str) -> String {
     let trimmed = base.trim();
     let stem = if trimmed.is_empty() {
@@ -107,8 +107,7 @@ pub fn png_name(base: &str) -> String {
     }
 }
 
-/// Encodes raw RGBA — what the system clipboard hands over — into PNG: without it
-/// we would store bytes no viewer could open.
+/// Encodes raw RGBA — what the system clipboard hands over — into PNG.
 pub fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, StorageError> {
     let expected = (width as usize)
         .saturating_mul(height as usize)

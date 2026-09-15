@@ -38,9 +38,9 @@ pub fn trashed(note: Note, deleted_at: DateTime<Utc>) -> TrashedNote {
     }
 }
 
-/// ⚠️ The attachment file names are collected before the `DELETE`: afterwards the
-/// cascade has taken the records that carried them, and the files are orphaned on
-/// disk until the next startup sweep.
+/// ⚠️ The attachment file names are collected before the `DELETE`: afterwards the cascade
+/// has taken the records that carried them, and the files are orphaned until the next
+/// startup sweep.
 pub fn purge(app: &AppHandle, db: &Db, ids: Vec<String>) -> Result<usize, AppError> {
     if ids.is_empty() {
         return Ok(0);
@@ -69,8 +69,7 @@ pub fn purge_expired(app: &AppHandle, db: &Db) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Retention applies even if nobody opens the trash. A failure is logged, never
-/// fatal — the application has to start.
+/// What makes retention hold even if nobody opens the trash. Never fatal.
 pub fn sweep_at_startup(app: &AppHandle, db: &Db) {
     if let Err(error) = purge_expired(app, db) {
         log::warn!("Expired trash not purged: {}", error.detail);

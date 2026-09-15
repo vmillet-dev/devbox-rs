@@ -1,6 +1,5 @@
-//! ⚠️ A field name is restricted to `[A-Za-z0-9_-]` on purpose: without it a note
-//! holding Angular template code (`{{ user.name }}`) would demand a form on every
-//! copy.
+//! ⚠️ A field name is restricted to `[A-Za-z0-9_-]` on purpose: without it a note holding
+//! Angular template code (`{{ user.name }}`) would demand a form on every copy.
 
 use std::collections::BTreeMap;
 
@@ -15,11 +14,13 @@ const CLOSE: &str = "}}";
 pub struct Placeholder {
     pub name: String,
     pub default_value: String,
-    /// A value gone orphan — its token renamed in the text — stays out of sight
-    /// here without being erased.
+    /// A value gone orphan — its token renamed in the text — stays out of sight without
+    /// being erased.
     pub value: String,
 }
 
+/// ⚠️ Mirrored by `isVariableName` (`core/model/variable.model.ts`), which only says so
+/// before a badly named row vanishes on save. This is where the rule lives.
 fn is_field_name(name: &str) -> bool {
     !name.is_empty()
         && name
@@ -53,9 +54,9 @@ enum Fragment<'a> {
     },
 }
 
-/// The single walk is the point: [`parse`] and [`fill`] would otherwise each carry
-/// their own idea of where a token starts and ends. An unterminated `{{` ends the
-/// walk, and the remainder — braces included — comes back as one last literal.
+/// One walk, so [`parse`] and [`fill`] cannot each carry their own idea of where a token
+/// starts and ends. An unterminated `{{` ends the walk, and the remainder comes back as
+/// one last literal.
 fn scan(content: &str, mut on_fragment: impl FnMut(Fragment<'_>)) {
     let mut rest = content;
 
@@ -79,8 +80,8 @@ fn scan(content: &str, mut on_fragment: impl FnMut(Fragment<'_>)) {
     on_fragment(Fragment::Literal(rest));
 }
 
-/// The **text** says which fields exist, never the value map: a value whose token
-/// has left the content is not a field, it is waiting for it to come back.
+/// ⚠️ The text says which fields exist, never the value map: a value whose token has left
+/// the content is not a field, it is waiting for it to come back.
 pub fn parse(content: &str, values: &BTreeMap<String, String>) -> Vec<Placeholder> {
     let mut found: Vec<Placeholder> = Vec::new();
 
@@ -104,8 +105,8 @@ pub fn parse(content: &str, values: &BTreeMap<String, String>) -> Vec<Placeholde
     found
 }
 
-/// An empty value is dropped rather than stored: empty means "I keep what the
-/// snippet offers", and a row would freeze that answer the day the default changes.
+/// An empty value is dropped rather than stored: it means "I keep what the snippet
+/// offers", and a row would freeze that answer the day the default changes.
 pub fn normalize_values(values: BTreeMap<String, String>) -> BTreeMap<String, String> {
     values
         .into_iter()
@@ -113,9 +114,7 @@ pub fn normalize_values(values: BTreeMap<String, String>) -> BTreeMap<String, St
         .collect()
 }
 
-/// What was typed on the note first, the **global variable** next, the default
-/// written in the text last: an empty entry overwrites nothing, empty meaning
-/// "I keep what I am offered".
+/// Note value, then global variable, then the default written in the text.
 pub fn resolve(
     globals: &BTreeMap<String, String>,
     values: &BTreeMap<String, String>,
@@ -131,7 +130,7 @@ pub fn resolve(
     resolved
 }
 
-/// A token that is not a field is **left as it is**.
+/// A token that is not a field is left as it is.
 pub fn fill(content: &str, values: &BTreeMap<String, String>) -> String {
     let mut filled = String::with_capacity(content.len());
 

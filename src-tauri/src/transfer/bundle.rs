@@ -1,5 +1,4 @@
-//! Building a bundle from the library and merging one back into it. The commands in
-//! `transfer.rs` open the file and hold the lock; the rules live here.
+//! The commands in `transfer.rs` open the file and hold the lock; the rules live here.
 
 use std::collections::BTreeMap;
 
@@ -14,8 +13,8 @@ use crate::notes::store as notes;
 use crate::spaces::model::Space;
 use crate::spaces::store as spaces;
 
-/// Only the spaces **actually cited** travel with the notes: exporting one space
-/// must not recreate the whole tree for whoever imports it.
+/// Only the spaces actually cited travel with the notes: exporting one space must not
+/// recreate the whole tree for whoever imports it.
 pub fn collect(
     connection: &mut SqliteConnection,
     exported: Vec<Note>,
@@ -33,12 +32,11 @@ pub fn collect(
     })
 }
 
-/// **Merge, never replace**: spaces are matched by name (case-insensitively), and a
-/// note whose id is already taken is counted then set aside. Importing the same file
-/// twice therefore duplicates nothing, which the report says.
+/// Merge, never replace: spaces are matched by name, and a note whose id is already taken
+/// is counted then set aside, so importing the same file twice duplicates nothing.
 ///
-/// ⚠️ One transaction for the whole file: a failure halfway used to leave spaces
-/// created and part of the notes in, with the report lost along with the error.
+/// ⚠️ One transaction for the whole file, or a failure halfway leaves spaces created and
+/// part of the notes in, with the report lost along with the error.
 pub fn merge(
     connection: &mut SqliteConnection,
     incoming: IncomingBundle,
@@ -76,8 +74,8 @@ pub fn merge(
 
             if notes::insert_imported(connection, &note)? {
                 report.notes_imported += 1;
-                // Only what actually came in: re-importing the same file imports
-                // nothing, and would otherwise keep reporting the same degradation.
+                // Only what actually came in, or re-importing the same file would keep
+                // reporting the same degradation.
                 if degraded.contains(&note.id) {
                     report.notes_degraded += 1;
                 }

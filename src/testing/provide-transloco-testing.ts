@@ -2,10 +2,7 @@ import { EnvironmentProviders } from '@angular/core';
 import { provideTransloco } from '@jsverse/transloco';
 import { AppTranslocoLoader } from '@core/services/i18n/transloco-loader';
 
-/**
- * The same Transloco providers as the real app — the bundled loader is already
- * synchronous, so no `TranslocoTestingModule` is needed.
- */
+/** The bundled loader is already synchronous, so no `TranslocoTestingModule` is needed. */
 export function provideTranslocoTesting(): EnvironmentProviders[] {
   return provideTransloco({
     config: {

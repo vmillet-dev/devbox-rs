@@ -32,6 +32,16 @@ non-obvious invariant, or why the obvious approach was rejected. Delete anything
 that restates a signature, narrates the next line, or repeats what
 `docs/architecture.md` already says.
 
+**There is a budget, and it is about 10% of a file's lines.** Past that, a file
+is explaining itself instead of reading — three of them had reached 37%, and it
+was narration every time. Two rules keep it there: a comment answers "what would
+a reader get wrong here?" and nothing else, and it says so in **one or two
+lines**, four at the very most. What a pull request explained — what was tried,
+what broke, which run caught it, how many milliseconds the rejected version cost
+— belongs in the pull request. It is the kind that rots fastest, because it
+describes a state of the code that no longer exists and nothing fails when it
+goes stale. ⚠️ is for the expensive ones only: a trap that costs a reader a day.
+
 `docs/architecture.md` is the detailed architecture reference (front-end structure, state and data-access patterns, i18n, theming, IPC boundary, testing conventions). Read it before making structural changes, and keep it in sync when you make them — it's the canonical place for that documentation, not this file and not the README.
 
 ## Commands

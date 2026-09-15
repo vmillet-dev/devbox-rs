@@ -4,11 +4,7 @@ import { NotesRepository } from '../data/notes.repository';
 import { TagUsage } from '../model/note.model';
 import { NotesRevision } from './notes-revision';
 
-/**
- * Scoped to the **whole corpus** and not to the active space: a tag that drifts (`auth`,
- * `authentication`, `Auth`) drifts everywhere, and mending it in one space would leave
- * the other half in place.
- */
+/** Scoped to the whole corpus: a tag that drifts drifts everywhere. */
 @Injectable({ providedIn: 'root' })
 export class TagsStore {
   private readonly repository = inject(NotesRepository);
@@ -61,7 +57,7 @@ export class TagsStore {
     });
   }
 
-  /** Renaming onto an existing tag **is** a merge: a note cannot carry one twice. */
+  /** Renaming onto an existing tag is a merge: a note cannot carry one twice. */
   async renameSelected(into: string): Promise<boolean> {
     const selection = [...this._selected()];
     if (selection.length === 0 || !into.trim()) return false;

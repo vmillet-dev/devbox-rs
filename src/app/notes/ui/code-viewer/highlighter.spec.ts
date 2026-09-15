@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LANGUAGE_LABELS, LanguageTag } from '@core/model/language.model';
 import { highlightLines, splitHighlightedLines } from './highlighter';
 
-/**
- * ⚠️ `Record`, not `Partial<Record>`: a language added to the Rust enum has to stop this
- * spec compiling. Left partial, the new one would come back uncoloured with nothing
- * saying so — which is the whole failure the grammar table exists to prevent.
- */
+/** ⚠️ `Record`, not `Partial<Record>`: a language added to the Rust enum must stop this compiling. */
 const SAMPLES: Readonly<Record<LanguageTag, string>> = {
   json: '{ "a": 1 }',
   js: 'const a = 1;',

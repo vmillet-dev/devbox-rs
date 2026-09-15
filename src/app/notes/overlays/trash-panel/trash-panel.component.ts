@@ -11,20 +11,14 @@ const SNIPPET_LINES = 2;
 
 interface TrashRow {
   readonly note: TrashedNote;
-  /**
-   * Empty for a todo list: its items do not travel this far, a discarded note being
-   * neither opened nor ticked.
-   */
+  /** Empty for a todo list: its items do not travel this far. */
   readonly snippet: string;
   readonly snippetKey: string | null;
   readonly deletedRef: TranslationRef;
   readonly purgeRef: TranslationRef;
 }
 
-/**
- * The purge deadline is computed at render rather than received as a label: like the
- * cards' relative times, it has to age on screen without a round trip.
- */
+/** Computed at render, like the cards' relative times: it has to age without a round trip. */
 @Component({
   selector: 'app-trash-panel',
   imports: [DialogComponent, TranslocoPipe],
@@ -78,7 +72,7 @@ export class TrashPanelComponent {
   }
 }
 
-/** Rounded **up**: "erased in 1 d" while there is any time left. */
+/** Rounded up: "erased in 1 d" while there is any time left. */
 function purgeRef(purgeAt: Date, now: Date): TranslationRef {
   const days = Math.ceil((purgeAt.getTime() - now.getTime()) / MS_PER_DAY);
 

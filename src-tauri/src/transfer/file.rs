@@ -1,4 +1,4 @@
-//! Reading and writing the export file. Nothing here knows the database.
+//! Nothing here knows the database.
 
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
@@ -9,8 +9,8 @@ use super::model::{Bundle, ExportReport, IncomingBundle};
 use crate::count::saturating_u32;
 use crate::error::{AppError, StorageError};
 
-/// ⚠️ Written beside the target then renamed: `fs::write` truncates first, so an
-/// export that ran out of disk destroyed the file it was overwriting.
+/// ⚠️ Written beside the target then renamed: `fs::write` truncates first, so an export
+/// that ran out of disk destroyed the file it was overwriting.
 pub fn write(path: &str, bundle: &Bundle) -> Result<ExportReport, AppError> {
     let report = ExportReport {
         notes: saturating_u32(bundle.notes.len()),
@@ -39,8 +39,7 @@ pub fn read(path: &str) -> Result<IncomingBundle, AppError> {
     Ok(super::model::read_bundle(&json)?)
 }
 
-/// Same directory as the target, or the rename would cross volumes and stop being
-/// atomic.
+/// ⚠️ Same directory as the target, or the rename crosses volumes and stops being atomic.
 fn staging_path(path: &str) -> PathBuf {
     let target = Path::new(path);
     let name = target
@@ -80,8 +79,7 @@ mod tests {
         directory
     }
 
-    /// A staging file one directory away would make the rename cross volumes, and
-    /// with it stop being atomic — the whole point of writing beside the target.
+    /// A staging file one directory away would make the rename cross volumes.
     #[test]
     fn the_staging_file_sits_next_to_its_target() {
         let target = std::env::temp_dir().join("documents").join("library.json");

@@ -2,11 +2,6 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 
-/**
- * The global error banner. On a desktop app the console is not an interface: a
- * failed write or an uncaught exception has to be visible, or the application
- * simply appears to ignore the action.
- */
 @Component({
   selector: 'app-error-banner',
   imports: [TranslocoPipe],

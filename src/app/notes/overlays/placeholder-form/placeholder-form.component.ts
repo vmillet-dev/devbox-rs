@@ -8,11 +8,9 @@ import {
 } from '@notes/ui/placeholder-fields/placeholder-fields.component';
 
 /**
- * Seeded with the values **already stored** on the note: there is one set per note, and
- * what comes out is copied *and* kept. The values leave raw — `notes::placeholder::fill`
- * decides what an empty field is worth and what is not a field at all.
- *
- * "Copy as is" exists for the note that contains template code without being a snippet.
+ * Seeded with the values already stored on the note, and what comes out is copied and
+ * kept. The values leave raw: `notes::placeholder::fill` decides what an empty field is
+ * worth and what is not a field at all.
  */
 @Component({
   selector: 'app-placeholder-form',
@@ -28,10 +26,7 @@ export class PlaceholderFormComponent {
   readonly rawRequested = output<void>();
   readonly cancelled = output<void>();
 
-  /**
-   * `null` until something is typed: the note then supplies its own values, and copying
-   * them here would freeze them.
-   */
+  /** `null` until something is typed: copying the note's values here would freeze them. */
   private readonly typed = signal<Record<string, string> | null>(null);
 
   protected readonly count = computed(() => this.placeholders().length);

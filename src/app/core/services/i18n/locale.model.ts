@@ -1,13 +1,8 @@
-/**
- * The interface languages and how the system one is read: no Angular here, so the
- * settings model can import it without pulling a service in.
- */
-
 /** The UI display languages — unrelated to `LanguageTag`, which colours notes. */
 export const APP_LOCALES = ['fr', 'en'] as const;
 export type AppLocale = (typeof APP_LOCALES)[number];
 
-/** Transloco's fallback bundle: which file answers when a key is missing from the other. */
+/** Which file answers when a key is missing from the other. */
 export const DEFAULT_LOCALE: AppLocale = 'fr';
 
 /** What `system` is worth when the machine speaks neither language. */
@@ -17,10 +12,7 @@ export function isAppLocale(value: string | null): value is AppLocale {
   return (APP_LOCALES as readonly string[]).includes(value ?? '');
 }
 
-/**
- * The WebView reports the system display language, which is as close to asking the OS as
- * we get without a plugin and an extra round trip in the initializer.
- */
+/** The WebView's report is as close to asking the OS as we get without a plugin. */
 export function resolveSystemLocale(): AppLocale {
   const tags = navigator.languages?.length ? navigator.languages : [navigator.language];
 

@@ -17,18 +17,11 @@ interface CanvasContext {
   readonly move: (direction: FocusDirection) => void;
 }
 
-/**
- * ⚠️ The two used to be separate lists — a `ShortcutGroup` for the sheet and a `switch`
- * for the handler — and nothing kept them in step. Here documenting a key and binding
- * it are the same act.
- */
+/** Documenting a key and binding it are the same act: the sheet is derived from this. */
 interface CanvasKey {
   readonly keys: readonly string[];
   readonly labelKey: string;
-  /**
-   * Absent means the key is only **documented** here and handled elsewhere — `Ctrl+K`
-   * belongs to the search field.
-   */
+  /** Absent means the key is only documented here and handled elsewhere. */
   readonly on?: readonly string[];
   /** Ctrl (or ⌘) must be held. Without it, no modifier may be. */
   readonly ctrl?: boolean;
@@ -58,10 +51,7 @@ function when(condition: boolean, action: () => void): boolean {
   return true;
 }
 
-/**
- * In reading order, which is also the order the sheet lists them in. The letters are
- * deliberately bare: they only serve here, where no typing is in progress.
- */
+/** In reading order, which is also the order the sheet lists them in. */
 const CANVAS_KEYS: readonly CanvasKey[] = [
   { keys: ['Ctrl', 'K'], labelKey: 'shortcuts.canvas.search' },
   {
@@ -114,8 +104,7 @@ const CANVAS_KEYS: readonly CanvasKey[] = [
     keys: ['Escape'],
     labelKey: 'shortcuts.canvas.clearSelection',
     on: ['Escape'],
-    // Falls through: the selection first, then the filters. Both are states the canvas
-    // is *in*, and Escape is the key for leaving one.
+    // Falls through: the selection first, then the filters.
     run: ({ selection, canvas }) =>
       when(selection.hasSelection(), () => selection.clearSelection()) ||
       when(canvas.matched() !== null, () => canvas.clearFilters()),
@@ -136,9 +125,8 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Applied as a **host directives** of the notes page, so its element is the canvas
- * itself — which is how it measures the card grid without the page handing it a list
- * of sections. It acts only when no modal has the keyboard and no field has focus.
+ * A host directive of the notes page, so its element is the canvas itself — which is
+ * how it measures the card grid without being handed a list of sections.
  */
 @Directive({
   selector: '[appCanvasKeyboard]',
@@ -183,10 +171,7 @@ export class CanvasKeyboardDirective {
     };
   }
 
-  /**
-   * The positions are **measured**: the column count depends on the window width, and
-   * each section has its own number of cards.
-   */
+  /** Measured: the column count depends on the window width. */
   private moveFocus(direction: FocusDirection): void {
     const boxes = this.cardBoxes();
     if (boxes.length === 0) return;

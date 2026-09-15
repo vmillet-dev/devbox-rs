@@ -55,10 +55,6 @@ describe('SearchBoxComponent', () => {
     expect(decorations.every((span: Element) => span.getAttribute('aria-hidden') === 'true')).toBe(true);
   });
 
-  /**
-   * The count was computed in Rust, crossed the bridge and was thrown away on arrival —
-   * `NotesView.matched` decided one boolean and was never shown.
-   */
   describe('the count', () => {
     function matchedText(): string {
       const node = fixture.nativeElement.querySelector('[data-testid="search-matched"]');

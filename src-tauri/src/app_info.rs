@@ -1,16 +1,15 @@
-//! What the application says about itself: the standard `Cargo.toml` fields through
-//! `CARGO_PKG_*`, and what Cargo has no field for through `[package.metadata.devbox]`
-//! and `rust-toolchain.toml`, both read by `build.rs`.
+//! ⚠️ What Cargo has no field for comes from `[package.metadata.devbox]` and
+//! `rust-toolchain.toml`, both read by `build.rs` — Cargo does not pass
+//! `[package.metadata]` to the crate.
 //!
-//! Its own version and Tauri's are absent on purpose — the front asks the running
-//! binary, which cannot go stale the way a committed `bindings.ts` can.
+//! Its own version and Tauri's are absent on purpose: the front asks the running binary,
+//! which cannot go stale the way a committed `bindings.ts` can.
 
 use serde::Serialize;
 use specta::Type;
 
-/// Reaches the front as the `APP_METADATA` constant of `bindings.ts`, so the titlebar
-/// and the about card read it synchronously — a command would show an empty name for
-/// the length of a round trip.
+/// A constant of `bindings.ts` and not a command: the titlebar reads the name
+/// synchronously, and a round trip would show an empty one first.
 #[derive(Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppMetadata {

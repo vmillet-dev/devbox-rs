@@ -4,13 +4,7 @@ import { TranslationRef } from '../i18n/translation-ref.model';
 /** Long enough to be read, short enough not to sit across the screen. */
 export const STATUS_TTL_MS = 6000;
 
-/**
- * Separate from `ErrorNotifier`, which carries a breakdown that stays until it is
- * dismissed: mixing the two in one banner would make a success read as a problem.
- *
- * The message is a **translation reference**, never a sentence: the caller does not know
- * the active language.
- */
+/** Separate from `ErrorNotifier`: in one banner, a success would read as a problem. */
 @Injectable({ providedIn: 'root' })
 export class StatusNotifier {
   private readonly _status = signal<TranslationRef | null>(null);

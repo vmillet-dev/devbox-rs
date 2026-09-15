@@ -104,8 +104,7 @@ describe('UpdateStore', () => {
 
     await store.dismiss();
 
-    // ⚠️ The offer closes, the **knowledge** stays: the dot is fed by the latter, and
-    // hiding a suggestion is not the same as there being nothing to suggest.
+    // ⚠️ The offer closes, the knowledge stays: the dot is fed by the latter.
     expect(store.offered()).toBeNull();
     expect(store.update()?.version).toBe('0.2.0');
     expect(store.status()).toBe('idle');

@@ -15,12 +15,9 @@ export const CLIPBOARD_ADAPTER = new InjectionToken<ClipboardAdapter>('CLIPBOARD
 });
 
 /**
- * The CSP locks the WebView to `'self'` and `navigator.clipboard` is unusable there:
+ * ⚠️ The CSP locks the WebView to `'self'` and `navigator.clipboard` is unusable there:
  * everything goes through the plugin, which throws outside Tauri — hence the success
- * boolean rather than an exception.
- *
- * ⚠️ The copy acknowledgement is placed **here** and not in the five callers, which is
- * what makes it settable by one boolean.
+ * boolean. The copy acknowledgement lives here and not in the five callers.
  */
 @Injectable({ providedIn: 'root' })
 export class ClipboardService {

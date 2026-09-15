@@ -7,8 +7,7 @@ import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
  * `notes.space_id` carries `ON DELETE CASCADE`, so deleting a space without a refuge
- * would take its notes with it. The refuge is enforced in the model and in the schema;
- * only a real database proves the cascade never fires.
+ * would take its notes with it. Only a real database proves the cascade never fires.
  */
 describe('Spaces', () => {
   let homeId = '';
@@ -17,10 +16,8 @@ describe('Spaces', () => {
     await canvas.open();
     homeId = await homeSpaceId();
 
-    // ⚠️ The first scenario asserts on "the only space there is", which is a property of
-    // the **whole database** — and one application serves the whole run, so an earlier
-    // spec file's space is still there. The precondition is established here rather than
-    // inherited, which also makes this file runnable on its own.
+    // ⚠️ The first scenario asserts on "the only space there is", a property of the whole
+    // database — and one application serves the whole run. Established, never inherited.
     for (const space of await bridge.listSpaces()) {
       if (space.id !== homeId) {
         await bridge.deleteSpace(space.id, homeId);
@@ -29,11 +26,7 @@ describe('Spaces', () => {
     await reloadCanvas();
   });
 
-  /**
-   * The canvas is left filtered on a space this file then deletes, and the active space
-   * outlives the page. Every later file asserts on titles, so it is put back on "all
-   * spaces" here rather than each of them guessing what this one left behind.
-   */
+  /** The active space outlives the page, and every later file asserts on titles. */
   after(async () => {
     await spaces.open();
     await spaces.allOption().click();
@@ -75,12 +68,9 @@ describe('Spaces', () => {
   });
 
   /**
-   * Name order was the only order there had ever been, so the space opened
-   * every morning sat wherever its initial fell. Pinning hoists it, the way it does a
-   * note on the canvas — and the order is SQL's, which only a real database can prove.
-   *
-   * ⚠️ Its own space, named to sort **last**: Mocha runs a nested suite after its
-   * siblings, and by then the tests above have renamed and deleted theirs.
+   * The order is SQL's, which only a real database can prove. ⚠️ Its own space, named to
+   * sort last: Mocha runs a nested suite after its siblings, and by then the tests above
+   * have renamed and deleted theirs.
    */
   describe('pinning one to the head of the list', () => {
     const name = 'Zzz pinned';
@@ -117,10 +107,7 @@ describe('Spaces', () => {
       expect(loose.at(-1)?.pinned).toBe(false);
     });
 
-    /**
-     * ⚠️ A rename answers with the row it read back rather than with what it was sent,
-     * which is what keeps it from quietly reporting a pinned space as unpinned.
-     */
+    /** ⚠️ A rename answers with the row it read back, not with what it was sent. */
     it('survives a rename', async () => {
       await spaces.open();
       await spaces.togglePin(id);
@@ -146,8 +133,7 @@ describe('Spaces', () => {
     await canvas.waitForCard('Only in Lectures');
     expect(await canvas.titles()).toEqual(['Only in Lectures']);
 
-    // The switcher wears the space it is filtering on, which is the only thing on
-    // screen saying the canvas is not showing everything.
+    // The only thing on screen saying the canvas is not showing everything.
     expect(await spaces.label()).toContain('Lectures');
   });
 

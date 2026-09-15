@@ -14,8 +14,7 @@ pub const DB_FILE_NAME: &str = "devbox.sqlite3";
 /// `SqliteConnection` is not `Sync`: overlapping commands serialize on this mutex.
 pub type Db = Mutex<SqliteConnection>;
 
-/// A poisoned mutex means a command panicked while holding it: better to say so
-/// than to panic again.
+/// A poisoned mutex means a command panicked while holding it.
 pub(crate) fn lock(db: &Db) -> Result<MutexGuard<'_, SqliteConnection>, StorageError> {
     db.lock().map_err(|_| StorageError::Unavailable)
 }
@@ -40,12 +39,10 @@ pub fn open_in_memory() -> Result<SqliteConnection, StorageError> {
 }
 
 fn configure(connection: &mut SqliteConnection) -> Result<(), StorageError> {
-    // ⚠️ `foreign_keys` is set **per connection** and is off by default: without it
-    // the `ON DELETE CASCADE` clauses are inert. WAL: a reader no longer blocks a writer.
-    //
-    // `busy_timeout` covers the window where a second process still holds the file —
-    // a stale instance shutting down, a backup tool reading it — where the default of
-    // zero surfaces `SQLITE_BUSY` as a storage error on the very first write.
+    // ⚠️ `foreign_keys` is set per connection and is off by default: without it the
+    // `ON DELETE CASCADE` clauses are inert. `busy_timeout` covers the window where a
+    // second process still holds the file, where the default of zero surfaces
+    // `SQLITE_BUSY` as a storage error on the very first write.
     connection.batch_execute(
         "PRAGMA foreign_keys = ON;
          PRAGMA journal_mode = WAL;
@@ -55,10 +52,10 @@ fn configure(connection: &mut SqliteConnection) -> Result<(), StorageError> {
     Ok(())
 }
 
-/// ⚠️ Milliseconds are always written, even when zero. `created_at` and `updated_at`
-/// are TEXT columns sorted lexicographically, and the canvas orders on them: `.`
-/// (0x2E) precedes `Z` (0x5A), so `09:00:00.500Z` would sort **before** `09:00:00Z`
-/// — exactly what chrono's default `SecondsFormat::AutoSi` produces.
+/// ⚠️ Milliseconds are always written, even when zero. `created_at` and `updated_at` are
+/// TEXT columns sorted lexicographically, and the canvas orders on them: `.` (0x2E)
+/// precedes `Z` (0x5A), so `09:00:00.500Z` would sort before `09:00:00Z` — exactly what
+/// chrono's default `SecondsFormat::AutoSi` produces.
 pub mod iso8601 {
     use chrono::{DateTime, SecondsFormat, Utc};
 
@@ -155,13 +152,12 @@ mod tests {
         std::panic::set_hook(hook);
 
         // `unwrap_err()` would need the guard to be `Debug`, which `SqliteConnection`
-        // is not; and `unwrap()` in `lock` would take the process down on the next command.
+        // is not.
         let Err(error) = lock(&db) else {
             panic!("a poisoned mutex must be reported, not returned");
         };
 
         assert!(matches!(error, StorageError::Unavailable));
-        // And it still reaches the front end as the code it always did.
         assert!(matches!(
             AppError::from(error).code,
             ErrorCode::StorageUnavailable

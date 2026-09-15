@@ -12,10 +12,7 @@ describe('TitlebarComponent', () => {
     return [...fixture.nativeElement.querySelectorAll('.locale-option')];
   }
 
-  /**
-   * The buttons show the *active* language, which with no choice made is the system one —
-   * and jsdom's is `en-US`. Pinned here so "French by default" means something.
-   */
+  /** With no choice made the active language is the system one, and jsdom's is `en-US`. */
   function stubSystemLanguage(tag: string): void {
     Object.defineProperty(navigator, 'languages', { value: [tag], configurable: true });
     Object.defineProperty(navigator, 'language', { value: tag, configurable: true });

@@ -1,7 +1,6 @@
 /**
- * The column count is only known on screen: it depends on the window width, and sections
- * do not all hold the same number of cards. Hence **measured positions** — rows are
- * deduced from equal `top`s, and the nearest column is picked on `left`.
+ * The column count is only known on screen, so positions are measured: rows are deduced
+ * from equal `top`s, and the nearest column is picked on `left`.
  */
 export interface CardBox {
   readonly top: number;
@@ -38,7 +37,7 @@ function rowsOf(boxes: readonly CardBox[]): readonly Row[] {
   return rows;
 }
 
-/** `current` when the move leaves the grid: stopping silently beats wrapping around. */
+/** `current` when the move leaves the grid: stopping beats wrapping around. */
 export function nextFocusIndex(
   boxes: readonly CardBox[],
   current: number,

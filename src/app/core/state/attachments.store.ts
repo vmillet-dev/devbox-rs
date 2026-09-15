@@ -9,12 +9,9 @@ import { Attachment } from '../model/note.model';
 import { NotesStore } from './notes.store';
 
 /**
- * It follows the open note itself rather than being told to: the page used to chain
- * "save the draft, then re-point the store, then attach", and forgetting the middle
- * step attached nothing without saying so.
- *
- * ⚠️ The bytes are never loaded in bulk: `preview` asks for **one** at a time, and a
- * `data:` URI weighs a third more than the file.
+ * Follows the open note itself rather than being told to. ⚠️ The bytes are never loaded
+ * in bulk: `preview` asks for one at a time, and a `data:` URI weighs a third more
+ * than the file.
  */
 @Injectable({ providedIn: 'root' })
 export class AttachmentsStore {
@@ -35,10 +32,10 @@ export class AttachmentsStore {
   readonly zoomed = this._zoomed.asReadonly();
 
   constructor() {
-    // Attachments follow the **persisted** note: a draft has no row to carry them.
+    // Attachments follow the persisted note: a draft has no row to carry them.
     effect(() => void this.openFor(this.notes.persistedNoteId()));
 
-    // A drop is a window event, not a DOM one.
+    // ⚠️ A drop is a window event, not a DOM one.
     const drops = inject(FileDropService);
     inject(DestroyRef).onDestroy(drops.on((paths) => void this.addDroppedFiles(paths)));
   }
@@ -82,9 +79,9 @@ export class AttachmentsStore {
   }
 
   /**
-   * ⚠️ The store is re-pointed **here** rather than waiting for the effect on
-   * `persistedNoteId`, which only runs on the next detection cycle — after the write
-   * that follows, which would attach nothing and not say so. `openFor` is idempotent.
+   * ⚠️ Re-pointed here rather than by the effect on `persistedNoteId`, which only runs
+   * on the next detection cycle — after the write that follows, which would then attach
+   * nothing and not say so. `openFor` is idempotent.
    */
   private async targetNote(): Promise<string | null> {
     const noteId = await this.notes.materialiseDraft();
@@ -101,17 +98,13 @@ export class AttachmentsStore {
   readonly previewData = this._previewData.asReadonly();
   readonly count = computed(() => this._attachments().length);
 
-  /**
-   * Resolved here and not in the strip: the lightbox lives in the page, above the
-   * editor, and cannot see what the strip computed for itself.
-   */
+  /** Resolved here: the lightbox lives in the page and cannot see the strip's state. */
   readonly previewed = computed<Attachment | null>(() => {
     const id = this._previewId();
     return this._attachments().find((attachment) => attachment.id === id) ?? null;
   });
 
-  /** A different note clears the preview: showing the previous one's screenshot
-   * would be worse than nothing. */
+  /** A different note clears the preview: the previous screenshot would be worse than nothing. */
   async openFor(noteId: string | null): Promise<void> {
     if (this._noteId() === noteId) return;
 
@@ -131,8 +124,7 @@ export class AttachmentsStore {
     return this.attachPath(path);
   }
 
-  /** The file name is announced: without it, attaching a screenshot is only visible
-   * by looking for it in the strip. */
+  /** The file name is announced: otherwise attaching is only visible in the strip. */
   private async write(action: (noteId: string) => Promise<Attachment>): Promise<boolean> {
     const noteId = this._noteId();
     if (noteId === null || this._isBusy()) return false;
@@ -158,7 +150,7 @@ export class AttachmentsStore {
     return true;
   }
 
-  /** An **already named** file — the one just dropped: the picker is not reopened. */
+  /** An already named file — the one just dropped: the picker is not reopened. */
   async attachPath(path: string): Promise<boolean> {
     return this.write((noteId) => this.repository.attach(noteId, path));
   }
@@ -237,8 +229,7 @@ export class AttachmentsStore {
   }
 }
 
-/** Dated to the second, so two captures in a row do not look alike in the list. The
- * extension is added on the Rust side. */
+/** Dated to the second; the extension is added on the Rust side. */
 function screenshotName(now: Date): string {
   const stamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '-');
   return `capture-${stamp}`;

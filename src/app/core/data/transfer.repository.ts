@@ -3,10 +3,7 @@ import { commands } from '@core/ipc/bindings';
 import { unwrap } from '@core/ipc/ipc.error';
 import { ExportReport, ImportReport } from '../model/note.model';
 
-/**
- * The file is written and read back **on the Rust side**: the front end only picks a
- * path, or there would be a second serialisation format to keep in TypeScript.
- */
+/** The file is written and read back on the Rust side; the front only picks a path. */
 @Injectable({ providedIn: 'root' })
 export class TransferRepository {
   /** A `null` `spaceId` exports the whole corpus. */

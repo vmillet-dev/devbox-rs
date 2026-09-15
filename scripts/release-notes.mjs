@@ -1,22 +1,18 @@
 #!/usr/bin/env node
 // Release notes from the pull requests merged since the last tag.
 //
-// Two modes and one grammar: `generate` splices a `## [x.y.z] - DATE` section into
-// CHANGELOG.md, `extract` reads one back out. The body of the GitHub release comes from
-// `extract` at the tag rather than from a job output, so the file baked into the binary
-// (`src-tauri/src/changelog.rs` embeds it with `include_str!`) and the page on github.com
-// cannot end up saying two different things.
-//
-// The grammar is the one `src-tauri/src/changelog/model.rs` parses: `## ` opens a release,
-// `### ` a category, `- ` an entry. A category with no entry fails `cargo test`.
+// `generate` splices a `## [x.y.z] - DATE` section into CHANGELOG.md, `extract` reads one
+// back out. ⚠️ The GitHub release body comes from `extract` at the tag rather than from a
+// job output, so the file baked into the binary and the page on github.com cannot say two
+// different things. The grammar is the one `src-tauri/src/changelog/model.rs` parses.
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 /**
- * Label and title-prefix routing. The order of this table is the order of the sections on
- * screen *and* the precedence when a pull request wears two mapped labels.
+ * ⚠️ The order of this table is the order of the sections on screen and the precedence
+ * when a pull request wears two mapped labels.
  */
 export const SECTIONS = [
   { id: 'added', heading: '✨ Added', labels: ['enhancement', 'feature'], kinds: ['feat'] },
@@ -38,10 +34,9 @@ export const SECTIONS = [
 ];
 
 /**
- * Subjects that describe the release rather than something in it.
- *
- * `(?![A-Za-z])` and not `\b`: after `chore(release)` comes a `:`, and two non-word
- * characters carry no word boundary between them. It still refuses `Bump versioning`.
+ * Subjects that describe the release rather than something in it. ⚠️ `(?![A-Za-z])` and
+ * not `\b`: after `chore(release)` comes a `:`, and two non-word characters carry no word
+ * boundary between them.
  */
 const RELEASE_COMMIT = /^(chore\(release\)|chore: release|release:|bump version|bump to)(?![A-Za-z])/i;
 
@@ -71,8 +66,8 @@ const KINDS = new Map([
 ]);
 
 /**
- * The prefix and its length, or `null` when the subject opens on prose. The word has to be a
- * **known** kind: without that, `Note: the panel is read-only` would lose its first word.
+ * The prefix and its length, or `null` when the subject opens on prose. The word has to be
+ * a known kind, or `Note: the panel is read-only` would lose its first word.
  */
 function matchPrefix(subject) {
   const match = /^(?:\(\s*([A-Za-z]+)\s*\)|([A-Za-z]+)(?:\([^)]*\))?\s*:)\s*/.exec(subject);
@@ -97,11 +92,8 @@ export function isReleaseCommit(subject) {
 }
 
 /**
- * `(refactor) Drop the DTO aliases (#56)` → `Drop the DTO aliases`.
- *
- * A `summary: details` title is cut at the colon — pull request titles here run to 180
- * characters and the panel renders an entry as one line of plain text. The head must be a
- * phrase of its own for that to be safe: `Note: the panel is read-only` keeps its `Note`.
+ * `(refactor) Drop the DTO aliases (#56)` → `Drop the DTO aliases`. A `summary: details`
+ * title is cut at the colon, since the panel renders an entry as one line of plain text.
  */
 export function cleanTitle(subject) {
   const prefix = matchPrefix(subject);
@@ -118,11 +110,8 @@ export function cleanTitle(subject) {
 }
 
 /**
- * Which section an entry belongs to, and **by which link of the chain** — the second half is
- * what the dry-run summary prints, and the only way to see that a pull request is misfiled
- * because it forgot its `Closes #42`.
- *
- * Pure on purpose: the caller does the GraphQL and hands over what it found.
+ * Which section an entry belongs to, and by which link of the chain — the second half is
+ * what the dry-run summary prints. Pure on purpose: the caller does the GraphQL.
  */
 export function sectionFor({ labels = [], issueLabels = [], title = '' }) {
   const claim = (worn) => {
@@ -158,9 +147,8 @@ export function groupEntries(entries) {
 }
 
 /**
- * The same contract as `the_shipped_file_parses_into_something_to_show`: a release with no
- * entry, or a heading with no bullet under it, turns `cargo test` red once committed — and
- * the commit this workflow makes is never seen by the CI, so this is the only place to say so.
+ * ⚠️ A release with no entry, or a heading with no bullet under it, turns `cargo test` red
+ * once committed — and the commit this workflow makes is never seen by CI.
  */
 export function assertRenderable(groups) {
   if (groups.length === 0) {
@@ -197,13 +185,13 @@ export function splice(markdown, version, release) {
   const first = lines.findIndex((line) => line.startsWith('## '));
   const head = (first === -1 ? lines : lines.slice(0, first)).join('\n').trimEnd();
   const tail = first === -1 ? '' : lines.slice(first).join('\n').trimEnd();
-  // Trimmed on every side and rejoined here: the blank lines are this function's to place,
-  // and a file ending on two newlines is one Prettier would rewrite on the next lint.
+  // The blank lines are this function's to place, and a file ending on two newlines is
+  // one Prettier would rewrite on the next lint.
   const body = release.trimEnd();
   return `${head}\n\n${body}\n${tail ? `\n${tail}\n` : ''}`;
 }
 
-/** The `### ` blocks of one release, without its `## ` heading: the body of a release page. */
+/** The `### ` blocks of one release, without its `## ` heading. */
 export function extractSection(markdown, version) {
   const lines = markdown.split('\n');
   const start = lines.findIndex((line) => headingOf(version).test(line.trim()));
@@ -216,10 +204,8 @@ export function extractSection(markdown, version) {
   return `${(end === -1 ? rest : rest.slice(0, end)).join('\n').trim()}\n`;
 }
 
-// ---------------------------------------------------------------------------------------
-// Everything below talks to git and to GitHub. Nothing above does, which is what makes the
+// Everything below talks to git and to GitHub; nothing above does, which is what makes the
 // table, the chain and the splice testable without a network.
-// ---------------------------------------------------------------------------------------
 
 const run = (command, args) => execFileSync(command, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
 
@@ -267,12 +253,10 @@ function subjectsSince(tag) {
 }
 
 /**
- * Asked for by number rather than listed: five pull requests of this repository were merged
- * into intermediate branches and never landed as a commit on `main`, so any listing — by date
- * or by page — reports work this release does not carry.
- *
- * `closingIssuesReferences` is GraphQL-only, and it is the whole point of the call: the issues
- * are labelled here, the pull requests almost never are.
+ * ⚠️ Asked for by number rather than listed: a pull request merged into an intermediate
+ * branch never lands as a commit on `main`, so any listing reports work this release does
+ * not carry. `closingIssuesReferences` is GraphQL-only and is the point of the call — the
+ * issues are labelled here, the pull requests almost never are.
  */
 function pullRequests(numbers) {
   const index = new Map();
@@ -287,8 +271,8 @@ function pullRequests(numbers) {
     labels(first: 20) { nodes { name } }
     closingIssuesReferences(first: 5) { nodes { number labels(first: 20) { nodes { name } } } }`;
 
-  // Batched so one query stays well under the node limit, and asked by alias so a number that
-  // is not a pull request comes back as one null instead of failing the whole call.
+  // Batched to stay under the node limit, and asked by alias so a number that is not a
+  // pull request comes back as one null instead of failing the whole call.
   for (let start = 0; start < numbers.length; start += 50) {
     const batch = numbers.slice(start, start + 50);
     const query = `{ repository(owner: "${owner}", name: "${name}") {
@@ -340,7 +324,7 @@ function entriesFor(subjects, index) {
   return entries;
 }
 
-/** What the dry run is for: every entry, where it landed, and which link of the chain put it there. */
+/** What the dry run is for: every entry, where it landed, and what put it there. */
 function renderSummary({ version, date, since, section, entries }) {
   const rows = entries
     .map((entry) => `| ${entry.number ? `#${entry.number}` : '—'} | ${entry.text} | ${entry.via} |`)

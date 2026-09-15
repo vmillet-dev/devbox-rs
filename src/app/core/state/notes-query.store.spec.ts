@@ -23,8 +23,7 @@ describe('NotesQueryStore', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
     vi.restoreAllMocks();
-    // The stores report failures through console.error on purpose; silence it
-    // so a deliberately failing test doesn't look like a crash.
+    // The stores report failures through console.error on purpose.
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
@@ -90,8 +89,7 @@ describe('NotesQueryStore', () => {
       const { canvas, repository } = await createNotesHarness([createNote()]);
       const before = repository.queryCount;
 
-      // Catches a `sameQueryParams` missing its languages clause: the resource would
-      // compare the params equal and never refetch.
+      // Catches a `sameQueryParams` missing its languages clause.
       canvas.toggleLanguage('json');
       await awaitQuery(repository, before);
 
@@ -129,11 +127,7 @@ describe('NotesQueryStore', () => {
     });
   });
 
-  /**
-   * `queryParams` builds a fresh object literal and reads `clock.now()`, while `resource`
-   * compares its parameters by identity: only the `equal` comparator keeps a clock tick
-   * from firing a full IPC round trip, and the retained view would hide it.
-   */
+  /** Only the `equal` comparator keeps a clock tick from firing a full IPC round trip. */
   describe('clock sensitivity', () => {
     async function createStoreWithClock(now: WritableSignal<Date>): Promise<NotesHarness> {
       const repository = new FakeNotesRepository([createNote()]);
@@ -182,18 +176,14 @@ describe('NotesQueryStore', () => {
     });
   });
 
-  /**
-   * The search, the tags and the languages were each undone where they were set — three
-   * bands of the header, one gesture apiece. This is the way out in one.
-   */
   describe('clearing the filters', () => {
     it('drops the search, the tags and the languages together', async () => {
       const { canvas, repository } = await createNotesHarness([createNote()]);
       canvas.setSearchQuery('deploy');
       canvas.toggleTag('urgent');
       canvas.toggleLanguage('json');
-      // ⚠️ Waited for: the params are a `computed` feeding a `resource`, so three setters
-      // undone before it runs would collapse to no change at all and prove nothing.
+      // ⚠️ Waited for: three setters undone before the `computed` runs would collapse to
+      // no change at all and prove nothing.
       await vi.waitFor(() => expect(repository.lastQuery?.search).toBe('deploy'));
       const before = repository.queryCount;
 
@@ -207,10 +197,7 @@ describe('NotesQueryStore', () => {
       expect(canvas.searchQuery()).toBe('');
     });
 
-    /**
-     * ⚠️ Not through `setSearchQuery`: its debounce would leave the canvas filtered for
-     * another 150 ms after the user asked it not to be.
-     */
+    /** ⚠️ Not through `setSearchQuery`: its debounce would leave the canvas filtered. */
     it('takes the search out of the query without waiting for the debounce', async () => {
       const { canvas, repository } = await createNotesHarness([createNote()]);
       canvas.setSearchQuery('deploy');
@@ -224,13 +211,9 @@ describe('NotesQueryStore', () => {
     });
 
     /**
-     * ⚠️ Clearing has to **cancel** the pending call, not merely set the signals past it.
-     * A keystroke from a moment ago is still on its way; it lands 150 ms later and puts
-     * the query back, so the canvas filters itself again with an empty field to explain
-     * it. Setting the two signals alone left exactly that.
-     *
-     * Real timers here, and a real wait: the bug needs the debounce to actually elapse,
-     * and faking it only proves the assertion ran before the timer did.
+     * ⚠️ Clearing has to cancel the pending call, not merely set the signals past it: a
+     * keystroke still on its way lands 150 ms later and puts the query back. Real timers,
+     * and a real wait — faking them only proves the assertion ran before the timer did.
      */
     it('drops a keystroke still in flight when the filters are cleared', async () => {
       const { canvas, repository } = await createNotesHarness([createNote()]);
@@ -261,8 +244,8 @@ describe('NotesQueryStore', () => {
 
   describe('search debounce', () => {
     beforeEach(() => {
-      // Only Date and timers: faking requestAnimationFrame would hang the
-      // zoneless scheduler in whenStable().
+      // ⚠️ Only Date and timers: faking requestAnimationFrame hangs the zoneless
+      // scheduler in whenStable().
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     });
 

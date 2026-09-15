@@ -5,9 +5,8 @@ import { Space } from '../model/space.model';
 import { NotesRevision } from './notes-revision';
 
 /**
- * The active space is a **filter**, and `null` is not a waiting state but a choice —
- * "all spaces". No "All" entry exists on the data side: it would be a phantom space
- * notes could be filed into by mistake.
+ * ⚠️ `null` is not a waiting state but a choice — "all spaces". No "All" entry exists on
+ * the data side: it would be a phantom space notes could be filed into.
  */
 @Injectable({ providedIn: 'root' })
 export class SpacesStore {
@@ -29,8 +28,7 @@ export class SpacesStore {
 
   private readonly _activeSpaceId = signal<string | null>(null);
 
-  /** `null` means "all spaces". An unknown id falls back to it rather than hiding
-   * every note. */
+  /** An unknown id falls back to "all spaces" rather than hiding every note. */
   readonly activeSpaceId = computed<string | null>(() => this.activeSpace()?.id ?? null);
 
   readonly activeSpace = computed<Space | null>(() => {
@@ -56,10 +54,7 @@ export class SpacesStore {
     this._activeSpaceId.set(id);
   }
 
-  /**
-   * Uniqueness is **not** checked here: only storage sees the real state of the
-   * database, and its refusal comes back as a translated code.
-   */
+  /** Uniqueness is not checked here: only storage sees the real state of the database. */
   async createSpace(name: string): Promise<Space | null> {
     const trimmed = name.trim();
     if (!trimmed) return null;
@@ -95,9 +90,8 @@ export class SpacesStore {
   }
 
   /**
-   * ⚠️ Reloads rather than patching the one row. Pinning changes the **order** of the
-   * list, and the order is the back end's — putting the returned space back where it
-   * was would leave it flagged and still buried.
+   * ⚠️ Reloads rather than patching the one row: pinning changes the order of the list,
+   * and the order is the back end's.
    */
   async togglePinned(id: string): Promise<boolean> {
     const current = this.spaces().find((space) => space.id === id);
@@ -112,13 +106,9 @@ export class SpacesStore {
     return true;
   }
 
-  /**
-   * `targetSpaceId` becomes active: the notes have just landed there, and falling
-   * back to "all spaces" would lose sight of where they went.
-   */
+  /** `targetSpaceId` becomes active: the notes have just landed there. */
   async deleteSpace(id: string, targetSpaceId: string): Promise<boolean> {
-    // A space cannot be its own refuge. The back end refuses it too; this guard only
-    // saves a round trip.
+    // The back end refuses this too; the guard only saves a round trip.
     if (id === targetSpaceId || !this.spaces().some((space) => space.id === targetSpaceId)) {
       return false;
     }

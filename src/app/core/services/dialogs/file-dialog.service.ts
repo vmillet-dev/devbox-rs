@@ -3,10 +3,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import type { OpenDialogOptions, SaveDialogOptions } from '@tauri-apps/plugin-dialog';
 import { APP_INFO } from '@core/services/app-info/app-info.service';
 
-/**
- * A token rather than a direct call, for the same practical reason as `CLIPBOARD_ADAPTER`:
- * the Angular builder bundles the modules before Vitest sees them.
- */
+/** A token rather than a direct call, for the same reason as `CLIPBOARD_ADAPTER`. */
 export interface FileDialogAdapter {
   open(options: OpenDialogOptions): Promise<string | string[] | null>;
   save(options: SaveDialogOptions): Promise<string | null>;
@@ -17,14 +14,9 @@ export const FILE_DIALOG_ADAPTER = new InjectionToken<FileDialogAdapter>('FILE_D
   factory: () => ({ open, save }),
 });
 
-/** The exchange format's filter, shared by import and export. */
 const BUNDLE_FILTER = { name: APP_INFO.name, extensions: ['json'] };
 
-/**
- * `null` covers both a cancellation and the plugin being unavailable (outside Tauri it
- * throws): either way the caller has nothing to open, and an exception would force it to
- * tell two non-choices apart.
- */
+/** `null` covers both a cancellation and the plugin being unavailable. */
 @Injectable({ providedIn: 'root' })
 export class FileDialogService {
   private readonly adapter = inject(FILE_DIALOG_ADAPTER);
@@ -54,10 +46,7 @@ export class FileDialogService {
     }
   }
 
-  /**
-   * `multiple: false` is asked of the plugin, but its return type stays a union: the
-   * array is ruled out here so callers handle one path only.
-   */
+  /** `multiple: false` is asked for, but the plugin's return type stays a union. */
   private async pick(options: OpenDialogOptions): Promise<string | null> {
     try {
       const chosen = await this.adapter.open(options);

@@ -20,10 +20,8 @@ import {
 } from './note.mapper';
 
 /**
- * The way in to the notes: no component or store touches a data source otherwise.
- *
- * `query` returns a view **already filtered and grouped**, and there is deliberately no
- * method handing back the raw list, so no caller is tempted to re-filter.
+ * ⚠️ `query` returns a view already filtered and grouped, and there is deliberately no
+ * method handing back the raw list: one would invite re-filtering on the front.
  */
 @Injectable({ providedIn: 'root' })
 export class NotesRepository {
@@ -88,18 +86,12 @@ export class NotesRepository {
     return unwrap('delete_tags', await commands.deleteTags([...tags]));
   }
 
-  /**
-   * Returns the note as persisted: `updatedAt` is **unchanged** there, filling a field
-   * not being editing the note.
-   */
+  /** `updatedAt` is unchanged: filling a field is not editing the note. */
   async setPlaceholderValues(id: string, values: Record<string, string>): Promise<Note> {
     return toNote(unwrap('set_placeholder_values', await commands.setPlaceholderValues(id, values)));
   }
 
-  /**
-   * **Global variables included**: a field left empty falls back to the variable before
-   * the default written in the text. Hence the database read, and hence the `Result`.
-   */
+  /** Global variables included, which is why this reads the database. */
   async fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
     return unwrap('fill_placeholders', await commands.fillPlaceholders(content, values));
   }
@@ -108,10 +100,7 @@ export class NotesRepository {
     return unwrap('list_global_placeholders', await commands.listGlobalPlaceholders());
   }
 
-  /**
-   * Stores the **whole** set: what is not sent is what the user removed. An empty value
-   * is not stored — it means "I keep what the snippet offers".
-   */
+  /** Stores the whole set. An empty value means "keep what the snippet offers". */
   async saveVariables(values: Record<string, string>): Promise<Record<string, string>> {
     return unwrap('set_global_placeholders', await commands.setGlobalPlaceholders(values));
   }

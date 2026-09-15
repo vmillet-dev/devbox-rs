@@ -15,12 +15,8 @@ import { FocusTrapDirective } from '@shared/directives/focus-trap.directive';
 
 /**
  * The frame every modal shares: scrim, focus trap, `role="dialog"`, Escape and the
- * backdrop click. Each dialog used to recopy all six, which made an accessibility fix a
- * twelve-file change and let two open dialogs answer the same Escape.
- *
- * What a shell cannot guess — how wide the panel is, the gap between its blocks, its
- * padding — are CSS custom properties a consumer sets on the `app-dialog` element. No
- * measurement travels through an `input()`, and none is spelled in a template.
+ * backdrop click. What a shell cannot guess — width, gap, padding — are CSS custom
+ * properties a consumer sets on the `app-dialog` element, never an `input()`.
  */
 @Component({
   selector: 'app-dialog',
@@ -43,10 +39,7 @@ export class DialogComponent implements OnInit {
   readonly labelledBy = input<string>();
   readonly label = input<string>();
 
-  /**
-   * `false` while an operation cannot be interrupted — installing an update replaces the
-   * files on disk.
-   */
+  /** `false` while an operation cannot be interrupted. */
   readonly dismissible = input(true);
 
   readonly closed = output<void>();
@@ -59,10 +52,8 @@ export class DialogComponent implements OnInit {
 
   /**
    * Joining the stack is the moment the dialog opens: an `@if` in the page is what puts
-   * one on screen, so there is no separate "open" to listen for.
-   *
-   * ⚠️ `ngOnInit` and not the constructor: `layer` is a required input, which has no value
-   * yet while the component is being built.
+   * one on screen. ⚠️ `ngOnInit` and not the constructor — `layer` is a required input
+   * and has no value yet while the component is being built.
    */
   ngOnInit(): void {
     this.stack.push(this, this.rung());

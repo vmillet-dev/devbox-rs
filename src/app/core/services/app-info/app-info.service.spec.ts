@@ -2,12 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_INFO, AppInfoService } from './app-info.service';
 
-/**
- * `getVersion()` and `openUrl()` belong to the Tauri core and to a plugin, so there is no
- * token to substitute. They are not mocked either: `vi.mock` on a Tauri package is
- * unreliable here, and the case that matters is the one jsdom reproduces for free — no
- * bridge at all.
- */
+/** Not mocked: `vi.mock` on a Tauri package is unreliable, and jsdom gives the no-bridge case free. */
 describe('AppInfoService', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -22,10 +17,8 @@ describe('AppInfoService', () => {
   });
 
   it('carries what Cargo.toml declares, down to the capability scope', () => {
-    // ⚠️ Outside the scope declared for `opener:allow-open-url`, the call is
-    // refused at runtime, and nothing says so before then. The values come from the
-    // manifest through `bindings.ts`, so this is what catches a manifest edit that
-    // leaves the capability behind.
+    // ⚠️ Outside the scope declared for `opener:allow-open-url` the call is refused at
+    // runtime, and nothing says so before then.
     expect(APP_INFO.repository).toBe('https://github.com/vmillet-dev/devbox-rs');
     expect(APP_INFO.name).toBe('DevBox');
     expect(APP_INFO.author).toBe('Valentin MILLET');

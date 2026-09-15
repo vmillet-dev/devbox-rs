@@ -1,10 +1,7 @@
 /**
- * Between the **generated** wire types and the model the app reasons in. Nothing is
- * redeclared here: the `Wire*` imports below are the structs tauri-specta wrote from the
- * Rust side, and this file is only what generation cannot cover — **JSON has no date
- * type**, so every `Date` arrives and leaves as an ISO 8601 string. The conversions
- * spread the wire object and override only the dates, so a scalar added on the Rust side
- * costs nothing here.
+ * What generation cannot cover: JSON has no date type, so every `Date` arrives and
+ * leaves as an ISO 8601 string. The conversions spread the wire object and override
+ * only the dates, so a scalar added on the Rust side costs nothing here.
  */
 import type {
   Attachment as WireAttachment,
@@ -31,7 +28,6 @@ import {
   TrashedNote,
 } from '../model/note.model';
 
-/** A break between what the bridge delivers and what the front can read. */
 export class ContractError extends Error {
   constructor(field: string, value: unknown) {
     super(`Broken contract: field "${field}" is unusable (${JSON.stringify(value)})`);
@@ -48,10 +44,7 @@ function parseIsoDate(value: string, field: string): Date {
   return date;
 }
 
-/**
- * `toISOString()` throws a bare `RangeError` on an `Invalid Date`, without saying which
- * field is at fault.
- */
+/** `toISOString()` throws a bare `RangeError`, without saying which field is at fault. */
 export function toIsoString(date: Date, field: string): string {
   if (Number.isNaN(date.getTime())) {
     throw new ContractError(field, date);
@@ -94,19 +87,15 @@ function toFooter(dto: WireNoteFooter): NoteFooter {
     case 'age':
       return { kind: 'age', at: parseIsoDate(dto.at, 'footer.at') };
     default:
-      // Only fires when an older front end meets a newer back end — the switch is
-      // exhaustive at compile time — and saying so beats a blank footer.
+      // Only an older front end against a newer back end: exhaustive at compile time.
       throw new ContractError('footer.kind', (dto satisfies never as { kind: string }).kind);
   }
 }
 
 /**
- * ⚠️ `placeholderValues` is dropped on purpose: the front end reads what was typed
- * through `placeholders[].value`, already paired with the field the text carries. A
- * second, unpaired copy would invite reading a value whose token has left the content.
- *
- * The arrays are aliased rather than copied: this runs for every note of every view on
- * every keystroke, and the model types are `readonly`.
+ * ⚠️ `placeholderValues` is dropped on purpose: the front reads what was typed through
+ * `placeholders[].value`, already paired with the field the text carries. A second,
+ * unpaired copy would invite reading a value whose token has left the content.
  */
 export function toNote({ placeholderValues: _stored, ...dto }: WireNote): Note {
   return {
@@ -121,10 +110,6 @@ export function toNote({ placeholderValues: _stored, ...dto }: WireNote): Note {
   };
 }
 
-/**
- * Narrower than a `Note` on purpose: a trashed note is restored or purged, never
- * opened, so nothing decorated travels this far.
- */
 export function toTrashedNote(dto: WireTrashedNote): TrashedNote {
   return {
     id: dto.id,
@@ -132,7 +117,6 @@ export function toTrashedNote(dto: WireTrashedNote): TrashedNote {
     title: dto.title,
     language: dto.language,
     content: dto.content,
-    // Copied here, unlike `toNote`: the panel opens on demand over a handful of rows.
     tags: [...dto.tags],
     deletedAt: parseIsoDate(dto.deletedAt, 'deletedAt'),
     purgeAt: parseIsoDate(dto.purgeAt, 'purgeAt'),
@@ -144,7 +128,6 @@ export function toAttachment(dto: WireAttachment): Attachment {
   return { ...dto, createdAt: parseIsoDate(dto.createdAt, 'createdAt') };
 }
 
-/** The wire draft wants mutable arrays; the model holds `readonly` ones. */
 export function toWireNoteDraft(draft: NoteDraft): WireNoteDraft {
   return {
     ...draft,
@@ -155,8 +138,8 @@ export function toWireNoteDraft(draft: NoteDraft): WireNoteDraft {
 }
 
 /**
- * A key left out is a field the patch does not touch; a key sent as `null` would
- * overwrite it — hence the filtering, and hence `#[specta(optional)]` on the Rust side.
+ * ⚠️ A key left out is a field the patch does not touch; a key sent as `null` would
+ * overwrite it — hence the filtering, and `#[specta(optional)]` on the Rust side.
  */
 export function toWireNotePatch(patch: NotePatch): WireNotePatch {
   const { lifecycle, tags, items, ...scalars } = patch;
@@ -164,7 +147,6 @@ export function toWireNotePatch(patch: NotePatch): WireNotePatch {
 
   if (lifecycle !== undefined) dto.lifecycle = toWireLifecycle(lifecycle);
   if (tags !== undefined) dto.tags = [...tags];
-  // Copied item by item: a patch is the last thing to hold these objects.
   if (items !== undefined) dto.items = items.map((item) => ({ ...item }));
 
   return dto;

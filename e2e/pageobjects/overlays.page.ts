@@ -41,18 +41,14 @@ export const spaces = {
   },
 
   /**
-   * The refuge is mandatory: without a target the notes would leave with the space.
-   *
-   * ⚠️ `setNativeValue` and not `selectByAttribute`, like every other `<select>` here.
-   * It happens to work either way today — the delete button reads `targetSelect.value`
-   * off a template ref — but the day that control becomes signal-bound, the driver's
+   * ⚠️ `setNativeValue` and not `selectByAttribute`, like every other `<select>` here: it
+   * works either way today, but the day the control becomes signal-bound the driver's
    * missing `change` would silently delete with the wrong refuge.
    */
   /** From the same panel as the rename and the delete, which the ⋯ opens. */
   /**
-   * ⚠️ Closes behind itself. The edit panel **replaces** the menu rather than sitting
-   * over it, so the dropdown is still there afterwards and `open()` — which checks for
-   * exactly that — would do nothing, leaving the next caller in the panel.
+   * ⚠️ Closes behind itself: the edit panel replaces the menu rather than sitting over it,
+   * so `open()` would find the dropdown already showing and leave the next caller here.
    */
   async togglePin(id: string): Promise<void> {
     await $(`${testid('space-edit')}[data-space-id="${id}"]`).click();
@@ -94,14 +90,10 @@ export const trash = {
     await confirmTwice($(testid('trash-empty')));
   },
 
-  /**
-   * The note id, matched in **one** call and then used as a selector — like
-   * `canvas.cardWithTitle`, and for the same reason: a walk comparing titles one round
-   * trip at a time compares them across a re-render.
-   */
+  /** Matched in one call and used as a selector, like `canvas.cardWithTitle`. */
   async rowWithTitle(title: string) {
-    // Waited for, not read once: the panel fetches its rows across the bridge, and a
-    // single read that lands early reports a row missing that is merely late.
+    // Waited for, not read once: a single read that lands early reports a row missing
+    // that is merely late.
     await browser.waitUntil(async () => (await trash.titles()).includes(title), {
       timeout: 10_000,
       timeoutMsg: `no trash row titled "${title}" ever appeared`,
@@ -149,17 +141,13 @@ export const palette = {
 export const fieldsForm = {
   form: () => $(testid('placeholder-form')),
 
-  /**
-   * ⚠️ Scoped to the form. `placeholder-input` is the same hook in the editor's fields
-   * panel, and a bare `$()` returns whichever comes first in the DOM — which is the
-   * panel. See `editor.field`.
-   */
+  /** ⚠️ Scoped to the form: `placeholder-input` is the same hook in the editor's panel. */
   field: (name: string) =>
     $(testid('placeholder-form')).$(`${testid('placeholder-input')}[data-field="${name}"]`),
 
   submit: () => $(testid('placeholder-submit')).click(),
 
-  /** ⚠️ Copies **and dismisses**: there is no form left to cancel afterwards. */
+  /** ⚠️ Copies and dismisses: there is no form left to cancel afterwards. */
   copyRaw: () => $(testid('placeholder-copy-raw')).click(),
 
   cancel: () => $(testid('placeholder-cancel')).click(),
@@ -181,7 +169,7 @@ export const tagManager = {
     await field.setValue(value);
   },
 
-  /** Submits the form rather than clicking, so the `<button type="submit">` path is the one taken. */
+  /** Submits the form rather than clicking, so the `type="submit"` path is the one taken. */
   apply: () => submitFormOf(testid('tag-target')),
 
   isApplyDisabled: async () => (await $(testid('tag-apply')).getAttribute('aria-disabled')) === 'true',

@@ -52,9 +52,8 @@ export const settings = {
   close: () => $(testid('settings-close')).click(),
 
   /**
-   * The preference controls are addressed by their `id`, which is not a test hook but
-   * the `for` target of their own `<label>` — it cannot be renamed without breaking the
-   * association, which makes it as stable as a `data-testid`.
+   * Addressed by their `id`, which is the `for` target of their own `<label>` and cannot
+   * be renamed without breaking the association.
    */
   control: CONTROL,
 
@@ -80,11 +79,8 @@ export const variables = {
   names: (): Promise<string[]> => readEach(testid('variable-row'), 'value', testid('variable-name')),
 
   /**
-   * ⚠️ Waits for the value to **reach the back end**, not for a plausible number of
-   * milliseconds. The panel commits on blur and the write crosses the bridge, so the
-   * 200 ms sleep that used to stand here was a bet — and a Windows runner lost it: the
-   * note was re-read before the variable existed and reported the snippet's own default
-   * (`5432` where `6543` was expected), then the next scenario found no row to remove.
+   * ⚠️ Waits for the value to reach the back end, not for a plausible number of
+   * milliseconds: the panel commits on blur and the write crosses the bridge.
    */
   async add(name: string, value: string): Promise<void> {
     const last = await clickToAddRow(testid('variable-add'), testid('variable-row'));
@@ -99,9 +95,8 @@ export const variables = {
   },
 
   async remove(name: string): Promise<void> {
-    // The row has to **be there** before it can be found. Reading once and giving up is
-    // how this reported `no variable row named "port" — found ["port"]`: the second read,
-    // the one in the error message, saw the row the first had missed.
+    // The row has to be there before it can be found: reading once and giving up reports
+    // a row missing that the error message then prints.
     await browser.waitUntil(async () => (await variables.names()).includes(name), {
       timeout: 10_000,
       timeoutMsg: `no variable row named "${name}" ever appeared`,

@@ -3,10 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 import { TagUsage } from '@core/model/note.model';
 
-/**
- * One destination field for both renaming **and** merging: in the database it is the
- * same operation, and two fields would suggest two mechanisms.
- */
+/** One field for renaming and merging: in the database it is the same operation. */
 @Component({
   selector: 'app-tag-manager',
   imports: [DialogComponent, TranslocoPipe],

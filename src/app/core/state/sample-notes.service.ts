@@ -12,8 +12,8 @@ const SEEDED_KEY = 'devbox.notes.samplesSeeded';
 const DEADLINE_DAYS = 7;
 
 /**
- * Code, so untranslated — and untranslatable: Transloco reads `{{name}}` as an
- * interpolation and would replace a snippet's fields with empty strings.
+ * ⚠️ Untranslatable: Transloco reads `{{name}}` as an interpolation and would replace
+ * a snippet's fields with empty strings.
  */
 const PSQL_SNIPPET = 'psql -h {{host}} -p {{port=5432}} -U {{user}} -d {{database}}';
 
@@ -24,10 +24,6 @@ increment(): void {
   this.count.update((value) => value + 1);
 }`;
 
-/**
- * Keyed by name rather than positional: inserting a key can no longer shift every
- * sample's text by one.
- */
 const KEYS = {
   spaceName: 'notes.samples.space',
   welcomeTitle: 'notes.samples.welcome.title',
@@ -52,10 +48,8 @@ const KEYS = {
 type SampleTexts = Record<keyof typeof KEYS, string>;
 
 /**
- * An empty canvas is the worst possible introduction, and a virgin database has no
- * space, so not even a note can be created. These four carry one feature each and
- * are ordinary notes — editing or trashing them is the point. Their text comes from
- * the front end, so they arrive in the language the application starts in.
+ * A virgin database has no space, so not even a note can be created. Their text comes
+ * from the front end, so they arrive in the language the application starts in.
  */
 @Injectable({ providedIn: 'root' })
 export class SampleNotesService {
@@ -66,17 +60,15 @@ export class SampleNotesService {
   private readonly clock = inject(ClockService);
 
   /**
-   * Two guards, not one: the marker alone would re-seed anyone whose preferences
-   * file went missing, "no space at all" alone the day the last space disappears.
-   * Together they only ever match a database that has never been written to.
+   * ⚠️ Two guards, not one: the marker alone would re-seed anyone whose preferences file
+   * went missing, "no space at all" alone the day the last space disappears. Together
+   * they only ever match a database that has never been written to.
    */
   async seedIfFirstRun(): Promise<boolean> {
     if (this.preferences.read(SEEDED_KEY) !== null) return false;
 
     try {
       if ((await this.spaces.loadAll()).length > 0) {
-        // An installation that predates the samples: nothing to offer, and nothing
-        // to come back and check on every launch.
         this.preferences.write(SEEDED_KEY, 'skipped');
         return false;
       }
@@ -99,7 +91,7 @@ export class SampleNotesService {
     const text = await this.texts();
 
     const space = await this.spaces.create({ name: text.spaceName });
-    // Written before the notes: a failure halfway through leaves an incomplete set
+    // ⚠️ Written before the notes: a failure halfway through leaves an incomplete set
     // rather than a second full one on the next launch.
     this.preferences.write(SEEDED_KEY, 'true');
 
@@ -111,7 +103,6 @@ export class SampleNotesService {
         content: text.welcomeContent,
         source: text.welcomeSource,
         tags: [text.devboxTag],
-        // Pinned so the "pinned" section is not an empty heading on the first screen.
         pinned: true,
         lifecycle: { kind: 'permanent' },
         kind: 'snippet',
@@ -155,15 +146,13 @@ export class SampleNotesService {
         source: text.codeSource,
         tags: [text.angularTag, text.exampleTag],
         pinned: false,
-        // The one sample with a deadline: it lights the ⏳ badge and gives the quick
-        // filter something to find.
         lifecycle: { kind: 'expires', at: this.deadline() },
         kind: 'snippet',
         items: [],
       },
     ];
 
-    // Sequential on purpose: `created_at` orders the canvas.
+    // ⚠️ Sequential on purpose: `created_at` orders the canvas.
     for (const draft of drafts) {
       await this.notes.create(draft);
     }
@@ -171,10 +160,7 @@ export class SampleNotesService {
     return true;
   }
 
-  /**
-   * End of the local day, like the editor's date field: midnight would make a note
-   * dated today expired on the spot.
-   */
+  /** End of the local day: midnight would make a note dated today expired on the spot. */
   private deadline(): Date {
     const at = new Date(this.clock.now());
     at.setDate(at.getDate() + DEADLINE_DAYS);

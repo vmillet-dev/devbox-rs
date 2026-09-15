@@ -5,8 +5,8 @@ import { Attachment } from '../model/note.model';
 import { toAttachment } from './note.mapper';
 
 /**
- * The bytes are only read on demand: `read` answers a `data:` URI, the one form an
- * `<img>` accepts under the WebView's CSP, and it weighs a third more than the file.
+ * ⚠️ `read` answers a `data:` URI, the one form an `<img>` accepts under the WebView's
+ * CSP. It weighs a third more than the file, so the bytes are only read on demand.
  */
 @Injectable({ providedIn: 'root' })
 export class AttachmentsRepository {
@@ -31,10 +31,7 @@ export class AttachmentsRepository {
     unwrap('save_attachment', await commands.saveAttachment(id, path));
   }
 
-  /**
-   * The bytes do not travel up here: the native side reads the clipboard, encodes to
-   * PNG and writes the file itself.
-   */
+  /** The bytes never cross the bridge: the native side re-reads the clipboard itself. */
   async attachClipboardImage(noteId: string, fileName: string): Promise<Attachment> {
     return toAttachment(
       unwrap('attach_clipboard_image', await commands.attachClipboardImage(noteId, fileName)),

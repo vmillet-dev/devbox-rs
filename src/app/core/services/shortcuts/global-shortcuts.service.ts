@@ -5,12 +5,9 @@ import { SettingsStore } from '@core/services/settings/settings.store';
 import { DEFAULT_SHORTCUTS, ShortcutBindings } from './shortcut.model';
 
 /**
- * ⚠️ The native side can only fail silently — first come, first served — and a log line is
- * not an interface: without this message, pressing the key does nothing and nothing says
- * why.
- *
- * All three travel together because the native command takes them as a block; only the
- * palette is settable.
+ * ⚠️ A global shortcut is first-come, first-served across the machine and the loser gets
+ * no error, so without this message pressing the key does nothing and nothing says why.
+ * All three travel together because the native command takes them as a block.
  */
 @Injectable({ providedIn: 'root' })
 export class GlobalShortcutsService {
@@ -18,12 +15,7 @@ export class GlobalShortcutsService {
   private readonly settings = inject(SettingsStore);
   private readonly injector = inject(Injector);
 
-  /**
-   * Pushes the shortcuts now, then on every preference change.
-   *
-   * ⚠️ Called from `provideAppInitializer`, so outside a constructor: the injector is
-   * passed explicitly rather than inferred from the caller.
-   */
+  /** ⚠️ Called outside a constructor, so the injector is passed explicitly. */
   start(): void {
     effect(
       () => {
@@ -35,7 +27,7 @@ export class GlobalShortcutsService {
 
   private async apply(bindings: ShortcutBindings): Promise<void> {
     try {
-      // A command with no `Result` on the Rust side: it throws when the bridge is absent.
+      // No `Result` on the Rust side: it throws when the bridge is absent.
       const taken = await commands.setGlobalShortcuts(bindings);
       if (taken.length > 0) {
         this.notifier.notify({
@@ -43,7 +35,7 @@ export class GlobalShortcutsService {
         });
       }
     } catch {
-      // Outside Tauri (jsdom): there is no global shortcut to take.
+      // Outside Tauri: there is no global shortcut to take.
     }
   }
 }

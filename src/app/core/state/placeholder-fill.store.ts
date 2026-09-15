@@ -6,20 +6,13 @@ import { NotesQueryStore } from './notes-query.store';
 import { NotesStore } from './notes.store';
 import { PaletteStore } from './palette.store';
 
-/**
- * What the editor asks to be filled: its **draft** body and the values typed in the
- * panel, composed at the moment of the click — anything computed ahead of time would be
- * stale after the next keystroke.
- */
+/** Composed at the moment of the click: anything computed ahead would be stale. */
 export interface FillRequest {
   readonly content: string;
   readonly values: Record<string, string>;
 }
 
-/**
- * The filling itself belongs to `notes::placeholder::fill`; what is here is the order
- * of operations, the same in all three cases: fill, copy, and **keep** the values.
- */
+/** The filling belongs to `notes::placeholder::fill`; what is here is fill, copy, keep. */
 @Injectable({ providedIn: 'root' })
 export class PlaceholderFillStore {
   private readonly notes = inject(NotesStore);
@@ -85,10 +78,7 @@ export class PlaceholderFillStore {
     }
   }
 
-  /**
-   * The acknowledgement goes through the status banner rather than the button's tick:
-   * the text only exists once the bridge has been crossed.
-   */
+  /** The status banner and not the button's tick: the text exists only after a round trip. */
   async copyFilled(request: FillRequest): Promise<void> {
     const filled = await this.notes.fillPlaceholders(request.content, request.values);
 

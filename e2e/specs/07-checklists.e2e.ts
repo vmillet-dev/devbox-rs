@@ -6,10 +6,9 @@ import { clipboardText, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * A todo list has items and no body: `note_items` is keyed by position, so every write
- * replaces the whole list. Reordering is pointer events plus `Alt+↑/↓`, because HTML5
- * drag and drop receives nothing in this WebView — the keyboard path is the one a test
- * can drive, and the one that has to work anyway.
+ * `note_items` is keyed by position, so every write replaces the whole list. ⚠️ Reordering
+ * is pointer events plus `Alt+↑/↓`, because HTML5 drag and drop receives nothing in this
+ * WebView — the keyboard path is the one a test can drive.
  */
 describe('Todo lists', () => {
   const title = 'Release checklist';
@@ -54,8 +53,8 @@ describe('Todo lists', () => {
   });
 
   it('ticks an item from the card, without opening it', async () => {
-    // The items sit on a layer above the card button, which is why they can be clicked
-    // at all — a <div> inside a <button> would be invalid HTML.
+    // ⚠️ The items sit on a layer above the card button, which is why they can be clicked
+    // at all — a `<div>` inside a `<button>` would be invalid HTML.
     const card = await canvas.cardWithTitle(title);
     await card.$('[data-testid="note-card-item"]').click();
     await browser.pause(600);
@@ -66,8 +65,7 @@ describe('Todo lists', () => {
 
   it('offers a drag handle that says what it moves', async () => {
     await canvas.openNote(title);
-    // ⚠️ Asserted, not dragged — see `editor.grip`. The handle is a pointer-capture
-    // affordance; `Alt+↑/↓` below is its keyboard twin and the testable one.
+    // ⚠️ Asserted, not dragged — see `editor.grip`.
     const grip = await editor.grip(0);
     expect(await grip.isExisting()).toBe(true);
     expect(await grip.getAttribute('aria-label')).toContain('Tag the release');
@@ -119,9 +117,8 @@ describe('Todo lists', () => {
 
     const copied = await clipboardText();
     if (copied === null) {
-      // Another process holds the clipboard, or this runner has no selection owner.
-      // Skipped rather than passed: a bare `return` here is a green test that asserted
-      // nothing, and it reads as coverage in the report. See `clipboardText`.
+      // No readable clipboard on this runner. Skipped rather than returned: a bare
+      // `return` is a green test that asserted nothing. See `clipboardText`.
       this.skip();
       return;
     }
@@ -135,11 +132,7 @@ describe('Todo lists', () => {
     expect(progress).toContain('2');
   });
 
-  /**
-   * A card shows two items of a list. Found by a third, it used to show the first two and
-   * explain nothing — the branch that renders a search excerpt sits behind `isChecklist()`
-   * and a todo list never reached it.
-   */
+  /** A card shows two items of a list; a search slides the window to the matching one. */
   describe('found by an item the card does not show', () => {
     const long = 'Deep list';
 
@@ -174,9 +167,8 @@ describe('Todo lists', () => {
     });
 
     /**
-     * ⚠️ The one that would have corrupted data: the template counts within the window,
-     * the position in the note is what gets written. Ticking the first visible box must
-     * not tick the first box of the list.
+     * ⚠️ The template counts within the window, the position in the note is what gets
+     * written: ticking the first visible box must not tick the first box of the list.
      */
     it('ticks the box it shows, not the one at the same place in the list', async () => {
       await canvas.search('kubeconfig');

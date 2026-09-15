@@ -9,11 +9,7 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-/**
- * Without this a dialog is not keyboard-usable: focus stays on the element that opened
- * it, `Tab` walks the user through the content hidden behind the modal, and closing loses
- * focus into nothing. Written by hand rather than pulling in `@angular/cdk`.
- */
+/** Written by hand rather than pulling in `@angular/cdk` for one directive. */
 @Directive({
   selector: '[appFocusTrap]',
   host: {
@@ -34,8 +30,8 @@ export class FocusTrapDirective implements AfterViewInit, OnDestroy {
     this.previouslyFocused?.focus();
   }
 
-  // `Event` and not `KeyboardEvent`: modifier pseudo-events (`keydown.tab`) are absent
-  // from the host-binding type table, so `typeCheckHostBindings` hands over an `Event`.
+  // `Event` and not `KeyboardEvent`: modifier pseudo-events are absent from the
+  // host-binding type table, so `typeCheckHostBindings` hands over an `Event`.
   protected onTab(event: Event, backwards: boolean): void {
     const elements = this.focusableElements();
     if (elements.length === 0) return;

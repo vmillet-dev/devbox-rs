@@ -16,27 +16,21 @@ const appBinary = resolve(
 );
 
 /**
- * The WebDriver server runs **inside the application**, through
- * `tauri-plugin-wdio-webdriver`, so there is no `tauri-driver`, no msedgedriver and no
- * Chrome DevTools protocol — nor anything those need from their host, which is what
- * made the external chain unrunnable on CI.
+ * The WebDriver server runs inside the application, so there is no `tauri-driver`, no
+ * msedgedriver and no Chrome DevTools protocol — nor anything those need from their host.
  *
- * ⚠️ The cost, and it shapes every spec file: this provider spawns the application
- * **once**, from its own `onPrepare`, and never again. Every spec file drives the same
- * process, the same SQLite file and the same `preferences.json`. Bumping `maxInstances`
- * would not change it — the service skips its per-worker spawn for this provider.
- *
- * What follows from that is documented in `docs/architecture.md`: the profile is wiped
- * before the runner starts rather than between files, `before()` buys each file a fresh
- * *front end* and nothing more, and a spec file establishes its own preconditions
- * instead of assuming a clean corpus.
+ * ⚠️ The cost shapes every spec file: this provider spawns the application once, from its
+ * own `onPrepare`. Every spec file drives the same process, the same SQLite file and the
+ * same `preferences.json`, and bumping `maxInstances` does not change it. So the profile
+ * is wiped before the runner starts, `before()` buys a fresh front end and nothing more,
+ * and a spec file establishes its own preconditions. See `docs/architecture.md`.
  */
 const driverProvider = 'embedded';
 
 /** `E2E_LOG_LEVEL=trace` when a session refuses to open; the default keeps runs readable. */
 const logLevel = (process.env['E2E_LOG_LEVEL'] ?? 'warn') as NonNullable<WebdriverIO.Config['logLevel']>;
 
-/** The refresh below is for what a *previous* file left behind, so it has none to undo yet. */
+/** The refresh below undoes what a previous file left behind, and there is none yet. */
 let aFileHasRun = false;
 
 export const config: WebdriverIO.Config = {
@@ -44,9 +38,9 @@ export const config: WebdriverIO.Config = {
   specs: ['./specs/**/*.e2e.ts'],
 
   /**
-   * One application at a time. The numeric prefix on each spec file is what orders
-   * them, and the order is load-bearing: `01-first-launch` is the only file that meets
-   * a virgin profile, and it is the one that resolves the seeded space for the rest.
+   * ⚠️ The numeric prefix on each spec file is the run order, and it is load-bearing:
+   * `01-first-launch` is the only file that meets a virgin profile, and the only one
+   * that can resolve the seeded space for the rest.
    */
   maxInstances: 1,
 
@@ -59,8 +53,7 @@ export const config: WebdriverIO.Config = {
     },
   ] as unknown as WebdriverIO.Capabilities[],
 
-  // The embedded provider needs no external driver, so a runner installs nothing and
-  // waits for nothing. `embeddedPort` is the base — each worker gets it plus its index.
+  // `embeddedPort` is the base — each worker gets it plus its index.
   services: [['@wdio/tauri-service', { driverProvider, appBinaryPath: appBinary, embeddedPort: 4445 }]],
 
   framework: 'mocha',
@@ -75,23 +68,17 @@ export const config: WebdriverIO.Config = {
 
   /**
    * One application serves the whole run, so a spec file inherits whatever the previous
-   * one left on screen — an overlay still open, a filter still set, a selection still
-   * ticked. Reloading the page gives each file a fresh front end over the shared
-   * database: Angular reboots, and every store with it.
-   *
-   * Imported inside the hook on purpose: the launcher loads this file too, and it has
-   * no `browser` to speak of.
+   * one left on screen. Reloading gives each file a fresh front end over the shared
+   * database. Imported inside the hook: the launcher loads this file too, with no
+   * `browser` to speak of.
    */
   async before() {
     const { browser } = await import('@wdio/globals');
 
-    // ⚠️ Never before the **first** file. The refresh clears what the previous file left
-    // on screen, and there is no previous file — while the application is still seeding
-    // its samples. `SampleNotesService` writes its marker *before* the notes, on purpose,
-    // so a front end reloaded inside that window skips the seeding it interrupted: a
-    // space, no notes, and every launch after it agreeing there is nothing to do. The
-    // corpus then has no samples for the whole run, which is how `01-first-launch` came
-    // to assert on an empty canvas on both CI platforms.
+    // ⚠️ Never before the first file: there is nothing to clear, and the application is
+    // still seeding its samples. `SampleNotesService` writes its marker before the notes,
+    // so a front end reloaded inside that window skips the seeding it interrupted — and
+    // every launch after it agrees there is nothing to do.
     if (!aFileHasRun) {
       aFileHasRun = true;
       return;
@@ -101,9 +88,8 @@ export const config: WebdriverIO.Config = {
   },
 
   /**
-   * A failing scenario leaves nothing behind but its assertion message, and "the row is
-   * missing" and "the field was never filled" read exactly the same from there. This
-   * writes down what was actually on screen, which is the difference between the two.
+   * "The row is missing" and "the field was never filled" read exactly the same from an
+   * assertion message. This writes down what was actually on screen.
    */
   async afterTest(test, _context, result) {
     if (result.passed) return;
@@ -122,7 +108,7 @@ export const config: WebdriverIO.Config = {
           (card.textContent ?? '').trim(),
         ),
         busy: document.querySelector('[data-testid="canvas"]')?.getAttribute('aria-busy') ?? null,
-        // The crux: a value that never arrived looks nothing like a write that was lost.
+        // A value that never arrived looks nothing like a write that was lost.
         fields: [...document.querySelectorAll('input, textarea')].map((field) => ({
           testid: field.getAttribute('data-testid'),
           value: (field as HTMLInputElement).value,

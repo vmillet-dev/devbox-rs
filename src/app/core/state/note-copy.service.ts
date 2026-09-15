@@ -2,11 +2,6 @@ import { Injectable, inject } from '@angular/core';
 import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 
-/**
- * A service rather than a method on whoever needs it: copying happens from the canvas,
- * from the editor and from the fields form, and an acknowledgement earned in only one
- * of the three would be a lie in the other two.
- */
 @Injectable({ providedIn: 'root' })
 export class NoteCopyService {
   private readonly clipboard = inject(ClipboardService);

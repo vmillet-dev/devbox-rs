@@ -1,11 +1,8 @@
-/** Unsubscribes. A no-op when the subscription never landed. */
 export type Unlisten = () => void;
 
 /**
- * Turns a subscription that only lands on the next turn into one that can be cancelled
- * **now**: without the flag, a caller destroyed before the promise resolves would stay
- * subscribed for the session. Outside Tauri the subscription never lands at all, and the
- * result is inert rather than fatal.
+ * ⚠️ Makes a subscription that only lands on the next turn cancellable now: without the
+ * flag, a caller destroyed before the promise resolves stays subscribed for the session.
  */
 export function subscribeCancellable<T>(subscribe: (handler: T) => Promise<Unlisten>, handler: T): Unlisten {
   let unlisten: Unlisten | null = null;

@@ -2,9 +2,8 @@ import { ShortcutGroup } from '@core/services/shortcuts/shortcut.model';
 import { CANVAS_SHORTCUT_GROUP } from '@shared/directives/canvas-keyboard.directive';
 
 /**
- * The canvas group comes from [`CanvasKeyboardDirective`], where the same table also
- * binds the keys; the two below are documentation, their keys being handled by the editor
- * and by the palette themselves. Key names stay untranslated.
+ * The canvas group comes from `CanvasKeyboardDirective`, where the same table binds the
+ * keys; the two below are documentation only, handled by the editor and the palette.
  */
 export const NOTES_SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
   CANVAS_SHORTCUT_GROUP,

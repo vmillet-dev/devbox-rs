@@ -41,10 +41,9 @@ const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) =>
 }));
 
 /**
- * ⚠️ Carried to the **end of the local day**, not to midnight: a note dated today
- * would otherwise be expired the moment it is typed. Built explicitly rather than
- * with `new Date(value)`, which reads as UTC — west of Greenwich the deadline would
- * slip back a day.
+ * ⚠️ End of the local day, not midnight: a note dated today would otherwise be
+ * expired the moment it is typed. Built explicitly because `new Date(value)` reads
+ * as UTC, and west of Greenwich the deadline would slip back a day.
  */
 function endOfLocalDay(value: string): Date | null {
   const [year, month, day] = value.split('-').map(Number);
@@ -59,14 +58,9 @@ function toDateInputValue(date: Date): string {
 }
 
 /**
- * Mutates nothing: it emits, `NotesStore` persists.
- *
- * It holds **local drafts** for the title and the body — persisting on every keystroke
- * would mean one IPC round trip per character. They are committed on blur and, the
- * delicate part, before every closing path, none of which produces a `blur`.
- *
- * ⚠️ They are keyed on the note's **`id`** and not on the note: every save refreshes
- * `updatedAt` and produces a new object, which would overwrite what is being typed.
+ * Mutates nothing: it emits, `NotesStore` persists. Title and body are local drafts
+ * — one round trip per keystroke otherwise — committed on blur and on every closing
+ * path, none of which produces a `blur`.
  */
 @Component({
   selector: 'app-note-editor-overlay',
@@ -89,42 +83,26 @@ export class NoteEditorOverlayComponent {
   private readonly clock = inject(ClockService);
   private readonly preferences = inject(PreferencesService);
 
-  /**
-   * Attachments and `{{field}}` filling have a write cycle of their own, and the editor
-   * reaches for them directly: routing seventeen bindings through the page made adding
-   * one a four-file change.
-   */
+  /** Attachments and `{{field}}` filling have a write cycle of their own. */
   protected readonly attachments = inject(AttachmentsStore);
   protected readonly fill = inject(PlaceholderFillStore);
 
   readonly note = input<Note | null>(null);
 
-  /**
-   * Which note the editor is pointed at, as a number that changes only when it is
-   * pointed at a **different** one. The drafts below key on this rather than on the
-   * note id — see `noteId`.
-   */
   readonly session = input(0);
 
   readonly closed = output<void>();
-  /**
-   * One output rather than one per field: the page used to wire nine of them, so adding
-   * a field meant editing four files. Whether a value actually moved is `NotesStore`'s
-   * call — it is the one holding what is stored.
-   */
+  /** One output for every field: whether a value moved is `NotesStore`'s call. */
   readonly patchRequested = output<NotePatch>();
   readonly deleteRequested = output<void>();
-  /** Stays an output: `NotesStore` is the one that knows whether the note exists yet. */
   readonly placeholderValuesChanged = output<Record<string, string>>();
 
   protected readonly languageOptions = LANGUAGE_OPTIONS;
 
   /**
-   * ⚠️ The **session**, not the note's id. Committing the first field of a new note
-   * materialises it, which changes its id — and keying the drafts on the id replayed
-   * them from a note whose content the store had not written yet, emptying the body the
-   * user had just typed. The session changes when the editor is pointed at a different
-   * note, which is what these drafts actually mean to follow.
+   * ⚠️ The session, not the note's id. Committing the first field of a new note
+   * materialises it, which changes its id — and drafts keyed on the id are then
+   * replayed from a note whose content is not written yet, emptying the body.
    */
   private readonly noteId = computed(() => this.session());
 
@@ -148,19 +126,12 @@ export class NoteEditorOverlayComponent {
 
   protected readonly tagInputValue = signal('');
 
-  /**
-   * A display preference and not note state: a plain `signal`, so it survives moving
-   * from one note to the next.
-   */
+  /** A display preference, not note state: it survives moving to the next note. */
   protected readonly fullscreen = signal(this.preferences.read(FULLSCREEN_STORAGE_KEY) === 'true');
 
-  /**
-   * Open by default: a panel folded away would hide the feature from anyone who does
-   * not know it exists yet.
-   */
+  /** Open by default: folded away, it hides the feature from anyone who does not know it. */
   protected readonly fieldsPanelOpen = signal(this.preferences.read(FIELDS_PANEL_STORAGE_KEY) !== 'false');
 
-  /** The preview belongs to the open note: it drops when moving to the next. */
   protected readonly previewingFilled = linkedSignal({
     source: this.noteId,
     computation: () => false,
@@ -170,14 +141,10 @@ export class NoteEditorOverlayComponent {
   private readonly checklistEditor = viewChild(ChecklistEditorComponent);
   private readonly fieldsPanel = viewChild(PlaceholderPanelComponent);
 
-  /** A todo list has no body: no coloured block, no format picker. */
   protected readonly isChecklist = computed(() => this.note()?.kind === 'checklist');
   protected readonly checklistStats = computed(() => checklistProgress(this.note()?.items ?? []));
 
-  /**
-   * The draft for an ordinary note — copying before leaving the field must yield what
-   * is on screen — and the Markdown list for a todo list, which has no body.
-   */
+  /** The draft, so copying before leaving the field yields what is on screen. */
   protected readonly copyText = computed(() =>
     this.isChecklist() ? (this.note()?.copyText ?? '') : this.draftContent(),
   );
@@ -197,19 +164,12 @@ export class NoteEditorOverlayComponent {
     return note ? relativeTimeRef(note.updatedAt, this.clock.now()) : null;
   });
 
-  /**
-   * This field, and only this one, feeds the "untriaged" filter and the sections'
-   * "due soon" hint.
-   */
   protected readonly expiryInputValue = computed(() => {
     const lifecycle = this.note()?.lifecycle;
     return lifecycle?.kind === 'expires' ? toDateInputValue(lifecycle.at) : '';
   });
 
-  /**
-   * Folding the panel closes the preview: leaving the body read-only without the
-   * button that put it there is a trap.
-   */
+  /** Folding closes the preview: a read-only body without the button that caused it is a trap. */
   protected toggleFieldsPanel(): void {
     const next = !this.fieldsPanelOpen();
     this.fieldsPanelOpen.set(next);
@@ -229,20 +189,13 @@ export class NoteEditorOverlayComponent {
     }
   }
 
-  /**
-   * The preview follows the typing, but nothing is written: the panel commits on
-   * field exit.
-   */
+  /** The preview follows the typing; the panel is what commits, on field exit. */
   protected onPlaceholderValuesChanged(): void {
     if (this.previewingFilled()) {
       this.requestFillPreview();
     }
   }
 
-  /**
-   * The body cannot move during the preview — the input is not there — so only the
-   * values trigger a new request.
-   */
   private requestFillPreview(): void {
     void this.fill.refreshPreview({
       content: this.draftContent(),
@@ -250,10 +203,6 @@ export class NoteEditorOverlayComponent {
     });
   }
 
-  /**
-   * Composed at click time rather than kept up to date: a keystroke in the body or in
-   * a field would make anything computed ahead of time stale.
-   */
   protected requestFilledCopy(): void {
     void this.fill.copyFilled({
       content: this.draftContent(),
@@ -272,9 +221,8 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * A **paste** is committed at once, typing stays deferred to blur: the paste is what
-   * gives an empty note its language, and waiting for field exit would leave the badge
-   * on TXT, which reads as "nothing was recognised".
+   * A paste commits at once, typing stays deferred to blur: the paste is what gives an
+   * empty note its language, and waiting would leave the badge reading TXT.
    */
   protected onBodyInput(event: Event, value: string): void {
     this.draftContent.set(value);
@@ -285,9 +233,8 @@ export class NoteEditorOverlayComponent {
   }
 
   /**
-   * A pasted image becomes an **attachment**: the body is a `<textarea>` and can show
-   * nothing but text. Only the content *type* is read here — the bytes are re-read
-   * natively, where the clipboard hands them over already decoded.
+   * A pasted image becomes an attachment: the body is a `<textarea>`. Only the content
+   * type is read here — the bytes are re-read natively and never cross the bridge.
    */
   protected onPaste(event: ClipboardEvent): void {
     const data = event.clipboardData;
@@ -334,10 +281,7 @@ export class NoteEditorOverlayComponent {
     }
   }
 
-  /**
-   * Clearing the field makes the note permanent. An unreadable date is ignored rather
-   * than turned into an `Invalid Date`, which the DTO would reject.
-   */
+  /** An unreadable date is ignored rather than sent on as an `Invalid Date`. */
   protected onExpiryChange(value: string): void {
     if (!value) {
       this.requestPatch({ lifecycle: { kind: 'permanent' } });
@@ -378,8 +322,7 @@ export class NoteEditorOverlayComponent {
 
   /**
    * Escape leaves the body first, then closes the modal: otherwise a keystroke meant
-   * for the field would make the whole editor disappear. The `blur` commits the draft
-   * on the way, and a backdrop click reaches the same path.
+   * for the field makes the whole editor disappear. The `blur` commits on the way.
    */
   protected onDismiss(): void {
     const editor = this.bodyEditor()?.nativeElement;
@@ -392,8 +335,7 @@ export class NoteEditorOverlayComponent {
 
   /**
    * ⚠️ The only closing path, and it commits the drafts first: Escape, the backdrop and
-   * the close button produce no `blur`, so the last line typed would be lost — which is
-   * why the checklist commits here too.
+   * the close button produce no `blur`, so the last line typed would be lost.
    */
   protected requestClose(): void {
     this.commitTitle();

@@ -1,4 +1,3 @@
-// Commands receive their arguments owned, deserialized from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod bundle;
@@ -12,8 +11,7 @@ use crate::error::AppError;
 use crate::notes::store as notes;
 use model::{ExportReport, ImportReport};
 
-/// The spaces travel with the notes: without them an import would hold an id with
-/// nowhere to file it.
+/// The spaces travel with the notes, or an import holds an id with nowhere to file it.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn export_notes(
@@ -50,8 +48,8 @@ pub fn export_selection(
     file::write(&path, &exported)
 }
 
-/// The file is read **before** the lock is taken: parsing a large export while
-/// holding the connection would block every other command for the length of it.
+/// ⚠️ The file is read before the lock is taken: parsing a large export while holding the
+/// connection would block every other command for the length of it.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn import_notes(path: String, db: State<'_, Db>) -> Result<ImportReport, AppError> {

@@ -1,12 +1,9 @@
 import { Directive, ElementRef, afterNextRender, inject } from '@angular/core';
 
 /**
- * Keyboard navigation for a `role="menu"` panel: focus on the first entry when it opens,
- * then arrows and Home/End with wrap-around. The cycle follows elements marked
- * `appMenuItem` and not every button — a secondary action can be left to Tab.
- *
- * The initial focus is load-bearing: a menu opened without it is unreachable from the
- * keyboard. It is set by `afterNextRender`, once the `@if` has created the panel.
+ * Keyboard navigation for a `role="menu"` panel. ⚠️ The initial focus is load-bearing —
+ * a menu opened without it is unreachable from the keyboard — and is set by
+ * `afterNextRender`, once the `@if` has created the panel.
  */
 @Directive({
   selector: '[appMenuPanel]',

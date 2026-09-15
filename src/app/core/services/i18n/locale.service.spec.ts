@@ -14,10 +14,7 @@ describe('LocaleService', () => {
     return service;
   }
 
-  /**
-   * Persistence is asserted through `PreferencesService`, not through whatever it happens
-   * to sit on: the backing store moved without this service changing a line.
-   */
+  /** Asserted through `PreferencesService`, not through whatever it happens to sit on. */
   function preferences(): PreferencesService {
     return TestBed.inject(PreferencesService);
   }

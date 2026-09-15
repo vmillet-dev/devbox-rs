@@ -1,12 +1,9 @@
 import { Directive, ElementRef, inject, output, signal } from '@angular/core';
 
 /**
- * A dropdown's open/closed state, and the two ways out of it without clicking an entry: a
- * click outside and Escape. The trigger is named by `[appMenuAnchor]` — focus returns to
- * it on close, which it would otherwise lose to `<body>`.
- *
- * Escape is emitted rather than handled here: a multi-level menu must be able to fold its
- * panel before closing (see `SpaceSwitcher`).
+ * A dropdown's open/closed state. Focus returns to `[appMenuAnchor]` on close, which it
+ * would otherwise lose to `<body>`. Escape is emitted rather than handled here: a
+ * multi-level menu must be able to fold its panel before closing.
  */
 @Directive({
   selector: '[appMenuTrigger]',
@@ -22,9 +19,7 @@ export class MenuTriggerDirective {
   private readonly _open = signal(false);
   readonly open = this._open.asReadonly();
 
-  /** Escape pressed while the menu is open. */
   readonly escaped = output<void>();
-  /** The menu has just closed, whatever the cause. */
   readonly closed = output<void>();
 
   toggle(): void {

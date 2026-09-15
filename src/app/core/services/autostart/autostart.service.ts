@@ -15,10 +15,9 @@ export const AUTOSTART_ADAPTER = new InjectionToken<AutostartAdapter>('AUTOSTART
 });
 
 /**
- * ⚠️ The real state belongs to the system and not to the preferences file: at startup we
- * read the system and align the preference to it. Without that read-back, disabling
- * autostart from the task manager would leave the box ticked — and DevBox would re-enable
- * it on the next setting change.
+ * ⚠️ The real state belongs to the system, not the preferences file: startup reads the
+ * system and aligns the preference to it. Without that read-back, disabling autostart
+ * from the task manager leaves the box ticked and gets re-enabled on the next change.
  */
 @Injectable({ providedIn: 'root' })
 export class AutostartService {
@@ -26,10 +25,7 @@ export class AutostartService {
   private readonly settings = inject(SettingsStore);
   private readonly injector = inject(Injector);
 
-  /**
-   * Aligns the preference with what the system declares, then follows every change. Never
-   * rejects: an autostart that cannot be set must not stop the application from opening.
-   */
+  /** Never rejects: an autostart that cannot be set must not stop the app from opening. */
   async start(): Promise<void> {
     try {
       this.settings.setStartWithSystem(await this.adapter.isEnabled());
@@ -47,13 +43,12 @@ export class AutostartService {
 
   private async push(enabled: boolean): Promise<void> {
     try {
-      // Read back first: `enable()` would rewrite the system entry on every start,
-      // for a value the system already holds.
+      // Read back first: `enable()` would rewrite the system entry on every start.
       if ((await this.adapter.isEnabled()) === enabled) return;
 
       await (enabled ? this.adapter.enable() : this.adapter.disable());
     } catch {
-      // Same: the failure is silent, the box stays what the user set.
+      // Silent: the box stays what the user set.
     }
   }
 }

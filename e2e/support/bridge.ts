@@ -19,18 +19,12 @@ import type {
 } from '@core/ipc/bindings';
 
 /**
- * Seeding a corpus by clicking would be slow and would test the seeding rather
- * than the scenario — so it goes through the same bridge the application uses,
- * into the same Rust, into the same database. The types come from the generated
- * `bindings.ts`, so a Rust signature that moves stops this file compiling. That
- * import is type-only and erased before `tsx` sees it: nothing here drags
- * `@tauri-apps/api` into the test process, which has no Tauri runtime of its own.
+ * Seeding goes through the same bridge the application uses, into the same Rust. The
+ * types come from the generated `bindings.ts`, so a Rust signature that moves stops this
+ * compiling; that import is type-only and erased before `tsx` sees it.
  *
- * ⚠️ `window.__TAURI__` (exposed by `withGlobalTauri` in `tauri.e2e.conf.json`) and
- * not `browser.tauri.execute`: the service resolves the latter through an HTTP
- * endpoint it only addresses correctly under the `embedded` driver provider, and
- * loses even that after a `reloadSession` — which is how a scenario restarts the
- * application. This path is the application's own `invoke`, and it survives both.
+ * ⚠️ `window.__TAURI__` (exposed by `withGlobalTauri`) and not `browser.tauri.execute`,
+ * which the service resolves through an HTTP endpoint it loses after a `reloadSession`.
  */
 async function invoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
   const outcome = (await browser.executeAsync(
@@ -82,7 +76,7 @@ export const bridge = {
   importNotes: (path: string) => invoke<ImportReport>('import_notes', { path }),
 } as const;
 
-/** A `NoteDraft` is exhaustive on the wire; a scenario only ever cares about two or three fields. */
+/** A `NoteDraft` is exhaustive on the wire; a scenario cares about two or three fields. */
 export function draft(overrides: Partial<NoteDraft> & Pick<NoteDraft, 'spaceId'>): NoteDraft {
   return {
     title: '',
@@ -112,18 +106,13 @@ export function query(overrides: Partial<NotesQuery> = {}): NotesQuery {
 }
 
 /**
- * Where a seeded note goes: the space the install seeded, by id, for the whole run.
+ * The space the install seeded, by id, for the whole run.
  *
- * ⚠️ **Not** `listSpaces()[0]`. `list_spaces` orders by `name COLLATE NOCASE`, so the
- * first row is the alphabetically first space, not the seeded one — and a spec file
- * running after another created `Ops` or `Veille` would silently pick that one
- * instead. It worked only because `Découverte` and `Getting started` both sort early;
- * renaming the sample space, or adding a locale, would have moved it under the suite.
- *
- * Resolved once, while a virgin profile still holds exactly one space, then read back
- * from a file — WebdriverIO gives each spec file its own worker process, so a
- * module-level cache would be empty again in the next one. `resetProfile()` deletes
- * the note along with the profile, so a new run resolves it afresh.
+ * ⚠️ Not `listSpaces()[0]`: `list_spaces` orders by `name COLLATE NOCASE`, so the first
+ * row is the alphabetically first space and a spec file that created `Ops` would pick
+ * that one instead. Resolved once while a virgin profile still holds exactly one space,
+ * then read back from a file — each spec file gets its own worker process, so a
+ * module-level cache would be empty again in the next one.
  */
 function readHomeSpaceId(): string | null {
   try {

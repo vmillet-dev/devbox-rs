@@ -13,8 +13,8 @@ pub fn list(connection: &mut SqliteConnection) -> Result<Vec<Space>, StorageErro
         .select((spaces::id, spaces::name, spaces::pinned))
         // Pinned first, then by name — the same shape the canvas gives notes.
         .order(spaces::pinned.desc())
-        // Raw fragment: Diesel does not model collations, and sorting as BINARY
-        // would place "personal" after "Zebra".
+        // ⚠️ Raw fragment: Diesel does not model collations, and sorting as BINARY would
+        // place "personal" after "Zebra".
         .then_order_by(sql::<Text>("name COLLATE NOCASE"))
         .load::<(String, String, bool)>(connection)?;
 
@@ -24,8 +24,7 @@ pub fn list(connection: &mut SqliteConnection) -> Result<Vec<Space>, StorageErro
         .collect())
 }
 
-/// Reads one back, so a write answers with the row rather than with what it sent —
-/// a rename must not quietly drop whether the space was pinned.
+/// Reads back, so a rename does not quietly drop whether the space was pinned.
 fn find(connection: &mut SqliteConnection, id: &str) -> Result<Space, StorageError> {
     spaces::table
         .find(id)
@@ -36,7 +35,6 @@ fn find(connection: &mut SqliteConnection, id: &str) -> Result<Space, StorageErr
         .ok_or_else(|| StorageError::SpaceNotFound(id.to_string()))
 }
 
-/// Hoists a space to the head of the list, or lets it fall back among the others.
 pub fn set_pinned(
     connection: &mut SqliteConnection,
     id: &str,
@@ -55,8 +53,7 @@ pub fn set_pinned(
     })
 }
 
-/// The foreign key would catch it too, but with an unreadable SQLite message
-/// whereas the front end displays the error.
+/// The foreign key would catch it too, but with a message the front cannot translate.
 pub fn exists(connection: &mut SqliteConnection, id: &str) -> Result<bool, StorageError> {
     let found = spaces::table
         .find(id)
@@ -67,9 +64,9 @@ pub fn exists(connection: &mut SqliteConnection, id: &str) -> Result<bool, Stora
     Ok(found.is_some())
 }
 
-/// Detected here rather than left to the unique index, to return a code the front
-/// end knows how to translate. `except_id` excludes the renamed space: without it,
-/// correcting the case of a name would be refused as a duplicate of itself.
+/// Detected here rather than left to the unique index, to return a code the front can
+/// translate. `except_id` excludes the renamed space, or correcting the case of a name
+/// would be refused as a duplicate of itself.
 fn ensure_unique_name(
     connection: &mut SqliteConnection,
     name: &str,
@@ -96,10 +93,8 @@ fn ensure_unique_name(
     Ok(())
 }
 
-/// `name` is expected **already validated**: this layer only decides uniqueness.
-///
-/// The transaction is what pairs the check with the write. Without it the guarantee
-/// rested on the connection mutex two layers up, where nothing named it.
+/// `name` is expected already validated: this layer only decides uniqueness, and the
+/// transaction is what pairs the check with the write.
 pub fn create(connection: &mut SqliteConnection, name: &str) -> Result<Space, StorageError> {
     connection.transaction(|connection| {
         ensure_unique_name(connection, name, None)?;
@@ -138,12 +133,9 @@ pub fn rename(
     })
 }
 
-/// ⚠️ Same transaction and **this order**: `notes.space_id` has an `ON DELETE
-/// CASCADE`, so deleting first — or failing between the two — would sweep away the
-/// notes instead of moving them.
-///
-/// `updated_at` is not refreshed: touching it would float the whole absorbed space
-/// to the top of the canvas, which sorts on it.
+/// ⚠️ Same transaction and this order: `notes.space_id` has an `ON DELETE CASCADE`, so
+/// deleting first — or failing between the two — sweeps away the notes instead of moving
+/// them. `updated_at` is not refreshed, or the absorbed space floats to the top.
 pub fn delete(
     connection: &mut SqliteConnection,
     id: &str,

@@ -5,26 +5,18 @@ import { banners, fileMenu, titlebar } from '../pageobjects/titlebar.page.js';
 import { bridge, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * The one scenario neither unit suite can reach: a database file that does not exist
- * yet. Migrations run against a real path, the seeding guards decide, and the front end
- * boots far enough to render what came back.
+ * A database file that does not exist yet: migrations against a real path, the seeding
+ * guards, and a front end that boots far enough to render what came back.
  *
- * ⚠️ This file is also the only one that meets a **virgin** profile, and the rest of the
- * run depends on that: `homeSpaceId()` resolves the seeded space here, while there is
- * still exactly one, and writes it down for the eleven files that follow.
+ * ⚠️ The only file that meets a virgin profile, and the rest of the run depends on it:
+ * `homeSpaceId()` resolves the seeded space here, while there is still exactly one.
  */
 describe('First launch', () => {
   /**
-   * ⚠️ `waitForCanvas` cannot see this one, and says so in its own comment: it has no
-   * signal for the reload that follows a write, "nor for the one that follows the sample
-   * seeding". Seeding is what a virgin profile does **after** the first view has already
-   * arrived and settled — empty — so on a slow machine the settle loop reports a settled,
-   * empty canvas and this file asserts on nothing. Both CI platforms have failed exactly
-   * here, with `no card titled "" — found []`.
-   *
-   * It waits for notes to **exist**, and never for how many: the count is what the first
-   * scenario is about to assert, and waiting for it would make the assertion its own
-   * witness.
+   * ⚠️ `waitForCanvas` cannot see this one: seeding happens after the first view has
+   * already arrived and settled — empty — so the settle loop reports a settled, empty
+   * canvas. It waits for notes to exist and never for how many, or the assertion below
+   * would be its own witness.
    */
   before(async () => {
     await browser.waitUntil(async () => (await bridge.queryNotes(query())).matched > 0, {
@@ -41,8 +33,7 @@ describe('First launch', () => {
   });
 
   it('opens on a window wearing the application name', async () => {
-    // From `Cargo.toml` through `APP_METADATA`, not from `tauri.conf.json`'s lowercase
-    // product name.
+    // From `Cargo.toml` through `APP_METADATA`, not `tauri.conf.json`'s lowercase name.
     expect(await titlebar.title()).toBe('DevBox');
   });
 
@@ -67,8 +58,7 @@ describe('First launch', () => {
 
     await canvas.applyFilter('untriaged');
 
-    // One of the four, not all four: a filter that filtered nothing would pass a
-    // "more than zero" assertion.
+    // One of the four: a filter that filtered nothing would pass "more than zero".
     const untriaged = await canvas.titles();
     expect(untriaged).toHaveLength(1);
     expect(everything).toContain(untriaged[0]);

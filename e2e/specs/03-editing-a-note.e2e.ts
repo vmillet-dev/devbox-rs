@@ -7,14 +7,12 @@ import { reloadCanvas, viewportSize } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * Every field goes through one `applyPatch`, whose comparator table decides what
- * actually moved. What a unit spec cannot see is the wire: an omitted key must stay
- * omitted, and `targetSpaceId` is the one argument Tauri renames between the two sides.
+ * Every field goes through one `applyPatch`. What a unit spec cannot see is the wire: an
+ * omitted key must stay omitted, and `targetSpaceId` is the one argument Tauri renames.
  */
 describe('Editing a note', () => {
-  // ⚠️ Not a sample note's title. `reread()` takes the first hit of a search, so a title
-  // shared with a seeded note makes the assertions depend on which of the two sorts
-  // first — that is, on what an earlier spec file happened to touch.
+  // ⚠️ Not a sample note's title: `reread()` takes the first hit of a search, so a shared
+  // title makes the assertions depend on which of the two sorts first.
   const title = 'Rollout under edit';
   let spaceId = '';
   let refugeId = '';
@@ -46,8 +44,7 @@ describe('Editing a note', () => {
 
   it('counts what the body holds, in the footer', async () => {
     await canvas.openNote(title);
-    // Language label, lines and bytes — derived from the draft, so it is what tells a
-    // reader the editor is looking at the note they opened.
+    // Derived from the draft, so it is what says the editor is on the note that was opened.
     const footer = await editor.footer();
     expect(footer).toContain('1');
     await editor.close();
@@ -65,8 +62,7 @@ describe('Editing a note', () => {
     expect(await editor.isFullscreen()).toBe(true);
     expect(await editor.body()).toBe('kubectl rollout restart deployment/api');
 
-    // Measured, not asked: the button reported itself pressed while the panel was still
-    // clamped to 92vw × 92vh, leaving a band of canvas that grew with the display.
+    // Measured, not asked: the button reports itself pressed before the panel has grown.
     const full = await editor.panelSize();
     expect(full.width).toBeGreaterThanOrEqual(viewport.width - 1);
     expect(full.height).toBeGreaterThanOrEqual(viewport.height - 1);
@@ -83,8 +79,8 @@ describe('Editing a note', () => {
 
     expect((await reread())?.language).toBe('sh');
 
-    // A variant added to the Rust enum, through the select, the patch, the column and
-    // back: the column stores the literal, so it takes no migration to get here.
+    // Through the select, the patch, the column and back: the column stores the literal,
+    // so a variant added to the Rust enum takes no migration to get here.
     await canvas.openNote(title);
     await editor.setLanguage('rs');
     await editor.close();
@@ -94,7 +90,6 @@ describe('Editing a note', () => {
 
   it('adds and removes a tag, normalised by Rust', async () => {
     await canvas.openNote(title);
-    // The leading `#` is stripped and the case-insensitive duplicate collapsed, in
     // `notes::model::normalize_tags` and nowhere else.
     await editor.addTag('#deploy');
     await editor.addTag('Deploy');

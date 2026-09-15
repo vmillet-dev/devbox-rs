@@ -7,11 +7,8 @@ import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 const RELEASES_LABEL = RELEASES_URL.replace(/^https:\/\//, '');
 
 /**
- * Read through the bridge and **not** rendered from Markdown: the Rust side returns
- * releases, categories and entries already separated, so there is no Markdown renderer to
- * pull in and no `innerHTML` for the CSP to worry about.
- *
- * Deliberately untranslated, like the release notes the updater hands over.
+ * Not rendered from Markdown: the Rust side returns releases, categories and entries
+ * already separated, so there is no renderer to pull in and no `innerHTML` to sanitize.
  */
 @Component({
   selector: 'app-whats-new-dialog',
@@ -33,17 +30,13 @@ export class WhatsNewDialogComponent {
     defaultValue: [] as readonly ChangelogRelease[],
   });
 
-  /** Read behind `hasValue()`: `value()` throws while the resource is in error. */
+  /** ⚠️ Read behind `hasValue()`: `value()` throws while the resource is in error. */
   protected readonly releases = computed<readonly ChangelogRelease[]>(() =>
     this.releasesResource.hasValue() ? this.releasesResource.value() : [],
   );
 
   protected readonly isLoading = this.releasesResource.isLoading;
 
-  /**
-   * Outside the Tauri runtime there is no bridge to ask, and an empty changelog would
-   * read as "nothing ever changed".
-   */
   protected readonly hasFailed = computed(() => this.releasesResource.error() !== undefined);
 
   protected readonly version = this.appInfo.version;

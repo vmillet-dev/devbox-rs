@@ -4,10 +4,7 @@ import { commands, type TrayLabels as WireTrayLabels } from '@core/ipc/bindings'
 
 export type TrayLabels = WireTrayLabels;
 
-/**
- * Keyed by field: `satisfies` makes a label added to `TrayLabels` in Rust a compile
- * error here.
- */
+/** `satisfies` makes a label added to `TrayLabels` in Rust a compile error here. */
 const LABEL_KEYS = {
   open: 'tray.open',
   newNote: 'tray.newNote',
@@ -17,12 +14,9 @@ const LABEL_KEYS = {
 } as const satisfies Record<keyof TrayLabels, string>;
 
 /**
- * This service **creates** the tray rather than the native startup: the native side
- * writes no user-facing text, so without translated labels there would be nothing to
- * show. The subscription re-emits on every language change, which re-translates the menu.
- *
- * The actions do not go through here — the menu emits the same `GlobalAction` as the
- * global shortcuts.
+ * The front creates the tray rather than the native startup: Rust writes no user-facing
+ * text, so without translated labels there would be nothing to show. The subscription
+ * re-emits on every language change, which re-translates the menu.
  */
 @Injectable({ providedIn: 'root' })
 export class TrayService {
@@ -36,10 +30,7 @@ export class TrayService {
       });
   }
 
-  /**
-   * A failure does not surface: outside Tauri the bridge is absent, and on a desktop
-   * without a tray the native side already declines silently.
-   */
+  /** A failure does not surface: on a desktop without a tray, Rust declines silently. */
   private async push(labels: TrayLabels): Promise<void> {
     try {
       // The one command with no `Result` on the Rust side, hence no `unwrap`.

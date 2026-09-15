@@ -7,8 +7,7 @@ import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
  * Deleting a note does not delete it: `deleted_at` is stamped and retention decides
- * later. Every read has to filter on it, which is only observable against a database
- * that holds both kinds of row at once.
+ * later. Every read has to filter on it.
  */
 describe('Deleting a note, and taking it back', () => {
   let spaceId = '';
@@ -29,8 +28,7 @@ describe('Deleting a note, and taking it back', () => {
     const card = await canvas.openCardMenu('Armed but not fired');
     await card.$('[data-testid="note-card-delete"]').click();
 
-    // One click only arms the confirmation — a spec asserting after a single click
-    // would pass while the note is still there.
+    // One click only arms the confirmation.
     await browser.pause(500);
     expect((await bridge.queryNotes(query({ search: 'Armed but not fired' }))).matched).toBe(1);
 

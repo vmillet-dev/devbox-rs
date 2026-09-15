@@ -4,9 +4,8 @@ import { DestroyRef, Injectable, Signal, inject, signal } from '@angular/core';
 export const CLOCK_TICK_MS = 30_000;
 
 /**
- * ⚠️ A `new Date()` read inside a `computed()` **freezes** it: it then depends on no
- * signal representing time and never re-evaluates — a card would show "4 min ago" forever.
- * Injecting `now()` makes those computeds pure and self-refreshing.
+ * ⚠️ A `new Date()` read inside a `computed()` freezes it: it depends on no signal
+ * representing time, so a card shows "4 min ago" forever.
  */
 @Injectable({ providedIn: 'root' })
 export class ClockService {

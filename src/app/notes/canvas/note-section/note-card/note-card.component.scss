@@ -48,19 +48,9 @@ app-copy-button:focus-within {
   box-shadow: 0 0 0 1px var(--amber-dim);
 }
 
-// The badge, the title and the marks, together. The badge used to own a row of its own:
-// ~17px plus an 8px margin out of the 122px a card has, spent before a character of body.
-//
-// ⚠️ A text block, not a flex row, and that is the whole point of this rule.
-//
-// As a row the title was a column between the badge and the marks, so it wrapped inside
-// 76px of a 224px card — where before the badge had a row of its own it had the full
-// width. Merging the rows bought the body two lines and charged the title for them.
-//
-// Here the badge and the marks are **inline**, so the title flows past them: it starts
-// after the badge and its second line runs from the left edge, full width. The clamp
-// moves up with it — it is the whole head that is two lines now, which is also the line
-// budget the ticket asked for.
+// ⚠️ A text block, not a flex row, and that is the whole point of this rule: as a row the
+// title is a column between the badge and the marks and wraps inside a third of the card.
+// Inline, it flows past them — its second line runs from the left edge, full width.
 .card-head {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -69,15 +59,12 @@ app-copy-button:focus-within {
   margin-bottom: 8px;
   font-size: 13px;
   line-height: 1.3;
-  // Reserves room for the copy and ⋯ buttons floating over the top-right corner. Measured
-  // rather than guessed: on a 224px card they start 6px past where this edge lands.
+  // Reserves room for the copy and ⋯ buttons floating over the top-right corner, measured
+  // rather than guessed.
   padding-right: 46px;
-  // ⚠️ And for the selection tick on the left, which floats over the card's own padding.
-  // Not a hover-only concern: `checked` keeps it on with no pointer at all, which is the
-  // state a multiple selection leaves every card in. Unreserved it sat squarely on the
-  // language badge, and on a todo list, which has no badge, it would sit on the title.
-  // A permanent gutter rather than one that appears with the tick: the second would shift
-  // the title sideways under the pointer.
+  // ⚠️ And for the selection tick on the left, which floats over the card's own padding —
+  // `checked` keeps it on with no pointer at all. A permanent gutter rather than one that
+  // appears with the tick, which would shift the title sideways under the pointer.
   padding-left: 8px;
 }
 
@@ -86,9 +73,7 @@ app-copy-button:focus-within {
   color: var(--text-0);
 }
 
-// Inline so the title flows past them rather than around a column of their own, and
-// before it so that no glyph can end up alone on a line of its own. The nowrap keeps the
-// cluster from being split across the two.
+// Inline so the title flows past them, and before it so no glyph ends up alone on a line.
 .card-marks {
   white-space: nowrap;
 }
@@ -111,8 +96,7 @@ app-language-badge,
   overflow: hidden;
 }
 
-// The line a search found, when it is not code: a tag or a checklist item. Prose rather
-// than a monospaced block, since that is what it is.
+// The line a search found when it is not code: prose rather than a monospaced block.
 .card-hit {
   display: block;
   font-family: inherit;
@@ -176,18 +160,15 @@ app-language-badge,
   white-space: nowrap;
 }
 
-// Reserves, inside the button, the band the list covers, or the footer would slide up
-// under the items.
+// Reserves the band the list covers, or the footer slides up under the items.
 .card-items-space {
   display: block;
   flex: 1;
 }
 
-// A sibling layer of the card button: it carries buttons, which cannot live inside
-// another one. Transparent to clicks — only the checkboxes take them.
-//
-// Anchored to the **bottom** rather than offset from the top: what precedes it has no
-// fixed height, and a hard `top` would have drifted every time.
+// ⚠️ A sibling layer of the card button: it carries buttons, which cannot live inside
+// another one. Transparent to clicks — only the checkboxes take them. Anchored to the
+// bottom, since what precedes it has no fixed height.
 .card-items {
   position: absolute;
   inset: 0;
@@ -237,7 +218,7 @@ app-language-badge,
   text-overflow: ellipsis;
 }
 
-// Struck through **and** dimmed: colour alone does not say what is done.
+// Struck through and dimmed: colour alone does not say what is done.
 .card-item.done .item-text {
   text-decoration: line-through;
   opacity: 0.6;
@@ -256,8 +237,7 @@ app-language-badge,
 }
 
 // ⚠️ Outside the card, into the grid gap, which is what keeps it clear of the copy and ⋯
-// buttons: those sit inside at 8px and 34px from the right edge, and anything drawn in
-// that band would be covered the moment the pointer arrived.
+// buttons — anything drawn in their band is covered the moment the pointer arrives.
 .card-pin {
   position: absolute;
   top: -6px;
@@ -271,9 +251,7 @@ app-language-badge,
   @include unstyled-control;
   position: absolute;
   top: 8px;
-  // Tight into the corner, so the gutter the head reserves for it can be 8px rather than
-  // the 14 it needed at `left: 8px` — six pixels of a 224px card, on the line that wanted
-  // them most.
+  // Tight into the corner, so the gutter the head reserves for it can be 8px.
   left: 2px;
   z-index: 1;
   padding: 2px 4px;

@@ -4,12 +4,7 @@ import { SettingsStore } from '@core/services/settings/settings.store';
 import { DEFAULT_SHORTCUTS } from '@core/services/shortcuts/shortcut.model';
 import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
-/**
- * Each chapter names two keys, `gettingStarted.chapters.<id>.title` and `.body`.
- *
- * Held here and not contributed through a registry, unlike the menu entries: a chapter
- * carries **no code**, so `layout/` imports nothing from a feature by listing them.
- */
+/** Each chapter names two keys, `gettingStarted.chapters.<id>.title` and `.body`. */
 const CHAPTERS = [
   'notes',
   'spaces',
@@ -22,10 +17,6 @@ const CHAPTERS = [
   'transfer',
 ] as const;
 
-/**
- * The written half of the pair the sample notes make, and the one that survives the day
- * they are deleted.
- */
 @Component({
   selector: 'app-getting-started-dialog',
   imports: [DialogComponent, TranslocoPipe],
@@ -41,9 +32,9 @@ export class GettingStartedDialogComponent {
   protected readonly chapters = CHAPTERS;
 
   /**
-   * Interpolated into every chapter, so a body can name a key without hard-coding it. The
-   * quick-paste one follows the preference: a guide quoting the combination that shipped
-   * would be wrong for anyone who changed it.
+   * ⚠️ Interpolated into every chapter, because Transloco replaces an unknown `{{name}}`
+   * with the empty string — a body cannot spell a key out. The quick-paste one follows
+   * the preference rather than the combination that shipped.
    */
   protected readonly keys = computed(() => ({
     palette: this.settings.paletteShortcut(),

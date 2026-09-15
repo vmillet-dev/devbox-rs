@@ -13,7 +13,6 @@ import {
   ThemeChoice,
 } from './app-settings.model';
 
-/** What the WebView gets from the OS; absent outside a browser (jsdom has an inert one). */
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
 interface SettingCodec<T> {
@@ -49,21 +48,15 @@ function asOneOf<T extends string>(values: readonly T[]): SettingCodec<T> {
 export type SettingSignal<T> = Signal<T> & { write(value: T): void };
 
 /**
- * **Writes apply immediately.** No "OK / Cancel": it is already the idiom here, and a
- * theme you only see after confirming is guessed at rather than chosen.
- *
- * This store talks to nobody: the native services *read* these signals and push to Rust.
- * The other way round would put IPC in a preferences store, which has to stay readable
- * outside Tauri.
+ * Writes apply immediately — there is no "OK / Cancel" anywhere in the panel. This
+ * store talks to nobody: the native services read these signals and push to Rust,
+ * which is what keeps it readable outside Tauri.
  */
 @Injectable({ providedIn: 'root' })
 export class SettingsStore {
   private readonly preferences = inject(PreferencesService);
 
-  /**
-   * ⚠️ Declared before the settings below: class fields initialise in order,
-   * and `setting()` pushes into this on the way.
-   */
+  /** ⚠️ Declared before the settings below: class fields initialise in order. */
   private readonly restorers: (() => void)[] = [];
 
   readonly locale = this.setting('locale', asOneOf(LOCALE_CHOICES));
@@ -78,7 +71,7 @@ export class SettingsStore {
   readonly updateNotifications = this.setting('updateNotifications', asBoolean);
   readonly skippedUpdate = this.setting('skippedUpdate', asText);
 
-  /** What the OS asks for, followed live: a "system" theme must switch without a restart. */
+  /** Followed live: a "system" theme must switch without a restart. */
   private readonly systemPrefersDark = signal(false);
 
   readonly resolvedTheme: Signal<ResolvedTheme> = computed(() => {
@@ -90,8 +83,8 @@ export class SettingsStore {
   constructor() {
     this.watchSystemTheme();
 
-    // `<html>` carries the theme and the density: the CSS variables live on `:root`,
-    // and a class set any lower would not reach them.
+    // `<html>` carries them: the CSS variables live on `:root`, and a class set any
+    // lower would not reach them.
     effect(() => {
       const root = document.documentElement;
       root.dataset['theme'] = this.resolvedTheme();
@@ -99,11 +92,7 @@ export class SettingsStore {
     });
   }
 
-  /**
-   * Called from `provideAppInitializer`, **after** `PreferencesService.hydrate()`:
-   * reading before would yield the defaults, and the interface would appear in one theme
-   * then the other.
-   */
+  /** ⚠️ Called after `PreferencesService.hydrate()`: before it, every read yields a default. */
   restore(): void {
     for (const restore of this.restorers) {
       restore();
@@ -134,7 +123,6 @@ export class SettingsStore {
     this.closeToTray.write(enabled);
   }
 
-  /** A blank combination is refused: it would leave the palette with no call. */
   setPaletteShortcut(accelerator: string): void {
     this.paletteShortcut.write(accelerator);
   }
@@ -147,11 +135,7 @@ export class SettingsStore {
     this.copyConfirmation.write(enabled);
   }
 
-  /**
-   * Turning the prompt back on also forgets the version that was skipped: "notify me
-   * about updates" is exactly what taking a skip back means, and a user who has just
-   * asked for it should not have to find a second control.
-   */
+  /** Turning the prompt back on also forgets the version that was skipped. */
   setUpdateNotifications(enabled: boolean): void {
     this.updateNotifications.write(enabled);
     if (enabled) {
@@ -159,15 +143,12 @@ export class SettingsStore {
     }
   }
 
-  /** `''` forgets the skip. Written by the prompt's checkbox, and by the panel. */
+  /** `''` forgets the skip. */
   setSkippedUpdate(version: string): void {
     this.skippedUpdate.write(version);
   }
 
-  /**
-   * One setting: its signal, its restore step and its write-through, from a single
-   * declaration.
-   */
+  /** One setting: its signal, its restore step and its write-through, in one declaration. */
   private setting<K extends keyof AppSettings>(
     key: K,
     codec: SettingCodec<AppSettings[K]>,
@@ -184,8 +165,8 @@ export class SettingsStore {
     });
 
     const write = (value: AppSettings[K]): void => {
-      // Through the codec both ways, so a value the restore path would reject
-      // is refused on the way in too.
+      // Through the codec both ways, so a value the restore path would reject is
+      // refused on the way in too.
       const accepted = codec.parse(codec.format(value));
       if (accepted === null) return;
 
@@ -197,8 +178,8 @@ export class SettingsStore {
   }
 
   private watchSystemTheme(): void {
-    // `matchMedia` is missing from some test environments; without it the
-    // "system" theme falls back to light, which the CSS default assumes.
+    // `matchMedia` is missing from some test environments; without it the "system"
+    // theme falls back to light, which the CSS default assumes.
     const media = window.matchMedia?.(DARK_QUERY);
     if (!media) return;
 

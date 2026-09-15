@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DownloadProgress, UpdaterService } from './updater.service';
 
-/**
- * `check()` and `relaunch()` are one-line calls into the plugin and are left to the
- * application to exercise: `vi.mock` on a Tauri package is unreliable here. What is worth
- * pinning is what the service decides — the download arithmetic and the lifetime of the
- * native handle — and none of it goes near the bridge.
- */
+/** What is pinned here is the download arithmetic and the lifetime of the native handle. */
 
 /** Download event as the plugin emits it, reduced to the fields that are read. */
 type DownloadEvent =
@@ -14,10 +9,7 @@ type DownloadEvent =
   | { event: 'Progress'; data: { chunkLength: number } }
   | { event: 'Finished' };
 
-/**
- * Stand-in for the plugin's `Update`, a **native resource**: it carries an id on the Rust
- * side and has to be closed when it is not installed.
- */
+/** Stand-in for the plugin's `Update`, a native resource that has to be closed. */
 function fakeUpdate(events: DownloadEvent[] = []) {
   return {
     closed: 0,

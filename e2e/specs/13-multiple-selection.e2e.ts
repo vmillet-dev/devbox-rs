@@ -7,13 +7,8 @@ import { clipboardText, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * The batch commands answer with a **count**, not a `Result` per note: a selection can
- * hold an id that went stale between the click and the call, and failing the whole
- * batch for one of them would be worse than a partial result. That contract is only
- * observable against a real corpus.
- *
- * The bar itself exists only while something is ticked — `NoteSelectionStore` answers
- * *which note is pointed at*, and the page draws the bar from it.
+ * The batch commands answer with a count, not a `Result` per note: a selection can hold
+ * an id that went stale between the click and the call.
  */
 describe('Selecting several notes at once', () => {
   const first = 'Batch one';
@@ -66,8 +61,8 @@ describe('Selecting several notes at once', () => {
     await selectionBar.copy();
     await browser.pause(800);
 
-    // Every clipboard copy is acknowledged under the titlebar — `copyConfirmation` is
-    // on by default, and the toast is the only thing saying the copy happened.
+    // `copyConfirmation` is on by default, and the toast is the only thing saying the
+    // copy happened.
     expect(await banners.status().isExisting()).toBe(true);
 
     const copied = await clipboardText();
@@ -110,8 +105,7 @@ describe('Selecting several notes at once', () => {
     await canvas.waitForNoCard(first);
     await canvas.waitForNoCard(second);
 
-    // `delete_notes` stamps `deleted_at` too — a batch is not a shortcut past the
-    // 30-day reprieve.
+    // `delete_notes` stamps `deleted_at` too — a batch is not a shortcut past the reprieve.
     const trashed = (await bridge.listTrash()).map((row) => row.title);
     expect(trashed).toContain(first);
     expect(trashed).toContain(second);

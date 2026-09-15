@@ -6,13 +6,8 @@ import { NOTES_SHORTCUT_GROUPS } from '@titlebar/about-menu/shortcuts-dialog/not
 import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
 /**
- * The **global** group is built here rather than registered, because it is the
- * application's own: those three combinations are taken by the native side before the
- * front has started, and the quick-paste one follows a preference — reading
- * `SettingsStore` is what makes the sheet show the key that is really bound.
- *
- * The sheet is read-only on purpose: the one shortcut that can be changed is changed in
- * the preferences.
+ * The global group reads `SettingsStore`, which is what makes the sheet show the key
+ * that is really bound rather than the one that shipped.
  */
 @Component({
   selector: 'app-shortcuts-dialog',

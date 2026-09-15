@@ -20,10 +20,6 @@ function checkedValue(event: Event): boolean {
   return (event.target as HTMLInputElement).checked;
 }
 
-/**
- * Every control writes straight into [`SettingsStore`] — there is no draft to confirm, and
- * the `core/` services carry each change down to the native side.
- */
 @Component({
   selector: 'app-settings-page',
   imports: [TranslocoPipe],
@@ -80,11 +76,9 @@ export class SettingsPageComponent {
   }
 
   /**
-   * The field accepts no text: it **listens for a keystroke**. Typing `Ctrl+Alt+P` by hand
-   * would let through combinations the native side cannot read back.
-   *
-   * A keystroke with no modifier is not a combination and goes back to the dialog: that is
-   * what leaves Tab and Escape working inside the field.
+   * The field listens for a keystroke rather than accepting text, which would let through
+   * combinations the native side cannot read back. A keystroke with no modifier goes back
+   * to the dialog, which is what leaves Tab and Escape working inside the field.
    */
   protected onShortcutKeydown(event: KeyboardEvent): void {
     const accelerator = acceleratorFromEvent(event);

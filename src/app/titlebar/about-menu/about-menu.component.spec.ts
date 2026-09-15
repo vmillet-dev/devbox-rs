@@ -67,11 +67,7 @@ describe('AboutMenuComponent', () => {
       expect(dot()).toBeNull();
     });
 
-    /**
-     * ⚠️ The point of the dot. `dismiss()` returns the status to `idle`, which is what
-     * closes the prompt — a dot reading that state would disappear with the dialog it
-     * exists to outlive.
-     */
+    /** ⚠️ `dismiss()` moves the status to `idle`: a dot reading it would vanish with the prompt. */
     it('stays after the prompt has been dismissed', async () => {
       updater.available = { version: '0.2.0', currentVersion: '0.1.0' };
       await store.check();

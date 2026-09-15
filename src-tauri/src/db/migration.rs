@@ -1,4 +1,4 @@
-//! ⚠️ **Append-only.** Evolving the model means adding a
+//! ⚠️ Append-only. Evolving the model means adding a
 //! `migrations/YYYY-MM-DD-HHMMSS_name/` directory, never editing a shipped one.
 
 use diesel::migration::MigrationSource;
@@ -11,8 +11,7 @@ use crate::error::StorageError;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
-/// The highest value the old `PRAGMA user_version` ever shipped; it never moves
-/// again, a migration added today having never existed under the old scheme.
+/// The highest value the old `PRAGMA user_version` ever shipped; it never moves again.
 const LEGACY_MIGRATION_COUNT: usize = 3;
 
 #[derive(QueryableByName)]
@@ -32,9 +31,9 @@ fn embedded_versions() -> Result<Vec<String>, StorageError> {
     Ok(versions)
 }
 
-/// Without it an already installed database would replay the initial migration over
-/// existing tables. The first `n` are marked as applied without being executed, and
-/// the pragma is zeroed — two sources of truth on the schema state would drift apart.
+/// ⚠️ Without it an already installed database replays the initial migration over
+/// existing tables. The first `n` are marked applied without being executed, and the
+/// pragma is zeroed — two sources of truth on the schema state would drift apart.
 fn adopt_legacy_history(
     connection: &mut SqliteConnection,
     embedded: &[String],
@@ -76,8 +75,7 @@ pub fn run(connection: &mut SqliteConnection) -> Result<(), StorageError> {
 
     adopt_legacy_history(connection, &embedded)?;
 
-    // An applied migration we do not know about signals a database written by a
-    // newer version: refusing beats overwriting its data.
+    // An applied migration we do not know signals a database written by a newer version.
     let applied = connection
         .applied_migrations()
         .map_err(|error| StorageError::Migration(error.to_string()))?;
@@ -105,8 +103,8 @@ mod tests {
     use crate::db::{DB_FILE_NAME, configure, open, open_in_memory, schema};
     use crate::error::StorageError;
 
-    /// The initial migration exactly as it shipped: replayed by hand it builds a
-    /// "legacy" database — schema in place, `user_version` set, nothing Diesel-side.
+    /// The initial migration exactly as it shipped: replayed by hand it builds a legacy
+    /// database — schema in place, `user_version` set, nothing Diesel-side.
     const LEGACY_SCHEMA: &str = include_str!("../../migrations/2026-07-25-000001_initial/up.sql");
     const LEGACY_FOLD_TAG_CASE: &str =
         include_str!("../../migrations/2026-07-25-000002_fold_tag_case/up.sql");
@@ -166,10 +164,8 @@ mod tests {
         assert_eq!(applied.len(), embedded_versions().unwrap().len());
     }
 
-    /// Reverting is a development convenience, never something an install does — but a
-    /// `down.sql` nobody runs is a `down.sql` nobody can trust. This is what keeps the
-    /// set honest, and what would catch an `ALTER TABLE ... DROP COLUMN` blocked by an
-    /// index the revert forgot to drop first.
+    /// A `down.sql` nobody runs is a `down.sql` nobody can trust: this is what would
+    /// catch a `DROP COLUMN` blocked by an index the revert forgot to drop first.
     #[test]
     fn every_migration_can_be_reverted_and_replayed() {
         let mut connection = open_in_memory().unwrap();

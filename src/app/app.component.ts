@@ -5,10 +5,6 @@ import { StatusToastComponent } from '@banners/status-toast/status-toast.compone
 import { TitlebarComponent } from '@titlebar/titlebar.component';
 import { UpdatePromptComponent } from '@banners/update-prompt/update-prompt.component';
 
-/**
- * The application's persistent frame: the features plug in through the outlet, not through
- * a direct import.
- */
 @Component({
   selector: 'app-root',
   imports: [

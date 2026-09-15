@@ -5,10 +5,6 @@ import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 /** Long enough to be seen, short enough not to follow the mouse to the next card. */
 const FEEDBACK_MS = 2000;
 
-/**
- * In `features/` and not in `shared/`: it injects, and a `shared/` component injects
- * nothing.
- */
 @Component({
   selector: 'app-copy-button',
   imports: [TranslocoPipe],
@@ -20,13 +16,8 @@ export class CopyButtonComponent {
   private readonly clipboard = inject(ClipboardService);
 
   readonly value = input.required<string>();
-  /** Adds the label next to the icon, for a toolbar. */
   readonly showLabel = input(false);
 
-  /**
-   * Settable because the same button says "Copy" in a toolbar and "Copy as is" next to
-   * a fields panel, where **as is** is what carries the information.
-   */
   readonly label = input('notes.copyContent');
 
   protected readonly copied = signal(false);

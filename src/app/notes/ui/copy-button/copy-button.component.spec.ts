@@ -30,8 +30,8 @@ describe('CopyButtonComponent', () => {
   }
 
   beforeEach(async () => {
-    // Only the timers: a bare useFakeTimers() also fakes requestAnimationFrame,
-    // which the zoneless scheduler needs, and whenStable() then never settles.
+    // ⚠️ Only the timers: a bare useFakeTimers() also fakes requestAnimationFrame,
+    // which the zoneless scheduler needs.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await build();
   });

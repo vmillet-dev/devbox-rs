@@ -10,8 +10,6 @@ use specta::Type;
 use super::checklist::{self, ChecklistItem, NoteKind};
 use super::language::{self, Language};
 use super::placeholder::{self, Placeholder};
-// The search vocabulary lives with the matching, in `view`. The two modules name each
-// other, which inside one feature is a reference rather than a dependency.
 use super::view::SearchHit;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -29,15 +27,15 @@ pub struct Note {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub lifecycle: NoteLifecycle,
-    /// ⚠️ `default`: `transfer::Bundle` deserializes `Note` itself, and a required
-    /// key would make every export file written before todo-lists unreadable.
+    /// ⚠️ `default`: `transfer::Bundle` deserializes `Note` itself, and a required key
+    /// would make every export file written before todo lists unreadable.
     #[serde(default)]
     pub kind: NoteKind,
-    /// Empty for a snippet. A checklist has these **instead of** `content`.
+    /// A checklist has these instead of `content`.
     #[serde(default)]
     pub items: Vec<ChecklistItem>,
-    /// Written by `set_placeholder_values` and by nothing else: filling a field is
-    /// not editing the note, so it leaves `updated_at` alone.
+    /// Written by `set_placeholder_values` and by nothing else: filling a field is not
+    /// editing the note, so it leaves `updated_at` alone.
     #[serde(default)]
     pub placeholder_values: BTreeMap<String, String>,
 }
@@ -46,10 +44,7 @@ pub struct Note {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum NoteLifecycle {
     Permanent,
-    /// "Untriaged" until this date.
-    Expires {
-        at: DateTime<Utc>,
-    },
+    Expires { at: DateTime<Utc> },
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]
@@ -69,9 +64,9 @@ pub struct NoteDraft {
     pub items: Vec<ChecklistItem>,
 }
 
-/// A field set to `None` stays **unchanged**. `#[specta(optional)]` makes the key
-/// omissible on the TypeScript side; without it the front would send `null` for
-/// what it does not touch, overwriting it.
+/// ⚠️ A field set to `None` stays unchanged, and `#[specta(optional)]` makes the key
+/// omissible on the TypeScript side — without it the front sends `null` for what it does
+/// not touch, overwriting it.
 #[derive(Debug, Clone, Default, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotePatch {
@@ -93,8 +88,7 @@ pub struct NotePatch {
     pub lifecycle: Option<NoteLifecycle>,
     #[specta(optional)]
     pub kind: Option<NoteKind>,
-    /// Replaces the **whole** list, like `tags`: a position is all the identity an
-    /// item has.
+    /// Replaces the whole list, like `tags`: a position is all the identity an item has.
     #[specta(optional)]
     pub items: Option<Vec<ChecklistItem>>,
 }
@@ -130,8 +124,8 @@ impl NoteDraft {
 }
 
 impl NotePatch {
-    /// ⚠️ Does not check that `space_id` exists — only persistence can, and it does
-    /// so before calling.
+    /// ⚠️ Does not check that `space_id` exists — only persistence can, and it does so
+    /// before calling.
     pub fn apply(&self, note: &mut Note, now: DateTime<Utc>) {
         // Skipped once the note is — or becomes — a checklist: no body to read.
         let becomes_checklist = self.kind.unwrap_or(note.kind) == NoteKind::Checklist;
@@ -181,8 +175,8 @@ impl NotePatch {
 
 const EXPIRING_SOON: TimeDelta = TimeDelta::days(3);
 
-/// The **decision**, not the rendering: the dated variants carry a date and not a
-/// label — "4 min ago" has to age on screen without a round trip.
+/// The decision, not the rendering: the dated variants carry a date and not a label,
+/// so "4 min ago" ages on screen without a round trip.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum NoteFooter {
@@ -199,17 +193,15 @@ pub struct DisplayNote {
     pub note: Note,
     pub footer: NoteFooter,
     pub expiring_soon: bool,
-    /// The **list** is derived from the text; the values are persisted.
+    /// The list is derived from the text; the values are persisted.
     pub placeholders: Vec<Placeholder>,
     /// Filled in afterwards by whoever holds a connection: `decorate` reads no database.
     pub attachment_count: u32,
-    /// What copying puts on the clipboard when that is **not** the content: a todo
-    /// list travels as the Markdown of its items, a snippet as `None`. Decided here
-    /// so `checklist::to_markdown` stays the only place the `- [x] ` syntax exists.
+    /// ⚠️ What copying yields when that is not the content. Decided here so
+    /// `checklist::to_markdown` stays the only place the `- [x] ` syntax exists.
     pub copy_text: Option<String>,
-    /// Why this note is in the results, when the card is not already showing it.
-    /// Filled in afterwards by `view::build`, like the attachment count above it —
-    /// `None` outside a search, and for a note found by its own title.
+    /// Filled in afterwards by `view::build`; `None` outside a search, and for a note
+    /// found by its own title.
     pub search_hit: Option<SearchHit>,
 }
 
@@ -240,9 +232,8 @@ pub fn decorate_now(note: Note) -> DisplayNote {
     decorate(note, Utc::now())
 }
 
-/// ⚠️ They override the default written in the text but **do not touch** what was
-/// typed on the note: copying one into `value` would freeze the variable the day
-/// it changes.
+/// ⚠️ They override the default written in the text but do not touch what was typed on
+/// the note: copying one into `value` would freeze the variable the day it changes.
 pub fn apply_global_defaults(note: &mut DisplayNote, globals: &BTreeMap<String, String>) {
     for placeholder in &mut note.placeholders {
         if let Some(value) = globals.get(&placeholder.name) {
@@ -278,8 +269,8 @@ fn expires_soon(note: &Note, now: DateTime<Utc>) -> bool {
         return false;
     };
 
-    // A duration, not a number of whole days: at 3 days and 1 hour, rounding down
-    // would switch the note to alert a day early.
+    // A duration, not a number of whole days: at 3 days and 1 hour, rounding down would
+    // switch the note to alert a day early.
     at.signed_duration_since(now) <= EXPIRING_SOON
 }
 
@@ -290,25 +281,23 @@ pub struct TagUsage {
     pub note_count: u32,
 }
 
-/// Written across the whole corpus (rename, merge), so its failure is an error:
-/// staying silent would rename onto nothing.
+/// Written across the whole corpus, so its failure is an error: staying silent would
+/// rename onto nothing.
 pub fn validated_tag(raw: &str) -> Result<String, crate::error::ValidationError> {
     normalize_tag(raw)
         .map(str::to_string)
         .ok_or_else(|| crate::error::ValidationError::new("tag", "a tag must have a readable name"))
 }
 
-/// Split out of [`normalize_tags`] so a caller that only needs to know whether a
-/// tag was selected can ask without building the list.
 pub fn normalize_tag(tag: &str) -> Option<&str> {
     let cleaned = tag.trim().trim_start_matches('#').trim();
 
     (!cleaned.is_empty()).then_some(cleaned)
 }
 
-/// Trim, leading `#`, blanks, duplicates. Both writing and querying go through
-/// here, or a typed `#urgent` would not find the stored `urgent`. De-duplication
-/// is case-insensitive and keeps the first spelling, like `COLLATE NOCASE`.
+/// ⚠️ Both writing and querying go through here, or a typed `#urgent` would not find the
+/// stored `urgent`. De-duplication is case-insensitive and keeps the first spelling,
+/// like the `COLLATE NOCASE` on the column.
 pub fn normalize_tags(tags: &[String]) -> Vec<String> {
     let mut seen: Vec<String> = Vec::new();
     let mut normalized: Vec<String> = Vec::new();

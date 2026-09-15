@@ -2,10 +2,7 @@ import { guard } from './fail-next';
 import { TransferRepository } from '@core/data/transfer.repository';
 import { ExportReport, ImportReport } from '@core/model/note.model';
 
-/**
- * It writes and reads nothing: the file is the back end's business, so the double records
- * the arguments and hands back the report the spec asked for.
- */
+/** Records the arguments and hands back the report the spec asked for. */
 export class FakeTransferRepository implements Pick<TransferRepository, keyof TransferRepository> {
   /** When set, the next call to any method rejects with this error, then clears. */
   failNext: Error | null = null;

@@ -6,12 +6,9 @@ interface StackEntry {
 }
 
 /**
- * Which modal is in front, so Escape reaches one dialog and not all of them: every open
- * dialog listens on `document`, and that used to be patched case by case.
- *
- * ⚠️ Ordered by **rung** and not by arrival: a dialog opened by another one (the fields
- * form, from the palette) is created second in the DOM but drawn in front, and Escape has
- * to follow what is on screen. Ties break on arrival.
+ * Which modal is in front, so Escape reaches one dialog and not all of them. ⚠️ Ordered
+ * by rung and not by arrival: a dialog opened by another one is created second in the
+ * DOM but drawn in front, and Escape has to follow what is on screen.
  */
 @Injectable({ providedIn: 'root' })
 export class DialogStack {

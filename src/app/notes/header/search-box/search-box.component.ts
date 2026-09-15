@@ -27,17 +27,10 @@ function platformShortcutHint(): string {
 export class SearchBoxComponent {
   readonly query = model('');
 
-  /**
-   * Disabled while a modal is open: it would otherwise move focus to a field *behind*
-   * the dialog, into a control the user cannot see.
-   */
+  /** Disabled while a modal is open: it would move focus to a field behind the dialog. */
   readonly shortcutEnabled = input(true);
 
-  /**
-   * How many notes the query matched, `null` when nothing is being filtered. It takes the
-   * shortcut hint's place rather than a slot of its own: the hint is what you need before
-   * you search, the count is what you need once you have.
-   */
+  /** Takes the shortcut hint's place: the hint is needed before a search, the count after. */
   readonly matched = input<number | null>(null);
 
   /** Asked for from the count, which is the only thing on screen that says it is on. */
@@ -47,10 +40,7 @@ export class SearchBoxComponent {
 
   private readonly inputRef = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
 
-  /**
-   * Carried by the component that shows its hint and owns the field, rather than lifted
-   * to the page through a chain of `viewChild`s crossing two levels.
-   */
+  /** Carried by the component that owns the field rather than lifted to the page. */
   protected onDocumentKeydown(event: KeyboardEvent): void {
     if (!this.shortcutEnabled()) return;
     if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
@@ -60,8 +50,8 @@ export class SearchBoxComponent {
   }
 
   /**
-   * ⚠️ The field is inside the <label>, so a click on this button would focus it and
-   * hand the user a cursor in a field they just emptied.
+   * ⚠️ The field is inside the `<label>`, so a click here would focus it and hand the
+   * user a cursor in a field they just emptied.
    */
   protected onClear(event: MouseEvent): void {
     event.preventDefault();
