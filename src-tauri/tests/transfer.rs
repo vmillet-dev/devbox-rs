@@ -243,6 +243,13 @@ fn a_degraded_note_is_counted_once_and_not_again_on_a_second_import() {
     assert_eq!(second.notes_degraded, 0);
 }
 
+/// The attachment as it really sits beside the database: sealed under the library key,
+/// which is what the export has to open before it can write the file out.
+fn seal_beside(directory: &std::path::Path, library: &Library, record: &Attachment, bytes: &[u8]) {
+    let sealed = library.vault().seal_bytes(bytes).unwrap();
+    std::fs::write(directory.join(record.stored_name()), sealed).unwrap();
+}
+
 /// `create` takes the pair, the way an import inside a transaction does.
 fn attach(
     library: &mut Library,
@@ -289,7 +296,7 @@ fn an_attachment_travels_with_the_library() {
     let mut source = library();
     let note_id = notes::all(&mut source, None).unwrap()[0].id.clone();
     let record = capture(&note_id);
-    std::fs::write(source_files.join(record.stored_name()), b"\x89PNG").unwrap();
+    seal_beside(&source_files, &source, &record, b"\x89PNG");
     attach(&mut source, &record).unwrap();
 
     let target_path = directory
@@ -297,11 +304,11 @@ fn an_attachment_travels_with_the_library() {
         .to_string_lossy()
         .to_string();
     let packed = exported(&mut source);
-    let written = file::write(&target_path, &packed, &source_files).unwrap();
+    let written = file::write(&target_path, &packed, &source_files, source.vault(), None).unwrap();
     assert_eq!(written.attachments, 1);
 
     let mut target = open_in_memory().unwrap();
-    let (incoming, mut payload) = file::read(&target_path).unwrap();
+    let (incoming, mut payload) = file::read(&target_path, None).unwrap();
     let report = merge_bundle(&mut target, incoming, &mut payload, &target_files).unwrap();
 
     assert_eq!(report.attachments_imported, 1);
@@ -326,20 +333,27 @@ fn importing_the_same_archive_twice_restores_the_attachment_once() {
     let mut source = library();
     let note_id = notes::all(&mut source, None).unwrap()[0].id.clone();
     let record = capture(&note_id);
-    std::fs::write(files.join(record.stored_name()), b"\x89PNG").unwrap();
+    seal_beside(&files, &source, &record, b"\x89PNG");
     attach(&mut source, &record).unwrap();
 
     let target_path = directory
         .join("library.devbox")
         .to_string_lossy()
         .to_string();
-    file::write(&target_path, &exported(&mut source), &files).unwrap();
+    file::write(
+        &target_path,
+        &exported(&mut source),
+        &files,
+        source.vault(),
+        None,
+    )
+    .unwrap();
 
     let mut target = open_in_memory().unwrap();
-    let (first, mut payload) = file::read(&target_path).unwrap();
+    let (first, mut payload) = file::read(&target_path, None).unwrap();
     merge_bundle(&mut target, first, &mut payload, &files).unwrap();
 
-    let (again, mut payload) = file::read(&target_path).unwrap();
+    let (again, mut payload) = file::read(&target_path, None).unwrap();
     let second = merge_bundle(&mut target, again, &mut payload, &files).unwrap();
 
     assert_eq!(second.notes_imported, 0);
@@ -366,11 +380,18 @@ fn an_attachment_the_archive_does_not_carry_is_reported() {
         .join("library.devbox")
         .to_string_lossy()
         .to_string();
-    let written = file::write(&target_path, &exported(&mut source), &files).unwrap();
+    let written = file::write(
+        &target_path,
+        &exported(&mut source),
+        &files,
+        source.vault(),
+        None,
+    )
+    .unwrap();
     assert_eq!(written.attachments, 0);
 
     let mut target = open_in_memory().unwrap();
-    let (incoming, mut payload) = file::read(&target_path).unwrap();
+    let (incoming, mut payload) = file::read(&target_path, None).unwrap();
     let report = merge_bundle(&mut target, incoming, &mut payload, &files).unwrap();
 
     assert_eq!(report.notes_imported, 2);

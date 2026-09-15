@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StatusNotifier } from '@core/services/notifications/status.service';
+import { LibraryStore } from '@core/state/library.store';
 import { NoteSelectionStore } from '@core/state/note-selection.store';
 import { NotesQueryStore } from '@core/state/notes-query.store';
 import { SpacesStore } from '@core/state/spaces.store';
@@ -39,6 +40,13 @@ describe('FileMenuComponent', () => {
     const found = options().find((option) => option.textContent?.includes(label));
     if (!found) throw new Error(`No menu option labelled "${label}"`);
     return found;
+  }
+
+  /** ⚠️ The prompt stands between the click and the file; these scenarios decline it. */
+  async function declineProtection(): Promise<void> {
+    const library = TestBed.inject(LibraryStore);
+    await vi.waitFor(() => expect(library.passphraseRequest()).not.toBeNull());
+    library.answerPassphrase({ kind: 'none' });
   }
 
   async function openMenu(): Promise<void> {
@@ -125,9 +133,14 @@ describe('FileMenuComponent', () => {
     await openMenu();
 
     optionLabelled('Exporter tout').click();
+    await declineProtection();
 
     await vi.waitFor(() =>
-      expect(transferRepository.exportedTo).toEqual({ path: 'C:\\out\\all.json', spaceId: null }),
+      expect(transferRepository.exportedTo).toEqual({
+        path: 'C:\\out\\all.json',
+        spaceId: null,
+        passphrase: null,
+      }),
     );
   });
 
@@ -143,6 +156,7 @@ describe('FileMenuComponent', () => {
     spaces.selectSpace('work');
     await fixture.whenStable();
     optionLabelled("Exporter l'espace").click();
+    await declineProtection();
 
     await vi.waitFor(() => expect(transferRepository.exportedTo?.spaceId).toBe('work'));
   });
@@ -165,6 +179,7 @@ describe('FileMenuComponent', () => {
     await openMenu();
 
     optionLabelled('Exporter la sélection').click();
+    await declineProtection();
 
     await vi.waitFor(() => expect(transferRepository.exportedIds).toEqual(['note-42']));
   });

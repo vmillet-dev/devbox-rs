@@ -1,10 +1,16 @@
 //! Nothing here knows the database.
 //!
-//! The export is a zip: `bundle.json` at the root, one entry per attachment under
+//! The export is a zip: the bundle at the root, one entry per attachment under
 //! `attachments/`. ⚠️ Base64 inside the JSON was the obvious alternative and was refused:
 //! it costs a third more bytes, and the import path holds the file as a `String`, then a
 //! `serde_json::Value`, then a `Bundle` — three copies of every screenshot in memory.
 //! Archive entries are pulled one at a time instead.
+//!
+//! ⚠️ An export leaves the library's key behind. The attachment files on disk are sealed
+//! with a key that never leaves this machine, so they are opened on the way out and then
+//! either written in the clear — an unprotected export is portable and readable, which is
+//! what the exchange format exists for — or resealed under a key derived from the phrase
+//! the user gave this one file.
 
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
@@ -16,12 +22,23 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 use super::model::{Bundle, ExportReport, IncomingBundle};
+use super::protect::{self, Recipe};
 use crate::attachments::model::Attachment;
 use crate::count::saturating_u32;
 use crate::error::{AppError, StorageError};
+use crate::vault::key::Vault;
 
 const BUNDLE_ENTRY: &str = "bundle.json";
 const ATTACHMENTS_ENTRY: &str = "attachments";
+
+/// ⚠️ Present only in a protected export, and it **replaces** `bundle.json` rather than
+/// sitting beside it: a reader that finds this and cannot open it must not fall back on a
+/// plaintext bundle that should not exist.
+const SEALED_ENTRY: &str = "bundle.sealed";
+
+/// Beside the sealed payload, in the clear: the salt and the cost are what a reader needs
+/// to derive the same key, and neither is a secret.
+const RECIPE_ENTRY: &str = "recipe.json";
 
 /// What a zip opens with. An export written before the archive existed is plain JSON and
 /// is still read: a new DevBox reads an old file, an old DevBox does not read a new one.
@@ -35,14 +52,41 @@ fn zip_error(error: &zip::result::ZipError) -> StorageError {
     StorageError::File(error.to_string())
 }
 
+fn deflated() -> SimpleFileOptions {
+    SimpleFileOptions::default().compression_method(CompressionMethod::Deflated)
+}
+
+/// A PNG is compressed already, and ciphertext does not compress at all.
+fn stored_as_is() -> SimpleFileOptions {
+    SimpleFileOptions::default().compression_method(CompressionMethod::Stored)
+}
+
 /// ⚠️ Written beside the target then renamed: a truncating write destroys the previous
 /// export the day the disk fills.
-pub fn write(path: &str, bundle: &Bundle, attachments: &Path) -> Result<ExportReport, AppError> {
+///
+/// `passphrase` protects the archive. Without one the file is plaintext — every note,
+/// every screenshot — which is what the interface has to say before it writes one.
+pub fn write(
+    path: &str,
+    bundle: &Bundle,
+    attachments: &Path,
+    library: &Vault,
+    passphrase: Option<&str>,
+) -> Result<ExportReport, AppError> {
     let json = serde_json::to_string_pretty(bundle)
         .map_err(|error| StorageError::File(error.to_string()))?;
 
+    let protection = passphrase.map(protect::seal_with).transpose()?;
+
     let staged = staging_path(path);
-    let stored = match archive(&staged, &json, &bundle.attachments, attachments) {
+    let stored = match archive(
+        &staged,
+        &json,
+        &bundle.attachments,
+        attachments,
+        library,
+        protection.as_ref(),
+    ) {
         Ok(stored) => stored,
         Err(error) => {
             let _ = std::fs::remove_file(&staged);
@@ -59,30 +103,50 @@ pub fn write(path: &str, bundle: &Bundle, attachments: &Path) -> Result<ExportRe
         notes: saturating_u32(bundle.notes.len()),
         spaces: saturating_u32(bundle.spaces.len()),
         attachments: stored,
+        protected: passphrase.is_some(),
     })
 }
 
-/// The bundle is deflated, being repetitive text. The attachments are stored as they are:
-/// a PNG is already compressed, and deflating it again costs time for nothing.
 fn archive(
     staged: &Path,
     json: &str,
     records: &[Attachment],
     source: &Path,
+    library: &Vault,
+    protection: Option<&(Vault, Recipe)>,
 ) -> Result<u32, StorageError> {
     let target =
         File::create(staged).map_err(|error| file_error(&staged.display().to_string(), &error))?;
     let mut writer = ZipWriter::new(target);
 
-    writer
-        .start_file(
-            BUNDLE_ENTRY,
-            SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
-        )
-        .map_err(|error| zip_error(&error))?;
-    writer
-        .write_all(json.as_bytes())
-        .map_err(|error| file_error(BUNDLE_ENTRY, &error))?;
+    // The recipe goes in first and in the clear: a reader has to know how to derive the
+    // key before it can be asked for a phrase.
+    if let Some((_, recipe)) = protection {
+        let written = serde_json::to_string_pretty(recipe)
+            .map_err(|error| StorageError::File(error.to_string()))?;
+        writer
+            .start_file(RECIPE_ENTRY, deflated())
+            .map_err(|error| zip_error(&error))?;
+        writer
+            .write_all(written.as_bytes())
+            .map_err(|error| file_error(RECIPE_ENTRY, &error))?;
+    }
+
+    if let Some((vault, _)) = protection {
+        writer
+            .start_file(SEALED_ENTRY, stored_as_is())
+            .map_err(|error| zip_error(&error))?;
+        writer
+            .write_all(&vault.seal_bytes(json.as_bytes())?)
+            .map_err(|error| file_error(SEALED_ENTRY, &error))?;
+    } else {
+        writer
+            .start_file(BUNDLE_ENTRY, deflated())
+            .map_err(|error| zip_error(&error))?;
+        writer
+            .write_all(json.as_bytes())
+            .map_err(|error| file_error(BUNDLE_ENTRY, &error))?;
+    }
 
     let mut stored = 0;
     for record in records {
@@ -90,15 +154,19 @@ fn archive(
 
         // A record whose file has gone missing leaves the export rather than failing it:
         // the note still travels, and `attachments_missing` says so on the way back in.
-        let Ok(bytes) = std::fs::read(source.join(&name)) else {
+        let Ok(sealed) = std::fs::read(source.join(&name)) else {
             continue;
         };
 
+        // Opened under the library's key, then written the way this export travels.
+        let plain = library.open_bytes(&sealed)?;
+        let bytes = match protection {
+            Some((vault, _)) => vault.seal_bytes(&plain)?,
+            None => plain,
+        };
+
         writer
-            .start_file(
-                format!("{ATTACHMENTS_ENTRY}/{name}"),
-                SimpleFileOptions::default().compression_method(CompressionMethod::Stored),
-            )
+            .start_file(format!("{ATTACHMENTS_ENTRY}/{name}"), stored_as_is())
             .map_err(|error| zip_error(&error))?;
         writer
             .write_all(&bytes)
@@ -112,7 +180,11 @@ fn archive(
 }
 
 /// The bundle, and whatever carries the attachment bytes that belong with it.
-pub fn read(path: &str) -> Result<(IncomingBundle, Payload), AppError> {
+///
+/// ⚠️ Answers [`StorageError::PassphraseRequired`] on a protected file offered without
+/// one: nothing can tell a protected archive from an ordinary one until it has looked
+/// inside, so looking is this function's job rather than the interface's.
+pub fn read(path: &str, passphrase: Option<&str>) -> Result<(IncomingBundle, Payload), AppError> {
     let mut file = File::open(path).map_err(|error| file_error(path, &error))?;
 
     let mut magic = [0u8; 4];
@@ -128,34 +200,110 @@ pub fn read(path: &str) -> Result<(IncomingBundle, Payload), AppError> {
     let mut archive =
         ZipArchive::new(file).map_err(|error| StorageError::ImportFormat(error.to_string()))?;
 
-    let json = {
-        let mut entry = archive
-            .by_name(BUNDLE_ENTRY)
-            .map_err(|_| StorageError::ImportFormat(format!("no {BUNDLE_ENTRY} in the archive")))?;
-        let mut json = String::new();
-        entry
-            .read_to_string(&mut json)
-            .map_err(|error| file_error(BUNDLE_ENTRY, &error))?;
-        json
+    let Some(recipe) = read_recipe(&mut archive)? else {
+        let raw = entry(&mut archive, BUNDLE_ENTRY)?;
+        let json = String::from_utf8(raw)
+            .map_err(|_| StorageError::ImportFormat("the bundle is not text".to_string()))?;
+
+        return Ok((
+            super::model::read_bundle(&json)?,
+            Payload::Archive {
+                archive: Box::new(archive),
+                vault: None,
+            },
+        ));
     };
+
+    let Some(passphrase) = passphrase else {
+        return Err(StorageError::PassphraseRequired.into());
+    };
+
+    let vault = protect::open_with(passphrase, &recipe)?;
+    let sealed = entry(&mut archive, SEALED_ENTRY)?;
+
+    // ⚠️ The payload's own tag is the check: a phrase that does not open it is refused
+    // here, so the file carries no separate verifier to work against.
+    let raw = vault
+        .open_bytes(&sealed)
+        .map_err(|_| StorageError::WrongPassphrase)?;
+    let json = String::from_utf8(raw)
+        .map_err(|_| StorageError::ImportFormat("the bundle is not text".to_string()))?;
 
     Ok((
         super::model::read_bundle(&json)?,
-        Payload::Archive(Box::new(archive)),
+        Payload::Archive {
+            archive: Box::new(archive),
+            vault: Some(vault),
+        },
     ))
 }
 
+/// Whether a file will want a phrase, asked without one so an interface can prompt.
+pub fn is_protected(path: &str) -> Result<bool, AppError> {
+    match read(path, None) {
+        Ok(_) => Ok(false),
+        Err(error) if error.code == crate::error::ErrorCode::PassphraseRequired => Ok(true),
+        Err(error) => Err(error),
+    }
+}
+
+fn read_recipe(archive: &mut ZipArchive<File>) -> Result<Option<Recipe>, StorageError> {
+    if archive.by_name(RECIPE_ENTRY).is_err() {
+        return Ok(None);
+    }
+
+    let raw = entry(archive, RECIPE_ENTRY)?;
+    let recipe: Recipe = serde_json::from_slice(&raw)
+        .map_err(|error| StorageError::ImportFormat(format!("unreadable recipe: {error}")))?;
+
+    Ok(Some(recipe))
+}
+
+fn entry(archive: &mut ZipArchive<File>, name: &str) -> Result<Vec<u8>, StorageError> {
+    let mut entry = archive
+        .by_name(name)
+        .map_err(|_| StorageError::ImportFormat(format!("no {name} in the archive")))?;
+
+    let mut bytes = Vec::new();
+    entry
+        .read_to_end(&mut bytes)
+        .map_err(|error| file_error(name, &error))?;
+
+    Ok(bytes)
+}
+
 /// The attachment bytes of an import, handed over one at a time.
+///
+/// ⚠️ `Debug` says nothing about the key it may hold, for the same reason `Vault`'s does.
 pub enum Payload {
     /// A `.json` export: it carried no attachments.
     Empty,
-    Archive(Box<ZipArchive<File>>),
+    Archive {
+        archive: Box<ZipArchive<File>>,
+        /// `None` for a plaintext archive; the export's own key for a protected one.
+        vault: Option<Vault>,
+    },
+}
+
+impl std::fmt::Debug for Payload {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => formatter.write_str("Payload::Empty"),
+            Self::Archive { vault, .. } => formatter.write_str(if vault.is_some() {
+                "Payload::Archive(protected)"
+            } else {
+                "Payload::Archive"
+            }),
+        }
+    }
 }
 
 impl Payload {
-    /// `None` when the archive names the record but does not carry its bytes.
+    /// `None` when the archive names the record but does not carry its bytes, and `None`
+    /// too when it carries them under a key that will not open them — a caller cannot act
+    /// on the difference, and the import reports both as missing.
     pub fn take(&mut self, stored_name: &str) -> Option<Vec<u8>> {
-        let Self::Archive(archive) = self else {
+        let Self::Archive { archive, vault } = self else {
             return None;
         };
 
@@ -165,7 +313,10 @@ impl Payload {
         let mut bytes = Vec::new();
         entry.read_to_end(&mut bytes).ok()?;
 
-        Some(bytes)
+        match vault {
+            Some(vault) => vault.open_bytes(&bytes).ok(),
+            None => Some(bytes),
+        }
     }
 }
 
@@ -188,6 +339,20 @@ mod tests {
     use super::*;
     use crate::notes::fixtures::note as sample;
     use crate::spaces::model::Space;
+    use crate::vault::key::Cost;
+
+    fn library() -> Vault {
+        Vault::derive(
+            "the library",
+            b"0123456789abcdef",
+            Cost {
+                memory_kib: 64,
+                passes: 1,
+                lanes: 1,
+            },
+        )
+        .unwrap()
+    }
 
     fn bundle() -> Bundle {
         Bundle {
@@ -221,6 +386,12 @@ mod tests {
         directory
     }
 
+    /// The attachment as it really sits beside the database: sealed under the library.
+    fn seal_beside(directory: &Path, vault: &Vault, bytes: &[u8]) {
+        let sealed = vault.seal_bytes(bytes).unwrap();
+        std::fs::write(directory.join(record().stored_name()), sealed).unwrap();
+    }
+
     /// A staging file one directory away would make the rename cross volumes.
     #[test]
     fn the_staging_file_sits_next_to_its_target() {
@@ -249,7 +420,14 @@ mod tests {
         let directory = scratch();
         let target = directory.join("library.devbox");
 
-        write(&target.to_string_lossy(), &bundle(), &directory).unwrap();
+        write(
+            &target.to_string_lossy(),
+            &bundle(),
+            &directory,
+            &library(),
+            None,
+        )
+        .unwrap();
 
         let left: Vec<_> = std::fs::read_dir(&directory)
             .unwrap()
@@ -267,7 +445,14 @@ mod tests {
         let target = directory.join("library.devbox");
         std::fs::write(&target, "previous export, longer than what replaces it").unwrap();
 
-        write(&target.to_string_lossy(), &bundle(), &directory).unwrap();
+        write(
+            &target.to_string_lossy(),
+            &bundle(),
+            &directory,
+            &library(),
+            None,
+        )
+        .unwrap();
 
         let written = std::fs::read(&target).unwrap();
         assert_eq!(written[..4], ZIP_MAGIC);
@@ -278,7 +463,14 @@ mod tests {
     fn an_export_to_an_unreachable_directory_reports_rather_than_panicking() {
         let directory = scratch();
 
-        let error = write("/no/such/directory/library.devbox", &bundle(), &directory).unwrap_err();
+        let error = write(
+            "/no/such/directory/library.devbox",
+            &bundle(),
+            &directory,
+            &library(),
+            None,
+        )
+        .unwrap_err();
 
         assert!(matches!(error.code, crate::error::ErrorCode::FileAccess));
         std::fs::remove_dir_all(&directory).ok();
@@ -289,8 +481,15 @@ mod tests {
         let directory = scratch();
         let target = directory.join("library.devbox");
 
-        write(&target.to_string_lossy(), &bundle(), &directory).unwrap();
-        let (read_back, _) = read(&target.to_string_lossy()).unwrap();
+        write(
+            &target.to_string_lossy(),
+            &bundle(),
+            &directory,
+            &library(),
+            None,
+        )
+        .unwrap();
+        let (read_back, _) = read(&target.to_string_lossy(), None).unwrap();
 
         assert_eq!(read_back.bundle.notes.len(), 1);
         assert_eq!(read_back.bundle.spaces[0].name, "Personal");
@@ -302,26 +501,33 @@ mod tests {
     fn an_attachment_travels_with_its_note() {
         let directory = scratch();
         let target = directory.join("library.devbox");
-        let attachment = record();
-        std::fs::write(directory.join(attachment.stored_name()), b"\x89PNG").unwrap();
+        let vault = library();
+        seal_beside(&directory, &vault, b"\x89PNG");
 
         let mut exported = bundle();
-        exported.attachments = vec![attachment.clone()];
-        let report = write(&target.to_string_lossy(), &exported, &directory).unwrap();
+        exported.attachments = vec![record()];
+        let report = write(
+            &target.to_string_lossy(),
+            &exported,
+            &directory,
+            &vault,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(report.attachments, 1);
+        assert!(!report.protected);
 
-        let (read_back, mut payload) = read(&target.to_string_lossy()).unwrap();
+        let (read_back, mut payload) = read(&target.to_string_lossy(), None).unwrap();
         assert_eq!(read_back.bundle.attachments.len(), 1);
         assert_eq!(
-            payload.take(&attachment.stored_name()),
+            payload.take(&record().stored_name()),
             Some(b"\x89PNG".to_vec())
         );
         std::fs::remove_dir_all(&directory).ok();
     }
 
-    /// ⚠️ A record whose file has gone missing must not fail the export: the note is what
-    /// matters, and the import reports the gap.
+    /// ⚠️ A record whose file has gone missing must not fail the export.
     #[test]
     fn a_record_whose_file_is_gone_leaves_the_export_rather_than_failing_it() {
         let directory = scratch();
@@ -329,7 +535,14 @@ mod tests {
 
         let mut exported = bundle();
         exported.attachments = vec![record()];
-        let report = write(&target.to_string_lossy(), &exported, &directory).unwrap();
+        let report = write(
+            &target.to_string_lossy(),
+            &exported,
+            &directory,
+            &library(),
+            None,
+        )
+        .unwrap();
 
         assert_eq!(report.attachments, 0);
         assert_eq!(report.notes, 1);
@@ -344,10 +557,133 @@ mod tests {
         let json = serde_json::to_string_pretty(&bundle()).unwrap();
         std::fs::write(&target, json).unwrap();
 
-        let (read_back, payload) = read(&target.to_string_lossy()).unwrap();
+        let (read_back, payload) = read(&target.to_string_lossy(), None).unwrap();
 
         assert_eq!(read_back.bundle.notes.len(), 1);
         assert!(matches!(payload, Payload::Empty));
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// ⚠️ The whole point of protecting an export: the file most likely to leave the
+    /// machine was the one carrying everything in the clear.
+    #[test]
+    fn a_protected_export_carries_none_of_the_notes_in_the_clear() {
+        let directory = scratch();
+        let target = directory.join("library.devbox");
+        let vault = library();
+        seal_beside(&directory, &vault, b"a screenshot of something");
+
+        let mut exported = bundle();
+        exported.notes[0].content = "psql -h prod -W hunter2".to_string();
+        exported.attachments = vec![record()];
+
+        let report = write(
+            &target.to_string_lossy(),
+            &exported,
+            &directory,
+            &vault,
+            Some("a shared phrase"),
+        )
+        .unwrap();
+        assert!(report.protected);
+
+        let raw = std::fs::read(&target).unwrap();
+        let haystack = String::from_utf8_lossy(&raw);
+        assert!(!haystack.contains("hunter2"));
+        assert!(!haystack.contains("Personal"));
+        assert!(!haystack.contains("a screenshot of"));
+
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn a_protected_export_reads_back_whole_with_its_phrase() {
+        let directory = scratch();
+        let target = directory.join("library.devbox");
+        let vault = library();
+        seal_beside(&directory, &vault, b"\x89PNG");
+
+        let mut exported = bundle();
+        exported.attachments = vec![record()];
+        write(
+            &target.to_string_lossy(),
+            &exported,
+            &directory,
+            &vault,
+            Some("a shared phrase"),
+        )
+        .unwrap();
+
+        let (read_back, mut payload) =
+            read(&target.to_string_lossy(), Some("a shared phrase")).unwrap();
+
+        assert_eq!(read_back.bundle.notes.len(), 1);
+        assert_eq!(
+            payload.take(&record().stored_name()),
+            Some(b"\x89PNG".to_vec())
+        );
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// ⚠️ Offered without one, it asks rather than failing: nothing can know a file is
+    /// protected until something has looked inside it.
+    #[test]
+    fn a_protected_export_asks_for_a_phrase_rather_than_failing() {
+        let directory = scratch();
+        let target = directory.join("library.devbox");
+
+        write(
+            &target.to_string_lossy(),
+            &bundle(),
+            &directory,
+            &library(),
+            Some("a shared phrase"),
+        )
+        .unwrap();
+
+        let error = read(&target.to_string_lossy(), None).unwrap_err();
+        assert_eq!(error.code, crate::error::ErrorCode::PassphraseRequired);
+        assert!(is_protected(&target.to_string_lossy()).unwrap());
+
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn the_wrong_phrase_is_refused_rather_than_read_as_nonsense() {
+        let directory = scratch();
+        let target = directory.join("library.devbox");
+
+        write(
+            &target.to_string_lossy(),
+            &bundle(),
+            &directory,
+            &library(),
+            Some("a shared phrase"),
+        )
+        .unwrap();
+
+        let error = read(&target.to_string_lossy(), Some("the wrong one")).unwrap_err();
+
+        assert_eq!(error.code, crate::error::ErrorCode::WrongPassphrase);
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// An ordinary export needs no phrase, and must not be made to ask for one.
+    #[test]
+    fn an_unprotected_export_is_not_reported_as_protected() {
+        let directory = scratch();
+        let target = directory.join("library.devbox");
+
+        write(
+            &target.to_string_lossy(),
+            &bundle(),
+            &directory,
+            &library(),
+            None,
+        )
+        .unwrap();
+
+        assert!(!is_protected(&target.to_string_lossy()).unwrap());
         std::fs::remove_dir_all(&directory).ok();
     }
 }

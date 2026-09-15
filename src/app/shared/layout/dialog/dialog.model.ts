@@ -4,7 +4,7 @@
  * `layout/` sit at 80 and must stay above every modal — they are triggered from inside
  * one — hence the base well below it.
  */
-const LAYERS = ['editor', 'app', 'settings', 'update', 'palette', 'fields', 'zoom'] as const;
+const LAYERS = ['editor', 'app', 'settings', 'update', 'palette', 'fields', 'zoom', 'passphrase'] as const;
 
 export type DialogLayer = (typeof LAYERS)[number];
 

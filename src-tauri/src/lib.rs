@@ -32,7 +32,7 @@ use notes::{
     tag_notes, update_note,
 };
 use spaces::{create_space, delete_space, list_spaces, pin_space, rename_space};
-use transfer::{export_notes, export_selection, import_notes, share_notes};
+use transfer::{export_is_protected, export_notes, export_selection, import_notes, share_notes};
 use vault::{create_vault, unlock_vault, vault_state};
 
 /// ⚠️ Resolved from the manifest: a relative path writes the file next to whatever the
@@ -89,6 +89,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             export_selection,
             import_notes,
             share_notes,
+            export_is_protected,
             vault_state,
             create_vault,
             unlock_vault,

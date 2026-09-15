@@ -27,6 +27,7 @@ const CODE_KEYS: Record<IpcErrorCode, string | null> = {
   storageUnavailable: 'errors.storageUnavailable',
   wrongPassphrase: 'errors.wrongPassphrase',
   locked: 'errors.locked',
+  passphraseRequired: 'errors.passphraseRequired',
   storage: null,
 };
 

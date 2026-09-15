@@ -45,6 +45,10 @@ pub struct ExportReport {
     /// What actually went into the archive. A record whose file has gone missing is left
     /// out rather than failing the export.
     pub attachments: u32,
+    /// ⚠️ `false` means the file is readable by anyone who has it — every note, every
+    /// screenshot. The interface says which of the two it wrote, because the file is the
+    /// one thing here most likely to leave the machine.
+    pub protected: bool,
 }
 
 /// `skipped`: notes already present or whose space is missing from the file — an import

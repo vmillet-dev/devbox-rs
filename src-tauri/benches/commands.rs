@@ -201,13 +201,22 @@ fn disk(c: &mut Criterion) {
         b.iter(|| {
             let notes = store::all(&mut corpus.connection, None).expect("the corpus");
             let packed = bundle::collect(&mut corpus.connection, notes).expect("a bundle");
-            black_box(file::write(&target, &packed, &attachments).expect("a written file"));
+            black_box(
+                file::write(
+                    &target,
+                    &packed,
+                    &attachments,
+                    corpus.connection.vault(),
+                    None,
+                )
+                .expect("a written file"),
+            );
         });
     });
 
     group.bench_function("import_notes, every id already there", |b| {
         b.iter(|| {
-            let (incoming, mut payload) = file::read(&target).expect("a readable file");
+            let (incoming, mut payload) = file::read(&target, None).expect("a readable file");
             black_box(
                 bundle::merge(&mut corpus.connection, incoming, &mut payload, &attachments)
                     .expect("a merge"),

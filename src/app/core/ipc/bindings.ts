@@ -67,15 +67,17 @@ export const commands = {
 	saveAttachment: (id: string, path: string) => typedError<null, AppError>(__TAURI_INVOKE("save_attachment", { id, path })),
 	deleteAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_attachment", { id })),
 	/**  The spaces travel with the notes, or an import holds an id with nowhere to file it. */
-	exportNotes: (path: string, spaceId: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_notes", { path, spaceId })),
-	exportSelection: (path: string, ids: string[]) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_selection", { path, ids })),
+	exportNotes: (path: string, spaceId: string | null, passphrase: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_notes", { path, spaceId, passphrase })),
+	exportSelection: (path: string, ids: string[], passphrase: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_selection", { path, ids, passphrase })),
 	/**
 	 *  ⚠️ The file is read before the lock is taken: parsing a large export while holding the
 	 *  connection would block every other command for the length of it.
 	 */
-	importNotes: (path: string) => typedError<ImportReport, AppError>(__TAURI_INVOKE("import_notes", { path })),
+	importNotes: (path: string, passphrase: string | null) => typedError<ImportReport, AppError>(__TAURI_INVOKE("import_notes", { path, passphrase })),
 	/**  Nothing is sent anywhere: "share" stops at the clipboard. */
 	shareNotes: (ids: string[]) => typedError<string, AppError>(__TAURI_INVOKE("share_notes", { ids })),
+	/**  Whether an import will want a phrase, so the interface can ask before it starts. */
+	exportIsProtected: (path: string) => typedError<boolean, AppError>(__TAURI_INVOKE("export_is_protected", { path })),
 	vaultState: () => typedError<VaultState, AppError>(__TAURI_INVOKE("vault_state")),
 	/**
 	 *  The first launch. ⚠️ Refuses a library that already has a key file rather than
@@ -183,7 +185,9 @@ export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" 
  */
 "wrongPassphrase" | 
 /**  A command ran before the library was unlocked. */
-"locked" | "storage";
+"locked" | 
+/**  The import needs the phrase the export was protected with. */
+"passphraseRequired" | "storage";
 
 export type ExportReport = {
 	notes: number,
@@ -193,6 +197,12 @@ export type ExportReport = {
 	 *  out rather than failing the export.
 	 */
 	attachments: number,
+	/**
+	 *  ⚠️ `false` means the file is readable by anyone who has it — every note, every
+	 *  screenshot. The interface says which of the two it wrote, because the file is the
+	 *  one thing here most likely to leave the machine.
+	 */
+	protected: boolean,
 };
 
 /**

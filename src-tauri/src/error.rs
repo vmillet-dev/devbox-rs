@@ -54,6 +54,10 @@ pub enum StorageError {
     /// to help a caller narrow down.
     #[error("Wrong passphrase")]
     WrongPassphrase,
+    /// A protected export was offered without the phrase that opens it. Not a failure —
+    /// the interface has to ask, and nothing could know before looking inside.
+    #[error("This file is protected by a passphrase")]
+    PassphraseRequired,
     /// A command panicked while holding the connection.
     #[error("Storage unavailable: a previous operation failed")]
     Unavailable,
@@ -68,7 +72,7 @@ pub enum StorageError {
 
 /// ⚠️ Adding a variant breaks the front-end build until `CODE_KEYS`
 /// (`core/services/errors/error-notifier.service.ts`) and both locales have their key.
-#[derive(Debug, Clone, Copy, Serialize, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ErrorCode {
     NoteNotFound,
@@ -86,6 +90,8 @@ pub enum ErrorCode {
     WrongPassphrase,
     /// A command ran before the library was unlocked.
     Locked,
+    /// The import needs the phrase the export was protected with.
+    PassphraseRequired,
     Storage,
 }
 
@@ -151,6 +157,7 @@ impl From<StorageError> for AppError {
             }
             StorageError::Unavailable => Self::new(ErrorCode::StorageUnavailable, detail),
             StorageError::WrongPassphrase => Self::new(ErrorCode::WrongPassphrase, detail),
+            StorageError::PassphraseRequired => Self::new(ErrorCode::PassphraseRequired, detail),
             StorageError::Locked => Self::new(ErrorCode::Locked, detail),
             StorageError::File(_) => Self::new(ErrorCode::FileAccess, detail),
             StorageError::ImportFormat(_) => Self::new(ErrorCode::ImportFormat, detail),

@@ -35,11 +35,18 @@ pub struct Cost {
 }
 
 impl Default for Cost {
-    /// OWASP's Argon2id floor at the time of writing: 19 MiB, two passes, one lane.
+    /// ⚠️ Well above OWASP's floor of 19 MiB and two passes, deliberately. This is paid
+    /// **once per launch**, while the user is still lifting their hands off the keyboard,
+    /// and it is the only thing standing between a copied library and someone working
+    /// through a wordlist. Memory is the parameter that hurts a GPU, so it carries most
+    /// of the weight.
+    ///
+    /// Raising it again later locks nobody out: the cost travels in the key file, and a
+    /// library reopens at whatever it was written with. Measured at ~1.2 s here.
     fn default() -> Self {
         Self {
-            memory_kib: 19 * 1024,
-            passes: 2,
+            memory_kib: 64 * 1024,
+            passes: 3,
             lanes: 1,
         }
     }

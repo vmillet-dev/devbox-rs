@@ -1,5 +1,6 @@
 import { guard } from './fail-next';
 import { TransferRepository } from '@core/data/transfer.repository';
+import { IpcError } from '@core/ipc/ipc.error';
 import { ExportReport, ImportReport } from '@core/model/note.model';
 
 /** Records the arguments and hands back the report the spec asked for. */
@@ -7,12 +8,20 @@ export class FakeTransferRepository implements Pick<TransferRepository, keyof Tr
   /** When set, the next call to any method rejects with this error, then clears. */
   failNext: Error | null = null;
 
-  exportedTo: { path: string; spaceId: string | null } | null = null;
+  exportedTo: { path: string; spaceId: string | null; passphrase: string | null } | null = null;
   importedFrom: string | null = null;
+  inspectedPath: string | null = null;
+  importedWith: string | null = null;
   sharedIds: readonly string[] | null = null;
   exportedIds: readonly string[] | null = null;
 
-  exportReport: ExportReport = { notes: 3, spaces: 1, attachments: 0 };
+  /** What `export_is_protected` answers, and what an import then has to be given. */
+  fileIsProtected = false;
+
+  /** When set, an import with anything else is refused the way the engine refuses it. */
+  expectedPassphrase: string | null = null;
+
+  exportReport: ExportReport = { notes: 3, spaces: 1, attachments: 0, protected: false };
   importReport: ImportReport = {
     spacesCreated: 1,
     notesImported: 2,
@@ -23,25 +32,41 @@ export class FakeTransferRepository implements Pick<TransferRepository, keyof Tr
   };
   markdown = '## Shared\n\n```txt\nbody\n```\n';
 
-  export(path: string, spaceId: string | null): Promise<ExportReport> {
+  export(path: string, spaceId: string | null, passphrase: string | null): Promise<ExportReport> {
     return guard(this, () => {
-      this.exportedTo = { path, spaceId };
-      return this.exportReport;
+      this.exportedTo = { path, spaceId, passphrase };
+      return { ...this.exportReport, protected: passphrase !== null };
     });
   }
 
-  exportSelection(path: string, ids: readonly string[]): Promise<ExportReport> {
+  exportSelection(path: string, ids: readonly string[], passphrase: string | null): Promise<ExportReport> {
     return guard(this, () => {
-      this.exportedTo = { path, spaceId: null };
+      this.exportedTo = { path, spaceId: null, passphrase };
       this.exportedIds = ids;
-      return { ...this.exportReport, notes: ids.length };
+      return { ...this.exportReport, notes: ids.length, protected: passphrase !== null };
     });
   }
 
-  import(path: string): Promise<ImportReport> {
+  import(path: string, passphrase: string | null): Promise<ImportReport> {
     return guard(this, () => {
       this.importedFrom = path;
+      this.importedWith = passphrase;
+      if (this.expectedPassphrase !== null && passphrase !== this.expectedPassphrase) {
+        throw new IpcError('import_notes', {
+          code: 'wrongPassphrase',
+          params: {},
+          detail: 'Wrong passphrase',
+        });
+      }
+
       return this.importReport;
+    });
+  }
+
+  isProtected(path: string): Promise<boolean> {
+    return guard(this, () => {
+      this.inspectedPath = path;
+      return this.fileIsProtected;
     });
   }
 

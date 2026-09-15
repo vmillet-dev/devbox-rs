@@ -14,6 +14,8 @@ use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Manager, State};
 
+use zeroize::Zeroize;
+
 use crate::db::{self, Db};
 use crate::error::{AppError, StorageError, ValidationError};
 use key::Cost;
@@ -56,19 +58,38 @@ pub fn vault_state(app: AppHandle, db: State<'_, Db>) -> Result<VaultState, AppE
 /// replacing it: that file is the only way into the notes beside it.
 #[tauri::command(async)]
 #[specta::specta]
-pub fn create_vault(passphrase: String, app: AppHandle, db: State<'_, Db>) -> Result<(), AppError> {
-    validate(&passphrase)?;
+pub fn create_vault(
+    mut passphrase: String,
+    app: AppHandle,
+    db: State<'_, Db>,
+) -> Result<(), AppError> {
+    // ⚠️ Wiped before this returns, whatever it returns. The string arrives owned from the
+    // IPC payload, so this is the last reference to it — and a passphrase left in freed
+    // memory is a passphrase in a crash dump.
+    let result = create_with(&passphrase, &app, &db);
+    passphrase.zeroize();
+
+    result
+}
+
+fn create_with(passphrase: &str, app: &AppHandle, db: &State<'_, Db>) -> Result<(), AppError> {
+    validate(passphrase)?;
 
     let directory = app.path().app_data_dir().map_err(storage)?;
     std::fs::create_dir_all(&directory).map_err(|error| storage_msg(&error.to_string()))?;
 
-    let vault = file::create(&directory, &passphrase, Cost::default())?;
+    let vault = file::create(&directory, passphrase, Cost::default())?;
 
-    adopt(&app, &db, vault)?;
+    open_library(app, db, vault)?;
 
-    // ⚠️ After `adopt`, which is what opened the database: a library created a moment ago
-    // has nothing to seal, and one that predates the passphrase has everything.
-    seal_what_was_there(&app, &db)
+    // ⚠️ Between opening and sweeping, never after. The orphan-file sweep reads attachment
+    // records, and on a library that predates the passphrase those are still in the clear —
+    // it would fail to open every one of them and log a warning for nothing.
+    seal_what_was_there(app, db)?;
+
+    crate::sweep(app);
+
+    Ok(())
 }
 
 /// ⚠️ The rows first, in one transaction, and the files after it commits. A file write
@@ -119,16 +140,31 @@ fn seal_what_was_there(app: &AppHandle, db: &State<'_, Db>) -> Result<(), AppErr
 /// main thread would freeze the window over every attempt.
 #[tauri::command(async)]
 #[specta::specta]
-pub fn unlock_vault(passphrase: String, app: AppHandle, db: State<'_, Db>) -> Result<(), AppError> {
-    let directory = app.path().app_data_dir().map_err(storage)?;
-    let vault = file::unlock(&directory, &passphrase)?;
+pub fn unlock_vault(
+    mut passphrase: String,
+    app: AppHandle,
+    db: State<'_, Db>,
+) -> Result<(), AppError> {
+    // ⚠️ Wiped before this returns, whatever it returns — see `create_vault`.
+    let result = unlock_with(&passphrase, &app, &db);
+    passphrase.zeroize();
 
-    adopt(&app, &db, vault)
+    result
 }
 
-/// Opens the library under the key, hands it to the rest of the application, and only
-/// then runs what a startup used to run before there was anything to unlock.
-fn adopt(app: &AppHandle, db: &State<'_, Db>, vault: key::Vault) -> Result<(), AppError> {
+fn unlock_with(passphrase: &str, app: &AppHandle, db: &State<'_, Db>) -> Result<(), AppError> {
+    let directory = app.path().app_data_dir().map_err(storage)?;
+    let vault = file::unlock(&directory, passphrase)?;
+
+    open_library(app, db, vault)?;
+    crate::sweep(app);
+
+    Ok(())
+}
+
+/// Opens the library under the key and hands it to the rest of the application. The
+/// sweeps are the caller's to run, because a first launch has to seal what is there first.
+fn open_library(app: &AppHandle, db: &State<'_, Db>, vault: key::Vault) -> Result<(), AppError> {
     let directory = app.path().app_data_dir().map_err(storage)?;
     let library = db::open(&directory.join(db::DB_FILE_NAME), vault)?;
 
@@ -140,8 +176,6 @@ fn adopt(app: &AppHandle, db: &State<'_, Db>, vault: key::Vault) -> Result<(), A
             *held = Some(library);
         }
     }
-
-    crate::sweep(app);
 
     Ok(())
 }

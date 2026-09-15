@@ -9,10 +9,8 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { MINIMUM_PASSPHRASE_LENGTH } from '@core/model/vault.model';
 import { VaultStore } from '@core/state/vault.store';
-
-/** What `create_vault` refuses below, said before the round trip rather than after it. */
-const MINIMUM_LENGTH = 8;
 
 /**
  * The screen that stands in front of everything until the library is open.
@@ -36,12 +34,8 @@ export class VaultGateComponent {
 
   protected readonly isCreating = computed(() => this.vault.needsCreating());
 
-  /**
-   * ⚠️ Said here rather than left to the back end: a first launch that answers "too short"
-   * after a 224 ms derivation reads as the application thinking about it.
-   */
   protected readonly tooShort = computed(
-    () => this.passphrase().length > 0 && this.passphrase().length < MINIMUM_LENGTH,
+    () => this.passphrase().length > 0 && this.passphrase().length < MINIMUM_PASSPHRASE_LENGTH,
   );
 
   protected readonly mismatched = computed(
@@ -49,12 +43,12 @@ export class VaultGateComponent {
   );
 
   protected readonly canSubmit = computed(() => {
-    if (this.vault.isWorking() || this.passphrase().length < MINIMUM_LENGTH) return false;
+    if (this.vault.isWorking() || this.passphrase().length < MINIMUM_PASSPHRASE_LENGTH) return false;
 
     return !this.isCreating() || this.confirmation() === this.passphrase();
   });
 
-  protected readonly minimumLength = MINIMUM_LENGTH;
+  protected readonly minimumLength = MINIMUM_PASSPHRASE_LENGTH;
 
   private readonly passphraseField = viewChild<ElementRef<HTMLInputElement>>('passphraseField');
 

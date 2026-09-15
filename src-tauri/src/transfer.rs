@@ -3,6 +3,7 @@
 pub mod bundle;
 pub mod file;
 pub mod model;
+pub mod protect;
 
 use tauri::{AppHandle, State};
 
@@ -18,18 +19,23 @@ use model::{ExportReport, ImportReport};
 pub fn export_notes(
     path: String,
     space_id: Option<String>,
+    passphrase: Option<String>,
     app: AppHandle,
     db: State<'_, Db>,
 ) -> Result<ExportReport, AppError> {
     model::validate_path(&path)?;
 
-    let exported = {
-        let mut connection = lock(&db)?;
-        let notes = notes::all(&mut connection, space_id.as_deref())?;
-        bundle::collect(&mut connection, notes)?
-    };
+    let mut connection = lock(&db)?;
+    let notes = notes::all(&mut connection, space_id.as_deref())?;
+    let exported = bundle::collect(&mut connection, notes)?;
 
-    file::write(&path, &exported, &attachments::directory(&app)?)
+    file::write(
+        &path,
+        &exported,
+        &attachments::directory(&app)?,
+        connection.vault(),
+        passphrase.as_deref(),
+    )
 }
 
 #[tauri::command(async)]
@@ -37,18 +43,23 @@ pub fn export_notes(
 pub fn export_selection(
     path: String,
     ids: Vec<String>,
+    passphrase: Option<String>,
     app: AppHandle,
     db: State<'_, Db>,
 ) -> Result<ExportReport, AppError> {
     model::validate_path(&path)?;
 
-    let exported = {
-        let mut connection = lock(&db)?;
-        let notes = notes::by_ids(&mut connection, &ids)?;
-        bundle::collect(&mut connection, notes)?
-    };
+    let mut connection = lock(&db)?;
+    let notes = notes::by_ids(&mut connection, &ids)?;
+    let exported = bundle::collect(&mut connection, notes)?;
 
-    file::write(&path, &exported, &attachments::directory(&app)?)
+    file::write(
+        &path,
+        &exported,
+        &attachments::directory(&app)?,
+        connection.vault(),
+        passphrase.as_deref(),
+    )
 }
 
 /// ⚠️ The file is read before the lock is taken: parsing a large export while holding the
@@ -57,12 +68,13 @@ pub fn export_selection(
 #[specta::specta]
 pub fn import_notes(
     path: String,
+    passphrase: Option<String>,
     app: AppHandle,
     db: State<'_, Db>,
 ) -> Result<ImportReport, AppError> {
     model::validate_path(&path)?;
 
-    let (imported, mut payload) = file::read(&path)?;
+    let (imported, mut payload) = file::read(&path, passphrase.as_deref())?;
     let directory = attachments::directory(&app)?;
 
     let mut connection = lock(&db)?;
@@ -73,6 +85,15 @@ pub fn import_notes(
         &mut payload,
         &directory,
     )?)
+}
+
+/// Whether an import will want a phrase, so the interface can ask before it starts.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn export_is_protected(path: String) -> Result<bool, AppError> {
+    model::validate_path(&path)?;
+
+    file::is_protected(&path)
 }
 
 /// Nothing is sent anywhere: "share" stops at the clipboard.

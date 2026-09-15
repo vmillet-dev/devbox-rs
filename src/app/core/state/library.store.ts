@@ -4,6 +4,7 @@ import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { FileDialogService } from '@core/services/dialogs/file-dialog.service';
 import { StatusNotifier } from '@core/services/notifications/status.service';
 import { ExportReport, ImportReport } from '@core/model/note.model';
+import { hasErrorCode } from '@core/ipc/ipc.error';
 import { TransferRepository } from '../data/transfer.repository';
 import { NotesRevision } from './notes-revision';
 
@@ -11,6 +12,23 @@ import { NotesRevision } from './notes-revision';
 function defaultFileName(now: Date): string {
   return `devbox-${now.toISOString().slice(0, 10)}.devbox`;
 }
+
+/**
+ * What the prompt is for: sealing a file about to be written, or opening one about to be
+ * read. The two ask for different things — the first confirms the phrase and may be
+ * declined, the second cannot be.
+ */
+export interface PassphraseRequest {
+  readonly purpose: 'protect' | 'unlock';
+  readonly fileName: string;
+  /** The previous attempt was refused, which belongs beside the field and nowhere else. */
+  readonly refused: boolean;
+}
+
+export type PassphraseAnswer =
+  | { readonly kind: 'phrase'; readonly value: string }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'cancelled' };
 
 /**
  * Export then re-import at once adds nothing at all, and saying so explicitly stops it
@@ -24,6 +42,15 @@ function importedKey(report: ImportReport): string {
   if (report.notesDegraded > 0) return 'file.importedFromNewerVersion';
 
   return report.attachmentsImported > 0 ? 'file.importedWithAttachments' : 'file.imported';
+}
+
+/** Which of the two files was written is part of the report, not a detail. */
+function exportedKey(report: ExportReport): string {
+  if (report.protected) {
+    return report.attachments > 0 ? 'file.exportedProtectedWithAttachments' : 'file.exportedProtected';
+  }
+
+  return report.attachments > 0 ? 'file.exportedWithAttachments' : 'file.exported';
 }
 
 function fileNameOf(path: string): string {
@@ -44,8 +71,14 @@ export class LibraryStore {
   private readonly revision = inject(NotesRevision);
 
   private readonly _isBusy = signal(false);
+  private readonly _passphraseRequest = signal<PassphraseRequest | null>(null);
 
   readonly isBusy = this._isBusy.asReadonly();
+
+  /** What the prompt drawn over the page is asking for; `null` when it is not asking. */
+  readonly passphraseRequest = this._passphraseRequest.asReadonly();
+
+  private pending: ((answer: PassphraseAnswer) => void) | null = null;
 
   /** `true` when notes came in, which is what bumps the canvas revision. */
   async import(): Promise<boolean> {
@@ -53,7 +86,9 @@ export class LibraryStore {
     if (path === null) return false;
 
     return this.run(async () => {
-      const report = await this.repository.import(path);
+      const report = await this.read(path, await this.repository.isProtected(path));
+      if (report === null) return false;
+
       const params = {
         notes: String(report.notesImported),
         skipped: String(report.notesSkipped),
@@ -74,13 +109,13 @@ export class LibraryStore {
 
   /** A `null` `spaceId` exports the whole corpus. */
   async export(spaceId: string | null, now: Date): Promise<void> {
-    await this.write((path) => this.repository.export(path, spaceId), now);
+    await this.write((path, passphrase) => this.repository.export(path, spaceId, passphrase), now);
   }
 
   async exportSelection(ids: readonly string[], now: Date): Promise<void> {
     if (!this.requireSelection(ids)) return;
 
-    await this.write((path) => this.repository.exportSelection(path, ids), now);
+    await this.write((path, passphrase) => this.repository.exportSelection(path, ids, passphrase), now);
   }
 
   /** Sharing stops at the clipboard: nothing is sent anywhere. */
@@ -99,6 +134,46 @@ export class LibraryStore {
     }, 'errors.shareFailed');
   }
 
+  /** The prompt's only way back in. Answering is what dismisses it. */
+  answerPassphrase(answer: PassphraseAnswer): void {
+    const resolve = this.pending;
+    this.pending = null;
+    this._passphraseRequest.set(null);
+    resolve?.(answer);
+  }
+
+  private ask(request: PassphraseRequest): Promise<PassphraseAnswer> {
+    return new Promise((resolve) => {
+      this.pending = resolve;
+      this._passphraseRequest.set(request);
+    });
+  }
+
+  /**
+   * ⚠️ A refused phrase asks again rather than failing the import: it is the ordinary
+   * answer to a typo, and a file nobody can reopen for one is a file lost. `null` when
+   * the user gave up at the prompt, which is not a failure either.
+   */
+  private async read(path: string, isProtected: boolean): Promise<ImportReport | null> {
+    let refused = false;
+
+    for (;;) {
+      let passphrase: string | null = null;
+      if (isProtected) {
+        const answer = await this.ask({ purpose: 'unlock', fileName: fileNameOf(path), refused });
+        if (answer.kind !== 'phrase') return null;
+        passphrase = answer.value;
+      }
+
+      try {
+        return await this.repository.import(path, passphrase);
+      } catch (error) {
+        if (!isProtected || !hasErrorCode(error, 'wrongPassphrase')) throw error;
+        refused = true;
+      }
+    }
+  }
+
   private requireSelection(ids: readonly string[]): boolean {
     if (ids.length > 0) return true;
 
@@ -106,12 +181,22 @@ export class LibraryStore {
     return false;
   }
 
-  private async write(action: (path: string) => Promise<ExportReport>, now: Date): Promise<void> {
+  /**
+   * ⚠️ The phrase is asked for once the destination is known, and never kept: it goes
+   * straight to the command, which derives a key of its own for that one file.
+   */
+  private async write(
+    action: (path: string, passphrase: string | null) => Promise<ExportReport>,
+    now: Date,
+  ): Promise<void> {
     const path = await this.dialog.chooseBundleDestination(defaultFileName(now));
     if (path === null) return;
 
+    const answer = await this.ask({ purpose: 'protect', fileName: fileNameOf(path), refused: false });
+    if (answer.kind === 'cancelled') return;
+
     await this.run(async () => {
-      const report = await action(path);
+      const report = await action(path, answer.kind === 'phrase' ? answer.value : null);
 
       if (report.notes === 0) {
         this.status.notify({ key: 'file.emptyLibrary' });
@@ -121,7 +206,7 @@ export class LibraryStore {
       // The file name is part of the report: an export whose landing place is unknown
       // is no use.
       this.status.notify({
-        key: report.attachments > 0 ? 'file.exportedWithAttachments' : 'file.exported',
+        key: exportedKey(report),
         params: {
           notes: String(report.notes),
           attachments: String(report.attachments),

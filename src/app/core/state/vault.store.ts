@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { hasErrorCode } from '@core/ipc/ipc.error';
 import { VaultRepository } from '../data/vault.repository';
 import { VaultState } from '@core/model/vault.model';
 
@@ -62,7 +63,7 @@ export class VaultStore {
       this._state.set('unlocked');
       return true;
     } catch (error) {
-      if (isWrongPassphrase(error)) {
+      if (hasErrorCode(error, 'wrongPassphrase')) {
         this._refused.set(true);
         return false;
       }
@@ -73,8 +74,4 @@ export class VaultStore {
       this._isWorking.set(false);
     }
   }
-}
-
-function isWrongPassphrase(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'wrongPassphrase';
 }
