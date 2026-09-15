@@ -101,8 +101,8 @@ describe('Import, export and share', () => {
   it('imports a bundle from a newer version instead of refusing it whole', async () => {
     // ⚠️ Written as a bare `.json`, which is also the shape DevBox exported before the
     // archive: this doubles as the proof that an old export still imports.
-    const view = await bridge.queryNotes(query({ search: 'Worth exporting' }));
-    const source = view.sections[0]?.notes[0];
+    const exported = await bridge.queryNotes(query({ search: 'Worth exporting' }));
+    const source = exported.sections[0]?.notes[0];
     expect(source).toBeDefined();
 
     const newerPath = join(directory, 'newer.json').replaceAll('\\', '/');
