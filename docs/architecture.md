@@ -1698,10 +1698,12 @@ on the way out: `read_attachment` decrypts into the `data:` URI the preview alre
 and `save_attachment` writes plaintext where the user chose to put it.
 
 ⚠️ `open_attachment` is the exception, and a deliberate one: the program that opens a
-document reads it from disk, so DevBox writes a decrypted copy under `temp/devbox-open/`
+document reads it from disk, so DevBox writes a decrypted copy under `app_data_dir()/open/`
 and opens that — one click, as before. Those copies are swept on the way out
 (`RunEvent::Exit`) and again at every launch, which is what covers one another application
-still held, and a crash.
+still held, and a crash. ⚠️ The profile and **not** the OS temporary directory: that one is
+shared with every account on the machine, where the copy would be readable by all of them
+and a directory somebody else created first would be theirs rather than ours.
 
 ## Persistence (Rust)
 

@@ -54,10 +54,10 @@ What is sealed on disk: note titles, bodies and sources, checklist items, space 
 ⚠️ **There is no recovery.** No account, no escrow, no reset: a lost passphrase is a lost
 library. An export written in the clear is the only copy that does not depend on it.
 
-⚠️ **Opening an attachment** writes a decrypted copy to a temporary folder, because the
-program that opens it reads from disk. DevBox deletes those copies when it quits, and
-sweeps whatever survived — a file another application still held, a crash — at the next
-launch.
+⚠️ **Opening an attachment** writes a decrypted copy — inside your own profile, never the
+shared temporary folder — because the program that opens it reads from disk. DevBox deletes
+those copies when it quits, and sweeps whatever survived — a file another application still
+held, a crash — at the next launch.
 
 An export is the one file meant to leave the machine, so it is offered a key of its own:
 give it a passphrase and it travels sealed, attachments included, or write it in the clear

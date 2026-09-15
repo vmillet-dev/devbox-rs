@@ -5,18 +5,20 @@
 //! file was not tampered with, and the 10 MiB cap on an attachment is what keeps it
 //! bounded.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use tauri::{AppHandle, Manager};
 
 use crate::error::StorageError;
 use crate::vault::key::Vault;
 
-/// What `open_externally` writes into, under the OS temporary directory.
+/// What [`plaintext_directory`] is called, beside the attachments themselves.
 ///
 /// ⚠️ A decrypted copy lands here whenever an attachment is opened with the application
 /// the desktop chose for it — there is no other way to hand a file to another program.
-/// [`sweep_plaintext`] empties it at every launch, so the copy outlives the session at
-/// worst, and the README says so plainly.
-const PLAINTEXT_DIRECTORY: &str = "devbox-open";
+/// [`sweep_plaintext`] empties it on the way out and at every launch, so the copy outlives
+/// the session at worst, and the README says so plainly.
+const PLAINTEXT_DIRECTORY: &str = "open";
 
 pub fn seal_into(vault: &Vault, source: &Path, destination: &Path) -> Result<u64, StorageError> {
     let plain = std::fs::read(source)
@@ -61,16 +63,28 @@ pub fn seal_in_place(vault: &Vault, path: &Path) -> Result<(), StorageError> {
 }
 
 /// Where a decrypted copy goes so the desktop can open it.
-pub fn plaintext_directory() -> std::path::PathBuf {
-    std::env::temp_dir().join(PLAINTEXT_DIRECTORY)
+///
+/// ⚠️ The application's own data directory, deliberately, and **not** the OS temporary
+/// one: that is a namespace shared with every account on the machine, where the copy would
+/// be readable by all of them and where a directory somebody else created first would be
+/// theirs rather than ours. This one sits inside the user's profile.
+pub fn plaintext_directory(app: &AppHandle) -> Result<PathBuf, StorageError> {
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|error| StorageError::File(format!("app_data_dir: {error}")))?
+        .join(PLAINTEXT_DIRECTORY))
 }
 
 /// ⚠️ Run on the way out *and* at every launch. A copy handed to another application
 /// cannot be deleted while that application holds it, and a crash reaches neither path —
 /// so the guarantee is "gone by the next launch", with the exit sweep narrowing the
 /// window to the session for everything not still open.
-pub fn sweep_plaintext() {
-    let directory = plaintext_directory();
+pub fn sweep_plaintext(app: &AppHandle) {
+    let Ok(directory) = plaintext_directory(app) else {
+        return;
+    };
+
     if let Err(error) = std::fs::remove_dir_all(&directory)
         && error.kind() != std::io::ErrorKind::NotFound
     {

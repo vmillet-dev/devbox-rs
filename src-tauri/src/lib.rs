@@ -213,7 +213,7 @@ pub(crate) fn sweep(handle: &tauri::AppHandle) {
     // ⚠️ The decrypted copies `open_attachment` had to write. They cannot be deleted on
     // close — the application that opened one still holds it — so this is the guarantee:
     // gone by the next launch.
-    attachments::sealed::sweep_plaintext();
+    attachments::sealed::sweep_plaintext(handle);
 }
 
 /// ⚠️ Both are refused when there is no tray to find the window in (see `desktop`).
@@ -253,14 +253,14 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .build(tauri::generate_context!())
         .expect("error while launching the Tauri application")
-        .run(|_handle, event| {
+        .run(|handle, event| {
             // ⚠️ Built and run rather than `run` alone, for this one event: a decrypted
             // copy handed to another application should not outlive the session that
             // asked for it. Best effort by design — one the desktop still holds is
             // locked and stays, and a crash reaches none of this, which is what the
             // sweep at launch is for.
             if matches!(event, tauri::RunEvent::Exit) {
-                attachments::sealed::sweep_plaintext();
+                attachments::sealed::sweep_plaintext(handle);
             }
         });
 }

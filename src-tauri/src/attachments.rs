@@ -217,7 +217,7 @@ pub fn open_attachment(id: String, app: AppHandle, db: State<'_, Db>) -> Result<
         sealed::read_sealed(connection.vault(), &stored)?
     };
 
-    let directory = sealed::plaintext_directory();
+    let directory = sealed::plaintext_directory(&app)?;
     std::fs::create_dir_all(&directory)
         .map_err(|error| file_error("a directory for decrypted copies", &error))?;
 
