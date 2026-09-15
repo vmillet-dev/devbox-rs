@@ -141,6 +141,110 @@ describe('NoteCardComponent', () => {
       expect(text('[data-testid="note-card-hit"]')).toBe('Push the tag');
     });
 
+    /**
+     * A todo list has no body, so the branch that renders the excerpt sits behind
+     * `isChecklist()` and was never reached: a list found by its fifth item showed its
+     * first two and `+3 more`, explaining nothing.
+     */
+    describe('on a todo list, which has no body to quote into', () => {
+      const items = [
+        { text: 'Version bumped', done: true },
+        { text: 'Lockfiles agree', done: true },
+        { text: 'Changelog written', done: false },
+        { text: 'Dry run of the release workflow', done: false },
+        { text: 'Tag pushed', done: false },
+      ];
+
+      function itemTexts(): string[] {
+        return fixture.debugElement
+          .queryAll(By.css('[data-testid="note-card-item"] .item-text'))
+          .map((node) => node.nativeElement.textContent.trim());
+      }
+
+      it('slides its window to the item that matched', async () => {
+        fixture.componentRef.setInput(
+          'note',
+          createNote({
+            kind: 'checklist',
+            items,
+            searchHit: { field: 'item', excerpt: 'Dry run of the release workflow' },
+          }),
+        );
+        await fixture.whenStable();
+
+        expect(itemTexts()).toEqual(['Dry run of the release workflow', 'Tag pushed']);
+      });
+
+      it('leaves the window at the head when the match is already in it', async () => {
+        fixture.componentRef.setInput(
+          'note',
+          createNote({ kind: 'checklist', items, searchHit: { field: 'item', excerpt: 'Version bumped' } }),
+        );
+        await fixture.whenStable();
+
+        expect(itemTexts()).toEqual(['Version bumped', 'Lockfiles agree']);
+      });
+
+      /**
+       * ⚠️ The excerpt is clipped at 160 characters, so a long item comes back with a
+       * trailing `…` and never equals its own text.
+       */
+      it('finds the item behind a clipped excerpt', async () => {
+        const long = 'x'.repeat(200);
+        fixture.componentRef.setInput(
+          'note',
+          createNote({
+            kind: 'checklist',
+            items: [...items, { text: long, done: false }],
+            searchHit: { field: 'item', excerpt: `${'x'.repeat(160)}…` },
+          }),
+        );
+        await fixture.whenStable();
+
+        expect(itemTexts()).toEqual(['Tag pushed', long]);
+      });
+
+      /**
+       * ⚠️ The template counts within the window; the position in the note is what gets
+       * written. Without the offset, ticking the first visible box edits the first box
+       * of the list — a card silently changing the wrong line.
+       */
+      it('ticks the item it shows, not the one at the same place in the list', async () => {
+        const store = TestBed.inject(NotesStore);
+        const setChecklist = vi.spyOn(store, 'setChecklist').mockResolvedValue(undefined);
+        fixture.componentRef.setInput(
+          'note',
+          createNote({
+            id: 'note-42',
+            kind: 'checklist',
+            items,
+            searchHit: { field: 'item', excerpt: 'Dry run of the release workflow' },
+          }),
+        );
+        await fixture.whenStable();
+
+        fixture.debugElement.queryAll(By.css('[data-testid="note-card-item"]'))[0].nativeElement.click();
+        await fixture.whenStable();
+
+        const written = setChecklist.mock.calls[0][1];
+        expect(written.map((item) => item.done)).toEqual([true, true, false, true, false]);
+      });
+    });
+
+    it('slides the tags it shows to the one that matched', async () => {
+      fixture.componentRef.setInput(
+        'note',
+        createNote({
+          tags: ['angular', 'ci', 'urgent'],
+          searchHit: { field: 'tag', excerpt: 'urgent' },
+        }),
+      );
+      await fixture.whenStable();
+
+      const tags = fixture.debugElement.queryAll(By.css('.card-tags span'));
+      expect(tags.map((tag) => tag.nativeElement.textContent)).toEqual(['#ci', '#urgent']);
+    });
+
     it('keeps the head of the body when the back end quoted nothing', async () => {
       fixture.componentRef.setInput('note', createNote({ content: 'one\ntwo', searchHit: null }));
       await fixture.whenStable();

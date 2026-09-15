@@ -2,8 +2,8 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
-import { clipboardText } from '../support/app.js';
-import { bridge, query } from '../support/bridge.js';
+import { clipboardText, reloadCanvas } from '../support/app.js';
+import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
  * A todo list has items and no body: `note_items` is keyed by position, so every write
@@ -133,5 +133,68 @@ describe('Todo lists', () => {
     const progress = await card.$('[data-testid="note-card-progress"]').getText();
     expect(progress).toContain('1');
     expect(progress).toContain('2');
+  });
+
+  /**
+   * A card shows two items of a list. Found by a third, it used to show the first two and
+   * explain nothing — the branch that renders a search excerpt sits behind `isChecklist()`
+   * and a todo list never reached it.
+   */
+  describe('found by an item the card does not show', () => {
+    const long = 'Deep list';
+
+    before(async () => {
+      await bridge.createNote(
+        draft({
+          spaceId: await homeSpaceId(),
+          title: long,
+          kind: 'checklist',
+          items: [
+            { text: 'first step', done: false },
+            { text: 'second step', done: false },
+            { text: 'third step', done: false },
+            { text: 'rotate the kubeconfig', done: false },
+          ],
+        }),
+      );
+      await reloadCanvas();
+    });
+
+    after(async () => {
+      await canvas.clearSearch();
+    });
+
+    it('slides its window to the item that matched', async () => {
+      await canvas.search('kubeconfig');
+      const card = await canvas.cardWithTitle(long);
+      const texts = await card.$$('[data-testid="note-card-item"]').map((item) => item.getText());
+
+      expect(texts.join(' ')).toContain('rotate the kubeconfig');
+      expect(texts.join(' ')).not.toContain('first step');
+    });
+
+    /**
+     * ⚠️ The one that would have corrupted data: the template counts within the window,
+     * the position in the note is what gets written. Ticking the first visible box must
+     * not tick the first box of the list.
+     */
+    it('ticks the box it shows, not the one at the same place in the list', async () => {
+      await canvas.search('kubeconfig');
+      const card = await canvas.cardWithTitle(long);
+      const boxes = await card.$$('[data-testid="note-card-item"]').getElements();
+      // The second visible box, which is the last item of the list.
+      await boxes[1]!.click();
+
+      await browser.waitUntil(
+        async () => {
+          const view = await bridge.queryNotes(query({ search: long }));
+          return view.sections[0]?.notes[0]?.items?.at(-1)?.done === true;
+        },
+        { timeout: 10_000, timeoutMsg: 'the matching item never came back ticked' },
+      );
+
+      const items = (await bridge.queryNotes(query({ search: long }))).sections[0]?.notes[0]?.items;
+      expect(items?.map((item) => item.done)).toEqual([false, false, false, true]);
+    });
   });
 });

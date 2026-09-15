@@ -114,11 +114,63 @@ export class NoteCardComponent {
     return !hit || hit.field === 'body';
   });
 
-  protected readonly displayedTags = computed(() => this.note().tags.slice(0, MAX_VISIBLE_TAGS));
+  /**
+   * Where a short list has to start for the thing a search found to be in it.
+   *
+   * ⚠️ A **window**, not a filter: the list keeps its order and its length, so what the
+   * reader sees is the card scrolled to the right place rather than a different card.
+   */
+  private windowStart(length: number, at: number, size: number): number {
+    if (at < size) return 0;
+    return Math.min(at, Math.max(0, length - size));
+  }
+
+  /**
+   * ⚠️ The excerpt is clipped at 160 characters, so an item found by a long line comes
+   * back with a trailing `…` and never equals its own text. Compared by prefix.
+   */
+  private indexOfHit(texts: readonly string[], excerpt: string): number {
+    const needle = excerpt.endsWith('…') ? excerpt.slice(0, -1) : excerpt;
+    return texts.findIndex((text) => text.startsWith(needle));
+  }
+
+  private readonly tagWindowStart = computed(() => {
+    const hit = this.searchHit();
+    if (hit?.field !== 'tag') return 0;
+
+    const tags = this.note().tags;
+    return this.windowStart(tags.length, this.indexOfHit(tags, hit.excerpt), MAX_VISIBLE_TAGS);
+  });
+
+  protected readonly displayedTags = computed(() => {
+    const from = this.tagWindowStart();
+    return this.note().tags.slice(from, from + MAX_VISIBLE_TAGS);
+  });
 
   protected readonly isChecklist = computed(() => this.note().kind === 'checklist');
   protected readonly progress = computed(() => checklistProgress(this.note().items));
-  protected readonly visibleItems = computed(() => this.note().items.slice(0, MAX_VISIBLE_ITEMS));
+  /**
+   * A todo list has no body, so `searchHit` never reached its card: the branch that
+   * renders the excerpt is unreachable behind `isChecklist()`. A list found by its fifth
+   * item showed its first two and `+3 more`, explaining nothing.
+   *
+   * ⚠️ Replacing the layer with the excerpt was not an option: these are real checkboxes
+   * a card can be ticked from. The window slides to the matching item instead, and the
+   * boxes keep working.
+   */
+  private readonly itemWindowStart = computed(() => {
+    const hit = this.searchHit();
+    if (hit?.field !== 'item') return 0;
+
+    const items = this.note().items;
+    const texts = items.map((item) => item.text);
+    return this.windowStart(items.length, this.indexOfHit(texts, hit.excerpt), MAX_VISIBLE_ITEMS);
+  });
+
+  protected readonly visibleItems = computed(() => {
+    const from = this.itemWindowStart();
+    return this.note().items.slice(from, from + MAX_VISIBLE_ITEMS);
+  });
   protected readonly hiddenItemCount = computed(() =>
     Math.max(0, this.note().items.length - MAX_VISIBLE_ITEMS),
   );
@@ -161,9 +213,18 @@ export class NoteCardComponent {
     this.selection.toggleChecked(this.note().id);
   }
 
-  /** Ticking from the card without opening the note: the whole list is written back. */
-  protected onItemToggle(event: MouseEvent, index: number): void {
+  /**
+   * Ticking from the card without opening the note: the whole list is written back.
+   *
+   * ⚠️ The template counts within the **window**, and the position in the note is what
+   * gets written. They were the same number while the window always started at zero;
+   * now that a search slides it, ticking the first visible box would have ticked the
+   * first box of the list instead — a card silently editing the wrong line.
+   */
+  protected onItemToggle(event: MouseEvent, indexInWindow: number): void {
     event.stopPropagation();
+    const index = this.itemWindowStart() + indexInWindow;
+
     void this.notes.setChecklist(
       this.note().id,
       this.note().items.map((item, at) => (at === index ? { ...item, done: !item.done } : { ...item })),
