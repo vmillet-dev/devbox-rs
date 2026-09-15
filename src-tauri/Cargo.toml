@@ -1,7 +1,6 @@
 [package]
 name = "devbox"
 version = "0.1.4"
-# ⚠️ Shipped: the installer and the Linux `.desktop` entry show this string.
 description = "A developer's notes and snippets manager for the desktop"
 authors = ["Valentin MILLET"]
 edition = "2024"
@@ -10,6 +9,7 @@ repository = "https://github.com/vmillet-dev/devbox-rs"
 license = "GPL-3.0-only"
 readme = "../README.md"
 default-run = "devbox"
+autobenches = false
 
 [package.metadata.devbox]
 display-name = "DevBox"
@@ -18,10 +18,19 @@ author-handle = "@vmillet-dev"
 [lib]
 name = "devbox_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+bench = false
+
+[[bin]]
+name = "devbox"
+path = "src/main.rs"
+bench = false
+
+[[bin]]
+name = "export-bindings"
+path = "src/bin/export-bindings.rs"
+bench = false
 
 [features]
-# The end-to-end harness, and nothing else. Off by default, so a release build
-# never links the test plugin into the shipped binary.
 e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
 
 [build-dependencies]
@@ -49,29 +58,22 @@ tauri-plugin-store = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-window-state = "2.4.1"
 tauri-plugin-log = "2"
-log = "0.4"
-thiserror = "2.0.20"
-unicode-normalization = "0.1.25"
-# Pulled in only by the `e2e` feature, and not optional in practice: the runner
-# waits on `window.wdioTauri` before it will open a session, so a binary without
-# the plugin hangs the suite rather than failing it. Its Rust half and the npm half
-# (`polyfills` in the `e2e` Angular configuration) go together — with one but not
-# the other, the front end invokes `plugin:wdio|…` commands nothing answers and the
-# error banner comes up on launch.
-#
-# ⚠️ Both crates, not one: the documentation presents `-webdriver` as needed by the
-# embedded driver provider alone, but it also serves the HTTP endpoint the runner's
-# `DirectEvalClient` posts to.
-tauri-plugin-wdio = { version = "1", optional = true }
-tauri-plugin-wdio-webdriver = { version = "1", optional = true }
-
-# Desktop-only plugins. They are plain dependencies rather than a
-# `cfg(not(android/ios))` table: DevBox targets the desktop, and a conditional table
-# only pretended the crate could build anywhere else.
 tauri-plugin-updater = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-wdio = { version = "1", optional = true }
+tauri-plugin-wdio-webdriver = { version = "1", optional = true }
+log = "0.4"
+thiserror = "2.0.20"
+unicode-normalization = "0.1.25"
+
+[dev-dependencies]
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "commands"
+harness = false
 
 [profile.release]
 lto = true
@@ -90,4 +92,3 @@ missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 must_use_candidate = "allow"
 module_name_repetitions = "allow"
-
