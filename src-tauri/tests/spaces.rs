@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use devbox_lib::db::open_in_memory;
 use devbox_lib::db::schema::notes;
 use devbox_lib::error::StorageError;
-use devbox_lib::spaces::store::{create, delete, exists, list, rename};
+use devbox_lib::spaces::store::{create, delete, exists, list, rename, set_pinned};
 
 const T0: &str = "2026-07-25T09:00:00.000Z";
 
@@ -67,6 +67,69 @@ fn spaces_are_listed_in_name_order() {
     create(&mut connection, "personal").unwrap();
 
     assert_eq!(names(&mut connection), ["Boulot", "personal", "Veille"]);
+}
+
+/// Name order alone put the space opened every morning wherever its initial fell,
+/// under archives nobody touches. Pinning is the gesture the app already has for
+/// "keep this within reach", and it hoists here the way it does on the canvas.
+#[test]
+fn a_pinned_space_comes_first_whatever_its_name() {
+    let mut connection = open_in_memory().unwrap();
+    create(&mut connection, "Boulot").unwrap();
+    let veille = create(&mut connection, "Veille").unwrap();
+    create(&mut connection, "Archive").unwrap();
+
+    set_pinned(&mut connection, &veille.id, true).unwrap();
+
+    assert_eq!(names(&mut connection), ["Veille", "Archive", "Boulot"]);
+}
+
+#[test]
+fn pinned_spaces_are_still_sorted_among_themselves() {
+    let mut connection = open_in_memory().unwrap();
+    let veille = create(&mut connection, "Veille").unwrap();
+    let boulot = create(&mut connection, "Boulot").unwrap();
+    create(&mut connection, "Archive").unwrap();
+
+    set_pinned(&mut connection, &veille.id, true).unwrap();
+    set_pinned(&mut connection, &boulot.id, true).unwrap();
+
+    assert_eq!(names(&mut connection), ["Boulot", "Veille", "Archive"]);
+}
+
+#[test]
+fn unpinning_lets_a_space_fall_back_among_the_others() {
+    let mut connection = open_in_memory().unwrap();
+    let veille = create(&mut connection, "Veille").unwrap();
+    create(&mut connection, "Archive").unwrap();
+
+    set_pinned(&mut connection, &veille.id, true).unwrap();
+    let unpinned = set_pinned(&mut connection, &veille.id, false).unwrap();
+
+    assert!(!unpinned.pinned);
+    assert_eq!(names(&mut connection), ["Archive", "Veille"]);
+}
+
+/// ⚠️ A rename answers with the row it read back, not with what it was sent — which
+/// is what keeps it from quietly reporting a pinned space as unpinned.
+#[test]
+fn renaming_a_pinned_space_leaves_it_pinned() {
+    let mut connection = open_in_memory().unwrap();
+    let space = create(&mut connection, "Veille").unwrap();
+    set_pinned(&mut connection, &space.id, true).unwrap();
+
+    let renamed = rename(&mut connection, &space.id, "Veille technique").unwrap();
+
+    assert!(renamed.pinned);
+}
+
+#[test]
+fn pinning_a_space_that_is_gone_says_which_one() {
+    let mut connection = open_in_memory().unwrap();
+
+    let error = set_pinned(&mut connection, "missing", true).unwrap_err();
+
+    assert!(matches!(error, StorageError::SpaceNotFound(id) if id == "missing"));
 }
 
 #[test]

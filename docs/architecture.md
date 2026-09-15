@@ -1514,7 +1514,7 @@ The commands, grouped by the feature that owns them:
 | Feature       | Commands                                                                                                                                                                                                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `notes`       | `query_notes`, `create_note`, `update_note`, `delete_note`, `delete_notes`, `restore_notes`, `list_trash`, `purge_notes`, `empty_trash`, `move_notes`, `tag_notes`, `list_tags`, `rename_tag`, `merge_tags`, `delete_tag`, `fill_placeholders`, `set_placeholder_values` |
-| `spaces`      | `list_spaces`, `create_space`, `rename_space`, `delete_space`                                                                                                                                                                                                            |
+| `spaces`      | `list_spaces`, `create_space`, `rename_space`, `pin_space`, `delete_space`                                                                                                                                                                                               |
 | `attachments` | `attach_file`, `attach_clipboard_image`, `list_attachments`, `read_attachment`, `open_attachment`, `save_attachment`, `delete_attachment`                                                                                                                                |
 | `transfer`    | `export_notes`, `export_selection`, `import_notes`, `share_notes`                                                                                                                                                                                                        |
 | `desktop`     | `sync_tray`, `unavailable_shortcuts`                                                                                                                                                                                                                                     |
@@ -2170,8 +2170,8 @@ The numeric prefix on each file is therefore load-bearing: it is the run order.
 that resolves the seeded space — `homeSpaceId()` records it while exactly one exists and writes
 it to a marker file, because WebdriverIO gives each spec file its own worker process and a
 module-level cache would be empty again in the next one. ⚠️ It cannot be `listSpaces()[0]`:
-`list_spaces` orders by `name COLLATE NOCASE`, so after another file creates `Ops` the first
-row is no longer the seeded space.
+`list_spaces` orders pinned first and then by `name COLLATE NOCASE`, so after another file
+creates `Ops` — or pins anything — the first row is no longer the seeded space.
 
 **⚠️ There is no restart, and no spec may claim one.** `reopenSession()` is a
 `browser.reloadSession()`: it tears the session down and opens a new one against the same

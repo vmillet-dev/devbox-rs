@@ -14,8 +14,8 @@ import { provideAppTesting } from '@testing/testing.providers';
 import { FileMenuComponent } from './file-menu.component';
 
 const SPACES: readonly Space[] = [
-  { id: 'space-1', name: 'Space one' },
-  { id: 'work', name: 'Work' },
+  { id: 'space-1', name: 'Space one', pinned: false },
+  { id: 'work', name: 'Work', pinned: false },
 ];
 
 describe('FileMenuComponent', () => {

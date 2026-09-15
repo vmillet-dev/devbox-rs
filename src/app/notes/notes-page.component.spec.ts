@@ -41,8 +41,8 @@ import { TrashPanelComponent } from './overlays/trash-panel/trash-panel.componen
 import { NotesPageComponent } from './notes-page.component';
 
 const SPACES: readonly Space[] = [
-  { id: 'space-1', name: 'Space one' },
-  { id: 'work', name: 'Work' },
+  { id: 'space-1', name: 'Space one', pinned: false },
+  { id: 'work', name: 'Work', pinned: false },
 ];
 
 describe('NotesPageComponent', () => {

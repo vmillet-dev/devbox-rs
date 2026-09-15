@@ -6,8 +6,8 @@ import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { SpaceSwitcherComponent } from './space-switcher.component';
 
 const SPACES: readonly Space[] = [
-  { id: 'work', name: 'Work' },
-  { id: 'personal', name: 'Personal' },
+  { id: 'work', name: 'Work', pinned: false },
+  { id: 'personal', name: 'Personal', pinned: false },
 ];
 
 describe('SpaceSwitcherComponent', () => {

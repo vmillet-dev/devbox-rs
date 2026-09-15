@@ -74,6 +74,68 @@ describe('Spaces', () => {
     expect(after?.name).toBe('Lectures');
   });
 
+  /**
+   * Name order was the only order there had ever been, so the space opened
+   * every morning sat wherever its initial fell. Pinning hoists it, the way it does a
+   * note on the canvas — and the order is SQL's, which only a real database can prove.
+   *
+   * ⚠️ Its own space, named to sort **last**: Mocha runs a nested suite after its
+   * siblings, and by then the tests above have renamed and deleted theirs.
+   */
+  describe('pinning one to the head of the list', () => {
+    const name = 'Zzz pinned';
+    let id = '';
+
+    before(async () => {
+      id = (await bridge.createSpace({ name })).id;
+      // Written straight through the bridge, so the front end has never heard of it.
+      await reloadCanvas();
+    });
+
+    after(async () => {
+      const refuge = (await bridge.listSpaces()).find((space) => space.id !== id);
+      await bridge.deleteSpace(id, refuge!.id);
+    });
+
+    it('hoists it whatever its name, and lets it fall back', async () => {
+      expect((await bridge.listSpaces()).at(-1)?.id).toBe(id);
+
+      await spaces.open();
+      await spaces.togglePin(id);
+      await browser.pause(500);
+
+      const pinned = await bridge.listSpaces();
+      expect(pinned[0]?.id).toBe(id);
+      expect(pinned[0]?.pinned).toBe(true);
+
+      await spaces.open();
+      await spaces.togglePin(id);
+      await browser.pause(500);
+
+      const loose = await bridge.listSpaces();
+      expect(loose.at(-1)?.id).toBe(id);
+      expect(loose.at(-1)?.pinned).toBe(false);
+    });
+
+    /**
+     * ⚠️ A rename answers with the row it read back rather than with what it was sent,
+     * which is what keeps it from quietly reporting a pinned space as unpinned.
+     */
+    it('survives a rename', async () => {
+      await spaces.open();
+      await spaces.togglePin(id);
+      await browser.pause(500);
+
+      await spaces.open();
+      await spaces.rename(id, 'Zzz renamed');
+      await browser.pause(500);
+
+      const after = (await bridge.listSpaces()).find((space) => space.id === id);
+      expect(after?.name).toBe('Zzz renamed');
+      expect(after?.pinned).toBe(true);
+    });
+  });
+
   it('filters the canvas down to the active space', async () => {
     const target = (await bridge.listSpaces()).find((space) => space.name === 'Lectures')!;
     await bridge.createNote(draft({ spaceId: target.id, title: 'Only in Lectures' }));

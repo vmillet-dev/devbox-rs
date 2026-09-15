@@ -8,8 +8,8 @@ import { provideAppTesting } from '@testing/testing.providers';
 import { SpacesStore } from './spaces.store';
 
 const SPACES: readonly Space[] = [
-  { id: 'work', name: 'Work' },
-  { id: 'personal', name: 'Personal' },
+  { id: 'work', name: 'Work', pinned: false },
+  { id: 'personal', name: 'Personal', pinned: false },
 ];
 
 interface Harness {
@@ -221,6 +221,56 @@ describe('SpacesStore', () => {
       expect(notifier.notice()?.ref.key).toBe('errors.spaceNameTaken');
       expect(notifier.notice()?.ref.params).toEqual({ name: 'Personal' });
       // The list must not have drifted from the backend.
+      expect(store.spaces()).toEqual(SPACES);
+    });
+  });
+
+  /**
+   * Name order alone put the space opened every morning wherever its initial fell.
+   * Pinning hoists it, the way it does a note on the canvas.
+   */
+  describe('togglePinned', () => {
+    it('sends the opposite of what the space carries', async () => {
+      const { store, repository } = await createStore();
+      const setPinned = vi.spyOn(repository, 'setPinned');
+
+      await store.togglePinned('work');
+
+      expect(setPinned).toHaveBeenCalledWith('work', true);
+    });
+
+    /**
+     * ⚠️ Reloaded rather than patched in place. Pinning changes the **order**, and the
+     * order is the back end's — putting the returned space back where it was would
+     * leave it flagged and still buried.
+     */
+    it('takes the new order from the backend rather than keeping its own', async () => {
+      const { store } = await createStore();
+      expect(store.spaces().map((space) => space.id)).toEqual(['work', 'personal']);
+
+      await store.togglePinned('personal');
+
+      // Waited for: the reload is a round trip, so the new order arrives after the call
+      // returns — the list reorders a moment later, which is what the user sees too.
+      await vi.waitFor(() => expect(store.spaces().map((space) => space.id)).toEqual(['personal', 'work']));
+      expect(store.spaces()[0].pinned).toBe(true);
+    });
+
+    it('writes nothing for a space it does not hold', async () => {
+      const { store, repository } = await createStore();
+      const setPinned = vi.spyOn(repository, 'setPinned');
+
+      expect(await store.togglePinned('missing')).toBe(false);
+      expect(setPinned).not.toHaveBeenCalled();
+    });
+
+    it('leaves the list alone when the write fails, and says so', async () => {
+      const { store, repository } = await createStore();
+      const notifier = TestBed.inject(ErrorNotifier);
+      repository.failNext = new Error('disk full');
+
+      expect(await store.togglePinned('work')).toBe(false);
+      expect(notifier.notice()?.ref.key).toBe('errors.spacePinFailed');
       expect(store.spaces()).toEqual(SPACES);
     });
   });

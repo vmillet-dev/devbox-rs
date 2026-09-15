@@ -38,6 +38,15 @@ pub fn rename_space(id: String, draft: SpaceDraft, db: State<'_, Db>) -> Result<
     Ok(store::rename(&mut connection, &id, &name)?)
 }
 
+/// Hoists a space to the head of the list, or lets it fall back among the others.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn pin_space(id: String, pinned: bool, db: State<'_, Db>) -> Result<Space, AppError> {
+    let mut connection = lock(&db)?;
+
+    Ok(store::set_pinned(&mut connection, &id, pinned)?)
+}
+
 #[tauri::command(async)]
 #[specta::specta]
 pub fn delete_space(

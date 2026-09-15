@@ -4,6 +4,7 @@ import { PreferencesService } from '@core/services/preferences/preferences.servi
 import { NotesRepository } from '@core/data/notes.repository';
 import { SpacesRepository } from '@core/data/spaces.repository';
 import { NoteDraft } from '@core/model/note.model';
+import { Space } from '@core/model/space.model';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { FakeSpacesRepository } from '@testing/fake-spaces-repository';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
@@ -19,7 +20,7 @@ describe('SampleNotesService', () => {
   /** The drafts handed to the repository, in the order they were written. */
   const drafts = (): NoteDraft[] => created.mock.calls.map(([draft]) => draft);
 
-  function setUp(existingSpaces: { id: string; name: string }[] = []): void {
+  function setUp(existingSpaces: Space[] = []): void {
     TestBed.resetTestingModule();
     notes = new FakeNotesRepository();
     spaces = new FakeSpacesRepository(existingSpaces);
@@ -94,7 +95,7 @@ describe('SampleNotesService', () => {
   });
 
   it('leaves an existing installation alone, and stops looking', async () => {
-    setUp([{ id: 'space-1', name: 'Perso' }]);
+    setUp([{ id: 'space-1', name: 'Perso', pinned: false }]);
 
     expect(await service.seedIfFirstRun()).toBe(false);
     expect(drafts()).toHaveLength(0);

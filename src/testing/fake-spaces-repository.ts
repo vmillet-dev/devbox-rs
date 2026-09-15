@@ -23,7 +23,7 @@ export class FakeSpacesRepository implements Pick<SpacesRepository, keyof Spaces
 
   create(draft: SpaceDraft): Promise<Space> {
     return guard(this, () => {
-      const space: Space = { id: `fake-space-${++this.nextId}`, name: draft.name };
+      const space: Space = { id: `fake-space-${++this.nextId}`, name: draft.name, pinned: false };
       this.spaces = [...this.spaces, space];
       return space;
     });
@@ -31,9 +31,29 @@ export class FakeSpacesRepository implements Pick<SpacesRepository, keyof Spaces
 
   rename(id: string, draft: SpaceDraft): Promise<Space> {
     return guard(this, () => {
-      const renamed: Space = { id, name: draft.name };
+      const existing = this.spaces.find((space) => space.id === id);
+      const renamed: Space = { id, name: draft.name, pinned: existing?.pinned ?? false };
       this.spaces = this.spaces.map((space) => (space.id === id ? renamed : space));
       return renamed;
+    });
+  }
+
+  /**
+   * Hoists to the head of the list, like the real one — the order is the whole point,
+   * so a double that only flipped the flag would let a broken sort pass.
+   */
+  setPinned(id: string, pinned: boolean): Promise<Space> {
+    return guard(this, () => {
+      const updated = this.spaces.map((space) => (space.id === id ? { ...space, pinned } : space));
+      this.spaces = [...updated].sort(
+        (a, b) => Number(b.pinned) - Number(a.pinned) || a.name.localeCompare(b.name),
+      );
+
+      const found = this.spaces.find((space) => space.id === id);
+      if (!found) {
+        throw new Error(`Unknown space: ${id}`);
+      }
+      return found;
     });
   }
 

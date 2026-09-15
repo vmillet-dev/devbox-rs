@@ -44,6 +44,8 @@ export class SpaceSwitcherComponent {
   /** The raw name typed: normalisation and persistence belong to the store. */
   readonly spaceCreated = output<string>();
   readonly spaceRenamed = output<SpaceRenaming>();
+  /** The id alone: whether it is being pinned or unpinned is the store's to read. */
+  readonly pinRequested = output<string>();
   readonly spaceDeleted = output<SpaceDeletion>();
 
   protected readonly menu = inject(MenuTriggerDirective);

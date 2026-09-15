@@ -239,10 +239,14 @@ fn a_space_serializes_with_the_keys_the_front_reads() {
     let json = serde_json::to_value(Space {
         id: "s-1".to_string(),
         name: "Personal".to_string(),
+        pinned: true,
     })
     .unwrap();
 
-    assert_eq!(json, serde_json::json!({ "id": "s-1", "name": "Personal" }));
+    assert_eq!(
+        json,
+        serde_json::json!({ "id": "s-1", "name": "Personal", "pinned": true })
+    );
 }
 
 #[test]
@@ -441,6 +445,7 @@ fn an_export_bundle_reads_back_the_notes_it_wrote() {
         spaces: vec![Space {
             id: "s-1".to_string(),
             name: "Personal".to_string(),
+            pinned: false,
         }],
         notes: vec![sample()],
     };

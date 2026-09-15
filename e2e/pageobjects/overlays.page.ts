@@ -48,6 +48,18 @@ export const spaces = {
    * off a template ref — but the day that control becomes signal-bound, the driver's
    * missing `change` would silently delete with the wrong refuge.
    */
+  /** From the same panel as the rename and the delete, which the ⋯ opens. */
+  /**
+   * ⚠️ Closes behind itself. The edit panel **replaces** the menu rather than sitting
+   * over it, so the dropdown is still there afterwards and `open()` — which checks for
+   * exactly that — would do nothing, leaving the next caller in the panel.
+   */
+  async togglePin(id: string): Promise<void> {
+    await $(`${testid('space-edit')}[data-space-id="${id}"]`).click();
+    await $(testid('space-pin')).click();
+    await spaces.close();
+  },
+
   async remove(id: string, refugeId: string): Promise<void> {
     await $(`${testid('space-edit')}[data-space-id="${id}"]`).click();
     await setNativeValue(testid('space-move-target'), refugeId);
