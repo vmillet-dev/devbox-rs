@@ -2010,6 +2010,67 @@ release that replayed it would pay for it twice.
 
 ## Testing
 
+### Benchmarks
+
+`cargo bench` from `src-tauri/`. They are **not in CI**: a timing assertion on a shared
+runner flaps, and a suite that flaps is a suite everyone learns to ignore. They run
+locally, on demand.
+
+```bash
+cargo bench -- --save-baseline main   # before
+cargo bench -- --baseline main        # after
+```
+
+That comparison is the whole reason the harness is **criterion** and not divan, which is
+lighter and pleasanter but does not offer it out of the box.
+
+⚠️ **They run below the command boundary, not through Tauri.** A command is four lines —
+validate, lock, delegate, translate the error — so `store::*` plus `view::*` plus the serde
+round-trip captures nearly all of the cost. `tauri::test::mock_app` would drag the whole app
+lifecycle in and buy only the IPC transport, which this codebase does not control. So these
+numbers are **not** "the IPC is fast": they are what the work behind a command costs.
+Serialisation is included on purpose — a `NotesView` over 800 notes is a real `serde_json`
+cost paid on every keystroke.
+
+⚠️ **The corpus is file-backed, never `open_in_memory`.** An in-memory database has no pager
+behind a file, no page cache doing real work and no I/O at all — it measures something the
+application never does. `benches/corpus.rs` writes 800 notes of ~13 kB into a temporary file
+database, the shape already quoted in `notes/view.rs`, and its bodies are accented on
+purpose: a pure-ASCII corpus would exercise only `fold`'s fast path.
+
+Two Cargo details exist solely to make this work, both commented in `Cargo.toml`:
+`autobenches = false` (or the shared corpus module is discovered as a benchmark of its own
+and reported as entirely unused) and `bench = false` on the lib and both bins (or cargo runs
+their built-in harness first, which rejects criterion's own flags).
+
+#### The first baseline
+
+Taken on 800 notes, Windows, release profile with `lto = true`:
+
+| Command                                        | Cost             |
+| ---------------------------------------------- | ---------------- |
+| `query_notes`, unfiltered                      | **27.3 ms**      |
+| `query_notes`, search matching nothing         | 26.8 ms          |
+| `query_notes`, search folding accents          | 25.8 ms          |
+| `delete_notes` then `restore_notes`, 100 notes | 9.0 ms           |
+| `export_notes` / `import_notes`                | 26.7 ms / 8.3 ms |
+| `rename_tag` across the corpus                 | 3.8 ms           |
+| `move_notes` / `tag_notes`, 100 notes          | 2.7 ms / 2.3 ms  |
+| `update_note`                                  | 1.5 ms           |
+| `list_tags` / `list_trash`                     | 591 µs / 424 µs  |
+| `list_global_placeholders`                     | 1.6 µs           |
+
+Two things worth reading off that table.
+
+**`query_notes` costs 27 ms and runs on every keystroke**, behind the 150 ms debounce. It is
+comfortably inside the debounce at this size, and it is the number #21 is about: the cost is
+linear in the corpus, so five thousand notes would put it past a tenth of a second.
+
+**The search is not what costs.** Filtering is _slightly cheaper_ than not filtering — fewer
+notes to serialise — so the accent fold is not the dominant term at all. Fetching 800 × 13 kB
+out of SQLite and turning the view into JSON is. Work aimed at making search faster would be
+aimed at the wrong half.
+
 Unit tests run with Vitest through the `@angular/build:unit-test` builder in a jsdom
 environment (configured in `angular.json`'s `test` target and `vitest-base.config.ts`), so
 no browser is needed. Specs sit next to the file they cover. Coverage thresholds are set at

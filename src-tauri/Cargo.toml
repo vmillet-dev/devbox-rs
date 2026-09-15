@@ -10,6 +10,22 @@ repository = "https://github.com/vmillet-dev/devbox-rs"
 license = "GPL-3.0-only"
 readme = "../README.md"
 default-run = "devbox"
+# ⚠️ Off, and the [[bench]] table below is why. Cargo would otherwise discover every
+# benches/*.rs as a target of its own — including the shared corpus, which is a module
+# and not a benchmark, and which clippy then reports as entirely unused.
+autobenches = false
+
+# Both binaries are auto-discovered; these tables exist only to turn the built-in
+# harness off, for the reason given on [lib].
+[[bin]]
+name = "devbox"
+path = "src/main.rs"
+bench = false
+
+[[bin]]
+name = "export-bindings"
+path = "src/bin/export-bindings.rs"
+bench = false
 
 [package.metadata.devbox]
 display-name = "DevBox"
@@ -18,6 +34,10 @@ author-handle = "@vmillet-dev"
 [lib]
 name = "devbox_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+# ⚠️ The lib carries no benchmarks, but cargo gives every target the built-in test
+# harness by default and runs it first — which then rejects criterion's own flags with
+# "Unrecognized option: save-baseline".
+bench = false
 
 [features]
 # The end-to-end harness, and nothing else. Off by default, so a release build
@@ -72,6 +92,20 @@ tauri-plugin-updater = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
+
+# ⚠️ The first dev-dependency, and `deny.toml` sets `all-features = true`, so cargo-deny
+# inspects this tree too: criterion's dependencies answer to the licence allow-list.
+#
+# criterion and not divan, for the one reason that decides it: `--save-baseline` and
+# `--baseline`. A baseline is only worth keeping if a later state can be compared to it in
+# one command.
+[dev-dependencies]
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+
+# `harness = false`: criterion brings its own main.
+[[bench]]
+name = "commands"
+harness = false
 
 [profile.release]
 lto = true

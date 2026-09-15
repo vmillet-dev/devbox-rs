@@ -57,6 +57,8 @@ Run all commands from the repo root (`package.json` there wraps both Angular and
 
 - `npm run e2e:build` then `npm run test:e2e` — the end-to-end suite (WebdriverIO + `tauri-driver`), twelve scenarios under `e2e/specs/` against the **assembled** application. The build step is not optional after a change to `src/` or `src-tauri/`: the suite drives a binary with the front end compiled into it.
 
+- `cargo bench` from `src-tauri/` — criterion, against a **file-backed** database of 800 notes of ~13 kB, below the command boundary. Deliberately **not in CI**: a timing assertion on a shared runner flaps. `--save-baseline main` then `--baseline main` is the comparison the harness exists for. ⚠️ `autobenches = false` and `bench = false` on the lib and both bins are load-bearing, and commented in `Cargo.toml`. The first baseline is in `docs/architecture.md`: `query_notes` costs **27 ms on 800 notes**, and the search is not what costs — filtering is cheaper than not filtering.
+
 - `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` from `src-tauri/` — `Cargo.toml` forbids `unsafe_code`, denies `clippy::all` and warns on `clippy::pedantic`, `rust_2018_idioms` and `unreachable_pub`. The toolchain is pinned in `rust-toolchain.toml`, so a new stable release can't turn CI red on an untouched commit.
 
 ## Things that will bite you
