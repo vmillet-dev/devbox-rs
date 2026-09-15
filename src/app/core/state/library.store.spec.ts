@@ -42,11 +42,16 @@ function createStore(): Harness {
 }
 
 /** The prompt is a promise the store is waiting on; nothing advances until it is given one. */
+async function asking(harness: Harness): Promise<void> {
+  for (let turn = 0; turn < 50; turn++) {
+    if (harness.store.passphraseRequest() !== null && !harness.store.passphraseWorking()) return;
+    await Promise.resolve();
+  }
+}
+
 async function answer(harness: Harness, ...answers: PassphraseAnswer[]): Promise<void> {
   for (const given of answers) {
-    for (let turn = 0; turn < 50 && harness.store.passphraseRequest() === null; turn++) {
-      await Promise.resolve();
-    }
+    await asking(harness);
 
     expect(harness.store.passphraseRequest()).not.toBeNull();
     harness.store.answerPassphrase(given);
@@ -217,9 +222,7 @@ describe('LibraryStore', () => {
 
       const done = harness.store.import();
       await answer(harness, { kind: 'phrase', value: 'a typo' });
-      for (let turn = 0; turn < 50 && harness.store.passphraseRequest() === null; turn++) {
-        await Promise.resolve();
-      }
+      await asking(harness);
 
       expect(harness.store.passphraseRequest()).toMatchObject({ purpose: 'unlock', refused: true });
 
@@ -344,9 +347,7 @@ describe('LibraryStore', () => {
       harness.dialog.savePath = 'C:/backups/devbox.devbox';
 
       const done = harness.store.export(null, NOW);
-      for (let turn = 0; turn < 50 && harness.store.passphraseRequest() === null; turn++) {
-        await Promise.resolve();
-      }
+      await asking(harness);
 
       expect(harness.store.passphraseRequest()).toEqual({
         purpose: 'protect',
@@ -368,6 +369,27 @@ describe('LibraryStore', () => {
       expect(harness.repository.exportedTo).toBeNull();
       expect(harness.status.status()).toBeNull();
     });
+  });
+
+  /** ⚠️ A dialog that vanished and came back on a typo would read as a fault, so the
+   *  prompt stays up while the phrase is being derived from — and refuses a second answer. */
+  it('keeps the prompt on screen while the phrase is being used', async () => {
+    harness.dialog.openPath = 'C:/in.devbox';
+    harness.repository.fileIsProtected = true;
+    harness.repository.expectedPassphrase = 'the shared phrase';
+
+    const done = harness.store.import();
+    await answer(harness, { kind: 'phrase', value: 'a typo' });
+
+    expect(harness.store.passphraseRequest()).not.toBeNull();
+    expect(harness.store.passphraseWorking()).toBe(true);
+
+    harness.store.answerPassphrase({ kind: 'cancelled' });
+    expect(harness.store.passphraseWorking()).toBe(true);
+
+    await answer(harness, { kind: 'cancelled' });
+    expect(await done).toBe(false);
+    expect(harness.store.passphraseRequest()).toBeNull();
   });
 
   describe('copy as Markdown', () => {

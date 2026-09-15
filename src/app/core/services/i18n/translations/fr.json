@@ -341,6 +341,7 @@
     "unlockLead": "Saisissez la phrase de passe avec laquelle {{path}} a été exporté.",
     "unlockAction": "Importer",
     "cancel": "Annuler",
+    "working": "En cours…",
     "copied": "{{notes}} note(s) copiée(s) en Markdown dans le presse-papier.",
     "needsSelection": "Sélectionnez au moins une note.",
     "emptyLibrary": "Rien à exporter : cette bibliothèque n'a aucune note.",
@@ -513,6 +514,7 @@
     "mismatched": "Les deux saisies diffèrent.",
     "createAction": "Protéger et continuer",
     "unlockAction": "Déverrouiller",
-    "working": "Déverrouillage…"
+    "working": "Déverrouillage…",
+    "creating": "Protection de la bibliothèque…"
   }
 }

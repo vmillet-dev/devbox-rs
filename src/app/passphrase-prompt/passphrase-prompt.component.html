@@ -1,7 +1,12 @@
 @let current = request();
 
 @if (current) {
-  <app-dialog [layer]="'passphrase'" labelledBy="passphrase-prompt-title" (closed)="cancel()">
+  <app-dialog
+    [layer]="'passphrase'"
+    labelledBy="passphrase-prompt-title"
+    [dismissible]="!working()"
+    (closed)="cancel()"
+  >
     <form class="prompt" data-testid="passphrase-prompt" (submit)="submit($event)">
       <h2 id="passphrase-prompt-title" class="title">
         {{ (isProtecting() ? 'file.protectTitle' : 'file.unlockTitle') | transloco }}
@@ -27,6 +32,7 @@
           [value]="passphrase()"
           [attr.aria-invalid]="refused() || tooShort() ? 'true' : null"
           [attr.aria-describedby]="refused() || tooShort() ? 'passphrase-prompt-problem' : null"
+          [disabled]="working()"
           (input)="onPassphrase($any($event.target).value)"
           data-testid="passphrase-prompt-field"
         />
@@ -41,6 +47,7 @@
             autocomplete="off"
             spellcheck="false"
             [value]="confirmation()"
+            [disabled]="working()"
             (input)="onConfirmation($any($event.target).value)"
             data-testid="passphrase-prompt-confirmation"
           />
@@ -58,13 +65,20 @@
       </p>
 
       <div class="actions">
-        <button type="button" class="action" data-testid="passphrase-prompt-cancel" (click)="cancel()">
+        <button
+          type="button"
+          class="action"
+          [disabled]="working()"
+          data-testid="passphrase-prompt-cancel"
+          (click)="cancel()"
+        >
           {{ 'file.cancel' | transloco }}
         </button>
         @if (isProtecting()) {
           <button
             type="button"
             class="action plain"
+            [disabled]="working()"
             data-testid="passphrase-prompt-plain"
             (click)="exportInTheClear()"
           >
@@ -77,7 +91,10 @@
           [disabled]="!canSubmit()"
           data-testid="passphrase-prompt-submit"
         >
-          {{ (isProtecting() ? 'file.protectAction' : 'file.unlockAction') | transloco }}
+          {{
+            (working() ? 'file.working' : isProtecting() ? 'file.protectAction' : 'file.unlockAction')
+              | transloco
+          }}
         </button>
       </div>
     </form>

@@ -341,6 +341,7 @@
     "unlockLead": "Enter the passphrase {{path}} was exported with.",
     "unlockAction": "Import",
     "cancel": "Cancel",
+    "working": "Working…",
     "copied": "{{notes}} note(s) copied as Markdown to the clipboard.",
     "needsSelection": "Select at least one note.",
     "emptyLibrary": "Nothing to export: this library has no notes.",
@@ -513,6 +514,7 @@
     "mismatched": "The two entries differ.",
     "createAction": "Protect and continue",
     "unlockAction": "Unlock",
-    "working": "Unlocking…"
+    "working": "Unlocking…",
+    "creating": "Protecting the library…"
   }
 }

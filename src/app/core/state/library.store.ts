@@ -72,11 +72,16 @@ export class LibraryStore {
 
   private readonly _isBusy = signal(false);
   private readonly _passphraseRequest = signal<PassphraseRequest | null>(null);
+  private readonly _passphraseWorking = signal(false);
 
   readonly isBusy = this._isBusy.asReadonly();
 
   /** What the prompt drawn over the page is asking for; `null` when it is not asking. */
   readonly passphraseRequest = this._passphraseRequest.asReadonly();
+
+  /** A phrase has been given and is being derived from. The prompt waits rather than
+   *  leaving the screen, and cannot be answered twice. */
+  readonly passphraseWorking = this._passphraseWorking.asReadonly();
 
   private pending: ((answer: PassphraseAnswer) => void) | null = null;
 
@@ -86,7 +91,7 @@ export class LibraryStore {
     if (path === null) return false;
 
     return this.run(async () => {
-      const report = await this.read(path, await this.repository.isProtected(path));
+      const report = await this.readWithPrompt(path);
       if (report === null) return false;
 
       const params = {
@@ -134,19 +139,49 @@ export class LibraryStore {
     }, 'errors.shareFailed');
   }
 
-  /** The prompt's only way back in. Answering is what dismisses it. */
+  /**
+   * The prompt's only way back in.
+   *
+   * ⚠️ A phrase leaves the prompt on screen, working: deriving the key takes about a
+   * second, and a dialog that vanished and came back on a typo would read as a fault.
+   * Anything else ends the asking there and then.
+   */
   answerPassphrase(answer: PassphraseAnswer): void {
     const resolve = this.pending;
+    if (resolve === null) return;
+
     this.pending = null;
-    this._passphraseRequest.set(null);
-    resolve?.(answer);
+    if (answer.kind === 'phrase') {
+      this._passphraseWorking.set(true);
+    } else {
+      this.closePrompt();
+    }
+
+    resolve(answer);
   }
 
   private ask(request: PassphraseRequest): Promise<PassphraseAnswer> {
     return new Promise((resolve) => {
       this.pending = resolve;
+      this._passphraseWorking.set(false);
       this._passphraseRequest.set(request);
     });
+  }
+
+  private closePrompt(): void {
+    this.pending = null;
+    this._passphraseWorking.set(false);
+    this._passphraseRequest.set(null);
+  }
+
+  /** The prompt never outlives the operation it was opened for, failure included. */
+  private async readWithPrompt(path: string): Promise<ImportReport | null> {
+    const isProtected = await this.repository.isProtected(path);
+    try {
+      return await this.read(path, isProtected);
+    } finally {
+      this.closePrompt();
+    }
   }
 
   /**
@@ -196,25 +231,38 @@ export class LibraryStore {
     if (answer.kind === 'cancelled') return;
 
     await this.run(async () => {
-      const report = await action(path, answer.kind === 'phrase' ? answer.value : null);
-
-      if (report.notes === 0) {
-        this.status.notify({ key: 'file.emptyLibrary' });
-        return false;
+      try {
+        return await this.writeWith(action, path, answer);
+      } finally {
+        this.closePrompt();
       }
-
-      // The file name is part of the report: an export whose landing place is unknown
-      // is no use.
-      this.status.notify({
-        key: exportedKey(report),
-        params: {
-          notes: String(report.notes),
-          attachments: String(report.attachments),
-          path: fileNameOf(path),
-        },
-      });
-      return true;
     }, 'errors.exportFailed');
+  }
+
+  private async writeWith(
+    action: (path: string, passphrase: string | null) => Promise<ExportReport>,
+    path: string,
+    answer: PassphraseAnswer,
+  ): Promise<boolean> {
+    const report = await action(path, answer.kind === 'phrase' ? answer.value : null);
+
+    if (report.notes === 0) {
+      this.status.notify({ key: 'file.emptyLibrary' });
+      return false;
+    }
+
+    // The file name is part of the report: an export whose landing place is unknown
+    // is no use.
+    this.status.notify({
+      key: exportedKey(report),
+      params: {
+        notes: String(report.notes),
+        attachments: String(report.attachments),
+        path: fileNameOf(path),
+      },
+    });
+
+    return true;
   }
 
   private async run(action: () => Promise<boolean>, failureKey: string): Promise<boolean> {

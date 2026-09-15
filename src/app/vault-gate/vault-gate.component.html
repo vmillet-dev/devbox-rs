@@ -55,10 +55,11 @@
     </p>
 
     <button class="submit" type="submit" [disabled]="!canSubmit()" data-testid="vault-submit">
-      {{
-        (vault.isWorking() ? 'vault.working' : isCreating() ? 'vault.createAction' : 'vault.unlockAction')
-          | transloco
-      }}
+      @if (vault.isWorking()) {
+        {{ (isCreating() ? 'vault.creating' : 'vault.working') | transloco }}
+      } @else {
+        {{ (isCreating() ? 'vault.createAction' : 'vault.unlockAction') | transloco }}
+      }
     </button>
   </form>
 </main>

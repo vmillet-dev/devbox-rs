@@ -86,7 +86,7 @@ export const commands = {
 	createVault: (passphrase: string) => typedError<null, AppError>(__TAURI_INVOKE("create_vault", { passphrase })),
 	/**
 	 *  ⚠️ Deliberately slow: deriving the key is the whole defence against someone trying
-	 *  passphrases against a copied file. It is `(async)` for the same reason — 224 ms on the
+	 *  passphrases against a copied file. It is `(async)` for the same reason — a second on the
 	 *  main thread would freeze the window over every attempt.
 	 */
 	unlockVault: (passphrase: string) => typedError<null, AppError>(__TAURI_INVOKE("unlock_vault", { passphrase })),

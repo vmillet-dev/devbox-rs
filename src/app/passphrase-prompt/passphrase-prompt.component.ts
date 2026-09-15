@@ -22,6 +22,7 @@ export class PassphrasePromptComponent {
   private readonly library = inject(LibraryStore);
 
   protected readonly request = this.library.passphraseRequest;
+  protected readonly working = this.library.passphraseWorking;
 
   protected readonly isProtecting = computed(() => this.request()?.purpose === 'protect');
 
@@ -54,6 +55,7 @@ export class PassphrasePromptComponent {
   );
 
   protected readonly canSubmit = computed(() => {
+    if (this.working()) return false;
     if (!this.isProtecting()) return this.passphrase().length > 0;
 
     return this.passphrase().length >= MINIMUM_PASSPHRASE_LENGTH && this.confirmation() === this.passphrase();
@@ -85,11 +87,17 @@ export class PassphrasePromptComponent {
 
   /** ⚠️ The plain export, taken deliberately: the warning above the button is the point. */
   protected exportInTheClear(): void {
+    if (this.working()) return;
+
     this.clear();
     this.library.answerPassphrase({ kind: 'none' });
   }
 
+  /** ⚠️ Refused while a phrase is being derived from: the operation is under way, and
+   *  the dialog is showing that rather than waiting for an answer. */
   protected cancel(): void {
+    if (this.working()) return;
+
     this.clear();
     this.library.answerPassphrase({ kind: 'cancelled' });
   }
