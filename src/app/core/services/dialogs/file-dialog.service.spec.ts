@@ -40,10 +40,18 @@ describe('FileDialogService', () => {
     expect(await service.pickBundle()).toBeNull();
   });
 
-  it('filters the bundle picker on the exchange format', async () => {
+  /** ⚠️ `json` stays on the way in: an export written before the archive existed is
+   *  still importable, and the picker has to let the user reach it. */
+  it('filters the bundle picker on the exchange format, old one included', async () => {
     await service.pickBundle();
 
-    expect(adapter.openCalls[0].filters?.[0].extensions).toEqual(['json']);
+    expect(adapter.openCalls[0].filters?.[0].extensions).toEqual(['devbox', 'json']);
+  });
+
+  it('offers only the archive when saving', async () => {
+    await service.chooseBundleDestination('library.devbox');
+
+    expect(adapter.saveCalls[0].filters?.[0].extensions).toEqual(['devbox']);
   });
 
   it('leaves the attachment picker unfiltered', async () => {

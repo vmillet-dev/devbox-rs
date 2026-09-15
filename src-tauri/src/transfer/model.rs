@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use crate::attachments::model::Attachment;
 use crate::error::{StorageError, ValidationError};
 use crate::notes::checklist::{self, NoteKind};
 use crate::notes::language::Language;
@@ -29,6 +30,11 @@ pub struct Bundle {
     pub exported_at: DateTime<Utc>,
     pub spaces: Vec<Space>,
     pub notes: Vec<Note>,
+    /// The records only — the bytes are entries of the archive, keyed by
+    /// [`crate::attachments::model::stored_name`]. ⚠️ `default` so a `.json` export written
+    /// before the archive existed still parses.
+    #[serde(default)]
+    pub attachments: Vec<Attachment>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Type)]
@@ -36,6 +42,9 @@ pub struct Bundle {
 pub struct ExportReport {
     pub notes: u32,
     pub spaces: u32,
+    /// What actually went into the archive. A record whose file has gone missing is left
+    /// out rather than failing the export.
+    pub attachments: u32,
 }
 
 /// `skipped`: notes already present or whose space is missing from the file — an import
@@ -49,6 +58,10 @@ pub struct ImportReport {
     /// Imported with a `language` or `kind` this build does not know brought down to the
     /// default. Counted so the loss is said rather than discovered.
     pub notes_degraded: u32,
+    pub attachments_imported: u32,
+    /// Records the archive named but did not carry. Counted rather than swallowed: the
+    /// note arrives with a thumbnail that will never load, and only this says why.
+    pub attachments_missing: u32,
 }
 
 /// A bundle read from a file, and the ids [`read_bundle`] had to degrade.
@@ -350,6 +363,7 @@ mod tests {
                 pinned: false,
             }],
             notes: vec![sample()],
+            attachments: Vec::new(),
         };
 
         let read = read_bundle(&serde_json::to_string(&bundle).unwrap()).unwrap();

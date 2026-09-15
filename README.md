@@ -27,7 +27,7 @@ is no account, and the application works with the network off.
 | **Bulk actions**     | select several notes, then move, tag, export or trash them in one go                              |
 | **Tag management**   | rename, merge or drop a tag across the whole library                                              |
 | **Attachments**      | drop a file on the editor or paste an image; open it, save it elsewhere, preview it inline        |
-| **Import / export**  | a JSON bundle both ways — everything, one space, or the selection — with a report either way      |
+| **Import / export**  | a `.devbox` archive both ways, attachments included — everything, one space, or the selection     |
 | **Copy as Markdown** | the selection rendered for a pull request, a ticket or a chat message                             |
 
 Syntax highlighting covers eighteen languages, the interface is available in French and

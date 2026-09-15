@@ -19,7 +19,7 @@ describe('Import, export and share', () => {
   const directory = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
 
   /** ⚠️ Forward slashes: `\` is an escape on the wire and a separator on Windows. */
-  const bundlePath = join(directory, 'library.json').replaceAll('\\', '/');
+  const bundlePath = join(directory, 'library.devbox').replaceAll('\\', '/');
 
   /** Kept from `before`: the seeded space is named from a translation (see below). */
   let homeId = '';
@@ -39,8 +39,11 @@ describe('Import, export and share', () => {
     expect(written.spaces).toBe((await bridge.listSpaces()).length);
 
     expect(existsSync(bundlePath)).toBe(true);
-    const bundle = JSON.parse(readFileSync(bundlePath, 'utf8')) as { notes: { title: string }[] };
-    expect(bundle.notes.map((note) => note.title)).toContain('Worth exporting');
+
+    // ⚠️ An archive, not JSON: the attachments travel as entries beside the bundle. What
+    // the archive holds is asserted in `tests/transfer.rs`, which can open one — reading
+    // a deflated entry from here would mean a zip reader in the harness for one check.
+    expect(readFileSync(bundlePath).subarray(0, 4)).toEqual(Buffer.from('PK\x03\x04', 'binary'));
   });
 
   it('imports nothing when every note is already there', async () => {
@@ -96,17 +99,22 @@ describe('Import, export and share', () => {
    * arrives with that field brought down to the default rather than failing the file.
    */
   it('imports a bundle from a newer version instead of refusing it whole', async () => {
-    const source = JSON.parse(readFileSync(bundlePath, 'utf8')) as {
-      notes: Record<string, unknown>[];
-    };
+    // ⚠️ Written as a bare `.json`, which is also the shape DevBox exported before the
+    // archive: this doubles as the proof that an old export still imports.
+    const view = await bridge.queryNotes(query({ search: 'Worth exporting' }));
+    const source = view.sections[0]?.notes[0];
+    expect(source).toBeDefined();
+
     const newerPath = join(directory, 'newer.json').replaceAll('\\', '/');
     writeFileSync(
       newerPath,
       JSON.stringify({
-        ...source,
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        spaces: await bridge.listSpaces(),
         notes: [
           {
-            ...source.notes[0],
+            ...source,
             id: 'written-by-a-newer-devbox',
             title: 'Ahead of this build',
             language: 'from-the-future',

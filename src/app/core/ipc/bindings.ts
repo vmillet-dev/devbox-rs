@@ -162,6 +162,11 @@ export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" 
 export type ExportReport = {
 	notes: number,
 	spaces: number,
+	/**
+	 *  What actually went into the archive. A record whose file has gone missing is left
+	 *  out rather than failing the export.
+	 */
+	attachments: number,
 };
 
 /**
@@ -184,6 +189,12 @@ export type ImportReport = {
 	 *  default. Counted so the loss is said rather than discovered.
 	 */
 	notesDegraded: number,
+	attachmentsImported: number,
+	/**
+	 *  Records the archive named but did not carry. Counted rather than swallowed: the
+	 *  note arrives with a thumbnail that will never load, and only this says why.
+	 */
+	attachmentsMissing: number,
 };
 
 /**

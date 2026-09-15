@@ -55,12 +55,19 @@ describe('LibraryStore', () => {
     });
 
     it('reports what came in, naming the file it read', async () => {
-      harness.dialog.openPath = 'C:/notes/devbox-2026-08-27.json';
+      harness.dialog.openPath = 'C:/notes/devbox-2026-08-27.devbox';
 
       expect(await harness.store.import()).toBe(true);
       expect(harness.status.status()).toEqual({
         key: 'file.imported',
-        params: { notes: '2', skipped: '0', degraded: '0', path: 'devbox-2026-08-27.json' },
+        params: {
+          notes: '2',
+          skipped: '0',
+          degraded: '0',
+          attachments: '0',
+          missing: '0',
+          path: 'devbox-2026-08-27.devbox',
+        },
       });
     });
 
@@ -73,11 +80,48 @@ describe('LibraryStore', () => {
         notesImported: 5,
         notesSkipped: 0,
         notesDegraded: 1,
+        attachmentsImported: 0,
+        attachmentsMissing: 0,
       };
 
       expect(await harness.store.import()).toBe(true);
       expect(harness.status.status()?.key).toBe('file.importedFromNewerVersion');
       expect(harness.status.status()?.params).toMatchObject({ notes: '5', degraded: '1' });
+    });
+
+    it('counts the attachments that came back with the notes', async () => {
+      harness.dialog.openPath = 'C:/in.devbox';
+      harness.repository.importReport = {
+        spacesCreated: 0,
+        notesImported: 2,
+        notesSkipped: 0,
+        notesDegraded: 0,
+        attachmentsImported: 3,
+        attachmentsMissing: 0,
+      };
+
+      expect(await harness.store.import()).toBe(true);
+      expect(harness.status.status()?.key).toBe('file.importedWithAttachments');
+      expect(harness.status.status()?.params).toMatchObject({ attachments: '3' });
+    });
+
+    /** ⚠️ The note arrives with a thumbnail that will never load, and this is the only
+     *  thing that says why. It outranks the degraded notice on purpose: a missing file is
+     *  a defect, a degraded field is a shrug. */
+    it('says when the archive named an attachment it did not carry', async () => {
+      harness.dialog.openPath = 'C:/in.devbox';
+      harness.repository.importReport = {
+        spacesCreated: 0,
+        notesImported: 2,
+        notesSkipped: 0,
+        notesDegraded: 1,
+        attachmentsImported: 0,
+        attachmentsMissing: 2,
+      };
+
+      expect(await harness.store.import()).toBe(true);
+      expect(harness.status.status()?.key).toBe('file.importedWithoutSomeAttachments');
+      expect(harness.status.status()?.params).toMatchObject({ missing: '2' });
     });
 
     it('says so plainly when everything was already there', async () => {
@@ -87,6 +131,8 @@ describe('LibraryStore', () => {
         notesImported: 0,
         notesSkipped: 4,
         notesDegraded: 0,
+        attachmentsImported: 0,
+        attachmentsMissing: 0,
       };
 
       expect(await harness.store.import()).toBe(false);
@@ -110,7 +156,7 @@ describe('LibraryStore', () => {
 
       await harness.store.export(null, NOW);
 
-      expect(harness.dialog.saveCalls[0].defaultPath).toBe('devbox-2026-08-27.json');
+      expect(harness.dialog.saveCalls[0].defaultPath).toBe('devbox-2026-08-27.devbox');
     });
 
     it('passes the active space through, or null for everything', async () => {
@@ -133,19 +179,33 @@ describe('LibraryStore', () => {
     });
 
     it('says how many notes went out, and where', async () => {
-      harness.dialog.savePath = 'C:/backups/devbox.json';
+      harness.dialog.savePath = 'C:/backups/devbox.devbox';
 
       await harness.store.export(null, NOW);
 
       expect(harness.status.status()).toEqual({
         key: 'file.exported',
-        params: { notes: '3', path: 'devbox.json' },
+        params: { notes: '3', attachments: '0', path: 'devbox.devbox' },
+      });
+    });
+
+    /** The attachments now travel, and a report that stayed silent about them would let a
+     *  user believe an export of screenshots carried none. */
+    it('counts the attachments that travelled with the notes', async () => {
+      harness.dialog.savePath = 'C:/backups/devbox.devbox';
+      harness.repository.exportReport = { notes: 3, spaces: 1, attachments: 2 };
+
+      await harness.store.export(null, NOW);
+
+      expect(harness.status.status()).toEqual({
+        key: 'file.exportedWithAttachments',
+        params: { notes: '3', attachments: '2', path: 'devbox.devbox' },
       });
     });
 
     it('does not pretend to have exported an empty library', async () => {
       harness.dialog.savePath = 'C:/out.json';
-      harness.repository.exportReport = { notes: 0, spaces: 0 };
+      harness.repository.exportReport = { notes: 0, spaces: 0, attachments: 0 };
 
       await harness.store.export(null, NOW);
 

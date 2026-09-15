@@ -3,24 +3,27 @@ import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { FileDialogService } from '@core/services/dialogs/file-dialog.service';
 import { StatusNotifier } from '@core/services/notifications/status.service';
-import { ImportReport } from '@core/model/note.model';
+import { ExportReport, ImportReport } from '@core/model/note.model';
 import { TransferRepository } from '../data/transfer.repository';
 import { NotesRevision } from './notes-revision';
 
 /** Dated, so two exports do not overlap. */
 function defaultFileName(now: Date): string {
-  return `devbox-${now.toISOString().slice(0, 10)}.json`;
+  return `devbox-${now.toISOString().slice(0, 10)}.devbox`;
 }
 
 /**
  * Export then re-import at once adds nothing at all, and saying so explicitly stops it
- * looking like a breakdown. A note degraded from a newer version arrived all the same,
- * and the report is the only place that says so.
+ * looking like a breakdown. The rest is a ladder of what most deserves saying: an
+ * attachment the archive named and did not carry leaves a thumbnail that will never
+ * load, and only this says why.
  */
 function importedKey(report: ImportReport): string {
   if (report.notesImported === 0) return 'file.importedNothing';
+  if (report.attachmentsMissing > 0) return 'file.importedWithoutSomeAttachments';
+  if (report.notesDegraded > 0) return 'file.importedFromNewerVersion';
 
-  return report.notesDegraded > 0 ? 'file.importedFromNewerVersion' : 'file.imported';
+  return report.attachmentsImported > 0 ? 'file.importedWithAttachments' : 'file.imported';
 }
 
 function fileNameOf(path: string): string {
@@ -55,6 +58,8 @@ export class LibraryStore {
         notes: String(report.notesImported),
         skipped: String(report.notesSkipped),
         degraded: String(report.notesDegraded),
+        attachments: String(report.attachmentsImported),
+        missing: String(report.attachmentsMissing),
         path: fileNameOf(path),
       };
 
@@ -101,7 +106,7 @@ export class LibraryStore {
     return false;
   }
 
-  private async write(action: (path: string) => Promise<{ notes: number }>, now: Date): Promise<void> {
+  private async write(action: (path: string) => Promise<ExportReport>, now: Date): Promise<void> {
     const path = await this.dialog.chooseBundleDestination(defaultFileName(now));
     if (path === null) return;
 
@@ -116,8 +121,12 @@ export class LibraryStore {
       // The file name is part of the report: an export whose landing place is unknown
       // is no use.
       this.status.notify({
-        key: 'file.exported',
-        params: { notes: String(report.notes), path: fileNameOf(path) },
+        key: report.attachments > 0 ? 'file.exportedWithAttachments' : 'file.exported',
+        params: {
+          notes: String(report.notes),
+          attachments: String(report.attachments),
+          path: fileNameOf(path),
+        },
       });
       return true;
     }, 'errors.exportFailed');

@@ -191,21 +191,27 @@ fn disk(c: &mut Criterion) {
     // The bundle is ~100 MB, so these two want their own sample size.
     group.sample_size(10);
 
-    let path = std::env::temp_dir().join("devbox-bench-export.json");
+    let path = std::env::temp_dir().join("devbox-bench-export.devbox");
     let target = path.to_string_lossy().to_string();
+    // The corpus seeds no attachment, so the archive carries the bundle alone. What the
+    // directory is does not matter; that it exists does.
+    let attachments = std::env::temp_dir();
 
     group.bench_function("export_notes", |b| {
         b.iter(|| {
             let notes = store::all(&mut corpus.connection, None).expect("the corpus");
             let packed = bundle::collect(&mut corpus.connection, notes).expect("a bundle");
-            black_box(file::write(&target, &packed).expect("a written file"));
+            black_box(file::write(&target, &packed, &attachments).expect("a written file"));
         });
     });
 
     group.bench_function("import_notes, every id already there", |b| {
         b.iter(|| {
-            let incoming = file::read(&target).expect("a readable file");
-            black_box(bundle::merge(&mut corpus.connection, incoming).expect("a merge"));
+            let (incoming, mut payload) = file::read(&target).expect("a readable file");
+            black_box(
+                bundle::merge(&mut corpus.connection, incoming, &mut payload, &attachments)
+                    .expect("a merge"),
+            );
         });
     });
 

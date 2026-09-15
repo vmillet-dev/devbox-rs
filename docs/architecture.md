@@ -1139,15 +1139,34 @@ about samples nobody asked for would only add noise.
 
 ### Import, export and copying out
 
-- **Export** writes a JSON bundle (`transfer::model::Bundle`: a version, an instant, the
-  spaces cited and the notes), for everything, one space, or the current selection. The format
-  reuses the domain types rather than duplicating them, so a field added to `Note` is exported
-  without anyone thinking about it. Only the spaces actually cited travel: exporting one space
-  should not recreate a whole tree on the other side.
+- **Export writes an archive**, `.devbox`, which is a zip: `bundle.json` at the root
+  (`transfer::model::Bundle` — a version, an instant, the spaces cited, the notes and the
+  attachment records) and one entry per attachment under `attachments/`, named by its
+  `stored_name`. The bundle is deflated, being repetitive text; the attachments are stored as
+  they are, a PNG being compressed already. The format reuses the domain types rather than
+  duplicating them, so a field added to `Note` is exported without anyone thinking about it.
+  Only the spaces actually cited travel: exporting one space should not recreate a whole tree
+  on the other side.
+- **⚠️ Base64 inside the JSON was the obvious alternative and was refused.** It costs a third
+  more bytes, and the import path holds the file as a `String`, then a `serde_json::Value`,
+  then a `Bundle` — three copies of every screenshot in memory, which a library of a hundred
+  captures turns into a gigabyte. `file::Payload` hands entries over one at a time instead.
+- **⚠️ A new DevBox reads an old file; an old DevBox does not read a new one.** `file::read`
+  sniffs the zip magic and falls back to parsing the whole file as JSON, so every `.json`
+  export written before the archive still imports. The picker keeps `json` among its
+  extensions on the way in for exactly that reason, and offers only `devbox` on the way out.
+  `FORMAT_VERSION` is untouched: the container changed, the data shape did not.
 - **Import merges, it never replaces.** Spaces are matched by name, case-insensitively, and a
   note whose id is already taken is counted as skipped rather than overwritten — so the same
   file can be imported twice without duplicating anything. A bundle from a newer format
   version is refused outright rather than half-read.
+- **An attachment comes back only with a note that actually arrived.** One belonging to a
+  skipped note is already in the library. ⚠️ The file is written **before** the record, the
+  rule `attachments.rs` already holds — a record without a file is a broken thumbnail, where
+  a file without a record is swept at the next startup, which is also what collects these if
+  the transaction rolls back. A record the archive names but does not carry is counted in
+  `attachments_missing` rather than swallowed: the note arrives with a preview that will stay
+  empty, and the report is the only thing that explains it.
 - **Copying out stops at the clipboard.** `share_notes` renders the selection as Markdown
   (heading, space, context, tags, then a fenced block). The fence is longer than the longest
   run of backticks in the content, otherwise a note that already contains a Markdown block

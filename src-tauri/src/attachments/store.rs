@@ -115,6 +115,26 @@ pub fn delete(connection: &mut SqliteConnection, id: &str) -> Result<(), Storage
     Ok(())
 }
 
+/// The records an export carries. The bytes are not here: the caller reads them from the
+/// attachments directory by [`model::stored_name`].
+pub fn for_notes(
+    connection: &mut SqliteConnection,
+    note_ids: &[String],
+) -> Result<Vec<Attachment>, StorageError> {
+    if note_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    attachments::table
+        .filter(attachments::note_id.eq_any(note_ids))
+        .select(AttachmentRow::as_select())
+        .order((attachments::created_at.asc(), attachments::id.asc()))
+        .load::<AttachmentRow>(connection)?
+        .into_iter()
+        .map(Attachment::try_from)
+        .collect()
+}
+
 /// ⚠️ Collected before a purge: the cascade takes the records, never the files.
 pub fn stored_names_of(
     connection: &mut SqliteConnection,

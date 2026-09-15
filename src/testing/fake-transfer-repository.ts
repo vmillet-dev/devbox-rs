@@ -12,12 +12,14 @@ export class FakeTransferRepository implements Pick<TransferRepository, keyof Tr
   sharedIds: readonly string[] | null = null;
   exportedIds: readonly string[] | null = null;
 
-  exportReport: ExportReport = { notes: 3, spaces: 1 };
+  exportReport: ExportReport = { notes: 3, spaces: 1, attachments: 0 };
   importReport: ImportReport = {
     spacesCreated: 1,
     notesImported: 2,
     notesSkipped: 0,
     notesDegraded: 0,
+    attachmentsImported: 0,
+    attachmentsMissing: 0,
   };
   markdown = '## Shared\n\n```txt\nbody\n```\n';
 
