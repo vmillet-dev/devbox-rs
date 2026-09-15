@@ -151,7 +151,7 @@ fn write_atomically(path: &Path, file: &KeyFile) -> Result<(), StorageError> {
 mod tests {
     use super::*;
 
-    /// ⚠️ Cheap parameters: the real ones cost 224 ms a derivation, and these tests derive
+    /// ⚠️ Cheap parameters: the real ones cost about a second a derivation, and these tests derive
     /// a dozen times. What they assert on is the file, not Argon2id's strength.
     fn cheap() -> Cost {
         Cost {

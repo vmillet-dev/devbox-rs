@@ -1642,6 +1642,22 @@ the one thing a reader of the raw file learns.
 written database and asserts exactly that split — the only test here that reads the file
 rather than the API.
 
+### What this protects against, and what it does not
+
+The threat is a file read at rest: a stolen laptop, a copied profile directory, a backup
+that ended up somewhere it should not have. Against that, a value is unreadable and a
+tampered one is refused rather than decrypted into nonsense.
+
+⚠️ It is **not** a defence against someone who can write to the file while you are away.
+A sealed value is authenticated on its own and not bound to the row it sits in — no
+associated data — so a value could be moved from one row to another and its tag would
+still verify. Binding it would mean threading the row identity through every seal and open
+call in the stores; it buys nothing against the threat above, where the attacker reads the
+file rather than edits it and hands it back.
+
+⚠️ Nor is it a defence against a machine already compromised while DevBox runs: the key is
+in this process’s memory for the length of the session, and there is no idle re-lock.
+
 ### The pieces
 
 - **`vault/key.rs`** — `Vault`: the key, and the two operations. Argon2id (`Cost`: 64 MiB,

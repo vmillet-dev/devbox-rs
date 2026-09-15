@@ -1,8 +1,8 @@
 //! Encryption at rest: the key, what it seals, and the one gate that opens the library.
 //!
-//! ⚠️ The passphrase is never stored, anywhere, deliberately — this is the bargain a password manager makes,
-//! not a keychain's. Losing it loses the library, and an export is the only copy that does
-//! not depend on it.
+//! ⚠️ The passphrase is never stored, anywhere, deliberately: this is the bargain a
+//! password manager makes, not a keychain's. Losing it loses the library, and an export
+//! is the only copy that does not depend on it.
 
 #![allow(clippy::needless_pass_by_value)]
 
@@ -136,7 +136,7 @@ fn seal_what_was_there(app: &AppHandle, db: &State<'_, Db>) -> Result<(), AppErr
 }
 
 /// ⚠️ Deliberately slow: deriving the key is the whole defence against someone trying
-/// passphrases against a copied file. It is `(async)` for the same reason — 224 ms on the
+/// passphrases against a copied file. It is `(async)` for the same reason — a second on the
 /// main thread would freeze the window over every attempt.
 #[tauri::command(async)]
 #[specta::specta]
