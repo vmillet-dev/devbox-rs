@@ -47,6 +47,9 @@ pub enum StorageError {
     SchemaTooRecent(String),
     #[error("Migration failed: {0}")]
     Migration(String),
+    /// Deriving a key, sealing a value, or opening one that will not open.
+    #[error("Vault error: {0}")]
+    Vault(String),
     /// A command panicked while holding the connection.
     #[error("Storage unavailable: a previous operation failed")]
     Unavailable,
@@ -139,6 +142,7 @@ impl From<StorageError> for AppError {
             // Nothing here gives the front anything to do beyond reporting the failure.
             StorageError::SchemaTooRecent(_)
             | StorageError::Migration(_)
+            | StorageError::Vault(_)
             | StorageError::CorruptRow { .. }
             | StorageError::Sqlite(_) => Self::new(ErrorCode::Storage, detail),
         }

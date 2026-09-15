@@ -9,6 +9,7 @@ pub mod error;
 pub mod notes;
 pub mod spaces;
 pub mod transfer;
+pub mod vault;
 
 pub(crate) mod app_info;
 pub(crate) mod closed_enum;
