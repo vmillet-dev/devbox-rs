@@ -189,6 +189,28 @@ export class NotesQueryStore {
     this._selectedLanguages.update((languages) => toggled(languages, language));
   }
 
+  /**
+   * Drops the search, the tags and the languages in one go — the three the back end
+   * counts as filtering, and the three that had to be undone one at a time where each
+   * was set.
+   *
+   * ⚠️ The quick filter is deliberately left alone. `is_filtering` in `notes::view` does
+   * not count it, so it is not what made this gesture appear; and it has a visible
+   * three-way control of its own with "All" in it, which is already the way out.
+   *
+   * ⚠️ The pending debounce is cancelled, **then** the two search signals are set. Setting
+   * them alone was not enough: a keystroke from a moment ago is still on its way, and it
+   * lands 150 ms later and puts the query back — the canvas filters itself again with an
+   * empty field to explain it.
+   */
+  clearFilters(): void {
+    this.commitSearch.cancel();
+    this._searchQuery.set('');
+    this._debouncedSearch.set('');
+    this._selectedTags.set(new Set());
+    this._selectedLanguages.set(new Set());
+  }
+
   findVisible(id: string): Note | null {
     for (const section of this.sections()) {
       const found = section.notes.find((note) => note.id === id);

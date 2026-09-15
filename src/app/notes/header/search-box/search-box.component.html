@@ -13,9 +13,18 @@
   />
   <!-- `!== null` and not a truthiness check: zero results is the answer that matters most. -->
   @if (matched() !== null) {
-    <span class="count" data-testid="search-matched">{{
-      'notes.searchMatched' | transloco: { count: matched() }
-    }}</span>
+    <!-- The count doubles as the way out: it is the one thing on screen that appears
+         exactly when the canvas is narrowed. -->
+    <button
+      type="button"
+      class="count"
+      data-testid="search-matched"
+      [attr.aria-label]="'notes.clearFilters' | transloco"
+      (click)="onClear($event)"
+    >
+      {{ 'notes.searchMatched' | transloco: { count: matched() } }}
+      <span class="count-clear" aria-hidden="true">✕</span>
+    </button>
   } @else {
     <span class="kbd" aria-hidden="true">{{ shortcutHint }}</span>
   }

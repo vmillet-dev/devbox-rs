@@ -11,6 +11,7 @@
     [query]="canvas.searchQuery()"
     [shortcutEnabled]="searchShortcutEnabled()"
     [matched]="canvas.matched()"
+    (cleared)="canvas.clearFilters()"
     (queryChange)="canvas.setSearchQuery($event)"
   />
   <app-filter-chips [active]="canvas.activeFilter()" (filterChanged)="canvas.setFilter($event)" />

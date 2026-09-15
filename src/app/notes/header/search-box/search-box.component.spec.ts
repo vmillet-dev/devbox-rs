@@ -60,13 +60,16 @@ describe('SearchBoxComponent', () => {
    * `NotesView.matched` decided one boolean and was never shown.
    */
   describe('the count', () => {
+    function matchedText(): string {
+      const node = fixture.nativeElement.querySelector('[data-testid="search-matched"]');
+      return node.textContent.replace(/\s+/g, ' ').trim();
+    }
+
     it('replaces the shortcut hint while something is being filtered', async () => {
       fixture.componentRef.setInput('matched', 12);
       await fixture.whenStable();
 
-      expect(fixture.nativeElement.querySelector('[data-testid="search-matched"]').textContent.trim()).toBe(
-        '12 résultat(s)',
-      );
+      expect(matchedText()).toBe('12 résultat(s) ✕');
       expect(fixture.nativeElement.querySelector('.kbd')).toBeNull();
     });
 
@@ -75,9 +78,7 @@ describe('SearchBoxComponent', () => {
       fixture.componentRef.setInput('matched', 0);
       await fixture.whenStable();
 
-      expect(fixture.nativeElement.querySelector('[data-testid="search-matched"]').textContent.trim()).toBe(
-        '0 résultat(s)',
-      );
+      expect(matchedText()).toBe('0 résultat(s) ✕');
     });
 
     it('shows the hint again when nothing is being filtered', async () => {
@@ -86,6 +87,34 @@ describe('SearchBoxComponent', () => {
 
       expect(fixture.nativeElement.querySelector('[data-testid="search-matched"]')).toBeNull();
       expect(fixture.nativeElement.querySelector('.kbd')).not.toBeNull();
+    });
+
+    /**
+     * The count doubles as the way out. ⚠️ `preventDefault` matters: the field is inside
+     * the `<label>`, so the click would otherwise focus it and hand the user a cursor in
+     * a field they had just emptied.
+     */
+    it('asks for the filters to be dropped, without focusing the field it emptied', async () => {
+      fixture.componentRef.setInput('matched', 12);
+      await fixture.whenStable();
+      let asked = 0;
+      fixture.componentInstance.cleared.subscribe(() => (asked += 1));
+
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      fixture.nativeElement.querySelector('[data-testid="search-matched"]').dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(asked).toBe(1);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('names the gesture for a screen reader, the count alone reading as a label', async () => {
+      fixture.componentRef.setInput('matched', 12);
+      await fixture.whenStable();
+
+      const button = fixture.nativeElement.querySelector('[data-testid="search-matched"]');
+      expect(button.tagName).toBe('BUTTON');
+      expect(button.getAttribute('aria-label')).toBe('Tout afficher');
     });
   });
 

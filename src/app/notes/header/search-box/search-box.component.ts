@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, ElementRef, input, model, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  input,
+  model,
+  output,
+  viewChild,
+} from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 /** Showing "⌘K" on Windows would name a key that does not exist there. */
@@ -32,6 +40,9 @@ export class SearchBoxComponent {
    */
   readonly matched = input<number | null>(null);
 
+  /** Asked for from the count, which is the only thing on screen that says it is on. */
+  readonly cleared = output<void>();
+
   protected readonly shortcutHint = platformShortcutHint();
 
   private readonly inputRef = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
@@ -46,6 +57,15 @@ export class SearchBoxComponent {
 
     event.preventDefault();
     this.inputRef().nativeElement.focus();
+  }
+
+  /**
+   * ⚠️ The field is inside the <label>, so a click on this button would focus it and
+   * hand the user a cursor in a field they just emptied.
+   */
+  protected onClear(event: MouseEvent): void {
+    event.preventDefault();
+    this.cleared.emit();
   }
 
   protected onInput(value: string): void {
