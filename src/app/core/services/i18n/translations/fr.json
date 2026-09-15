@@ -151,6 +151,7 @@
     "invalidInput": "Valeur refusée par le moteur : {{field}}.",
     "storageUnavailable": "Le stockage est indisponible. Redémarrez {{app}}.",
     "wrongPassphrase": "Phrase de passe incorrecte.",
+    "locked": "La bibliothèque est verrouillée.",
     "updateFailed": "La mise à jour a échoué. {{app}} reste utilisable dans sa version actuelle.",
     "updateCheckFailed": "La recherche de mise à jour a échoué. Réessayez plus tard.",
     "attachmentGone": "Cette pièce jointe n'existe plus.",

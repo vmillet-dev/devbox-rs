@@ -23,6 +23,7 @@ const IPC_ERROR_CODES: Record<IpcErrorCode, true> = {
   invalidInput: true,
   storageUnavailable: true,
   wrongPassphrase: true,
+  locked: true,
   storage: true,
 };
 

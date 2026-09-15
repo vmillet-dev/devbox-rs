@@ -148,8 +148,8 @@ mod tests {
         std::fs::create_dir_all(&directory).unwrap();
         let path = directory.join(DB_FILE_NAME);
 
-        open(&path).unwrap();
-        let mut connection = open(&path).unwrap();
+        open(&path, crate::db::test_vault().unwrap()).unwrap();
+        let mut connection = open(&path, crate::db::test_vault().unwrap()).unwrap();
 
         assert!(!connection.has_pending_migration(MIGRATIONS).unwrap());
 
@@ -301,7 +301,7 @@ mod tests {
         diesel::sql_query(
             "INSERT INTO __diesel_schema_migrations (version) VALUES ('2099-01-01-000000')",
         )
-        .execute(&mut connection)
+        .execute(connection.db())
         .unwrap();
 
         let error = run(&mut connection).unwrap_err();

@@ -69,6 +69,18 @@ export const commands = {
 	importNotes: (path: string) => typedError<ImportReport, AppError>(__TAURI_INVOKE("import_notes", { path })),
 	/**  Nothing is sent anywhere: "share" stops at the clipboard. */
 	shareNotes: (ids: string[]) => typedError<string, AppError>(__TAURI_INVOKE("share_notes", { ids })),
+	vaultState: () => typedError<VaultState, AppError>(__TAURI_INVOKE("vault_state")),
+	/**
+	 *  The first launch. ⚠️ Refuses a library that already has a key file rather than
+	 *  replacing it: that file is the only way into the notes beside it.
+	 */
+	createVault: (passphrase: string) => typedError<null, AppError>(__TAURI_INVOKE("create_vault", { passphrase })),
+	/**
+	 *  ⚠️ Deliberately slow: deriving the key is the whole defence against someone trying
+	 *  passphrases against a copied file. It is `(async)` for the same reason — 224 ms on the
+	 *  main thread would freeze the window over every attempt.
+	 */
+	unlockVault: (passphrase: string) => typedError<null, AppError>(__TAURI_INVOKE("unlock_vault", { passphrase })),
 	appChangelog: () => __TAURI_INVOKE<ChangelogRelease[]>("app_changelog"),
 	/**
 	 *  Replaces only the menu when the tray already exists, so a language change does not
@@ -162,7 +174,9 @@ export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" 
  *  The one the unlock screen acts on: it clears the field rather than banishing the
  *  user to a banner.
  */
-"wrongPassphrase" | "storage";
+"wrongPassphrase" | 
+/**  A command ran before the library was unlocked. */
+"locked" | "storage";
 
 export type ExportReport = {
 	notes: number,
@@ -397,6 +411,22 @@ export type TrayLabels = {
 	palette: string,
 	quit: string,
 };
+
+/**  What the front end renders before it renders anything else. */
+export type VaultState = 
+/**
+ *  A library that has never been encrypted: the first launch asks for a passphrase
+ *  twice and creates one.
+ */
+"absent" | 
+/**  A key file is there and the passphrase has not been given yet. */
+"locked" | 
+/**
+ *  ⚠️ Held in Rust, never in the front end: a page reload must not ask again for a
+ *  library this process already has open — which is also what keeps `reopenSession`
+ *  working in the end-to-end suite.
+ */
+"unlocked";
 
 /**
  *  Pushed from the preferences panel like the tray labels: reading `preferences.json`

@@ -352,7 +352,7 @@ fn emptying_the_list_leaves_no_row_behind() {
     assert_eq!(
         note_items::table
             .count()
-            .get_result::<i64>(&mut connection)
+            .get_result::<i64>(connection.db())
             .unwrap(),
         0
     );
@@ -400,7 +400,7 @@ fn purging_removes_the_note_and_its_items_for_good() {
     assert_eq!(
         note_items::table
             .count()
-            .get_result::<i64>(&mut connection)
+            .get_result::<i64>(connection.db())
             .unwrap(),
         0
     );
@@ -508,7 +508,7 @@ fn deleting_takes_the_note_off_the_canvas_without_destroying_it() {
     assert!(list(&mut connection).unwrap().is_empty());
     let kept_tags = note_tags::table
         .count()
-        .get_result::<i64>(&mut connection)
+        .get_result::<i64>(connection.db())
         .unwrap();
     assert_eq!(kept_tags, 2);
 
@@ -563,7 +563,7 @@ fn purging_removes_the_note_and_its_tags_for_good() {
     assert!(list_trashed(&mut connection).unwrap().is_empty());
     let orphan_tags = note_tags::table
         .count()
-        .get_result::<i64>(&mut connection)
+        .get_result::<i64>(connection.db())
         .unwrap();
     assert_eq!(orphan_tags, 0);
 }
@@ -727,7 +727,7 @@ fn purging_removes_the_note_and_its_values_for_good() {
     assert_eq!(
         note_placeholders::table
             .count()
-            .get_result::<i64>(&mut connection)
+            .get_result::<i64>(connection.db())
             .unwrap(),
         0
     );
@@ -1669,7 +1669,7 @@ fn deleting_a_space_takes_its_notes_with_it() {
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     diesel::delete(spaces_table::table.find(&space_id))
-        .execute(&mut connection)
+        .execute(connection.db())
         .unwrap();
 
     assert!(list(&mut connection).unwrap().is_empty());
@@ -1683,7 +1683,7 @@ fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
 
     diesel::update(devbox_lib::db::schema::notes::table.find(&created.id))
         .set(devbox_lib::db::schema::notes::created_at.eq("pas une date"))
-        .execute(&mut connection)
+        .execute(connection.db())
         .unwrap();
 
     let error = list(&mut connection).unwrap_err();
@@ -1708,7 +1708,7 @@ fn a_stored_date_always_carries_its_milliseconds() {
     let stored: String = devbox_lib::db::schema::notes::table
         .find(&created.id)
         .select(devbox_lib::db::schema::notes::updated_at)
-        .first(&mut connection)
+        .first(connection.db())
         .unwrap();
 
     assert_eq!(stored, "2026-07-25T09:00:00.000Z");

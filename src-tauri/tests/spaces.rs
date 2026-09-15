@@ -207,7 +207,7 @@ fn deleting_a_space_moves_its_notes_to_the_target() {
     let space_id = notes::table
         .find("n-1")
         .select(notes::space_id)
-        .first::<String>(&mut connection)
+        .first::<String>(connection.db())
         .unwrap();
     assert_eq!(space_id, refuge.id);
     assert_eq!(list(&mut connection).unwrap().len(), 1);
@@ -225,7 +225,7 @@ fn moving_notes_out_of_a_deleted_space_does_not_touch_their_timestamps() {
     let updated_at = notes::table
         .find("n-1")
         .select(notes::updated_at)
-        .first::<String>(&mut connection)
+        .first::<String>(connection.db())
         .unwrap();
     assert_eq!(updated_at, T0);
 }
@@ -264,7 +264,7 @@ fn deleting_into_an_unknown_space_changes_nothing() {
     assert_eq!(
         notes::table
             .count()
-            .get_result::<i64>(&mut connection)
+            .get_result::<i64>(connection.db())
             .unwrap(),
         1
     );

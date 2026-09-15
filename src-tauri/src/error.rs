@@ -57,6 +57,10 @@ pub enum StorageError {
     /// A command panicked while holding the connection.
     #[error("Storage unavailable: a previous operation failed")]
     Unavailable,
+    /// ⚠️ A command reached the library before the passphrase did. The front gates on the
+    /// unlock screen, so this is a caller that jumped the queue rather than a state.
+    #[error("The library is locked")]
+    Locked,
     /// `#[from]`: required by `Connection::transaction`.
     #[error("Storage error: {0}")]
     Sqlite(#[from] diesel::result::Error),
@@ -80,6 +84,8 @@ pub enum ErrorCode {
     /// The one the unlock screen acts on: it clears the field rather than banishing the
     /// user to a banner.
     WrongPassphrase,
+    /// A command ran before the library was unlocked.
+    Locked,
     Storage,
 }
 
@@ -145,6 +151,7 @@ impl From<StorageError> for AppError {
             }
             StorageError::Unavailable => Self::new(ErrorCode::StorageUnavailable, detail),
             StorageError::WrongPassphrase => Self::new(ErrorCode::WrongPassphrase, detail),
+            StorageError::Locked => Self::new(ErrorCode::Locked, detail),
             StorageError::File(_) => Self::new(ErrorCode::FileAccess, detail),
             StorageError::ImportFormat(_) => Self::new(ErrorCode::ImportFormat, detail),
             // Nothing here gives the front anything to do beyond reporting the failure.

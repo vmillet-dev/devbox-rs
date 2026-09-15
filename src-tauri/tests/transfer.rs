@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use diesel::SqliteConnection;
+use devbox_lib::db::Library;
 
 use devbox_lib::attachments::model::Attachment;
 use devbox_lib::attachments::store as attachments;
@@ -36,7 +36,7 @@ fn draft(space_id: &str, title: &str) -> NoteDraft {
 /// No attachment travels in these scenarios — the archive itself is covered in
 /// `transfer::file`. `Payload::Empty` hands over no bytes, so the directory is never
 /// written to.
-fn merge(connection: &mut SqliteConnection, bundle: IncomingBundle) -> ImportReport {
+fn merge(connection: &mut Library, bundle: IncomingBundle) -> ImportReport {
     merge_bundle(
         connection,
         bundle,
@@ -47,7 +47,7 @@ fn merge(connection: &mut SqliteConnection, bundle: IncomingBundle) -> ImportRep
 }
 
 /// A populated database, the way a user would have one.
-fn library() -> SqliteConnection {
+fn library() -> Library {
     let mut connection = open_in_memory().unwrap();
     let personal = spaces::create(&mut connection, "Personal").unwrap().id;
     let boulot = spaces::create(&mut connection, "Boulot").unwrap().id;
@@ -57,7 +57,7 @@ fn library() -> SqliteConnection {
     connection
 }
 
-fn exported(connection: &mut SqliteConnection) -> Bundle {
+fn exported(connection: &mut Library) -> Bundle {
     let all = notes::all(connection, None).unwrap();
     collect(connection, all).unwrap()
 }

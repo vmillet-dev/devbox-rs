@@ -33,6 +33,7 @@ use notes::{
 };
 use spaces::{create_space, delete_space, list_spaces, pin_space, rename_space};
 use transfer::{export_notes, export_selection, import_notes, share_notes};
+use vault::{create_vault, unlock_vault, vault_state};
 
 /// ⚠️ Resolved from the manifest: a relative path writes the file next to whatever the
 /// current directory happens to be, without saying a word.
@@ -88,6 +89,9 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             export_selection,
             import_notes,
             share_notes,
+            vault_state,
+            create_vault,
+            unlock_vault,
             app_changelog,
             sync_tray,
             set_global_shortcuts,
@@ -186,17 +190,19 @@ fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let directory = app.path().app_data_dir()?;
     std::fs::create_dir_all(&directory)?;
 
-    let connection = db::open(&directory.join(db::DB_FILE_NAME))?;
-    app.manage(db::Db::new(connection));
-
-    sweep(app.handle());
+    // ⚠️ Nothing is opened here any more: the key comes from a passphrase the front end
+    // has not asked for yet. `vault::unlock` is what fills this and runs the sweeps.
+    app.manage(db::Db::new(None));
 
     Ok(())
 }
 
 /// What makes retention hold even if nobody opens the trash. Neither sweep is fatal:
 /// the application has to start.
-fn sweep(handle: &tauri::AppHandle) {
+///
+/// ⚠️ Moved behind the unlock with the database itself. A sweep needs to read the notes,
+/// and before the passphrase there is nothing to read.
+pub(crate) fn sweep(handle: &tauri::AppHandle) {
     let db = handle.state::<db::Db>();
 
     notes::trash::sweep_at_startup(handle, &db);

@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, TimeDelta, Utc};
-use diesel::SqliteConnection;
+use devbox_lib::db::Library;
 
 use devbox_lib::db;
 use devbox_lib::notes::checklist::{ChecklistItem, NoteKind};
@@ -28,7 +28,7 @@ const TAGS: &[&str] = &[
 
 /// A database file of its own per group, erased with the guard.
 pub(crate) struct Corpus {
-    pub(crate) connection: SqliteConnection,
+    pub(crate) connection: Library,
     pub(crate) space_ids: Vec<String>,
     pub(crate) note_ids: Vec<String>,
     /// ⚠️ Last, and the erasure lives on this field rather than on `Corpus`: fields drop
@@ -109,7 +109,13 @@ pub(crate) fn build() -> Corpus {
     let directory = std::env::temp_dir().join(format!("devbox-bench-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&directory).expect("a writable temporary directory");
 
-    let mut connection = db::open(&directory.join("bench.sqlite3")).expect("a fresh database");
+    // The corpus is sealed like a real library, so the benchmarks measure what the
+    // commands really pay, encryption included.
+    let mut connection = db::open(
+        &directory.join("bench.sqlite3"),
+        db::bench_vault().expect("a key"),
+    )
+    .expect("a fresh database");
 
     let space_ids: Vec<String> = (0..SPACES)
         .map(|at| {
