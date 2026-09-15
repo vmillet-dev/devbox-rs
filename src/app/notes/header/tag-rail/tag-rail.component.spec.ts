@@ -42,6 +42,22 @@ describe('TagRailComponent', () => {
     expect(rail.getAttribute('aria-label')).toBe('Filtrer par tag');
   });
 
+  /**
+   * ⚠️ Structural, because jsdom lays nothing out. Inside the scrolling row the Manage
+   * button's `margin-left: auto` had no free space to claim once the tags overflowed, so
+   * it followed them out of the viewport — at forty tags it sat at x=2710 in a rail 1920
+   * wide. What keeps it reachable is being outside that row.
+   */
+  it('keeps the Manage button out of the row that scrolls', async () => {
+    fixture.componentRef.setInput('tags', ['alpha', 'beta']);
+    await fixture.whenStable();
+
+    const scroll = fixture.nativeElement.querySelector('.tag-rail-scroll');
+    expect(scroll.querySelectorAll('app-tag-pill')).toHaveLength(2);
+    expect(scroll.querySelector('.tag-rail-manage')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.tag-rail > .tag-rail-manage')).not.toBeNull();
+  });
+
   it('forwards the toggled event from a tag pill as tagToggled', async () => {
     fixture.componentRef.setInput('tags', ['alpha']);
     await fixture.whenStable();
