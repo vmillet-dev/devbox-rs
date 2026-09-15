@@ -8,6 +8,8 @@
   border-bottom: 1px solid var(--line-soft);
   flex-shrink: 0;
   overflow-x: auto;
+  // Same fade as the tag rail: a row that scrolls should say so.
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }
 
 .language-rail-label {

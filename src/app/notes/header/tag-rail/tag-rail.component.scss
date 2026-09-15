@@ -5,7 +5,21 @@
   padding: 10px 24px;
   border-bottom: 1px solid var(--line-soft);
   flex-shrink: 0;
+}
+
+// ⚠️ Only the pills scroll. With the Manage button inside the scrolling row, its
+// `margin-left: auto` had no free space left to claim once the tags overflowed, and it
+// followed them out of the viewport.
+.tag-rail-scroll {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  // Or the row pushes the button out again instead of scrolling.
+  min-width: 0;
   overflow-x: auto;
+  // Falls on empty space while everything fits, so it only shows when there is more.
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }
 
 .tag-rail-label {
@@ -18,7 +32,6 @@
 .tag-rail-manage {
   all: unset;
   box-sizing: border-box;
-  margin-left: auto;
   flex-shrink: 0;
   padding: 3px 9px;
   border: 1px solid var(--line-soft);
