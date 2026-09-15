@@ -123,34 +123,39 @@ pub(super) fn notes_of_space(
         .filter(notes::space_id.eq(space_id.to_string()))
 }
 
+/// ⚠️ The value is sealed like a note's own, the name is not: the name is the key rows
+/// are found by, and a variable called `host` is worth a good deal less than what it holds.
 pub fn global_placeholder_values(
     connection: &mut Library,
 ) -> Result<BTreeMap<String, String>, StorageError> {
-    Ok(global_placeholders::table
+    let (db, vault) = connection.split();
+
+    global_placeholders::table
         .select((global_placeholders::name, global_placeholders::value))
         .order(global_placeholders::name.asc())
-        .load::<(String, String)>(connection.db())?
+        .load::<(String, String)>(db)?
         .into_iter()
-        .collect())
+        .map(|(name, value)| Ok((name, vault.open(&value)?)))
+        .collect::<Result<BTreeMap<_, _>, StorageError>>()
 }
 
 pub fn replace_global_placeholder_values(
     connection: &mut Library,
     values: &BTreeMap<String, String>,
 ) -> Result<(), StorageError> {
-    connection.transaction(|connection, _vault| {
+    connection.transaction(|connection, vault| {
         diesel::delete(global_placeholders::table).execute(connection)?;
 
         if !values.is_empty() {
             let rows: Vec<_> = values
                 .iter()
                 .map(|(name, value)| {
-                    (
+                    Ok((
                         global_placeholders::name.eq(name),
-                        global_placeholders::value.eq(value),
-                    )
+                        global_placeholders::value.eq(vault.seal(value)?),
+                    ))
                 })
-                .collect();
+                .collect::<Result<Vec<_>, StorageError>>()?;
             diesel::insert_into(global_placeholders::table)
                 .values(rows)
                 .execute(connection)?;

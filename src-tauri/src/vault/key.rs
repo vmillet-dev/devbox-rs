@@ -108,7 +108,7 @@ impl Vault {
     pub fn open_bytes(&self, sealed: &[u8]) -> Result<Vec<u8>, StorageError> {
         if sealed.len() <= NONCE_BYTES {
             return Err(StorageError::Vault(
-                "a file is too short to be sealed".to_string(),
+                "too short to have been sealed".to_string(),
             ));
         }
 
@@ -117,26 +117,13 @@ impl Vault {
 
         self.cipher()
             .decrypt(nonce.into(), body)
-            .map_err(|_| StorageError::Vault("a file would not open".to_string()))
+            .map_err(|_| StorageError::Vault("it would not open".to_string()))
     }
 
-    /// `nonce ++ ciphertext ++ tag`, base64. The columns are TEXT, so what goes in one has
-    /// to survive being read back as a string.
+    /// The same bytes, base64. The columns are TEXT, so what goes in one has to survive
+    /// being read back as a string.
     pub fn seal(&self, plaintext: &str) -> Result<String, StorageError> {
-        let mut nonce = [0u8; NONCE_BYTES];
-        getrandom::fill(&mut nonce)
-            .map_err(|error| StorageError::Vault(format!("no randomness: {error}")))?;
-
-        let sealed = self
-            .cipher()
-            .encrypt((&nonce).into(), plaintext.as_bytes())
-            .map_err(|_| StorageError::Vault("could not seal a value".to_string()))?;
-
-        let mut joined = Vec::with_capacity(NONCE_BYTES + sealed.len());
-        joined.extend_from_slice(&nonce);
-        joined.extend_from_slice(&sealed);
-
-        Ok(BASE64.encode(joined))
+        Ok(BASE64.encode(self.seal_bytes(plaintext.as_bytes())?))
     }
 
     /// ⚠️ Fails on a value that was not sealed with this key, and that is the point: the
@@ -147,21 +134,7 @@ impl Vault {
             .decode(sealed)
             .map_err(|_| StorageError::Vault("a value is not base64".to_string()))?;
 
-        if raw.len() <= NONCE_BYTES {
-            return Err(StorageError::Vault(
-                "a value is too short to be sealed".to_string(),
-            ));
-        }
-
-        let (nonce, body) = raw.split_at(NONCE_BYTES);
-        let nonce: &[u8; NONCE_BYTES] = nonce.try_into().expect("a checked length");
-
-        let opened = self
-            .cipher()
-            .decrypt(nonce.into(), body)
-            .map_err(|_| StorageError::Vault("a value would not open".to_string()))?;
-
-        String::from_utf8(opened).map_err(|_| {
+        String::from_utf8(self.open_bytes(&raw)?).map_err(|_| {
             StorageError::Vault("a value opened to something that is not text".to_string())
         })
     }

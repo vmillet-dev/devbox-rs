@@ -1736,6 +1736,13 @@ fn a_note_is_not_readable_in_the_file_it_was_written_to() {
         seeded.content = secret.to_string();
         seeded.tags = vec!["prod".to_string()];
         create(&mut library, seeded, t0()).unwrap();
+
+        // A variable for the whole corpus is where a host name or a token ends up, so it
+        // is sealed like anything else a reader would want.
+        let mut globals = std::collections::BTreeMap::new();
+        globals.insert("host".to_string(), "prod.internal".to_string());
+        devbox_lib::notes::store::replace_global_placeholder_values(&mut library, &globals)
+            .unwrap();
     }
 
     let raw = std::fs::read(&path).unwrap();
@@ -1750,11 +1757,20 @@ fn a_note_is_not_readable_in_the_file_it_was_written_to() {
         !haystack.contains("Secrets"),
         "the space name is in the clear"
     );
-    // ⚠️ Tags are deliberately not sealed: the facet and the filter both touch them in
-    // SQL. This asserts the decision rather than an accident.
+    assert!(
+        !haystack.contains("prod.internal"),
+        "a global variable's value is in the clear"
+    );
+    // ⚠️ Tags and the names of variables are deliberately not sealed: the facet, the
+    // filter and the lookup all touch them in SQL. This asserts the decision rather than
+    // an accident.
     assert!(
         haystack.contains("prod"),
         "a tag is expected to stay readable"
+    );
+    assert!(
+        haystack.contains("host"),
+        "a variable's name is expected to stay readable"
     );
 
     std::fs::remove_dir_all(&directory).ok();
