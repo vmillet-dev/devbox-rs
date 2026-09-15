@@ -150,6 +150,7 @@
     "spaceGone": "This space no longer exists.",
     "invalidInput": "The engine rejected this value: {{field}}.",
     "storageUnavailable": "Storage is unavailable. Restart {{app}}.",
+    "wrongPassphrase": "Wrong passphrase.",
     "updateFailed": "The update failed. {{app}} remains usable on its current version.",
     "updateCheckFailed": "The update check failed. Try again later.",
     "attachmentGone": "This attachment no longer exists.",

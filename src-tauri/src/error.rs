@@ -50,6 +50,10 @@ pub enum StorageError {
     /// Deriving a key, sealing a value, or opening one that will not open.
     #[error("Vault error: {0}")]
     Vault(String),
+    /// ⚠️ Says only that: which of the passphrase and the file is wrong is not something
+    /// to help a caller narrow down.
+    #[error("Wrong passphrase")]
+    WrongPassphrase,
     /// A command panicked while holding the connection.
     #[error("Storage unavailable: a previous operation failed")]
     Unavailable,
@@ -73,6 +77,9 @@ pub enum ErrorCode {
     InvalidInput,
     /// Poisoned mutex: a command panicked while holding the connection.
     StorageUnavailable,
+    /// The one the unlock screen acts on: it clears the field rather than banishing the
+    /// user to a banner.
+    WrongPassphrase,
     Storage,
 }
 
@@ -137,6 +144,7 @@ impl From<StorageError> for AppError {
                 Self::with(ErrorCode::AttachmentNotFound, detail, "id", &id)
             }
             StorageError::Unavailable => Self::new(ErrorCode::StorageUnavailable, detail),
+            StorageError::WrongPassphrase => Self::new(ErrorCode::WrongPassphrase, detail),
             StorageError::File(_) => Self::new(ErrorCode::FileAccess, detail),
             StorageError::ImportFormat(_) => Self::new(ErrorCode::ImportFormat, detail),
             // Nothing here gives the front anything to do beyond reporting the failure.

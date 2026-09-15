@@ -22,6 +22,7 @@ const IPC_ERROR_CODES: Record<IpcErrorCode, true> = {
   importFormat: true,
   invalidInput: true,
   storageUnavailable: true,
+  wrongPassphrase: true,
   storage: true,
 };
 

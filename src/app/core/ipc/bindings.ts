@@ -157,7 +157,12 @@ export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" 
 /**  The `field` parameter names the offending field. */
 "invalidInput" | 
 /**  Poisoned mutex: a command panicked while holding the connection. */
-"storageUnavailable" | "storage";
+"storageUnavailable" | 
+/**
+ *  The one the unlock screen acts on: it clears the field rather than banishing the
+ *  user to a banner.
+ */
+"wrongPassphrase" | "storage";
 
 export type ExportReport = {
 	notes: number,
