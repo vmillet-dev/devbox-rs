@@ -1,4 +1,4 @@
-use diesel::SqliteConnection;
+use devbox_lib::db::Library;
 use diesel::prelude::*;
 
 use devbox_lib::db::open_in_memory;
@@ -10,7 +10,7 @@ const T0: &str = "2026-07-25T09:00:00.000Z";
 
 /// A note written straight into the database: going through `notes::create` would
 /// drag its own rules in.
-fn note_in(connection: &mut SqliteConnection, space_id: &str) {
+fn note_in(connection: &mut Library, space_id: &str) {
     diesel::insert_into(notes::table)
         .values((
             notes::id.eq("n-1"),
@@ -24,11 +24,11 @@ fn note_in(connection: &mut SqliteConnection, space_id: &str) {
             notes::updated_at.eq(T0),
             notes::lifecycle_kind.eq("permanent"),
         ))
-        .execute(connection)
+        .execute(connection.db())
         .unwrap();
 }
 
-fn names(connection: &mut SqliteConnection) -> Vec<String> {
+fn names(connection: &mut Library) -> Vec<String> {
     list(connection)
         .unwrap()
         .into_iter()

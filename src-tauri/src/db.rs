@@ -30,6 +30,13 @@ impl Library {
         &mut self.connection
     }
 
+    /// ⚠️ Both halves at once. Two calls would not do: one borrows mutably and the other
+    /// shared, and the compiler cannot see they touch different fields until they are
+    /// destructured together.
+    pub fn split(&mut self) -> (&mut SqliteConnection, &Vault) {
+        (&mut self.connection, &self.vault)
+    }
+
     /// The key. Sealing is the caller's to do — this only hands it over.
     pub fn vault(&self) -> &Vault {
         &self.vault

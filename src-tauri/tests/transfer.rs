@@ -243,6 +243,15 @@ fn a_degraded_note_is_counted_once_and_not_again_on_a_second_import() {
     assert_eq!(second.notes_degraded, 0);
 }
 
+/// `create` takes the pair, the way an import inside a transaction does.
+fn attach(
+    library: &mut Library,
+    record: &Attachment,
+) -> Result<(), devbox_lib::error::StorageError> {
+    let (db, vault) = library.split();
+    attachments::create(db, vault, record)
+}
+
 /// A directory of its own per scenario: these write real files beside a real archive.
 fn scratch() -> std::path::PathBuf {
     let stamp = std::time::SystemTime::now()
@@ -281,7 +290,7 @@ fn an_attachment_travels_with_the_library() {
     let note_id = notes::all(&mut source, None).unwrap()[0].id.clone();
     let record = capture(&note_id);
     std::fs::write(source_files.join(record.stored_name()), b"\x89PNG").unwrap();
-    attachments::create(&mut source, &record).unwrap();
+    attach(&mut source, &record).unwrap();
 
     let target_path = directory
         .join("library.devbox")
@@ -318,7 +327,7 @@ fn importing_the_same_archive_twice_restores_the_attachment_once() {
     let note_id = notes::all(&mut source, None).unwrap()[0].id.clone();
     let record = capture(&note_id);
     std::fs::write(files.join(record.stored_name()), b"\x89PNG").unwrap();
-    attachments::create(&mut source, &record).unwrap();
+    attach(&mut source, &record).unwrap();
 
     let target_path = directory
         .join("library.devbox")
@@ -351,7 +360,7 @@ fn an_attachment_the_archive_does_not_carry_is_reported() {
     let mut source = library();
     let note_id = notes::all(&mut source, None).unwrap()[0].id.clone();
     // The record exists, its file never did: the export writes the row and no entry.
-    attachments::create(&mut source, &capture(&note_id)).unwrap();
+    attach(&mut source, &capture(&note_id)).unwrap();
 
     let target_path = directory
         .join("library.devbox")

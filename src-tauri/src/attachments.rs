@@ -95,7 +95,10 @@ pub fn attach_file(
     }
 
     let mut connection = lock(&db)?;
-    if let Err(error) = store::create(&mut connection, &attachment) {
+    if let Err(error) = {
+        let (db, vault) = connection.split();
+        store::create(db, vault, &attachment)
+    } {
         remove_files(&directory, &[attachment.stored_name()]);
         return Err(error.into());
     }
@@ -140,7 +143,10 @@ fn write_attachment(
         .map_err(|error| file_error(&attachment.file_name, &error))?;
 
     let mut connection = lock(db)?;
-    if let Err(error) = store::create(&mut connection, &attachment) {
+    if let Err(error) = {
+        let (db, vault) = connection.split();
+        store::create(db, vault, &attachment)
+    } {
         remove_files(&directory, &[attachment.stored_name()]);
         return Err(error.into());
     }

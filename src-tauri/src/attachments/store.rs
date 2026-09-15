@@ -4,9 +4,11 @@ use diesel::prelude::*;
 
 use super::model::{self, Attachment};
 use crate::count::saturating_u32;
+use crate::db::Library;
 use crate::db::iso8601;
 use crate::db::schema::{attachments, notes};
 use crate::error::StorageError;
+use crate::vault::key::Vault;
 
 #[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = attachments)]
@@ -20,42 +22,41 @@ struct AttachmentRow {
     created_at: String,
 }
 
-impl TryFrom<AttachmentRow> for Attachment {
-    type Error = StorageError;
-
-    fn try_from(row: AttachmentRow) -> Result<Self, Self::Error> {
+/// ⚠️ `mime_type` stays in the clear, deliberately: the file on disk is named
+/// `{id}.{extension}`, so the type is already public. Sealing it would be theatre.
+impl AttachmentRow {
+    fn open(row: Self, vault: &Vault) -> Result<Attachment, StorageError> {
         let created_at = iso8601::parse(&row.created_at).map_err(|_| StorageError::CorruptRow {
             id: row.id.clone(),
             field: "createdAt",
         })?;
 
-        Ok(Self {
+        Ok(Attachment {
             byte_size: saturating_u32(row.byte_size),
+            file_name: vault.open(&row.file_name)?,
             id: row.id,
             note_id: row.note_id,
-            file_name: row.file_name,
             mime_type: row.mime_type,
             created_at,
         })
     }
-}
 
-impl From<&Attachment> for AttachmentRow {
-    fn from(attachment: &Attachment) -> Self {
-        Self {
+    fn seal(attachment: &Attachment, vault: &Vault) -> Result<Self, StorageError> {
+        Ok(Self {
             id: attachment.id.clone(),
             note_id: attachment.note_id.clone(),
-            file_name: attachment.file_name.clone(),
+            file_name: vault.seal(&attachment.file_name)?,
             mime_type: attachment.mime_type.clone(),
             byte_size: i64::from(attachment.byte_size),
             created_at: iso8601::format(attachment.created_at),
-        }
+        })
     }
 }
 
 /// The foreign key would refuse it too, but with a message the front cannot translate.
 pub fn create(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     attachment: &Attachment,
 ) -> Result<(), StorageError> {
     connection.transaction(|connection| {
@@ -71,37 +72,35 @@ pub fn create(
         }
 
         diesel::insert_into(attachments::table)
-            .values(AttachmentRow::from(attachment))
+            .values(AttachmentRow::seal(attachment, vault)?)
             .execute(connection)?;
 
         Ok(())
     })
 }
 
-pub fn list(
-    connection: &mut SqliteConnection,
-    note_id: &str,
-) -> Result<Vec<Attachment>, StorageError> {
+pub fn list(connection: &mut Library, note_id: &str) -> Result<Vec<Attachment>, StorageError> {
+    let (db, vault) = connection.split();
+
     attachments::table
         .filter(attachments::note_id.eq(note_id))
         .select(AttachmentRow::as_select())
         .order((attachments::created_at.asc(), attachments::id.asc()))
-        .load::<AttachmentRow>(connection)?
+        .load::<AttachmentRow>(db)?
         .into_iter()
-        .map(Attachment::try_from)
+        .map(|row| AttachmentRow::open(row, vault))
         .collect()
 }
 
-pub fn find(
-    connection: &mut SqliteConnection,
-    id: &str,
-) -> Result<Option<Attachment>, StorageError> {
+pub fn find(connection: &mut Library, id: &str) -> Result<Option<Attachment>, StorageError> {
+    let (db, vault) = connection.split();
+
     attachments::table
         .find(id)
         .select(AttachmentRow::as_select())
-        .first::<AttachmentRow>(connection)
+        .first::<AttachmentRow>(db)
         .optional()?
-        .map(Attachment::try_from)
+        .map(|row| AttachmentRow::open(row, vault))
         .transpose()
 }
 
@@ -118,48 +117,54 @@ pub fn delete(connection: &mut SqliteConnection, id: &str) -> Result<(), Storage
 /// The records an export carries. The bytes are not here: the caller reads them from the
 /// attachments directory by [`model::stored_name`].
 pub fn for_notes(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     note_ids: &[String],
 ) -> Result<Vec<Attachment>, StorageError> {
     if note_ids.is_empty() {
         return Ok(Vec::new());
     }
 
+    let (db, vault) = connection.split();
+
     attachments::table
         .filter(attachments::note_id.eq_any(note_ids))
         .select(AttachmentRow::as_select())
         .order((attachments::created_at.asc(), attachments::id.asc()))
-        .load::<AttachmentRow>(connection)?
+        .load::<AttachmentRow>(db)?
         .into_iter()
-        .map(Attachment::try_from)
+        .map(|row| AttachmentRow::open(row, vault))
         .collect()
 }
 
 /// ⚠️ Collected before a purge: the cascade takes the records, never the files.
 pub fn stored_names_of(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     note_ids: &[String],
 ) -> Result<Vec<String>, StorageError> {
     if note_ids.is_empty() {
         return Ok(Vec::new());
     }
 
-    Ok(attachments::table
+    let (db, vault) = connection.split();
+
+    attachments::table
         .filter(attachments::note_id.eq_any(note_ids))
         .select((attachments::id, attachments::file_name))
-        .load::<(String, String)>(connection)?
+        .load::<(String, String)>(db)?
         .iter()
-        .map(|(id, file_name)| model::stored_name(id, file_name))
-        .collect())
+        .map(|(id, file_name)| Ok(model::stored_name(id, &vault.open(file_name)?)))
+        .collect::<Result<Vec<_>, StorageError>>()
 }
 
-pub fn all_stored_names(connection: &mut SqliteConnection) -> Result<Vec<String>, StorageError> {
-    Ok(attachments::table
+pub fn all_stored_names(connection: &mut Library) -> Result<Vec<String>, StorageError> {
+    let (db, vault) = connection.split();
+
+    attachments::table
         .select((attachments::id, attachments::file_name))
-        .load::<(String, String)>(connection)?
+        .load::<(String, String)>(db)?
         .iter()
-        .map(|(id, file_name)| model::stored_name(id, file_name))
-        .collect())
+        .map(|(id, file_name)| Ok(model::stored_name(id, &vault.open(file_name)?)))
+        .collect::<Result<Vec<_>, StorageError>>()
 }
 
 /// One note; [`counts`] answers for the whole corpus at once.
@@ -194,7 +199,7 @@ mod tests {
     use crate::notes::language::Language;
     use crate::notes::model::{NoteDraft, NoteLifecycle};
 
-    fn note(connection: &mut SqliteConnection) -> String {
+    fn note(connection: &mut Library) -> String {
         let space = crate::spaces::store::create(connection, "Personal").unwrap();
         crate::notes::store::create(
             connection,
@@ -216,6 +221,12 @@ mod tests {
         .id
     }
 
+    /// The tests hold a library; `create` takes the pair, as an import does.
+    fn create_here(connection: &mut Library, attachment: &Attachment) -> Result<(), StorageError> {
+        let (db, vault) = connection.split();
+        create(db, vault, attachment)
+    }
+
     fn sample(id: &str, note_id: &str) -> Attachment {
         Attachment {
             id: id.to_string(),
@@ -232,7 +243,7 @@ mod tests {
         let mut connection = open_in_memory().unwrap();
         let note_id = note(&mut connection);
 
-        create(&mut connection, &sample("a-1", &note_id)).unwrap();
+        create_here(&mut connection, &sample("a-1", &note_id)).unwrap();
         let listed = list(&mut connection, &note_id).unwrap();
 
         assert_eq!(listed.len(), 1);
@@ -244,7 +255,7 @@ mod tests {
     fn attaching_to_an_unknown_note_is_refused() {
         let mut connection = open_in_memory().unwrap();
 
-        let error = create(&mut connection, &sample("a-1", "ghost")).unwrap_err();
+        let error = create_here(&mut connection, &sample("a-1", "ghost")).unwrap_err();
 
         assert!(matches!(error, StorageError::NoteNotFound(_)));
     }
@@ -253,7 +264,7 @@ mod tests {
     fn purging_a_note_takes_its_attachment_rows_with_it() {
         let mut connection = open_in_memory().unwrap();
         let note_id = note(&mut connection);
-        create(&mut connection, &sample("a-1", &note_id)).unwrap();
+        create_here(&mut connection, &sample("a-1", &note_id)).unwrap();
 
         let files = stored_names_of(&mut connection, std::slice::from_ref(&note_id)).unwrap();
         crate::notes::store::trash::trash(&mut connection, &note_id, Utc::now()).unwrap();

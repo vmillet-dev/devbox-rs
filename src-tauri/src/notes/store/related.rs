@@ -10,6 +10,7 @@ use crate::db::schema::{note_items, note_placeholders, note_tags};
 use crate::error::StorageError;
 use crate::notes::checklist::ChecklistItem;
 use crate::notes::model::Note;
+use crate::vault::key::Vault;
 
 /// ⚠️ Narrowed by subquery, not by a list of bound ids: binding one parameter per note
 /// measured slower than reading the table whole past a few thousand notes. Reading a
@@ -70,6 +71,7 @@ pub fn replace_tags(
 
 pub fn all_items(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     space_id: Option<&str>,
 ) -> Result<HashMap<String, Vec<ChecklistItem>>, StorageError> {
     let mut query = note_items::table
@@ -83,10 +85,10 @@ pub fn all_items(
 
     let mut grouped: HashMap<String, Vec<ChecklistItem>> = HashMap::new();
     for (note_id, text, done) in query.load::<(String, String, bool)>(connection)? {
-        grouped
-            .entry(note_id)
-            .or_default()
-            .push(ChecklistItem { text, done });
+        grouped.entry(note_id).or_default().push(ChecklistItem {
+            text: vault.open(&text)?,
+            done,
+        });
     }
 
     Ok(grouped)
@@ -94,22 +96,29 @@ pub fn all_items(
 
 pub fn items_of(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     note_id: &str,
 ) -> Result<Vec<ChecklistItem>, StorageError> {
-    Ok(note_items::table
+    note_items::table
         .filter(note_items::note_id.eq(note_id))
         .select((note_items::text, note_items::done))
         .order(note_items::position.asc())
         .load::<(String, bool)>(connection)?
         .into_iter()
-        .map(|(text, done)| ChecklistItem { text, done })
-        .collect())
+        .map(|(text, done)| {
+            Ok(ChecklistItem {
+                text: vault.open(&text)?,
+                done,
+            })
+        })
+        .collect()
 }
 
 /// Wiped then reinserted: the position is part of the key, so reordering would otherwise
 /// move rows one at a time under a key that refuses duplicates.
 pub fn replace_items(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     note_id: &str,
     items: &[ChecklistItem],
 ) -> Result<(), StorageError> {
@@ -121,14 +130,14 @@ pub fn replace_items(
             .iter()
             .enumerate()
             .map(|(position, item)| {
-                (
+                Ok((
                     note_items::note_id.eq(note_id),
                     note_items::position.eq(i32::try_from(position).unwrap_or(i32::MAX)),
-                    note_items::text.eq(&item.text),
+                    note_items::text.eq(vault.seal(&item.text)?),
                     note_items::done.eq(item.done),
-                )
+                ))
             })
-            .collect();
+            .collect::<Result<Vec<_>, StorageError>>()?;
         diesel::insert_into(note_items::table)
             .values(rows)
             .execute(connection)?;
@@ -138,6 +147,7 @@ pub fn replace_items(
 }
 pub fn attach_related(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     notes: &mut [Note],
     space_id: Option<&str>,
 ) -> Result<(), StorageError> {
@@ -146,8 +156,8 @@ pub fn attach_related(
     }
 
     let mut tags = all_tags(connection, space_id)?;
-    let mut items = all_items(connection, space_id)?;
-    let mut values = all_placeholder_values(connection, space_id)?;
+    let mut items = all_items(connection, vault, space_id)?;
+    let mut values = all_placeholder_values(connection, vault, space_id)?;
 
     for note in notes {
         note.tags = tags.remove(&note.id).unwrap_or_default();
@@ -160,6 +170,7 @@ pub fn attach_related(
 
 pub fn all_placeholder_values(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     space_id: Option<&str>,
 ) -> Result<HashMap<String, BTreeMap<String, String>>, StorageError> {
     let mut query = note_placeholders::table
@@ -176,7 +187,10 @@ pub fn all_placeholder_values(
 
     let mut grouped: HashMap<String, BTreeMap<String, String>> = HashMap::new();
     for (note_id, name, value) in query.load::<(String, String, String)>(connection)? {
-        grouped.entry(note_id).or_default().insert(name, value);
+        grouped
+            .entry(note_id)
+            .or_default()
+            .insert(name, vault.open(&value)?);
     }
 
     Ok(grouped)
@@ -184,18 +198,21 @@ pub fn all_placeholder_values(
 
 pub fn placeholder_values_of(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     note_id: &str,
 ) -> Result<BTreeMap<String, String>, StorageError> {
-    Ok(note_placeholders::table
+    note_placeholders::table
         .filter(note_placeholders::note_id.eq(note_id))
         .select((note_placeholders::name, note_placeholders::value))
         .load::<(String, String)>(connection)?
         .into_iter()
-        .collect())
+        .map(|(name, value)| Ok((name, vault.open(&value)?)))
+        .collect::<Result<BTreeMap<_, _>, StorageError>>()
 }
 
 pub fn replace_placeholder_values(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     note_id: &str,
     values: &BTreeMap<String, String>,
 ) -> Result<(), StorageError> {
@@ -206,13 +223,13 @@ pub fn replace_placeholder_values(
         let rows: Vec<_> = values
             .iter()
             .map(|(name, value)| {
-                (
+                Ok((
                     note_placeholders::note_id.eq(note_id),
                     note_placeholders::name.eq(name),
-                    note_placeholders::value.eq(value),
-                )
+                    note_placeholders::value.eq(vault.seal(value)?),
+                ))
             })
-            .collect();
+            .collect::<Result<Vec<_>, StorageError>>()?;
         diesel::insert_into(note_placeholders::table)
             .values(rows)
             .execute(connection)?;

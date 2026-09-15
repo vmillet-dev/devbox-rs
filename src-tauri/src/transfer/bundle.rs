@@ -5,24 +5,22 @@ use std::path::Path;
 
 use chrono::Utc;
 use diesel::SqliteConnection;
-use diesel::prelude::*;
 
 use super::file::Payload;
 use super::model::{self, Bundle, ImportReport, IncomingBundle};
 use crate::attachments::model::Attachment;
 use crate::attachments::store as attachments;
+use crate::db::Library;
 use crate::error::StorageError;
 use crate::notes::model::Note;
 use crate::notes::store as notes;
 use crate::spaces::model::Space;
 use crate::spaces::store as spaces;
+use crate::vault::key::Vault;
 
 /// Only the spaces actually cited travel with the notes: exporting one space must not
 /// recreate the whole tree for whoever imports it.
-pub fn collect(
-    connection: &mut SqliteConnection,
-    exported: Vec<Note>,
-) -> Result<Bundle, StorageError> {
+pub fn collect(connection: &mut Library, exported: Vec<Note>) -> Result<Bundle, StorageError> {
     let spaces: Vec<Space> = spaces::list(connection)?
         .into_iter()
         .filter(|space| exported.iter().any(|note| note.space_id == space.id))
@@ -45,19 +43,19 @@ pub fn collect(
 /// ⚠️ One transaction for the whole file, or a failure halfway leaves spaces created and
 /// part of the notes in, with the report lost along with the error.
 pub fn merge(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     incoming: IncomingBundle,
     payload: &mut Payload,
     directory: &Path,
 ) -> Result<ImportReport, StorageError> {
     let IncomingBundle { bundle, degraded } = incoming;
 
-    connection.transaction(|connection| {
+    connection.transaction(|connection, vault| {
         let mut report = ImportReport::default();
 
         let mut arrived: BTreeSet<String> = BTreeSet::new();
         let mut mapping: BTreeMap<String, String> = BTreeMap::new();
-        let existing = spaces::list(connection)?;
+        let existing = spaces::list_in(connection, vault)?;
 
         for space in &bundle.spaces {
             let matched = existing
@@ -68,7 +66,7 @@ pub fn merge(
                 candidate.id.clone()
             } else {
                 report.spaces_created += 1;
-                spaces::create(connection, &space.name)?.id
+                spaces::create_in(connection, vault, &space.name)?.id
             };
             mapping.insert(space.id.clone(), local_id);
         }
@@ -82,7 +80,7 @@ pub fn merge(
             };
             note.space_id.clone_from(space_id);
 
-            if notes::insert_imported(connection, &note)? {
+            if notes::insert_imported_in(connection, vault, &note)? {
                 report.notes_imported += 1;
                 arrived.insert(note.id.clone());
                 // Only what actually came in, or re-importing the same file would keep
@@ -97,6 +95,7 @@ pub fn merge(
 
         restore_attachments(
             connection,
+            vault,
             bundle.attachments,
             &arrived,
             payload,
@@ -116,6 +115,7 @@ pub fn merge(
 /// already in the library, and re-importing the same file has to add nothing.
 fn restore_attachments(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     records: Vec<Attachment>,
     arrived: &BTreeSet<String>,
     payload: &mut Payload,
@@ -134,7 +134,7 @@ fn restore_attachments(
 
         std::fs::write(directory.join(record.stored_name()), &bytes)
             .map_err(|error| StorageError::File(format!("{}: {error}", record.stored_name())))?;
-        attachments::create(connection, &record)?;
+        attachments::create(connection, vault, &record)?;
         report.attachments_imported += 1;
     }
 
@@ -142,9 +142,7 @@ fn restore_attachments(
 }
 
 /// The space names an export needs to render a note's breadcrumb.
-pub fn space_names(
-    connection: &mut SqliteConnection,
-) -> Result<BTreeMap<String, String>, StorageError> {
+pub fn space_names(connection: &mut Library) -> Result<BTreeMap<String, String>, StorageError> {
     Ok(spaces::list(connection)?
         .into_iter()
         .map(|space| (space.id, space.name))
