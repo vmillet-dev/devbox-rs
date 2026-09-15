@@ -5,5 +5,4 @@ export interface Space {
   readonly pinned: boolean;
 }
 
-/** The `id` is assigned by persistence and never by the front end. */
 export type SpaceDraft = Omit<Space, 'id' | 'pinned'>;

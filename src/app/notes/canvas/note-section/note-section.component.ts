@@ -18,7 +18,7 @@ export class NoteSectionComponent {
 
   readonly noteActivated = output<NoteActivation>();
 
-  /** The section key *is* the translation key: no label kept in two places. */
+  /** The section key is the translation key: no label kept in two places. */
   protected readonly titleKey = computed(() => `sections.${this.section().key}`);
 
   /** Ties the region to its heading, for screen-reader region navigation. */

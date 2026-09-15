@@ -1,10 +1,7 @@
 import { FileDialogAdapter } from '@core/services/dialogs/file-dialog.service';
 import type { OpenDialogOptions, SaveDialogOptions } from '@tauri-apps/plugin-dialog';
 
-/**
- * `null` is the default answer: cancelling is what the real dialog does most often, and a
- * spec that forgets to arm a path must not silently import a file.
- */
+/** `null` by default: a spec that forgets to arm a path must not silently import a file. */
 export class FakeFileDialog implements FileDialogAdapter {
   /** Path the next `open()` resolves to; `null` stands for a cancelled dialog. */
   openPath: string | string[] | null = null;

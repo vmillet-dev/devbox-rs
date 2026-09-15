@@ -1,6 +1,5 @@
-//! No user-facing text leaves this module: a `String` would put French in the
-//! English UI and force callers to parse prose. The front end maps `code` onto a
-//! translation key and interpolates `params`.
+//! ⚠️ No user-facing text leaves this module: a `String` would put French in the English
+//! UI and force callers to parse prose. The front maps `code` onto a translation key.
 
 use std::collections::BTreeMap;
 
@@ -25,8 +24,8 @@ impl ValidationError {
     }
 }
 
-/// Each variant becomes a **code** the front end translates; `Display` is only the
-/// technical detail, which may stay in French when it comes from an external error.
+/// Each variant becomes a code the front end translates; `Display` is only the technical
+/// detail.
 #[derive(Debug, Error)]
 pub enum StorageError {
     /// Never a silent `Ok`: the front would believe the write went through.
@@ -48,21 +47,16 @@ pub enum StorageError {
     SchemaTooRecent(String),
     #[error("Migration failed: {0}")]
     Migration(String),
-    /// A command panicked while holding the connection. Saying so beats panicking
-    /// again on the next one.
+    /// A command panicked while holding the connection.
     #[error("Storage unavailable: a previous operation failed")]
     Unavailable,
-    /// `#[from]`: required by `Connection::transaction`. `#[source]` comes along for
-    /// free, where an overridden `impl Display` used to lose the cause chain.
+    /// `#[from]`: required by `Connection::transaction`.
     #[error("Storage error: {0}")]
     Sqlite(#[from] diesel::result::Error),
 }
 
-/// Adding a variant breaks the front-end build until `CODE_KEYS`
-/// (`core/errors/error-notifier.service.ts`) and both locales have their key.
-///
-/// No "schema too recent" variant: that failure aborts startup during the
-/// migration, so no command can ever return it.
+/// ⚠️ Adding a variant breaks the front-end build until `CODE_KEYS`
+/// (`core/services/errors/error-notifier.service.ts`) and both locales have their key.
 #[derive(Debug, Clone, Copy, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ErrorCode {
@@ -142,8 +136,7 @@ impl From<StorageError> for AppError {
             StorageError::Unavailable => Self::new(ErrorCode::StorageUnavailable, detail),
             StorageError::File(_) => Self::new(ErrorCode::FileAccess, detail),
             StorageError::ImportFormat(_) => Self::new(ErrorCode::ImportFormat, detail),
-            // Nothing here gives the front end anything to do beyond reporting the
-            // failure; `detail` carries the rest in plain text.
+            // Nothing here gives the front anything to do beyond reporting the failure.
             StorageError::SchemaTooRecent(_)
             | StorageError::Migration(_)
             | StorageError::CorruptRow { .. }

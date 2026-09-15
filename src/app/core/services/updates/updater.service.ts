@@ -5,10 +5,7 @@ import { Update, check } from '@tauri-apps/plugin-updater';
 export interface AvailableUpdate {
   readonly version: string;
   readonly currentVersion: string;
-  /**
-   * Explicitly `| undefined`: the plugin may omit them, and `exactOptionalPropertyTypes`
-   * tells an absent key from a present-but-undefined one.
-   */
+  /** Explicitly `| undefined`: the plugin may omit them under `exactOptionalPropertyTypes`. */
   readonly notes?: string | undefined;
 }
 
@@ -16,13 +13,9 @@ export interface AvailableUpdate {
 export type DownloadProgress = number | null;
 
 /**
- * The only way through to the updater plugin: no component or store imports
- * `@tauri-apps/plugin-updater` directly, which is what makes the store testable by
- * doubling this class.
- *
- * ⚠️ The `Update` the plugin returns is a **native resource**: it holds an identifier on
- * the Rust side and must be closed when it is not installed. It is kept here rather than
- * handed to the store, which would only leak it.
+ * ⚠️ The `Update` the plugin returns is a native resource: it holds an identifier on the
+ * Rust side and must be closed when it is not installed. Kept here rather than handed
+ * to the store, which would only leak it.
  */
 @Injectable({ providedIn: 'root' })
 export class UpdaterService {
@@ -43,10 +36,7 @@ export class UpdaterService {
     };
   }
 
-  /**
-   * Downloads then installs the update held by the last `check()`. On Windows the
-   * installer stops the application itself, so nothing after this call is guaranteed.
-   */
+  /** ⚠️ On Windows the installer stops the app itself: nothing after this call runs. */
   async install(onProgress: (progress: DownloadProgress) => void): Promise<void> {
     const update = this.pending;
     if (!update) throw new Error('No update pending.');

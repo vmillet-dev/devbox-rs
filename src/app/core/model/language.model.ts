@@ -1,10 +1,6 @@
 import type { Language } from '@core/ipc/bindings';
 
-/**
- * A plain alias of the union **generated** from the Rust `Language` enum, so a variant
- * added there breaks the build everywhere it is not handled — starting with
- * `LANGUAGE_LABELS`, which has to stay exhaustive.
- */
+/** Generated from the Rust `Language` enum, so a variant added there breaks the build here. */
 export type LanguageTag = Language;
 
 /** The key order is the editor select's. */
@@ -30,13 +26,10 @@ export const LANGUAGE_LABELS: Record<LanguageTag, string> = {
   txt: 'TXT',
 };
 
-/** The language kept when the value received is not (or no longer) recognised. */
+/** Kept when the value received is not (or no longer) recognised. */
 export const FALLBACK_LANGUAGE: LanguageTag = 'txt';
 
-/**
- * Narrows a **free** string — a `<select>`'s value, never data from the bridge, which
- * already delivers a `LanguageTag`.
- */
+/** Narrows a free string — a `<select>`'s value, never data from the bridge. */
 export function isLanguageTag(value: unknown): value is LanguageTag {
   return typeof value === 'string' && Object.hasOwn(LANGUAGE_LABELS, value);
 }

@@ -2,10 +2,7 @@ import { TranslationRef } from '@core/services/i18n/translation-ref.model';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/**
- * `now` is a parameter and not an internal `new Date()`: callers pass `ClockService.now()`,
- * which keeps the computeds pure and makes the labels age on their own.
- */
+/** ⚠️ `now` is a parameter: an internal `new Date()` would freeze the caller's `computed`. */
 export function relativeTimeRef(date: Date, now: Date): TranslationRef {
   const minutes = Math.round((now.getTime() - date.getTime()) / 60_000);
   if (minutes < 1) return { key: 'time.justNow' };

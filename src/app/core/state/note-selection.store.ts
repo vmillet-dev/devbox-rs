@@ -2,11 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Note } from '../model/note.model';
 import { NotesQueryStore } from './notes-query.store';
 
-/**
- * Both are **positions in the visible list**, which is why they live together and
- * next to it: a range selection spans from the focused note to the clicked one, and
- * neither survives a note leaving the view.
- */
+/** Both are positions in the visible list, and neither survives a note leaving the view. */
 @Injectable({ providedIn: 'root' })
 export class NoteSelectionStore {
   private readonly notes = inject(NotesQueryStore);
@@ -17,10 +13,7 @@ export class NoteSelectionStore {
   readonly focusedNoteId = this._focusedNoteId.asReadonly();
   readonly checkedIds = this._checkedIds.asReadonly();
 
-  /**
-   * Derived from what is visible, never read raw: an id ticked then gone must not
-   * travel into a bulk action.
-   */
+  /** Derived from what is visible: an id ticked then gone must not reach a bulk action. */
   readonly checkedNotes = computed<readonly Note[]>(() => {
     const checked = this._checkedIds();
     return this.notes.visibleNotes().filter((note) => checked.has(note.id));
@@ -46,10 +39,6 @@ export class NoteSelectionStore {
     return index < 0 ? null : (this.notes.visibleNotes()[index] ?? null);
   }
 
-  /**
-   * By position rather than by id: navigation reasons in indices, the only landmark
-   * that survives a renamed note.
-   */
   focusIndex(index: number): void {
     const note = this.notes.visibleNotes()[index];
     if (note) {
@@ -67,7 +56,7 @@ export class NoteSelectionStore {
     });
   }
 
-  /** A file list's Shift+click. With no anchor, this ticks the named note alone. */
+  /** With no anchor, this ticks the named note alone. */
   checkRangeTo(id: string): void {
     const visible = this.notes.visibleNotes();
     const anchor = this.focusedIndex();

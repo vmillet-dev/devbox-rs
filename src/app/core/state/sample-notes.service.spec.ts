@@ -37,8 +37,7 @@ describe('SampleNotesService', () => {
   }
 
   beforeEach(() => {
-    // The deadline sample is dated from the clock; `Date` alone, or the
-    // zoneless scheduler loses the `requestAnimationFrame` it needs.
+    // ⚠️ `Date` alone, or the zoneless scheduler loses the `requestAnimationFrame` it needs.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-11T09:00:00Z'));
     setUp();
@@ -104,8 +103,7 @@ describe('SampleNotesService', () => {
   });
 
   it('stays silent when there is no database to write to', async () => {
-    // jsdom has no bridge; the canvas reports its own failure, and a second
-    // banner about samples nobody asked for would only add noise.
+    // jsdom has no bridge; the canvas reports its own failure.
     spaces.failNext = new Error('no bridge');
 
     await expect(service.seedIfFirstRun()).resolves.toBe(false);

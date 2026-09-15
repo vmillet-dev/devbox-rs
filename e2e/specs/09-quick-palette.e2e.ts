@@ -7,10 +7,9 @@ import { emitGlobalAction, press, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId } from '../support/bridge.js';
 
 /**
- * ⚠️ The OS-level `Ctrl+Alt+P` is **out of scope**: WebDriver types into the
- * WebView, not into the machine, and a global accelerator is registered natively
- * before the front end exists. What is exercised here is everything downstream of
- * it — the same `devbox:action` event the accelerator and the tray both send.
+ * ⚠️ The OS-level `Ctrl+Alt+P` is out of scope: WebDriver types into the WebView, not into
+ * the machine. What is exercised is everything downstream of it — the same action event
+ * the accelerator and the tray both send.
  */
 describe('The quick-paste palette', () => {
   async function setShortcuts(bindings: Record<string, string>) {
@@ -54,16 +53,14 @@ describe('The quick-paste palette', () => {
 
   it('says the corpus is empty rather than showing a bare list', async () => {
     await palette.type('');
-    // Every note is a candidate with no query, so the empty row is the one thing that
-    // must not appear here — it belongs to a corpus with nothing in it.
+    // Every note is a candidate with no query, so the empty row must not appear.
     expect(await palette.empty().isExisting()).toBe(false);
     expect(await palette.options().length).toBeGreaterThan(0);
   });
 
   it('opens the highlighted note in the editor on Tab', async () => {
     await palette.type('reset');
-    // Tab is the palette's own shortcut here, not a way out of a field: it opens
-    // what is highlighted, so it is pressed rather than blurred.
+    // Tab is the palette's own shortcut here, not a way out of a field.
     await press('Tab');
 
     expect(await editor.isOpen()).toBe(true);
@@ -79,11 +76,9 @@ describe('The quick-paste palette', () => {
   });
 
   it('re-registers the three accelerators and names the ones it lost', async () => {
-    // A global accelerator is first-come-first-served across the machine and the
-    // loser gets no error, so the command answers with what it could not take.
-    // Which of the three is machine-dependent; that they are the only candidates
-    // is not, and neither is the fact that re-registering an already-held
-    // accelerator succeeds rather than reporting it lost.
+    // ⚠️ A global accelerator is first-come-first-served across the machine and the loser
+    // gets no error, so the command answers with what it could not take. Which of the
+    // three is machine-dependent; that they are the only candidates is not.
     const asked = { palette: 'Ctrl+Alt+P', capture: 'Ctrl+Alt+V', newNote: 'Ctrl+Alt+N' };
 
     const first = await setShortcuts(asked);
@@ -92,8 +87,8 @@ describe('The quick-paste palette', () => {
       expect(Object.values(asked)).toContain(accelerator);
     }
 
-    // `register_shortcuts` drops all three and takes them again: the second call
-    // must lose no more than the first, or it is unregistering its own.
+    // `register_shortcuts` drops all three and takes them again: the second call must
+    // lose no more than the first, or it is unregistering its own.
     const second = await setShortcuts(asked);
     expect(second.ok).toEqual(first.ok);
   });

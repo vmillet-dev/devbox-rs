@@ -1,10 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-/**
- * `role="status"` and not `alert`: a deletion the user asked for is not an alert, and a
- * screen reader must not interrupt to announce it.
- */
+/** `role="status"` and not `alert`: a screen reader must not interrupt for this. */
 @Component({
   selector: 'app-undo-bar',
   imports: [TranslocoPipe],

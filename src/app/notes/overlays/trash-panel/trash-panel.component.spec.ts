@@ -33,8 +33,7 @@ describe('TrashPanelComponent', () => {
   }
 
   beforeEach(async () => {
-    // Only `Date` is faked: a faked `requestAnimationFrame` would block Angular's
-    // zoneless scheduler and `whenStable` would never resolve.
+    // ⚠️ Only `Date`: a faked `requestAnimationFrame` blocks the zoneless scheduler.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(NOW);
 

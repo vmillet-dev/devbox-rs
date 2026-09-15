@@ -53,8 +53,7 @@ impl From<&Attachment> for AttachmentRow {
     }
 }
 
-/// The note is checked here: the foreign key would refuse it too, but with an
-/// SQLite message the front cannot translate.
+/// The foreign key would refuse it too, but with a message the front cannot translate.
 pub fn create(
     connection: &mut SqliteConnection,
     attachment: &Attachment,
@@ -116,7 +115,7 @@ pub fn delete(connection: &mut SqliteConnection, id: &str) -> Result<(), Storage
     Ok(())
 }
 
-/// Collected **before** a purge: the cascade takes the records, never the files.
+/// ⚠️ Collected before a purge: the cascade takes the records, never the files.
 pub fn stored_names_of(
     connection: &mut SqliteConnection,
     note_ids: &[String],
@@ -143,8 +142,7 @@ pub fn all_stored_names(connection: &mut SqliteConnection) -> Result<Vec<String>
         .collect())
 }
 
-/// One note. [`counts`] answers for the whole corpus at once; reading the records
-/// back only to call `.len()` on them was a row per attachment for a number.
+/// One note; [`counts`] answers for the whole corpus at once.
 pub fn count_for(connection: &mut SqliteConnection, note_id: &str) -> Result<u32, StorageError> {
     let total: i64 = attachments::table
         .filter(attachments::note_id.eq(note_id))

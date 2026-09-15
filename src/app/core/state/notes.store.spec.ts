@@ -12,17 +12,12 @@ describe('NotesStore', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
     vi.restoreAllMocks();
-    // The stores report failures through console.error on purpose; silence it
-    // so a deliberately failing test doesn't look like a crash.
+    // The stores report failures through console.error on purpose.
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
   describe('a draft closed while it was being written', () => {
-    /**
-     * Holds the repository's own `create` open: the editor can then be closed with the
-     * write in flight, and a row is still left behind — which is what the reload has to
-     * find. A detached promise would prove only half of it.
-     */
+    /** Holds `create` open so the editor can be closed with the write in flight. */
     function holdCreate(repository: FakeNotesRepository) {
       const write = repository.create.bind(repository);
       let open!: () => void;
@@ -40,10 +35,8 @@ describe('NotesStore', () => {
     }
 
     /**
-     * ⚠️ Materialising a draft takes a round trip, and the editor can be closed inside
-     * it. Adopting the created note unconditionally put the overlay **back on screen**,
-     * on a note carrying only the field whose commit started the write — so the close the
-     * user asked for never took, and the body they had typed was nowhere in it.
+     * ⚠️ The editor can be closed inside the round trip that materialises a draft, and
+     * adopting the created note would then put the overlay back on screen.
      */
     it('does not put the editor back on screen', async () => {
       const { store, repository } = await createNotesHarness([]);
@@ -60,12 +53,7 @@ describe('NotesStore', () => {
       expect(store.selectedNote()).toBeNull();
     });
 
-    /**
-     * ⚠️ The note is still **written**, and the canvas has to hear about it. Making the
-     * reload conditional along with the adoption left a note in the database and nothing
-     * on screen until something else happened to reload — closing a new note quickly was
-     * enough to lose sight of it.
-     */
+    /** ⚠️ The note is still written, and the canvas has to hear about it either way. */
     it('still puts the note on the canvas', async () => {
       const { store, canvas, repository } = await createNotesHarness([]);
       const write = holdCreate(repository);
@@ -82,14 +70,9 @@ describe('NotesStore', () => {
     });
 
     /**
-     * ⚠️ The commits that were still in flight have to land on the row too.
-     *
-     * Closing fires the title, the source and the content back to back and the close
-     * lands between them. Once the write comes back the draft is gone, and a closed
-     * editor adopts nothing — so the later commits could only resolve the note through
-     * the canvas view, which is a round trip behind. They were dropped, and the note
-     * kept the title its creation payload carried and lost the body typed after it:
-     * `02-note-lifecycle` read `""` back on a Linux runner.
+     * ⚠️ The commits still in flight have to land on the row too. Closing fires title,
+     * source and content back to back, the close lands between them, and a closed editor
+     * adopts nothing — so without `materialisedNote` the later commits are dropped.
      */
     it('lands the commits the close itself fired', async () => {
       const { store, repository } = await createNotesHarness([]);
@@ -99,7 +82,7 @@ describe('NotesStore', () => {
 
       const update = vi.spyOn(repository, 'update');
 
-      // `requestClose()` fires the commits and closes **in the same turn**, so the close
+      // `requestClose()` fires the commits and closes in the same turn, so the close
       // lands while they are still suspended on the draft's resolution.
       const writing = store.applyPatch(DRAFT_ID, { content: 'openssl req -new' });
       store.closeOverlay();
@@ -482,11 +465,8 @@ describe('NotesStore', () => {
     });
 
     /**
-     * ⚠️ The exact shape of `requestClose()`: it fires `commitTitle`, `commitSource` and
-     * `commitContent` back to back, synchronously, with no `await` between them. The
-     * second therefore starts while the first is still writing the row, and a draft that
-     * resolved to `DRAFT_ID` in that window was created a second time — one close, two
-     * notes, which is data loss the user sees on the canvas.
+     * ⚠️ `requestClose()` fires three commits back to back with no `await` between them,
+     * so a draft that still resolves to `DRAFT_ID` in that window is created twice.
      */
     it('creates one note when the closing commits are chained without awaiting', async () => {
       const { store, repository } = await createNotesHarness([]);
@@ -754,8 +734,8 @@ describe('NotesStore', () => {
 
     it('hides the banner after its window but stays undoable', async () => {
       const { store } = await createNotesHarness([createNote({ id: 'a' })]);
-      // The timers are faked **after** the store is built: `waitFor` depends on
-      // them to await the first view.
+      // ⚠️ The timers are faked after the store is built: `waitFor` needs them to await
+      // the first view.
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       try {
         await store.deleteNote('a');

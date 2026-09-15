@@ -36,8 +36,8 @@ pub(super) struct NoteRow {
 }
 
 /// An unreadable date fails the read: these columns are only ever written by
-/// [`iso8601::format`]. Language and `kind` fall back to their default instead —
-/// a newer version may have written a value this build does not know.
+/// [`iso8601::format`]. Language and `kind` degrade instead — a newer version may have
+/// written a value this build does not know.
 impl TryFrom<NoteRow> for Note {
     type Error = StorageError;
 
@@ -183,7 +183,7 @@ fn facets(
     })
 }
 
-/// **Coarse** criteria only; `view::build` takes over for search and sections.
+/// Coarse criteria only; `view::build` takes over for search and sections.
 pub fn fetch(
     connection: &mut SqliteConnection,
     request: &NotesQuery,
@@ -220,8 +220,8 @@ pub fn fetch(
         );
     }
 
-    // On `updated_at` although the sections group on `created_at`: the section
-    // says when a note was born, the order within it which one moved last.
+    // On `updated_at` although the sections group on `created_at`: the section says when
+    // a note was born, the order within it which one moved last.
     let mut notes = query
         .order((notes::updated_at.desc(), notes::id.asc()))
         .load::<NoteRow>(connection)?
@@ -326,8 +326,8 @@ pub fn update(
     })
 }
 
-/// ⚠️ **`updated_at` is not touched**: filling a field is not editing the note,
-/// and the canvas sorts on that column.
+/// ⚠️ `updated_at` is not touched: filling a field is not editing the note, and the
+/// canvas sorts on that column.
 pub fn set_placeholder_values(
     connection: &mut SqliteConnection,
     id: &str,
@@ -422,10 +422,8 @@ pub fn tag_usage(connection: &mut SqliteConnection) -> Result<Vec<(String, i64)>
         .load::<(String, i64)>(connection)?)
 }
 
-/// Renames or merges: `sources` become `target` everywhere.
-///
-/// ⚠️ `updated_at` stays intact — the canvas sorts on it, and a corpus-wide
-/// rename would float up notes nobody reopened.
+/// ⚠️ `updated_at` stays intact — the canvas sorts on it, and a corpus-wide rename would
+/// float up notes nobody reopened.
 pub fn retag(
     connection: &mut SqliteConnection,
     sources: &[String],
@@ -442,7 +440,7 @@ pub fn retag(
             .distinct()
             .load::<String>(connection)?;
 
-        // The target is swept along with the sources then rewritten: the key is
+        // ⚠️ The target is swept along with the sources then rewritten: the key is
         // `NOCASE`, so a pure case correction (`auth` → `Auth`) would be a no-op.
         let mut holders = renamed.clone();
         holders.extend(
@@ -482,8 +480,7 @@ pub fn drop_tags(
     Ok(diesel::delete(note_tags::table.filter(note_tags::tag.eq_any(tags))).execute(connection)?)
 }
 
-/// Export only: no command hands this list to the front, which would be tempted
-/// to re-filter it.
+/// Export only: no command hands this list to the front, which would re-filter it.
 pub fn all(
     connection: &mut SqliteConnection,
     space_id: Option<&str>,

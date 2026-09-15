@@ -31,8 +31,7 @@ describe('SpacesStore', () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
     vi.restoreAllMocks();
-    // Failures are reported through console.error on purpose; silence it so a
-    // deliberately failing test doesn't look like a crash.
+    // Failures are reported through console.error on purpose.
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
@@ -68,8 +67,7 @@ describe('SpacesStore', () => {
   });
 
   it('falls back to "all spaces" when the selected id matches no space', async () => {
-    // Otherwise a stale id — a space deleted elsewhere — would hide every note
-    // with no way to tell why.
+    // Otherwise a stale id would hide every note with no way to tell why.
     const { store } = await createStore();
 
     store.selectSpace('does-not-exist');
@@ -79,8 +77,7 @@ describe('SpacesStore', () => {
   });
 
   it('surfaces a load failure through the error notifier', async () => {
-    // Nothing on screen goes blank when spaces fail to load, so without the
-    // banner the failure would be invisible.
+    // Nothing on screen goes blank when spaces fail to load.
     const repository = new FakeSpacesRepository(SPACES);
     repository.failNext = new Error('backend down');
     TestBed.configureTestingModule({ providers: [provideAppTesting({ spacesRepository: repository })] });
@@ -130,10 +127,8 @@ describe('SpacesStore', () => {
     });
 
     it('translates the backend refusal of an already-taken name', async () => {
-      // Two identically named spaces are indistinguishable in the switcher, but
-      // only the storage layer can see the real state of the database. It
-      // answers with a code, which is what makes a translated message possible
-      // — the Rust message itself is French and would leak into the English UI.
+      // Only the storage layer can see the real state of the database, and it answers
+      // with a code, which is what makes a translated message possible.
       const { store, repository } = await createStore();
       const notifier = TestBed.inject(ErrorNotifier);
       repository.failNext = new IpcError('create_space', {
@@ -225,10 +220,6 @@ describe('SpacesStore', () => {
     });
   });
 
-  /**
-   * Name order alone put the space opened every morning wherever its initial fell.
-   * Pinning hoists it, the way it does a note on the canvas.
-   */
   describe('togglePinned', () => {
     it('sends the opposite of what the space carries', async () => {
       const { store, repository } = await createStore();
@@ -239,19 +230,14 @@ describe('SpacesStore', () => {
       expect(setPinned).toHaveBeenCalledWith('work', true);
     });
 
-    /**
-     * ⚠️ Reloaded rather than patched in place. Pinning changes the **order**, and the
-     * order is the back end's — putting the returned space back where it was would
-     * leave it flagged and still buried.
-     */
+    /** ⚠️ Reloaded rather than patched in place: pinning changes the order, which is the back end's. */
     it('takes the new order from the backend rather than keeping its own', async () => {
       const { store } = await createStore();
       expect(store.spaces().map((space) => space.id)).toEqual(['work', 'personal']);
 
       await store.togglePinned('personal');
 
-      // Waited for: the reload is a round trip, so the new order arrives after the call
-      // returns — the list reorders a moment later, which is what the user sees too.
+      // Waited for: the reload is a round trip, so the new order arrives after the call.
       await vi.waitFor(() => expect(store.spaces().map((space) => space.id)).toEqual(['personal', 'work']));
       expect(store.spaces()[0].pinned).toBe(true);
     });
@@ -293,8 +279,8 @@ describe('SpacesStore', () => {
 
       const deleted = await store.deleteSpace('work', 'work');
 
-      // The schema cascades on delete: the notes would be taken back out one
-      // statement after being "moved".
+      // The schema cascades on delete: the notes would be taken back out one statement
+      // after being "moved".
       expect(deleted).toBe(false);
       expect(remove).not.toHaveBeenCalled();
       expect(store.spaces()).toEqual(SPACES);

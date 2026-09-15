@@ -1,6 +1,5 @@
-//! The format reuses the domain types rather than duplicating them: a field added
-//! to `Note` is exported without anyone thinking about it, and an older file stays
-//! readable as long as serde can fill the gap.
+//! The format reuses the domain types rather than duplicating them: a field added to
+//! `Note` is exported without anyone thinking about it.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Write};
@@ -16,13 +15,11 @@ use crate::notes::language::Language;
 use crate::notes::model::Note;
 use crate::spaces::model::Space;
 
-/// Bumped when a file written today would stop being readable. Refusing a newer
-/// version beats importing half of it.
+/// Bumped when a file written today would stop being readable.
 ///
-/// ⚠️ An **added enum variant does not bump this**. It is not a format break: the
-/// file still parses, one field just names something this build has never heard of,
-/// and [`read_bundle`] brings that field down to the default. Bumping here instead
-/// would refuse a 500-note file over one note's unknown `language`.
+/// ⚠️ An added enum variant does not bump this: the file still parses, and
+/// [`read_bundle`] brings the unknown value down to the default. Bumping would refuse a
+/// 500-note file over one note's unknown `language`.
 pub const FORMAT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -41,29 +38,28 @@ pub struct ExportReport {
     pub spaces: u32,
 }
 
-/// `skipped`: notes already present (same id) or whose space is missing from the
-/// file — an import has to be replayable without duplicating.
+/// `skipped`: notes already present or whose space is missing from the file — an import
+/// has to be replayable without duplicating.
 #[derive(Debug, Clone, Copy, Default, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportReport {
     pub spaces_created: u32,
     pub notes_imported: u32,
     pub notes_skipped: u32,
-    /// Imported, but with a `language` or a `kind` this build does not know brought
-    /// down to the default. Counted so the loss is said rather than discovered.
+    /// Imported with a `language` or `kind` this build does not know brought down to the
+    /// default. Counted so the loss is said rather than discovered.
     pub notes_degraded: u32,
 }
 
-/// A bundle read from a file, and the ids [`read_bundle`] had to bring down to a
-/// shape this build knows.
+/// A bundle read from a file, and the ids [`read_bundle`] had to degrade.
 #[derive(Debug)]
 pub struct IncomingBundle {
     pub bundle: Bundle,
     pub degraded: BTreeSet<String>,
 }
 
-/// ⚠️ The version is read off the raw JSON, before the bundle is built: a file from
-/// a future format may not deserialise at all, and the designed message beats serde's.
+/// ⚠️ The version is read off the raw JSON, before the bundle is built: a file from a
+/// future format may not deserialise at all, and the designed message beats serde's.
 pub fn read_bundle(json: &str) -> Result<IncomingBundle, StorageError> {
     let mut value: serde_json::Value = serde_json::from_str(json)
         .map_err(|error| StorageError::ImportFormat(error.to_string()))?;
@@ -87,16 +83,12 @@ pub fn read_bundle(json: &str) -> Result<IncomingBundle, StorageError> {
     Ok(IncomingBundle { bundle, degraded })
 }
 
-/// A newer DevBox may have written a `language` or a `kind` this build never heard of,
-/// and `Note` deserialises both as closed enums — so one unknown value in a 500-note
-/// file failed the whole import with a serde message about a variant.
+/// `Note` deserialises `language` and `kind` as closed enums, so one value from a newer
+/// DevBox would fail the whole import. This degrades instead, like the database read
+/// already does (`notes::store`, `TryFrom<NoteRow>`) — the title, body, tags and deadline
+/// all still arrive, and the report says how many were touched.
 ///
-/// **It degrades, like the database read already does** (`notes::store`,
-/// `TryFrom<NoteRow>`): a bundle is the same data through another door, and that is the
-/// one place the two disagreed. Degrading loses less than skipping the note — the title,
-/// the body, the tags and the deadline all still arrive, only the colouring is dropped —
-/// and the report says how many, so it is not silent. What stays strict is the
-/// **bridge**: a value the front end cannot name has no business being written.
+/// ⚠️ What stays strict is the bridge: a value the front end cannot name is never written.
 fn degrade_unknown_values(bundle: &mut serde_json::Value) -> BTreeSet<String> {
     let mut degraded = BTreeSet::new();
 
@@ -121,8 +113,8 @@ fn degrade_unknown_values(bundle: &mut serde_json::Value) -> BTreeSet<String> {
     degraded
 }
 
-/// A field that is absent, or holds something other than a string, is left for serde
-/// to judge: a malformed file is malformed, not a file from a newer version.
+/// A field that is absent, or holds something other than a string, is left for serde to
+/// judge: a malformed file is malformed, not a file from a newer version.
 fn degrade_field<T: FromStr + Default + Display>(
     note: &mut serde_json::Value,
     field: &str,
@@ -147,16 +139,16 @@ pub fn validate_path(path: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
-/// A fence longer than the longest run of backticks in the content: without it,
-/// a note that already holds a Markdown block would cut its own in two.
+/// Longer than the longest run of backticks in the content, or a note that already holds
+/// a Markdown block would cut its own in two.
 fn fence_for(content: &str) -> String {
     let longest = content.split(|c| c != '`').map(str::len).max().unwrap_or(0);
 
     "`".repeat(longest.max(2) + 1)
 }
 
-/// A todo list comes out as a Markdown task list rather than a fenced block: it has
-/// no content, and an empty block pastes nowhere.
+/// A todo list comes out as a task list: it has no content, and an empty block pastes
+/// nowhere.
 pub fn to_markdown(notes: &[Note], space_names: &BTreeMap<String, String>) -> String {
     let mut out = String::new();
 
@@ -275,8 +267,8 @@ mod tests {
 
     #[test]
     fn a_bundle_from_a_newer_version_is_refused_rather_than_half_read() {
-        // Notes this build could not deserialise at all: the version is read off the
-        // raw JSON first, so the answer names the version and not a serde field.
+        // The version is read off the raw JSON first, so the answer names the version
+        // and not a serde field.
         let json = serde_json::json!({
             "version": FORMAT_VERSION + 1,
             "exportedAt": "2026-07-25T09:00:00.000Z",
@@ -330,8 +322,7 @@ mod tests {
         assert!(read.degraded.is_empty());
     }
 
-    /// A malformed file is malformed, not a file from a newer version: only a string
-    /// this build cannot name is degraded.
+    /// Only a string this build cannot name is degraded.
     #[test]
     fn a_language_that_is_not_a_string_is_still_a_format_error() {
         assert!(matches!(

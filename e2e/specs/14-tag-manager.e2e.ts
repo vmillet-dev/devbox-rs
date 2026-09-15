@@ -6,14 +6,9 @@ import { reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * Corpus-wide retagging, reached from the end of the tag rail rather than from the File
- * menu — it is a view on the notes, not a tool.
- *
  * ⚠️ The rule under test lives in `notes::store::retag` and needs a real SQLite: the
- * primary key `(note_id, tag)` is `NOCASE`, so a rename onto an existing tag is a
- * **merge**, and the target has to be swept along with the sources. An
- * `INSERT OR IGNORE` alone would make a pure case correction a silent no-op — which is
- * exactly the kind of thing an in-memory double cannot reproduce.
+ * primary key `(note_id, tag)` is `NOCASE`, so a rename onto an existing tag is a merge
+ * and the target has to be swept along with the sources.
  */
 describe('Managing the tags of the whole corpus', () => {
   let spaceId = '';
@@ -62,8 +57,7 @@ describe('Managing the tags of the whole corpus', () => {
   });
 
   it('merges rather than duplicating when the target already exists', async () => {
-    // Reopened rather than continued: the panel stays up after an apply, but which tags
-    // are still ticked is the store's business, and this test states its own.
+    // Reopened rather than continued: this test states its own selection.
     await reloadCanvas();
     await canvas.openTagManager();
 
@@ -90,8 +84,8 @@ describe('Managing the tags of the whole corpus', () => {
     await tagManager.apply();
     await browser.pause(800);
 
-    // Same rows, different spelling: the read orders in the NOCASE collation, so the
-    // value has to be rewritten rather than ignored as a duplicate.
+    // Same rows, different spelling: the value has to be rewritten rather than ignored
+    // as a duplicate.
     expect(await tagsOf('Tagged alpha')).toEqual(['Recette']);
   });
 

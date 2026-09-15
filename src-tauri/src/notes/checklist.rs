@@ -4,18 +4,17 @@ use specta::Type;
 use crate::closed_enum::closed_enum;
 
 closed_enum! {
-    /// **Closed**, like `Language`: the front end receives it as a generated
-    /// TypeScript union, so an unknown value stops compiling there.
+    /// Closed, like `Language`: the front receives a generated union, so an unknown
+    /// value stops compiling there.
     pub enum NoteKind {
-        /// Default, and what every note written before todo-lists reads back as.
+        /// Default, and what every note written before todo lists reads back as.
         #[default]
         Snippet = "snippet",
-        /// A todo list: no body, an ordered list of items instead.
         Checklist = "checklist",
     }
 }
 
-/// No identifier: the position **is** the identity — `note_items` is keyed on
+/// No identifier: the position is the identity — `note_items` is keyed on
 /// `(note_id, position)`, and a write rewrites the whole list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -24,8 +23,8 @@ pub struct ChecklistItem {
     pub done: bool,
 }
 
-/// No de-duplication, unlike tags: two identical tasks are two tasks. The editor
-/// keeps a trailing empty row to type into, which must not reach the database.
+/// No de-duplication, unlike tags: two identical tasks are two tasks. The editor keeps a
+/// trailing empty row to type into, which must not reach the database.
 pub fn normalize_items(items: &[ChecklistItem]) -> Vec<ChecklistItem> {
     items
         .iter()
@@ -39,8 +38,7 @@ pub fn normalize_items(items: &[ChecklistItem]) -> Vec<ChecklistItem> {
         .collect()
 }
 
-/// GitHub-flavoured task list — what a checklist must look like once pasted into
-/// a ticket or a message.
+/// ⚠️ The only place the `- [x] ` syntax exists; the front reads it as `copy_text`.
 pub fn to_markdown(items: &[ChecklistItem]) -> String {
     items
         .iter()

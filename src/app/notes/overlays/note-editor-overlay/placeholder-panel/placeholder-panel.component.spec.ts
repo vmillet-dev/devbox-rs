@@ -45,8 +45,7 @@ describe('PlaceholderPanelComponent', () => {
     await fixture.whenStable();
   }
 
-  /** The draft is seeded at construction, on the note id: a panel opened on other values
-   * is a panel rebuilt. */
+  /** The draft is seeded at construction: a panel opened on other values is a panel rebuilt. */
   async function open(placeholders: readonly Placeholder[] = FIELDS): Promise<void> {
     fixture = TestBed.createComponent(PlaceholderPanelComponent);
     fixture.componentRef.setInput('placeholders', placeholders);

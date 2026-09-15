@@ -24,20 +24,16 @@ import { LanguageBadgeComponent } from '@notes/ui/language-badge/language-badge.
 import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component';
 import { NoteCardMenuComponent } from './note-card-menu/note-card-menu.component';
 
-/** The footer label is either plain text (a source name) or a translation reference (a time). */
 type FooterLabel = { kind: 'text'; value: string } | { kind: 'ref'; ref: TranslationRef };
 
-/** An opening request, and how: the modifier decides the selection. */
 export interface NoteActivation {
   readonly noteId: string;
   readonly toggleChecked: boolean;
   readonly extendRange: boolean;
 }
 
-/** What fits under a head that no longer spends a row on the language badge. */
 const SNIPPET_LINES = 4;
 const MAX_VISIBLE_TAGS = 2;
-/** What fits between the progress bar and the footer on a 150 px card. */
 const MAX_VISIBLE_ITEMS = 2;
 
 @Component({
@@ -59,15 +55,11 @@ export class NoteCardComponent {
   private readonly selection = inject(NoteSelectionStore);
   private readonly fill = inject(PlaceholderFillStore);
 
-  /** Read by the card menu, which removes the note's own space from the destinations. */
   protected readonly spaces = inject(SpacesStore);
 
   readonly note = input.required<Note>();
 
-  /**
-   * Only the click stays an output: which of opening, ticking and extending a range it
-   * means is the canvas's to arbitrate, and the card does not know the visible list.
-   */
+  /** Which of opening, ticking and extending it means is the canvas's to arbitrate. */
   readonly opened = output<NoteActivation>();
 
   protected readonly selected = computed(() => this.notes.selectedNoteId() === this.note().id);
@@ -78,7 +70,7 @@ export class NoteCardComponent {
   private readonly cardButton = viewChild.required<ElementRef<HTMLButtonElement>>('cardButton');
 
   constructor() {
-    // Real focus follows the state, or arrow navigation would move an outline without
+    // Real focus follows the state, or arrow navigation moves an outline without
     // taking the keyboard with it.
     effect(() => {
       if (this.focused() && document.activeElement !== this.cardButton().nativeElement) {
@@ -87,15 +79,6 @@ export class NoteCardComponent {
     });
   }
 
-  /**
-   * What the card shows in place of a body when a search put it here: the line that
-   * actually matched.
-   *
-   * ⚠️ The back end decides, as everywhere else — `null` outside a search **and** for a
-   * note found by its own title, which the card already shows in full. Without it the
-   * preview was the first three lines of the body, so a note matched at line forty came
-   * back with nothing explaining why it was in the list.
-   */
   protected readonly searchHit = computed(() => this.note().searchHit);
 
   protected readonly snippet = computed(() => {
@@ -105,20 +88,15 @@ export class NoteCardComponent {
     return this.note().content.split('\n').slice(0, SNIPPET_LINES).join('\n');
   });
 
-  /**
-   * A body excerpt is still code and stays coloured; a tag or a checklist item is not,
-   * and the highlighter would paint its words as keywords.
-   */
+  /** A tag or an item is not code: the highlighter would paint its words as keywords. */
   protected readonly snippetIsCode = computed(() => {
     const hit = this.searchHit();
     return !hit || hit.field === 'body';
   });
 
   /**
-   * Where a short list has to start for the thing a search found to be in it.
-   *
-   * ⚠️ A **window**, not a filter: the list keeps its order and its length, so what the
-   * reader sees is the card scrolled to the right place rather than a different card.
+   * Where a short list has to start for the thing a search found to be in it. ⚠️ A
+   * window, not a filter: the list keeps its order and its length.
    */
   private windowStart(length: number, at: number, size: number): number {
     if (at < size) return 0;
@@ -150,13 +128,8 @@ export class NoteCardComponent {
   protected readonly isChecklist = computed(() => this.note().kind === 'checklist');
   protected readonly progress = computed(() => checklistProgress(this.note().items));
   /**
-   * A todo list has no body, so `searchHit` never reached its card: the branch that
-   * renders the excerpt is unreachable behind `isChecklist()`. A list found by its fifth
-   * item showed its first two and `+3 more`, explaining nothing.
-   *
-   * ⚠️ Replacing the layer with the excerpt was not an option: these are real checkboxes
-   * a card can be ticked from. The window slides to the matching item instead, and the
-   * boxes keep working.
+   * The excerpt cannot replace the layer: these are real checkboxes a card can be
+   * ticked from. The window slides to the matching item instead.
    */
   private readonly itemWindowStart = computed(() => {
     const hit = this.searchHit();
@@ -175,15 +148,11 @@ export class NoteCardComponent {
     Math.max(0, this.note().items.length - MAX_VISIBLE_ITEMS),
   );
 
-  /** The body for a snippet, the list rendered as Markdown for a todo list. */
   protected readonly copyText = computed(() => noteCopyText(this.note()));
 
   protected readonly hasPlaceholders = computed(() => this.note().placeholders.length > 0);
 
-  /**
-   * The back end has already decided **what** to show. The two dated variants are
-   * formatted here so the label ages on screen without a new query.
-   */
+  /** The back end decides what to show; the dated variants are formatted here so they age. */
   protected readonly footerLabel = computed<FooterLabel>(() => {
     const footer = this.note().footer;
     if (footer.kind === 'source') {
@@ -195,10 +164,6 @@ export class NoteCardComponent {
     return { kind: 'ref', ref: relativeTimeRef(footer.at, this.clock.now()) };
   });
 
-  /**
-   * Ctrl ticks, Shift extends the range, a bare click opens — the convention of a file
-   * list, which is what the canvas became once it gained a selection.
-   */
   protected onOpen(event: MouseEvent): void {
     this.opened.emit({
       noteId: this.note().id,
@@ -207,19 +172,14 @@ export class NoteCardComponent {
     });
   }
 
-  /** The checkbox is a control of its own: it must not open the note. */
   protected onCheck(event: MouseEvent): void {
     event.stopPropagation();
     this.selection.toggleChecked(this.note().id);
   }
 
   /**
-   * Ticking from the card without opening the note: the whole list is written back.
-   *
-   * ⚠️ The template counts within the **window**, and the position in the note is what
-   * gets written. They were the same number while the window always started at zero;
-   * now that a search slides it, ticking the first visible box would have ticked the
-   * first box of the list instead — a card silently editing the wrong line.
+   * ⚠️ The template counts within the window; the position in the note is what gets
+   * written. A search slides the window, so the two are not the same number.
    */
   protected onItemToggle(event: MouseEvent, indexInWindow: number): void {
     event.stopPropagation();
@@ -236,7 +196,6 @@ export class NoteCardComponent {
     this.fill.openFor(this.note().id);
   }
 
-  /** The menu does not know the note: the card attaches the id. */
   protected onMove(spaceId: string): void {
     void this.notes.moveNote(this.note().id, spaceId);
   }

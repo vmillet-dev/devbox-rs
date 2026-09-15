@@ -1,11 +1,8 @@
 /**
- * The **order is the value**: a rung's position in this list decides both the `z-index`
- * and which dialog Escape reaches, so adding one is a single entry here. No stylesheet
- * carries a modal `z-index`.
- *
- * ⚠️ The banners of `layout/` sit at 80 and must stay above every modal: they are
- * triggered from inside one, and a blurred backdrop over them would hide the
- * acknowledgement. Hence the base well below it.
+ * ⚠️ The order is the value: a rung's position decides both the `z-index` and which
+ * dialog Escape reaches, and no stylesheet carries a modal `z-index`. The banners of
+ * `layout/` sit at 80 and must stay above every modal — they are triggered from inside
+ * one — hence the base well below it.
  */
 const LAYERS = ['editor', 'app', 'settings', 'update', 'palette', 'fields', 'zoom'] as const;
 

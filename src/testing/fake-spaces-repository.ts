@@ -2,10 +2,6 @@ import { guard } from './fail-next';
 import { SpacesRepository } from '@core/data/spaces.repository';
 import { Space, SpaceDraft } from '@core/model/space.model';
 
-/**
- * Like `FakeNotesRepository`: it owns the list, assigns ids, and can be made to reject
- * through `failNext`. See that file for why the implemented type is a `Pick`.
- */
 export class FakeSpacesRepository implements Pick<SpacesRepository, keyof SpacesRepository> {
   private spaces: readonly Space[];
   private nextId = 0;
@@ -38,10 +34,7 @@ export class FakeSpacesRepository implements Pick<SpacesRepository, keyof Spaces
     });
   }
 
-  /**
-   * Hoists to the head of the list, like the real one — the order is the whole point,
-   * so a double that only flipped the flag would let a broken sort pass.
-   */
+  /** Hoists like the real one: a double that only flipped the flag would let a broken sort pass. */
   setPinned(id: string, pinned: boolean): Promise<Space> {
     return guard(this, () => {
       const updated = this.spaces.map((space) => (space.id === id ? { ...space, pinned } : space));
@@ -57,10 +50,7 @@ export class FakeSpacesRepository implements Pick<SpacesRepository, keyof Spaces
     });
   }
 
-  /**
-   * The target is accepted without checking it holds the notes: this double owns none.
-   * `NotesStore` reloads from its own repository afterwards.
-   */
+  /** The target is accepted without checking it holds the notes: this double owns none. */
   delete(id: string, _targetSpaceId: string): Promise<void> {
     return guard(this, () => {
       this.spaces = this.spaces.filter((space) => space.id !== id);

@@ -1,6 +1,6 @@
 /// One list gives the enum, its `ALL` array, its stored spelling, `Display` and
-/// `FromStr`. The literal per variant is the **single** spelling: serde, the
-/// database column, `Display` and `FromStr` all read it, so they cannot drift.
+/// `FromStr`. ⚠️ The literal per variant is the single spelling: serde, the column,
+/// `Display` and `FromStr` all read it, so they cannot drift.
 macro_rules! closed_enum {
     (
         $(#[$meta:meta])*
@@ -33,9 +33,8 @@ macro_rules! closed_enum {
         }
 
         impl $name {
-            /// Every variant, in declaration order. Production code matches rather
-            /// than iterates; this is what lets a test assert over the whole set,
-            /// so that adding a variant cannot quietly escape the round-trip checks.
+            /// Every variant, in declaration order — what lets a test assert over the
+            /// whole set, so adding one cannot escape the round-trip checks.
             #[allow(dead_code)]
             $vis const ALL: [Self; [$(Self::$variant),+].len()] = [$(Self::$variant),+];
 
@@ -52,8 +51,8 @@ macro_rules! closed_enum {
             }
         }
 
-        /// The column carries no `CHECK`: a database written by a newer version may
-        /// hold a value this one never heard of, and the caller decides to fall back.
+        /// The column carries no `CHECK`: a database written by a newer version may hold
+        /// a value this one never heard of, and the caller decides to fall back.
         impl std::str::FromStr for $name {
             type Err = ();
 

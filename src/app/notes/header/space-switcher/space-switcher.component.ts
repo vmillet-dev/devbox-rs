@@ -23,7 +23,6 @@ export interface SpaceDeletion {
 
 export interface SpaceRenaming {
   readonly id: string;
-  /** The raw name: trimming and uniqueness belong to the back end. */
   readonly name: string;
 }
 
@@ -41,10 +40,8 @@ export class SpaceSwitcherComponent {
   readonly activeSpace = input.required<Space | null>();
 
   readonly spaceChanged = output<string | null>();
-  /** The raw name typed: normalisation and persistence belong to the store. */
   readonly spaceCreated = output<string>();
   readonly spaceRenamed = output<SpaceRenaming>();
-  /** The id alone: whether it is being pinned or unpinned is the store's to read. */
   readonly pinRequested = output<string>();
   readonly spaceDeleted = output<SpaceDeletion>();
 
@@ -52,23 +49,16 @@ export class SpaceSwitcherComponent {
 
   protected readonly creating = signal(false);
 
-  /**
-   * The panel **replaces** the menu rather than adding to it, like the create form:
-   * input fields inside a `role="menu"` are neither valid ARIA nor navigable as options.
-   */
+  /** ⚠️ The panel replaces the menu: input fields inside a `role="menu"` are not valid ARIA. */
   protected readonly editing = signal<Space | null>(null);
 
-  /** Deletion in two steps: the WebView blocks on a native `confirm()`. */
+  /** Two steps: the WebView blocks on a native `confirm()`. */
   protected readonly confirmingDelete = signal(false);
 
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
   private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
 
-  /**
-   * A space cannot be its own refuge: the cascade would take the notes right after the
-   * transfer. An empty list means deletion is impossible, and the panel says so rather
-   * than offering a button that would fail.
-   */
+  /** A space cannot be its own refuge: the cascade would take the notes after the transfer. */
   protected readonly moveTargets = computed<readonly Space[]>(() => {
     const edited = this.editing();
     return edited ? this.spaces().filter((space) => space.id !== edited.id) : [];
@@ -78,7 +68,6 @@ export class SpaceSwitcherComponent {
     this.menu.escaped.subscribe(() => this.onEscape());
     this.menu.closed.subscribe(() => this.resetPanels());
 
-    // The panels replace the menu, whose focus `MenuPanelDirective` handles.
     effect(() => {
       if (!this.menu.open()) return;
       if (this.editing()) {

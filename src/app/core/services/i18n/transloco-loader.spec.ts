@@ -28,11 +28,7 @@ describe('AppTranslocoLoader', () => {
   });
 });
 
-/**
- * The invariant, asserted on the **shipped** files: a string written with the name in it
- * would render correctly today and go stale the day the name changes, which is the whole
- * point of taking it from `Cargo.toml`.
- */
+/** Asserted on the shipped files: no translated string may spell the app's name out. */
 describe('the translation files', () => {
   function strings(node: unknown): string[] {
     if (typeof node === 'string') return [node];

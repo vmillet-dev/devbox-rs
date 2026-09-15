@@ -4,10 +4,7 @@ import { TranslationRef } from '@core/services/i18n/translation-ref.model';
 import { UpdateStore } from '@core/services/updates/update.store';
 import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
-/**
- * Once installing starts both buttons disappear and the dialog stops being dismissible:
- * there is nothing left to cancel, the installer is replacing the files.
- */
+/** Once installing starts the dialog stops being dismissible: the installer is replacing files. */
 @Component({
   selector: 'app-update-prompt',
   imports: [DialogComponent, TranslocoPipe],
@@ -18,10 +15,7 @@ import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 export class UpdatePromptComponent {
   protected readonly store = inject(UpdateStore);
 
-  /**
-   * Local, and read on the way out: Escape and the backdrop close the dialog without
-   * touching the buttons, and both have to honour a box the user has already ticked.
-   */
+  /** Read on the way out: Escape and the backdrop must honour a box already ticked. */
   protected readonly skip = signal(false);
 
   protected readonly busy = computed(

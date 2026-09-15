@@ -2,10 +2,7 @@ import { ErrorHandler, Injectable, inject } from '@angular/core';
 import { IpcError } from '@core/ipc/ipc.error';
 import { ErrorNotifier, errorDetail } from './error-notifier.service';
 
-/**
- * The last net: every uncaught exception is logged **and** put on screen. IPC failures get
- * their own message — the expected failure mode in production.
- */
+/** The last net: on a desktop app an uncaught exception has to reach the screen. */
 @Injectable()
 export class AppErrorHandler implements ErrorHandler {
   private readonly notifier = inject(ErrorNotifier);

@@ -2,17 +2,12 @@ import type { ShortcutBindings } from '@core/ipc/bindings';
 
 export type { ShortcutBindings };
 
-/**
- * `keys` is already split — `['Ctrl', 'K']` and not `'Ctrl+K'` — because each one is
- * rendered as its own `<kbd>`. A step that is not a key press (`Ctrl` + click, a drag) is
- * spelled out in the label instead: a `<kbd>Click</kbd>` would read as a key to press.
- */
+/** `keys` is split because each one is rendered as its own `<kbd>`. */
 export interface ShortcutEntry {
   readonly keys: readonly string[];
   readonly labelKey: string;
 }
 
-/** A heading of the sheet, owned whole by whoever owns those keys. */
 export interface ShortcutGroup {
   readonly id: string;
   readonly labelKey: string;
@@ -21,10 +16,8 @@ export interface ShortcutGroup {
 
 /**
  * ⚠️ Mirror of `ShortcutBindings::defaults()` (`src-tauri/src/desktop.rs`), and
- * deliberately so: the native side takes these **before** the front has started, and
- * without them `Ctrl+Alt+P` would be dead for the length of the first render.
- *
- * Only the palette is settable from the preferences; the native command takes all three.
+ * deliberately so: the native side takes these before the front has started, and
+ * without them `Ctrl+Alt+P` is dead for the length of the first render.
  */
 export const DEFAULT_SHORTCUTS: ShortcutBindings = {
   capture: 'Ctrl+Alt+V',
@@ -32,10 +25,7 @@ export const DEFAULT_SHORTCUTS: ShortcutBindings = {
   palette: 'Ctrl+Alt+P',
 };
 
-/**
- * While a modifier key is alone the combination is not finished, and there is nothing
- * to record.
- */
+/** A modifier alone is not a finished combination. */
 const MODIFIER_CODES = new Set([
   'ControlLeft',
   'ControlRight',
@@ -84,9 +74,9 @@ const NAMED_KEYS = new Set([
 const MODIFIER_NAMES = new Set(['Ctrl', 'Alt', 'Shift', 'Super']);
 
 /**
- * ⚠️ `KeyboardEvent.code` describes the key's **position**, not the character it
- * produces: a shortcut set on an AZERTY keyboard stays in the same place on a QWERTY,
- * which `event.key` would not guarantee. `null` when the key cannot carry a shortcut.
+ * ⚠️ `KeyboardEvent.code` is the key's position, not the character it produces: a
+ * shortcut set on AZERTY stays in the same place on QWERTY, which `event.key` would
+ * not guarantee.
  */
 function keyName(code: string): string | null {
   const named = /^Key([A-Z])$/.exec(code)?.[1] ?? /^Digit(\d)$/.exec(code)?.[1];
@@ -102,7 +92,7 @@ function isKeyName(name: string): boolean {
 }
 
 /**
- * ⚠️ At least one modifier is required: a **global** shortcut without one would swallow
+ * ⚠️ At least one modifier is required: a global shortcut without one would swallow
  * that key in every application on the machine, typing included.
  */
 export function acceleratorFromEvent(event: KeyboardEvent): string | null {
@@ -120,7 +110,6 @@ export function acceleratorFromEvent(event: KeyboardEvent): string | null {
   return key ? [...modifiers, key].join('+') : null;
 }
 
-/** What the native side could read back: at least one modifier, then a key. */
 export function isAccelerator(value: string): boolean {
   const tokens = value.split('+').map((token) => token.trim());
   if (tokens.length < 2) return false;
@@ -131,10 +120,7 @@ export function isAccelerator(value: string): boolean {
   return key !== undefined && modifiers.every((modifier) => MODIFIER_NAMES.has(modifier)) && isKeyName(key);
 }
 
-/**
- * One key per `<kbd>`: rendering the accelerator as a single string would put the `+`
- * separators inside the key caps, where they read as a key to press.
- */
+/** One key per `<kbd>`: a single string would put the `+` inside the key caps. */
 export function acceleratorKeys(accelerator: string): readonly string[] {
   return accelerator
     .split('+')

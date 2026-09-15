@@ -1,7 +1,7 @@
 @let menuTitle = note().title || ('notes.untitled' | transloco);
 
-<!-- A wrapper and not a root `<button>`: the action menu is itself a button, and a
-     button's content model forbids nesting one. It also anchors the menu. -->
+<!-- ⚠️ A wrapper and not a root `<button>`: the action menu is itself a button, and a
+     button's content model forbids nesting one. -->
 <div
   class="card-shell"
   data-testid="note-card"
@@ -9,7 +9,7 @@
   [class.checked]="checked()"
   [class.checklist]="isChecklist()"
 >
-  <!-- Content in <span> and not <div>: a <button> admits only phrasing content. -->
+  <!-- ⚠️ <span> and not <div>: a <button> admits only phrasing content. -->
   <button
     #cardButton
     type="button"
@@ -20,17 +20,13 @@
     (click)="onOpen($event)"
   >
     @if (note().pinned) {
-      <!-- Pinning is signalled by a decorative dot: without this text twin, the
-           information does not exist for a screen reader. -->
+      <!-- The dot is decorative: without this text twin, a screen reader gets nothing. -->
       <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
     }
-    <!-- The badge and the glyphs, then the title flowing past them. They were a row of
-         their own above it. ⚠️ The glyphs come **before** the title and not after: a
-         mark trailing it wraps onto a second line of its own when the title ends near
-         the edge, and that second line costs the body one of its own. -->
+    <!-- ⚠️ The glyphs come before the title and not after: a mark trailing it wraps onto
+         a line of its own when the title ends near the edge. -->
     <span class="card-head">
-      <!-- No format for a todo list: a "TXT" badge would announce a language nothing
-           shows. -->
+      <!-- No format for a todo list: "TXT" would announce a language nothing shows. -->
       @if (!isChecklist()) {
         <app-language-badge [language]="note().language" />
       }
@@ -89,7 +85,6 @@
       </span>
     }
     <span class="card-footer">
-      <!-- Compact on purpose: a line break between the interpolations would leave a stray space in the rendered text, which the prettier-ignore below keeps out. -->
       <!-- prettier-ignore -->
       <span [class.stale]="note().expiringSoon"
         >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
@@ -102,16 +97,14 @@
     </span>
   </button>
 
-  <!-- Driven into the card's corner, over its border. A sibling of the button and not a
-       child: the head is text now, and a glyph inline with the title wrapped onto a line
-       of its own whenever the title ended near the edge — costing the body a line. Its
-       text twin stays inside the card, next to the title it belongs to. -->
+  <!-- ⚠️ A sibling of the button and not a child: inline with the title, a glyph wraps
+       onto a line of its own. Its text twin stays inside, next to the title. -->
   @if (note().pinned) {
     <span class="card-pin" data-testid="note-card-pin" aria-hidden="true">📌</span>
   }
 
-  <!-- A button with `aria-pressed` rather than an `<input type=checkbox>`: the parent
-       card is a button, and a native control would inherit its styles. -->
+  <!-- `aria-pressed` rather than an `<input type=checkbox>`, which would inherit the
+       parent button's styles. -->
   <button
     type="button"
     class="card-check"
@@ -124,9 +117,8 @@
     <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
   </button>
 
-  <!-- Siblings of the card button and not its children, because they are buttons. The
-       layer is transparent to clicks and only the boxes take them, so everything else
-       falls through to the card. -->
+  <!-- ⚠️ Siblings of the card button and not its children, because they are buttons. The
+       layer is transparent to clicks; only the boxes take them. -->
   @if (isChecklist() && note().items.length > 0) {
     <ul class="card-items">
       @for (item of visibleItems(); track $index) {

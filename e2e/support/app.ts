@@ -12,25 +12,18 @@ const SETTLE_POLLS = 3;
 const SETTLE_INTERVAL = 200;
 
 /**
- * The canvas is behind a lazy route, a `resource` and a debounce; every scenario
- * starts by waiting for it rather than for the window, which exists long before
- * anything is queryable.
+ * The canvas is behind a lazy route, a `resource` and a debounce; every scenario waits
+ * for it rather than for the window, which exists long before anything is queryable.
  */
 export async function waitForCanvas(): Promise<void> {
   await $(testid('canvas')).waitForExist({ timeout: 30_000 });
 
-  // ⚠️ `aria-busy` is `NotesQueryStore.isLoading`, which is `!hasView && resource.isLoading()`
-  // — and the retained `linkedSignal` means that once a view has landed it is false for
-  // the rest of the session. So the flag does not toggle once per reload: it answers
-  // "has anything at all arrived yet", once, and then says nothing ever again.
+  // ⚠️ `aria-busy` answers "has anything at all arrived yet", once, and then says nothing
+  // ever again — the retained `linkedSignal` keeps `isLoading` false for the rest of the
+  // session. It gives no signal for the reload that follows a write, and the canvas
+  // re-renders under the spec either way.
   //
-  // That is exactly why waiting on it alone is not enough. It gives no signal for the
-  // reload that follows a write, nor for the one that follows the sample seeding, and
-  // the canvas re-renders under the spec either way: a count read mid-render is short,
-  // a card list read across it mixes two states, and a *click* read across it lands on
-  // a control that has moved — which is how a single create button produced two drafts.
-  //
-  // Settled therefore means idle *and* unchanged: the card count has to hold still. It
+  // So settled means idle *and* unchanged: the card count has to hold still. It
   // deliberately does not wait for a number, so it cannot assume the answer a spec is
   // about to assert.
   let previous = -1;
@@ -63,7 +56,7 @@ export async function viewportSize(): Promise<{ width: number; height: number }>
   return browser.execute(() => ({ width: window.innerWidth, height: window.innerHeight }));
 }
 
-/** The cursor the WebView paints, which is what `all: unset` quietly took away. */
+/** The cursor the WebView paints, which is what `all: unset` quietly takes away. */
 export async function cursorOf(selector: string): Promise<string> {
   return browser.execute((sel: string) => {
     const element = document.querySelector(sel);
@@ -75,12 +68,9 @@ export async function cursorOf(selector: string): Promise<string> {
 }
 
 /**
- * Sets a field and **checks it took**, retrying if it did not.
- *
- * ⚠️ The editor's drafts are `linkedSignal`s keyed on the note. A render landing between
- * the click and the keystrokes rewrites `[value]` from the note and wipes what was just
- * typed, leaving a field the spec believes it filled and a note nothing kept — which is
- * how "no card titled … appeared" was reached with the write never attempted.
+ * Sets a field and checks it took, retrying if it did not. ⚠️ The editor's drafts are
+ * `linkedSignal`s: a render landing between the click and the keystrokes rewrites
+ * `[value]` from the note and wipes what was just typed.
  */
 export async function setField(selector: string, text: string): Promise<void> {
   const field = $(selector);
@@ -99,9 +89,8 @@ export async function setField(selector: string, text: string): Promise<void> {
 }
 
 /**
- * Clicks a control that appends a row, and waits for the row to **arrive** before handing
- * it back. The click crosses the bridge and comes back through a re-render; reading the
- * list on the next line reads it as it was before the click.
+ * ⚠️ The click crosses the bridge and comes back through a re-render; reading the list on
+ * the next line reads it as it was before the click.
  */
 export async function clickToAddRow(button: string, row: string) {
   const before = await $$(row).length;
@@ -128,9 +117,8 @@ interface Confirmable {
 }
 
 /**
- * Every destructive control here confirms on a second click and says so with a
- * `confirming` class. Clicking twice in a row bets the first click's render has landed —
- * and that render is exactly what moves the button out from under the second click.
+ * ⚠️ Destructive controls confirm on a second click. Clicking twice in a row bets the
+ * first click's render has landed — and that render moves the button out from under it.
  */
 export async function confirmTwice(button: Confirmable): Promise<void> {
   await button.click();
@@ -147,13 +135,9 @@ export async function confirmTwice(button: Confirmable): Promise<void> {
 type Extract = 'text' | 'value' | `@${string}`;
 
 /**
- * Reads one thing off **every** match, in a single call.
- *
- * ⚠️ A walk that fetches one element per round trip leaves a window in which the page
- * re-renders, and the list that comes back mixes two states: the same row read twice, an
- * element that no longer exists, or — the one CI caught — a card compared against a title
- * from a view that has since been replaced. `canvas.titles()` was already written this
- * way and says why; thirteen other walks were not.
+ * Reads one thing off every match, in a single call. ⚠️ A walk fetching one element per
+ * round trip leaves a window in which the page re-renders, and the list that comes back
+ * mixes two states.
  */
 export async function readEach(selector: string, extract: Extract, child?: string): Promise<string[]> {
   return browser.execute(
@@ -172,10 +156,8 @@ export async function readEach(selector: string, extract: Extract, child?: strin
 }
 
 /**
- * Clicks a toggle and waits for it to **report** the new state.
- *
- * Pinning crosses the bridge and comes back through the store — writes here are not
- * optimistic — so `aria-pressed` read on the line after the click is the state before it.
+ * ⚠️ Writes here are not optimistic, so `aria-pressed` read on the line after the click
+ * is still the state before it.
  */
 export async function toggleAndWait(selector: string, attribute = 'aria-pressed'): Promise<void> {
   const button = $(selector);
@@ -204,17 +186,13 @@ function codeFor(key: string): string {
 
 /**
  * ⚠️ Not `browser.keys`: the embedded WebDriver server answers
- * `POST /session/:id/actions` with a 200 and dispatches nothing, so every shortcut in
- * this suite was silently doing nothing. A synthetic `KeyboardEvent` reaches the same
- * handlers, which all listen in the DOM (`CANVAS_KEYS`, `DialogStack`,
- * `acceleratorFromEvent`).
+ * `POST /session/:id/actions` with a 200 and dispatches nothing. A synthetic
+ * `KeyboardEvent` reaches the same handlers, which all listen in the DOM.
  *
- * `code` is filled as carefully as `key`: the shortcut field reads the **physical**
- * key, so an event carrying only `key` would record the wrong accelerator and the test
- * would pass for the wrong reason.
- *
- * Out of reach for any WebDriver: the **native** global shortcuts, which the system
- * delivers outside the window. `emitGlobalAction` covers what sits downstream of those.
+ * `code` is filled as carefully as `key`: the shortcut field reads the physical key, so
+ * an event carrying only `key` records the wrong accelerator and passes for the wrong
+ * reason. The native global shortcuts are out of reach for any WebDriver — see
+ * `emitGlobalAction`.
  */
 export async function press(key: string, modifiers: Modifier[] = []): Promise<void> {
   await browser.execute(
@@ -240,16 +218,10 @@ export async function press(key: string, modifiers: Modifier[] = []): Promise<vo
 }
 
 /**
- * Assign the value, then dispatch the `change` the browser would have.
- *
- * ⚠️ Covers `<select>` and `<input type="date">` alike, and neither can be driven the
- * obvious way. `selectByAttribute` moves the selection without the `change` the
- * components listen to, so the model kept the old value while the control showed the
- * new one; and a date input accepts keystrokes in the **display** format, which follows
- * the WebView's locale — a spec typing `15/06/2030` would pass at home and fail on an
- * English runner.
- *
- * What this skips is the browser's own parsing; every handler downstream still runs.
+ * ⚠️ Neither `<select>` nor `<input type="date">` can be driven the obvious way:
+ * `selectByAttribute` moves the selection without the `change` the components listen to,
+ * and a date input accepts keystrokes in the display format, which follows the WebView's
+ * locale. This skips the browser's own parsing; every handler downstream still runs.
  */
 export async function setNativeValue(selector: string, value: string): Promise<void> {
   await $(selector).waitForExist({ timeout: 10_000 });
@@ -268,9 +240,8 @@ export async function setNativeValue(selector: string, value: string): Promise<v
 }
 
 /**
- * Enter inside a text input submits its form through the browser's **implicit
- * submission** — a native behaviour, not a handler, and one the browser reserves for
- * real user input. `requestSubmit()` fires exactly the event the form listens to.
+ * ⚠️ Enter inside a text input submits through implicit submission, which the browser
+ * reserves for real user input. `requestSubmit()` fires the event the form listens to.
  */
 export async function submitFormOf(selector: string): Promise<void> {
   await browser.execute((sel: string) => {
@@ -280,8 +251,8 @@ export async function submitFormOf(selector: string): Promise<void> {
 }
 
 /**
- * Title, body and source commit on **blur**. A synthetic key event does not move
- * focus, so the blur is asked for directly rather than hoped for as a side effect.
+ * ⚠️ Title, body and source commit on blur, and a synthetic key event does not move
+ * focus — so the blur is asked for directly.
  */
 export async function blur(): Promise<void> {
   await browser.execute(() => {
@@ -290,9 +261,9 @@ export async function blur(): Promise<void> {
 }
 
 /**
- * A note written straight through the bridge is invisible to a canvas that has not
- * been told to re-query — `NotesRevision` is a front-end signal, and the back end
- * does not push. Reloading the page is the honest way to make seeded data appear.
+ * ⚠️ A note written straight through the bridge is invisible to a canvas that has not
+ * been told to re-query: `NotesRevision` is a front-end signal, and the back end does
+ * not push.
  */
 export async function reloadCanvas(): Promise<void> {
   await browser.refresh();
@@ -300,18 +271,12 @@ export async function reloadCanvas(): Promise<void> {
 }
 
 /**
- * ⚠️ **Not** a restart of the application, and it cannot be one.
+ * ⚠️ Not a restart of the application, and it cannot be one: under the `embedded`
+ * provider the WebDriver server lives inside the process, which has to stay up. The Rust
+ * side, its SQLite connection and the store plugin's map all survive.
  *
- * Under the `embedded` driver provider the WebDriver server lives *inside* the
- * application, so `reloadSession` tears the session down and opens a new one against
- * the same living process — which has to stay up, since it *is* the server. The Rust
- * side, its SQLite connection and the store plugin's in-memory map all survive.
- *
- * What it does buy is a front end built from nothing: the new session loads the page
- * fresh, so Angular reboots and every store is reconstructed from what the commands
- * answer rather than from a signal it was still holding.
- *
- * ⚠️ Never use it to prove that something reached the **disk** — it cannot.
+ * What it buys is a front end built from nothing — every store reconstructed from what
+ * the commands answer. ⚠️ Never use it to prove something reached the disk;
  * `15-preferences-on-disk.e2e.ts` reads the file from Node for that.
  */
 export async function reopenSession(): Promise<void> {
@@ -320,9 +285,8 @@ export async function reopenSession(): Promise<void> {
 }
 
 /**
- * The native side asks the front end for an action; the OS keystroke that normally
- * sends it cannot be typed through a WebView, so the event is emitted instead. What
- * is exercised is everything downstream of the accelerator.
+ * The OS keystroke that normally sends this cannot be typed through a WebView, so the
+ * event is emitted instead. What is exercised is everything downstream of it.
  */
 export async function emitGlobalAction(action: GlobalAction): Promise<void> {
   await browser.executeAsync((name: string, done: (value: unknown) => void) => {
@@ -335,14 +299,11 @@ export async function emitGlobalAction(action: GlobalAction): Promise<void> {
 }
 
 /**
- * What the application actually put on the system clipboard — or `null` when this
- * machine will not let anyone read it.
- *
- * ⚠️ On Windows the clipboard is a single global lock, and a clipboard manager (or the
- * history pane) can hold it indefinitely; on a headless Linux runner there may be no
- * selection owner at all. Either way that is a property of the runner, not of DevBox,
- * so a caller treats `null` as "not observable here" and skips rather than fails — and
- * asserts on `DisplayNote.copyText`, which is the part DevBox owns.
+ * What the application put on the system clipboard, or `null` when this machine will not
+ * let anyone read it. ⚠️ On Windows the clipboard is a single global lock a clipboard
+ * manager can hold indefinitely, and a headless Linux runner may have no selection owner
+ * — a property of the runner, so a caller skips rather than fails and asserts on
+ * `DisplayNote.copyText` instead.
  */
 export async function clipboardText(): Promise<string | null> {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -363,17 +324,11 @@ export async function clipboardText(): Promise<string | null> {
 }
 
 /**
- * ⚠️ There is no way to stand in front of the OS file picker, and the scenarios are
- * written around that rather than against it.
+ * ⚠️ There is no way to stand in front of the OS file picker.
+ * `window.__TAURI_INTERNALS__.invoke` is defined `writable: false, configurable: false`,
+ * so neither an assignment nor `browser.tauri.mock()` can wrap it — a picker opened by a
+ * click blocks the whole application until a human clicks it.
  *
- * `window.__TAURI_INTERNALS__.invoke` — the single funnel every `invoke` goes through,
- * the application's own included — is defined `writable: false, configurable: false`.
- * Neither an assignment nor `Object.defineProperty` can wrap it, which is deliberate
- * hardening on Tauri's side; `browser.tauri.mock()` cannot reach it either. So a picker
- * opened by a click blocks the whole application until a human clicks it.
- *
- * Consequence for the suite: import, export and attaching a file are exercised through
- * their commands, which take a path and are what actually touch the database and the
- * disk. The controls that *open* a picker are asserted on, never clicked — like the
- * tray menu and the global accelerator, they are OS UI.
+ * So import, export and attaching are exercised through their commands, which take a
+ * path. The controls that open a picker are asserted on, never clicked.
  */

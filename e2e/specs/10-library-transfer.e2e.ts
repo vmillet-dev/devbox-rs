@@ -9,24 +9,16 @@ import { press, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * Export and import compose the notes and spaces stores rather than owning a table,
- * and every operation reports — including when it changed nothing, which is the one
- * case indistinguishable from a failure without a report.
+ * Every operation reports, including when it changed nothing — the one case
+ * indistinguishable from a failure without a report.
  *
- * ⚠️ The OS file picker is **not** driven here: `__TAURI_INTERNALS__.invoke` is
- * frozen, so nothing can stand in front of it, and a picker opened by a click would
- * block the application until a human clicked it (see `support/app.ts`). The
- * commands take a path, and the path is where the real work happens; what the menu
- * is asked here is only what it can answer without a dialog.
+ * ⚠️ The OS file picker is not driven here (see `support/app.ts`): the commands take a
+ * path, and the path is where the real work happens.
  */
 describe('Import, export and share', () => {
   const directory = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
 
-  /**
-   * Forward slashes for the command, which crosses JSON and lands in a Rust `Path`:
-   * `\` is an escape on the wire and a separator on Windows. Node reads the same path
-   * back with `/` on either platform, so nothing converts it a second time.
-   */
+  /** ⚠️ Forward slashes: `\` is an escape on the wire and a separator on Windows. */
   const bundlePath = join(directory, 'library.json').replaceAll('\\', '/');
 
   /** Kept from `before`: the seeded space is named from a translation (see below). */
@@ -55,8 +47,7 @@ describe('Import, export and share', () => {
     const before = (await bridge.queryNotes(query())).matched;
     const report = await bridge.importNotes(bundlePath);
 
-    // Correct, and the only reason it is not read as a failure is that the report
-    // says so: every id in the bundle is already in the database.
+    // Correct, and only the report says so: every id in the bundle is already there.
     expect(report.notesImported).toBe(0);
     expect(report.notesSkipped).toBe(before);
     expect((await bridge.queryNotes(query())).matched).toBe(before);
@@ -85,14 +76,11 @@ describe('Import, export and share', () => {
 
   it('files an imported note into the existing space rather than a second one', async () => {
     const before = await bridge.listSpaces();
-    // ⚠️ By identity, never by name: the seeded space is **translated**, and the
-    // application opens in the system language — `Découverte` on a French machine,
-    // `Getting started` on an English runner. A spec that spells the name passes at
-    // home and fails on CI, which is exactly what it did.
+    // ⚠️ By identity, never by name: the seeded space is translated and the application
+    // opens in the system language, so a spec that spells the name fails on CI.
     expect(before.some((space) => space.id === homeId)).toBe(true);
 
-    // The bundle carries that space by name, and the database already has it:
-    // matching is case-insensitive and by name, so nothing is created.
+    // Matching is case-insensitive and by name, so nothing is created.
     const report = await bridge.importNotes(bundlePath);
     expect(report.spacesCreated).toBe(0);
 
@@ -104,10 +92,8 @@ describe('Import, export and share', () => {
   });
 
   /**
-   * `language` and `kind` are closed enums on both sides, so one note written by a
-   * newer DevBox used to fail the **whole** file on a serde message about a variant.
-   * It now arrives with that field brought down to the default, and the report is what
-   * says the colouring was lost.
+   * `language` and `kind` are closed enums on both sides, so a note from a newer DevBox
+   * arrives with that field brought down to the default rather than failing the file.
    */
   it('imports a bundle from a newer version instead of refusing it whole', async () => {
     const source = JSON.parse(readFileSync(bundlePath, 'utf8')) as {
@@ -140,13 +126,12 @@ describe('Import, export and share', () => {
 
   it('greys out the menu entries that have nothing to act on', async () => {
     await fileMenu.open();
-    // Nothing is ticked, so there is no selection to export. The entry stays in the DOM
-    // and clickable — it carries `aria-disabled`, not `disabled`.
+    // The entry stays in the DOM and clickable — it carries `aria-disabled`, not `disabled`.
     expect(await fileMenu.isDisabled('exportSelection')).toBe(true);
     expect(await fileMenu.isDisabled('exportAll')).toBe(false);
 
     // ⚠️ Neither is clicked: both open the OS file picker, which blocks the application
-    // until a human answers it. The commands underneath are what the tests above drive.
+    // until a human answers it.
     expect(await fileMenu.entry('exportAll').isExisting()).toBe(true);
     await press('Escape');
   });

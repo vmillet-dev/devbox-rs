@@ -2,10 +2,7 @@ import { InjectionToken, Injectable, inject } from '@angular/core';
 import { exit } from '@tauri-apps/plugin-process';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-/**
- * A token, as for the clipboard: under jsdom there is no bridge, and a spec really calling
- * `exit()` would take the test runner down.
- */
+/** ⚠️ A token: a spec really calling `exit()` would take the test runner down. */
 export interface AppWindowAdapter {
   hide(): Promise<void>;
   exit(code: number): Promise<void>;
@@ -20,9 +17,8 @@ export const APP_WINDOW_ADAPTER = new InjectionToken<AppWindowAdapter>('APP_WIND
 });
 
 /**
- * The two are distinct and stay so: the window's close button **hides** (`lib.rs`
- * intercepts `CloseRequested` while there is a tray), and `quit` is the only path that
- * actually ends the process.
+ * The two are distinct: the close button hides (`lib.rs` intercepts `CloseRequested`
+ * while there is a tray), and `quit` is the only path that ends the process.
  */
 @Injectable({ providedIn: 'root' })
 export class AppWindowService {
@@ -41,7 +37,7 @@ export class AppWindowService {
     try {
       await this.adapter.exit(0);
     } catch {
-      // Same: a failure here leaves nothing inconsistent behind.
+      // A failure here leaves nothing inconsistent behind.
     }
   }
 }

@@ -15,9 +15,8 @@ import {
 } from '../support/app.js';
 
 /**
- * The editor overlay. Title, body and source commit on **blur**, so every setter here
- * blurs before returning — a spec asserting persistence right after typing would be
- * asserting on a draft nothing has saved.
+ * ⚠️ Title, body and source commit on blur, so every setter here blurs before returning:
+ * a spec asserting right after typing would be asserting on a draft nothing has saved.
  */
 async function typeAndCommit(selector: string, text: string): Promise<void> {
   await setField(selector, text);
@@ -49,21 +48,15 @@ export const editor = {
   setDeadline: (isoDay: string) => setNativeValue(testid('editor-deadline'), isoDay),
 
   async addTag(tag: string): Promise<void> {
-    // `setField` and not a bare `setValue`: submitting a field whose value never landed
-    // adds an empty tag, silently, and the assertion blames the normalisation.
     await setField(testid('editor-tag-add'), tag);
-    // The field commits by **submitting its form**, which Enter does natively and no
+    // ⚠️ The field commits by submitting its form, which Enter does natively and no
     // synthetic key can — see `submitFormOf`.
     await submitFormOf(testid('editor-tag-add'));
 
-    // ⚠️ The field clearing only says the form was submitted. The **list** comes from the
-    // note, so it appears after the write has crossed the bridge and come back: asserting
-    // on the next line read `[]` where the tag was on its way.
-    //
-    // The comparison is loose on purpose — `#` and case are what
-    // `notes::model::normalize_tags` decides, and the harness has no business deciding
-    // it too. This is a wait for the gesture to have landed; the scenario still asserts
-    // the exact list Rust produced.
+    // ⚠️ The field clearing only says the form was submitted; the list comes from the
+    // note, after the write has crossed the bridge and come back. The comparison is loose
+    // on purpose — `#` and case are `normalize_tags`'s to decide, and the scenario still
+    // asserts the exact list Rust produced.
     const expected = tag.trim().replace(/^#/, '').toLowerCase();
     await browser.waitUntil(
       async () => (await editor.tags()).some((each) => each.toLowerCase() === expected),
@@ -71,7 +64,7 @@ export const editor = {
     );
   },
 
-  /** Waits for it to be **gone**: the list follows the write, not the click. */
+  /** Waits for it to be gone: the list follows the write, not the click. */
   async removeTag(tag: string): Promise<void> {
     await $(`${testid('editor-tag-remove')}[data-tag="${tag}"]`).click();
 
@@ -91,30 +84,20 @@ export const editor = {
   toggleFullscreen: () => toggleAndWait(testid('editor-fullscreen')),
   isFullscreen: async () => (await $(testid('editor-fullscreen')).getAttribute('aria-pressed')) === 'true',
 
-  /**
-   * The shell's panel, measured: `aria-pressed` says the button was pressed, not that the
-   * panel grew. Only the editor is open here, so the role is selector enough.
-   */
+  /** Measured: `aria-pressed` says the button was pressed, not that the panel grew. */
   panelSize: () => $('[role="dialog"]').getSize(),
 
-  /** Only shown for a note carrying `{{fields}}`; a plain note gets the ordinary copy button. */
+  /** Only shown for a note carrying `{{fields}}`. */
   copyFilled: () => $(testid('editor-copy-filled')).click(),
   hasCopyFilled: () => $(testid('editor-copy-filled')).isExisting(),
 
-  /**
-   * Escape, the backdrop and the close button all produce no `blur`, so the component
-   * commits the draft itself on the way out. Closing through the button is the path
-   * that exercises that.
-   */
+  /** Escape, the backdrop and the button produce no `blur`: the component commits itself. */
   async close(): Promise<void> {
     await $(testid('editor-close')).click();
     await $(testid('editor-title')).waitForExist({ reverse: true, timeout: 10_000 });
 
-    // ⚠️ Closing **commits**: the title, the source and the content all leave on the way
-    // out, and the dialog disappears without waiting for any of them. A scenario that
-    // reads the note back through the bridge on the next line reads it before the write.
-    // Settling the canvas is the observable end of that round trip — the store reloads it
-    // once the write has come back.
+    // ⚠️ Closing commits, and the dialog disappears without waiting for any of the three
+    // writes. Settling the canvas is the observable end of that round trip.
     await waitForCanvas();
   },
 
@@ -150,11 +133,8 @@ export const editor = {
   },
 
   /**
-   * ⚠️ Asserted on, not dragged. The grip is a pointer-drag handle
-   * (`pointerdown` + `setPointerCapture` + `pointermove`), and synthesising a capture
-   * through WebDriver is both unreliable and beside the point: `Alt+↑/↓` is its
-   * keyboard twin, it has to work anyway for the linter, and it is what `moveItemUp`
-   * drives. This only holds that the handle exists and says what it moves.
+   * ⚠️ Asserted on, not dragged: synthesising a pointer capture through WebDriver is
+   * unreliable and beside the point, `Alt+↑/↓` being its keyboard twin.
    */
   grip: (index: number) =>
     rowAt(testid('checklist-row'), index).then((row) => row.$(testid('checklist-grip'))),
@@ -176,10 +156,8 @@ export const editor = {
     (await $(testid('placeholder-panel-toggle')).getAttribute('aria-expanded')) === 'true',
 
   /**
-   * ⚠️ Scoped to the overlay. `placeholder-input` is the same hook in two places — this
-   * panel and the fill form — and a bare `$()` returns whichever comes first in the DOM.
-   * Unscoped, a spec that meant the form typed into the editor's panel instead, which
-   * commits on `focusout`: the value was written by the test that meant to discard it.
+   * ⚠️ Scoped to the overlay: `placeholder-input` is the same hook in this panel and in
+   * the fill form, and a bare `$()` returns whichever comes first in the DOM.
    */
   field: (name: string) => $(`app-note-editor-overlay ${testid('placeholder-input')}[data-field="${name}"]`),
 
@@ -187,7 +165,7 @@ export const editor = {
     await $(testid('placeholder-panel-toggle')).click();
   },
 
-  /** Open by default — a folded panel would hide the feature from anyone who has not met it. */
+  /** Open by default — a folded panel would hide the feature. */
   async openFieldsPanel(): Promise<void> {
     if (!(await editor.isFieldsPanelOpen())) {
       await editor.toggleFieldsPanel();
@@ -201,9 +179,8 @@ export const editor = {
   attachmentNames: (): Promise<string[]> => readEach(testid('attachment-item'), '@data-file-name'),
 
   /**
-   * ⚠️ Asserted on, never clicked — both of them open OS UI. "Add" raises the file
-   * picker, which blocks the application until a human answers it, and "open" hands the
-   * file to the desktop's default application. See `support/app.ts`.
+   * ⚠️ Asserted on, never clicked — both open OS UI, and the picker blocks the whole
+   * application until a human answers it. See `support/app.ts`.
    */
   attachmentAdd: () => $(testid('attachment-add')),
   attachmentOpen: (fileName: string) =>

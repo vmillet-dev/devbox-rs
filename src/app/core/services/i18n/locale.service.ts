@@ -4,11 +4,6 @@ import { LocaleChoice } from '@core/services/settings/app-settings.model';
 import { SettingsStore } from '@core/services/settings/settings.store';
 import { AppLocale, DEFAULT_LOCALE, isAppLocale, resolveSystemLocale } from './locale.model';
 
-/**
- * The active UI language: the choice belongs to [`SettingsStore`], this resolves it and
- * pushes it to Transloco — the same shape as the services that carry a preference down to
- * the native side.
- */
 @Injectable({ providedIn: 'root' })
 export class LocaleService {
   private readonly transloco = inject(TranslocoService);
@@ -35,9 +30,8 @@ export class LocaleService {
   }
 
   /**
-   * Called from a `provideAppInitializer`, **after** `SettingsStore.restore()`: the effect
-   * above would only flush after the first render, showing the interface in one language
-   * then the other.
+   * ⚠️ Called after `SettingsStore.restore()`: the effect above only flushes after the
+   * first render, which would show the interface in one language then the other.
    */
   restore(): void {
     this.apply(this.settings.locale());

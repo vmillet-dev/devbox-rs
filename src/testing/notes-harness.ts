@@ -10,16 +10,10 @@ import { FakeClipboard } from './fake-clipboard';
 import { FakeNotesRepository } from './fake-notes-repository';
 import { provideAppTesting } from './testing.providers';
 
-/**
- * The three notes stores, wired onto one fake repository: they *are* one object graph, so
- * testing any of them in isolation would mean faking the other two.
- */
+/** The three notes stores are one object graph: testing one alone means faking two. */
 export interface NotesHarness {
-  /** The open note: creating, writing, deleting. */
   readonly store: NotesStore;
-  /** What the canvas shows. */
   readonly canvas: NotesQueryStore;
-  /** What it is pointing at. */
   readonly selection: NoteSelectionStore;
   readonly repository: FakeNotesRepository;
   readonly spaces: SpacesStore;

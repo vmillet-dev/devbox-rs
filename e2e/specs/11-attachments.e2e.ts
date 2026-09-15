@@ -9,13 +9,9 @@ import { reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * Attachment bytes are not in the database: the row holds a record and the file lives
- * under `app_data_dir()/attachments/` with a name derived from the record id. Write
- * order is load-bearing — copy the file, then insert — and only a real directory can
- * show it.
- *
- * ⚠️ The picker is not driven (see `support/app.ts`); `attach_file` takes the path the
- * picker would have returned.
+ * The bytes are not in the database: the row holds a record and the file lives under
+ * `app_data_dir()/attachments/`. ⚠️ The picker is not driven (see `support/app.ts`);
+ * `attach_file` takes the path it would have returned.
  */
 describe('Attachments', () => {
   const title = 'Note with a file';
@@ -32,7 +28,7 @@ describe('Attachments', () => {
     await canvas.waitForCard(title);
   });
 
-  /** Forward slashes: `\` is an escape on the wire, a separator on Windows. */
+  /** ⚠️ Forward slashes: `\` is an escape on the wire, a separator on Windows. */
   async function attach(path: string) {
     return browser.executeAsync(
       (id: string, file: string, done: (value: unknown) => void) => {
@@ -53,7 +49,7 @@ describe('Attachments', () => {
     expect(await editor.attachments().length).toBe(0);
 
     // ⚠️ Presence only: clicking it raises the OS file picker, which blocks the whole
-    // application until a human answers. `attach_file` below is the same operation.
+    // application until a human answers.
     expect(await editor.attachmentAdd().isExisting()).toBe(true);
     await editor.close();
   });
@@ -88,7 +84,6 @@ describe('Attachments', () => {
 
   it('offers to hand the file to the desktop, which nothing here clicks', async () => {
     // ⚠️ `open_attachment` asks the OS to launch the default application for the file.
-    // On a runner that is a text editor nobody closes — presence and label only.
     const open = editor.attachmentOpen('runbook.txt');
     expect(await open.isExisting()).toBe(true);
     expect(await open.getAttribute('aria-label')).toContain('runbook.txt');
@@ -96,8 +91,8 @@ describe('Attachments', () => {
   });
 
   it('gives two files of the same name two records', async () => {
-    // `model::stored_name` derives the stored name from the record id: two
-    // `runbook.txt` must not overwrite each other on disk.
+    // `model::stored_name` derives the stored name from the record id: two `runbook.txt`
+    // must not overwrite each other on disk.
     const second = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
     const twin = join(second, 'runbook.txt');
     writeFileSync(twin, 'a different runbook\n');

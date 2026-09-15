@@ -1,11 +1,8 @@
 /**
- * Node ≥ 22 ships a `localStorage` global of its own. It shadows the one jsdom installs
- * and evaluates to `undefined` unless the process was started with `--localstorage-file`,
- * which is enough to take down every spec that touches it; reading it also prints an
- * `ExperimentalWarning` once per worker.
- *
- * The replacement is therefore installed **unconditionally**: finding out whether the
- * global works means reading the accessor, which is exactly what emits that warning.
+ * ⚠️ Node ≥ 22 ships a `localStorage` global that shadows jsdom's and evaluates to
+ * `undefined` without `--localstorage-file`. The replacement is installed
+ * unconditionally: finding out whether the global works means reading the accessor,
+ * which is exactly what prints the `ExperimentalWarning`.
  */
 
 function createStorage(): Storage {
@@ -21,8 +18,7 @@ function createStorage(): Storage {
     getItem(key: string): string | null {
       return entries.get(String(key)) ?? null;
     },
-    // The real thing stringifies both sides; a spec storing a number must read
-    // one back as a string, like the WebView would hand it over.
+    // The real thing stringifies both sides, like the WebView would.
     setItem(key: string, value: string): void {
       entries.set(String(key), String(value));
     },

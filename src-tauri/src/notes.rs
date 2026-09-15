@@ -1,4 +1,3 @@
-// Commands receive their arguments owned, deserialized from the IPC payload.
 #![allow(clippy::needless_pass_by_value)]
 
 pub mod checklist;
@@ -9,8 +8,8 @@ pub mod store;
 pub mod trash;
 pub mod view;
 
-/// Reference note for the feature tests: a field added to [`model::Note`] is
-/// declared here rather than in every module that builds one.
+/// Reference note for the feature tests: a field added to [`model::Note`] is declared
+/// here rather than in every module that builds one.
 #[cfg(test)]
 pub(crate) mod fixtures {
     use std::collections::BTreeMap;
@@ -62,7 +61,7 @@ use model::{DisplayNote, NoteDraft, NotePatch, TagUsage};
 use trash::TrashedNote;
 use view::{NotesQuery, NotesView};
 
-/// No command returns the raw list: it would invite re-filtering on the front end.
+/// ⚠️ No command returns the raw list: it would invite re-filtering on the front end.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, AppError> {
@@ -101,7 +100,7 @@ pub fn update_note(
     Ok(display(&mut connection, note)?)
 }
 
-/// **Moves to the trash**: the note comes back through [`restore_notes`] for
+/// Moves to the trash: the note comes back through [`restore_notes`] for
 /// [`trash::RETENTION`].
 #[tauri::command(async)]
 #[specta::specta]
@@ -131,8 +130,7 @@ pub fn restore_notes(ids: Vec<String>, db: State<'_, Db>) -> Result<u32, AppErro
     Ok(count(store::trash::restore_many(&mut connection, &ids)?))
 }
 
-/// Purges what retention has caught up with **first**: the trash must never
-/// show a note a restart would erase.
+/// Purges first: the trash must never show a note a restart would erase.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn list_trash(app: AppHandle, db: State<'_, Db>) -> Result<Vec<TrashedNote>, AppError> {
@@ -176,8 +174,7 @@ pub fn move_notes(ids: Vec<String>, space_id: String, db: State<'_, Db>) -> Resu
     )?))
 }
 
-/// Normalized here as everywhere else, or an `#urgent` typed in the action bar
-/// would not join the `urgent` already stored.
+/// Normalized here as everywhere else, or a typed `#urgent` would not join `urgent`.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn tag_notes(ids: Vec<String>, tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -207,7 +204,7 @@ pub fn list_tags(db: State<'_, Db>) -> Result<Vec<TagUsage>, AppError> {
         .collect())
 }
 
-/// Renaming onto an existing tag **is** a merge: a note cannot carry one twice.
+/// Renaming onto an existing tag is a merge: a note cannot carry one twice.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn rename_tag(tag: String, into: String, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -228,8 +225,7 @@ pub fn merge_tags(tags: Vec<String>, into: String, db: State<'_, Db>) -> Result<
     Ok(count(store::retag(&mut connection, &tags, &target)?))
 }
 
-/// A list rather than one tag at a time: the panel deletes a whole selection, and
-/// one round trip per tag was one lock and one transaction per tag.
+/// A list rather than one tag at a time: one round trip per tag is one lock per tag.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn delete_tags(tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
@@ -255,8 +251,8 @@ pub fn set_placeholder_values(
     Ok(display(&mut connection, note)?)
 }
 
-/// No note identifier: the palette fills an unsaved draft as readily as the note
-/// it just opened. The database is read only for the **global variables**.
+/// No note identifier: the palette fills an unsaved draft as readily as a saved note.
+/// The database is read only for the global variables.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn fill_placeholders(
@@ -281,8 +277,7 @@ pub fn list_global_placeholders(db: State<'_, Db>) -> Result<BTreeMap<String, St
     Ok(store::global_placeholder_values(&mut connection)?)
 }
 
-/// Stores the **whole** set: what is not sent is what the user removed. No note is
-/// touched, not even its `updated_at`.
+/// Stores the whole set: what is not sent is what the user removed.
 #[tauri::command(async)]
 #[specta::specta]
 pub fn set_global_placeholders(
@@ -297,9 +292,8 @@ pub fn set_global_placeholders(
     Ok(retained)
 }
 
-/// What only the database knows: the attachment count, and the global variables
-/// laid on the fields as proposed values. Both are queries of their own, which is
-/// why neither lives in [`model::decorate`].
+/// What only the database knows. Both are queries of their own, which is why neither
+/// lives in [`model::decorate`].
 fn display(
     connection: &mut SqliteConnection,
     note: model::Note,

@@ -1,7 +1,5 @@
-// Patterns shared between components, used through `@use 'mixins' as *;`.
-//
-// The modal frame is **not** here: backdrop, panel and stacking order belong to
-// `shared/ui/dialog/`, where one component owns them.
+// Patterns shared between components, used through `@use 'mixins' as *;`. The modal frame
+// is not here: backdrop, panel and stacking order belong to `shared/layout/dialog/`.
 
 // Strips the native rendering of a <button>/<input> used as a custom control.
 @mixin unstyled-control {
@@ -9,10 +7,9 @@
   box-sizing: border-box;
 }
 
-// A field the user types into. `cursor` is inherited, so the `all: unset` above resolves
-// it to `inherit` and not to the UA's I-beam: a field built on `unstyled-control` alone
-// shows whatever its parent shows, which is the arrow. The declaration has to come after
-// the unset, which is why this is a mixin of its own rather than a line inside it.
+// ⚠️ `cursor` is inherited, so the `all: unset` above resolves it to the parent's arrow
+// and not to the UA's I-beam. The declaration has to come after the unset, which is why
+// this is a mixin of its own rather than a line inside it.
 @mixin text-field {
   @include unstyled-control;
   cursor: text;
@@ -33,8 +30,8 @@
 
 // --- Preferences panel ---
 //
-// Shared rather than written inside `layout/settings-dialog/`: the "Variables" page lives
-// in `features/notes/`, out of reach of a neighbour component's SCSS.
+// Shared rather than written inside the dialog: a component's SCSS is out of reach of its
+// neighbours, and the pages do not share a folder.
 
 // One setting row: label on the left, control on the right.
 @mixin setting-row {
@@ -72,8 +69,8 @@
   }
 }
 
-// A switch: a real checkbox repainted, which keeps the keyboard, the clickable
-// label and the announced state without a single ARIA attribute.
+// A real checkbox repainted, which keeps the keyboard, the clickable label and the
+// announced state without a single ARIA attribute.
 @mixin setting-switch {
   appearance: none;
   position: relative;
@@ -127,8 +124,8 @@
   color: var(--text-2);
 }
 
-// A tinted "pill" badge: translucent background and solid text in the same hue, from an
-// RGB CSS variable so no colour is duplicated in hex.
+// Translucent background and solid text in the same hue, from an RGB variable so no
+// colour is duplicated in hex.
 @mixin tint-badge($rgb-var, $bg-alpha: 0.15, $border-alpha: null) {
   background: rgba(var(#{$rgb-var}), $bg-alpha);
   color: rgb(var(#{$rgb-var}));
@@ -140,9 +137,8 @@
 
 // --- Help dialogs ---
 //
-// Three views on the same object: a fixed frame, a scrolling middle, one "Fermer" at the
-// bottom. Written here rather than in one of them because a component's SCSS is out of
-// reach of its neighbours.
+// Here rather than in one of the three because a component's SCSS is out of reach of its
+// neighbours.
 
 @mixin help-header {
   padding: 16px 20px 12px;

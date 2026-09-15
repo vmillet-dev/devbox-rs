@@ -5,9 +5,8 @@ import { blur, cursorOf, press, reloadCanvas, testid } from '../support/app.js';
 import { bridge, draft, homeSpaceId } from '../support/bridge.js';
 
 /**
- * Filtering, grouping and facet aggregation all run in Rust; the front end only
- * describes the query. What crosses the bridge here is the query itself — the debounce,
- * the local-day offset, and a section set that must stay exhaustive.
+ * Filtering, grouping and facet aggregation all run in Rust. What crosses the bridge here
+ * is the query itself — the debounce, the local-day offset, and an exhaustive section set.
  */
 describe('Search, filters and facets', () => {
   before(async () => {
@@ -35,9 +34,8 @@ describe('Search, filters and facets', () => {
     await reloadCanvas();
   });
 
-  // `unstyled-control` is `all: unset`, and `cursor` is inherited — so every field in
-  // the app took its parent's arrow. The <label> is the visible box here, and clicking
-  // its padding already focuses the input.
+  // ⚠️ `unstyled-control` is `all: unset` and `cursor` is inherited, so a field takes its
+  // parent's arrow. The `<label>` is the visible box here.
   it('says it can be typed into, on the whole box', async () => {
     expect(await cursorOf(testid('search-input'))).toBe('text');
     expect(await cursorOf('.search-bar')).toBe('text');
@@ -54,8 +52,8 @@ describe('Search, filters and facets', () => {
   });
 
   it('folds case the way Rust does, not the way SQLite would', async () => {
-    // `LOWER()` without ICU only folds ASCII, which is why matching is done on the
-    // fetched rows and not in the WHERE clause.
+    // `LOWER()` without ICU only folds ASCII, which is why matching runs on the fetched
+    // rows and not in the WHERE clause.
     await canvas.search('étape');
     expect(await canvas.titles()).toEqual(['Étape de migration']);
   });
@@ -71,8 +69,8 @@ describe('Search, filters and facets', () => {
   });
 
   it('collapses to a single flat results section while searching', async () => {
-    // Searched here rather than inherited from the test above: an `it` that depends on
-    // what the previous one left cannot be run, reordered or bailed on alone.
+    // Searched here rather than inherited: an `it` that depends on the previous one
+    // cannot be run or reordered alone.
     await canvas.search('étape');
     expect(await canvas.sectionKeys()).toEqual(['results']);
   });
@@ -82,17 +80,12 @@ describe('Search, filters and facets', () => {
     expect(await canvas.noResults().isExisting()).toBe(true);
   });
 
-  /**
-   * The count was already computed in Rust and thrown away on arrival; the excerpt is
-   * new. Both answer the same question — how big is this result, and why is that card
-   * in it — which a canvas full of first-three-lines previews could not.
-   */
+  /** How big is this result, and why is that card in it. */
   describe('what a search says about itself', () => {
     /**
-     * ⚠️ Mocha runs a suite's own tests **before** its nested suites, so this block is
-     * the last thing in the file whatever its position in it — and one process serves
-     * the whole run, so a search left in the field is a search `07-checklists` inherits.
-     * It did, and every one of its scenarios failed on a canvas holding one card.
+     * ⚠️ Mocha runs a suite's own tests before its nested suites, so this block is the
+     * last thing in the file whatever its position — and a search left in the field is a
+     * search the next spec file inherits.
      */
     after(async () => {
       await canvas.clearSearch();
@@ -100,8 +93,7 @@ describe('Search, filters and facets', () => {
 
     it('counts the results, and says zero rather than going quiet', async () => {
       await canvas.search('Docker');
-      // Against what is on screen rather than a number written down here: the corpus is
-      // shared with every spec file that ran before this one.
+      // Against what is on screen: the corpus is shared with every file that ran before.
       expect(await canvas.matchedCount()).toContain(String((await canvas.titles()).length));
 
       await canvas.search('nothing matches this');
@@ -113,10 +105,6 @@ describe('Search, filters and facets', () => {
       expect(await $(testid('search-matched')).isExisting()).toBe(false);
     });
 
-    /**
-     * The search, the tags and the languages were undone one at a time, each where it was
-     * set — three bands of the header. The count doubles as the way out of all three.
-     */
     it('drops the search, the tag and the language in one click', async () => {
       await canvas.search('Docker');
       await canvas.toggleTag('ops');

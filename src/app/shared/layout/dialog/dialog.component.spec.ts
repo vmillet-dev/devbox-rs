@@ -3,10 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DialogComponent } from './dialog.component';
 
-/**
- * Two dialogs on two rungs, the way the palette opens the fields form: only one of them
- * answers Escape, which is what tells the shell apart from a per-dialog copy.
- */
+/** Two dialogs on two rungs: only one of them answers Escape. */
 @Component({
   selector: 'app-dialog-host',
   imports: [DialogComponent],

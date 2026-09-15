@@ -13,9 +13,8 @@ import { Note } from '../model/note.model';
 const MAX_RESULTS = 8;
 
 /**
- * It queries **every space** and ignores the canvas filters: recalling a snippet, one
- * does not remember which space it was filed in. It does not reuse `NotesStore` for
- * the same reason — its search would change what the canvas shows behind it.
+ * Queries every space and ignores the canvas filters. It does not reuse `NotesStore`
+ * for the same reason: its search would change what the canvas shows behind it.
  */
 @Injectable({ providedIn: 'root' })
 export class PaletteStore {
@@ -37,10 +36,7 @@ export class PaletteStore {
   readonly results = this._results.asReadonly();
   readonly pendingFill = this._pendingFill.asReadonly();
 
-  /**
-   * The create row comes **after** the results: finding a snippet stays the most
-   * frequent gesture and keeps first place.
-   */
+  /** The create row comes after the results: finding a snippet keeps first place. */
   readonly canCreate = computed(() => this._query().trim().length > 0);
 
   readonly optionCount = computed(() => this._results().length + (this.canCreate() ? 1 : 0));
@@ -87,10 +83,7 @@ export class PaletteStore {
     this._highlighted.set(index);
   }
 
-  /**
-   * The store creates nothing itself: it does not know `NotesStore`, and the other
-   * way round would be a cycle. The page chains it.
-   */
+  /** It does not know `NotesStore`, and the other way round would be a cycle. */
   takeNewNoteContent(): string | null {
     if (!this.isCreateHighlighted()) return null;
 
@@ -100,10 +93,7 @@ export class PaletteStore {
     return content;
   }
 
-  /**
-   * A snippet with fields goes through the form first: copying `psql -h {{host}}`
-   * as is would give an unusable command.
-   */
+  /** A snippet with fields goes through the form first, or the copy is unusable. */
   async chooseHighlighted(): Promise<void> {
     const note = this.highlightedNote();
     if (!note) return;
@@ -144,8 +134,7 @@ export class PaletteStore {
         languages: [],
         now,
         tzOffsetMinutes: now.getTimezoneOffset(),
-        // The one place the pinned hoist is a setting: here it only decides what
-        // comes to hand first.
+        // The one place the pinned hoist is a setting.
         pinnedFirst: this.settings.showPinnedFirst(),
       });
 

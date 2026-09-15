@@ -8,10 +8,9 @@ import { clipboardText, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * A `{{field}}` is decided in `notes::placeholder` and nowhere else, its value is kept
- * in a table of its own, and a global variable only ever *proposes* one. The last part
- * is what a unit suite cannot see: the proposal reaches the card as the field's
- * `defaultValue`, and copying it into `value` would freeze it.
+ * A `{{field}}` is decided in `notes::placeholder` and nowhere else, and a global variable
+ * only ever proposes a value: it reaches the card as `defaultValue`, and copying it into
+ * `value` would freeze it.
  */
 describe('{{fields}} in a snippet', () => {
   const title = 'Connect to the database';
@@ -49,8 +48,7 @@ describe('{{fields}} in a snippet', () => {
   it('shows the fields panel open, counting what is filled', async () => {
     await canvas.openNote(title);
 
-    // Open by default: a panel folded away would hide the feature from anyone who does
-    // not know it exists yet.
+    // Open by default: folded away it hides the feature.
     expect(await editor.isFieldsPanelOpen()).toBe(true);
 
     // Nothing typed yet, and the default written in the text does not count as filled.
@@ -64,7 +62,7 @@ describe('{{fields}} in a snippet', () => {
     expect(await editor.isFieldsPanelOpen()).toBe(false);
     await editor.close();
 
-    // The choice is a preference, not a per-note state: reopening keeps it folded.
+    // A preference, not a per-note state: reopening keeps it folded.
     await canvas.openNote(title);
     expect(await editor.isFieldsPanelOpen()).toBe(false);
 
@@ -99,7 +97,7 @@ describe('{{fields}} in a snippet', () => {
     await fieldsForm.form().waitForExist({ timeout: 10_000 });
 
     await fieldsForm.copyRaw();
-    // ⚠️ Copies **and dismisses** — there is no form left to cancel.
+    // ⚠️ Copies and dismisses — there is no form left to cancel.
     await fieldsForm.form().waitForExist({ reverse: true, timeout: 10_000 });
 
     const raw = await clipboardText();
@@ -149,8 +147,8 @@ describe('{{fields}} in a snippet', () => {
   });
 
   it('does not refresh updated_at, which the canvas sorts on', async () => {
-    // Filling a field is not aimed at the note: `set_placeholder_values` has a command
-    // of its own precisely so it does not take the patch path.
+    // Filling a field is not aimed at the note: `set_placeholder_values` has a command of
+    // its own precisely so it does not take the patch path.
     const before = (await reread())?.updatedAt;
     const card = await canvas.cardWithTitle(title);
     await card.$('[data-testid="note-card-fill"]').click();
@@ -169,8 +167,7 @@ describe('{{fields}} in a snippet', () => {
     await reloadCanvas();
 
     const port = (await reread())?.placeholders.find((field) => field.name === 'port');
-    // The proposal arrives as the default, not as the stored value — the day the
-    // variable changes, the note follows.
+    // The proposal arrives as the default, not as the stored value.
     expect(port?.defaultValue).toBe('6543');
     expect(port?.value).toBe('');
     expect(await bridge.listGlobalPlaceholders()).toEqual({ port: '6543' });

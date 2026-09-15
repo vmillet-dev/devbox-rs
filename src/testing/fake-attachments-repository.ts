@@ -2,10 +2,7 @@ import { guard } from './fail-next';
 import { AttachmentsRepository } from '@core/data/attachments.repository';
 import { Attachment } from '@core/model/note.model';
 
-/**
- * `read` returns a stub `data:` URI rather than real bytes: what the front owns is *when*
- * it asks for them. See `fake-notes-repository.ts` for why the implemented type is a `Pick`.
- */
+/** `read` returns a stub `data:` URI: what the front owns is *when* it asks for bytes. */
 export class FakeAttachmentsRepository implements Pick<AttachmentsRepository, keyof AttachmentsRepository> {
   private attachments: readonly Attachment[];
   private nextId = 0;
@@ -16,7 +13,6 @@ export class FakeAttachmentsRepository implements Pick<AttachmentsRepository, ke
   /** Reads recorded, so a spec can assert nothing is preloaded in bulk. */
   reads: string[] = [];
 
-  /** Calls recorded for the two actions that leave nothing observable behind. */
   opened: string[] = [];
   savedAs: { id: string; path: string } | null = null;
 

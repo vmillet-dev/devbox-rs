@@ -6,11 +6,7 @@ import { Note } from '@core/model/note.model';
 
 const SNIPPET_LINES = 2;
 
-/**
- * The field keeps focus from start to finish and the list is walked with the arrows
- * without ever taking it — hence `aria-activedescendant` rather than a moved focus,
- * which would lose what is being typed.
- */
+/** ⚠️ `aria-activedescendant` and not a moved focus, which would lose what is being typed. */
 @Component({
   selector: 'app-quick-palette',
   imports: [DialogComponent, LanguageBadgeComponent, TranslocoPipe],
@@ -22,7 +18,6 @@ export class QuickPaletteComponent {
   readonly query = input('');
   readonly results = input.required<readonly Note[]>();
   readonly highlighted = input(0);
-  /** The "create a note" row closes the list: it is the last one. */
   readonly canCreate = input(false);
 
   readonly queryChanged = output<string>();

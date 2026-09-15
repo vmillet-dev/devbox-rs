@@ -1,8 +1,9 @@
-//! Hand-written rather than produced by `diesel print-schema`, which would make
-//! `cargo check` depend on an up-to-date database outside the repository.
+//! ⚠️ Hand-written rather than produced by `diesel print-schema`, which would make
+//! `cargo check` depend on an up-to-date database outside the repository. Adding a column
+//! means editing both the migration SQL and this file.
 //!
-//! The `CHECK`s, the `ON DELETE CASCADE`s and the `NOCASE` collations do **not**
-//! appear here: Diesel does not model them, it simply obeys them.
+//! The `CHECK`s, the `ON DELETE CASCADE`s and the `NOCASE` collations do not appear here:
+//! Diesel does not model them, it simply obeys them.
 
 diesel::table! {
     spaces (id) {
@@ -47,8 +48,7 @@ diesel::table! {
     }
 }
 
-// The name *is* the identity and is compared byte for byte: `{{Host}}` is not
-// `{{host}}`, so this key stays case-sensitive where `note_tags` folds case.
+// ⚠️ Case-sensitive where `note_tags` folds case: `{{Host}}` is not `{{host}}`.
 diesel::table! {
     note_placeholders (note_id, name) {
         note_id -> Text,
@@ -57,8 +57,8 @@ diesel::table! {
     }
 }
 
-// A table of their own rather than a nullable `note_id`, which would have emptied
-// the `note_placeholders` primary key of its meaning.
+// A table of their own rather than a nullable `note_id`, which would empty the
+// `note_placeholders` primary key of its meaning.
 diesel::table! {
     global_placeholders (name) {
         name -> Text,

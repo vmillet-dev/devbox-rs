@@ -4,11 +4,7 @@ import { Attachment } from '@core/model/note.model';
 
 const BYTES_PER_KB = 1024;
 
-/**
- * The preview is fetched **on demand** and one at a time: a `data:` URI weighs a third
- * more than the file, and preloading the list would pull several megabytes into the
- * WebView for one thumbnail.
- */
+/** One preview at a time: a `data:` URI weighs a third more than the file. */
 @Component({
   selector: 'app-attachment-strip',
   imports: [TranslocoPipe],
@@ -20,7 +16,6 @@ export class AttachmentStripComponent {
   readonly attachments = input.required<readonly Attachment[]>();
   readonly isBusy = input(false);
   readonly previewId = input<string | null>(null);
-  /** `null` until the bytes are read: the preview then shows a blank. */
   readonly previewData = input<string | null>(null);
 
   readonly addRequested = output<void>();
@@ -32,7 +27,6 @@ export class AttachmentStripComponent {
 
   protected readonly confirmingRemove = signal<string | null>(null);
 
-  /** Resolved here so the preview carries the file's **name**, not its id. */
   protected readonly previewed = computed<Attachment | null>(() => {
     const id = this.previewId();
     return this.attachments().find((attachment) => attachment.id === id) ?? null;
@@ -42,7 +36,7 @@ export class AttachmentStripComponent {
     return attachment.mimeType.startsWith('image/');
   }
 
-  /** Rounded up to the next kB: "0 kB" for a non-empty file would be wrong. */
+  /** Rounded up: "0 kB" for a non-empty file would be wrong. */
   protected sizeInKb(attachment: Attachment): number {
     return Math.max(1, Math.ceil(attachment.byteSize / BYTES_PER_KB));
   }

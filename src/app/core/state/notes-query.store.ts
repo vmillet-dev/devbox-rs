@@ -12,7 +12,7 @@ export type { NoteFilter } from '../model/note.model';
 
 export { SEARCH_DEBOUNCE_MS };
 
-/** The **local** day: a new query only on a day change. */
+/** The local day: a new query only on a day change. */
 function localDayKey(now: Date): string {
   return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 }
@@ -57,9 +57,8 @@ function toggled<T>(selection: ReadonlySet<T>, value: T): ReadonlySet<T> {
 }
 
 /**
- * It filters, sorts and groups nothing: `query_notes` returns a ready-to-render
- * `NotesView` and this store displays it. Everything here is about *which* notes —
- * writing one is [`NotesStore`]'s business, pointing at one [`NoteSelectionStore`]'s.
+ * Which notes are shown. It filters, sorts and groups nothing — `query_notes` returns
+ * a ready-to-render `NotesView`.
  */
 @Injectable({ providedIn: 'root' })
 export class NotesQueryStore {
@@ -85,10 +84,6 @@ export class NotesQueryStore {
     SEARCH_DEBOUNCE_MS,
   );
 
-  /**
-   * Only the **day** matters for the section split, not the exact instant. The
-   * `equal` comparator is load-bearing, see `sameQueryParams`.
-   */
   private readonly queryParams = computed<QueryParams>(
     () => ({
       spaceId: this.spaces.activeSpaceId(),
@@ -115,7 +110,6 @@ export class NotesQueryStore {
         languages: params.languages,
         now,
         tzOffsetMinutes: now.getTimezoneOffset(),
-        // Always true on the canvas: pinning is what keeps a note within reach there.
         pinnedFirst: true,
       };
       return this.repository.query(query);
@@ -123,10 +117,9 @@ export class NotesQueryStore {
   });
 
   /**
-   * Kept during reloads, or every keystroke would blank the canvas.
-   *
-   * ⚠️ A `linkedSignal` only retains what it has **seen go past**: everything this
-   * store exposes therefore reads `view()`, with no short-circuit (see `isLoading`).
+   * Kept during reloads, or every keystroke would blank the canvas. ⚠️ A `linkedSignal`
+   * only retains what it has seen go past, so everything this store exposes must read
+   * `view()`, with no short-circuit (see `isLoading`).
    */
   private readonly view = linkedSignal<NotesView | undefined, NotesView | null>({
     source: () => (this.viewResource.hasValue() ? this.viewResource.value() : undefined),
@@ -138,11 +131,7 @@ export class NotesQueryStore {
   readonly allLanguages = computed<readonly LanguageTag[]>(() => this.view()?.availableLanguages ?? []);
   readonly isFiltering = computed(() => this.view()?.isFiltering ?? false);
 
-  /**
-   * How many notes the query matched, `null` when nothing is being filtered. Counted in
-   * Rust and crossing the bridge since `NotesView` existed — it decided a boolean and
-   * was thrown away, which is why a search said nothing about its own size.
-   */
+  /** `null` when nothing is being filtered. */
   readonly matched = computed<number | null>(() => {
     const view = this.view();
     return view !== null && view.isFiltering ? view.matched : null;
@@ -151,8 +140,8 @@ export class NotesQueryStore {
   readonly hasNoResults = computed(() => this.matched() === 0);
 
   /**
-   * ⚠️ `view()` is read **before** the resource state: an `&&` the other way round
-   * would short-circuit past the read, dropping the freshly loaded view.
+   * ⚠️ `view()` is read before the resource state: an `&&` the other way round would
+   * short-circuit past the read, dropping the freshly loaded view.
    */
   readonly isLoading = computed(() => {
     const hasView = this.view() !== null;
@@ -161,8 +150,7 @@ export class NotesQueryStore {
 
   readonly loadError: Signal<Error | undefined> = this.viewResource.error;
 
-  /** Flat and **in section order**: what keyboard navigation follows, and what a
-   * range selection spans. */
+  /** Flat and in section order: what keyboard navigation follows and a range spans. */
   readonly visibleNotes = computed<readonly Note[]>(() =>
     this.sections().flatMap((section) => [...section.notes]),
   );
@@ -190,18 +178,11 @@ export class NotesQueryStore {
   }
 
   /**
-   * Drops the search, the tags and the languages in one go — the three the back end
-   * counts as filtering, and the three that had to be undone one at a time where each
-   * was set.
+   * The three things `notes::view` counts as filtering. The quick filter is left alone:
+   * it has a three-way control with "All" in it, which is already the way out.
    *
-   * ⚠️ The quick filter is deliberately left alone. `is_filtering` in `notes::view` does
-   * not count it, so it is not what made this gesture appear; and it has a visible
-   * three-way control of its own with "All" in it, which is already the way out.
-   *
-   * ⚠️ The pending debounce is cancelled, **then** the two search signals are set. Setting
-   * them alone was not enough: a keystroke from a moment ago is still on its way, and it
-   * lands 150 ms later and puts the query back — the canvas filters itself again with an
-   * empty field to explain it.
+   * ⚠️ The debounce is cancelled first. A keystroke still on its way lands 150 ms later
+   * and puts the query back, leaving the canvas filtered with an empty field.
    */
   clearFilters(): void {
     this.commitSearch.cancel();

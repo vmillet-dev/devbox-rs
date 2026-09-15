@@ -8,12 +8,9 @@ export interface PlaceholderValue {
 }
 
 /**
- * Extracted because two screens show them — the editor panel and the copy modal — and
- * they must ask exactly the same question. It holds no state: the parent carries the
- * values, because one stores them and the other throws them away once the copy is done.
- *
- * ⚠️ An empty field shows its default as a **suggestion**, it does not copy it: empty
- * means "I keep what the snippet offers".
+ * Holds no state: the parent carries the values, because one stores them and the other
+ * throws them away. ⚠️ An empty field shows its default as a suggestion and never copies
+ * it — the day the snippet's default changes, a stored copy would win.
  */
 @Component({
   selector: 'app-placeholder-fields',

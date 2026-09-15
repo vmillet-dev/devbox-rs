@@ -6,9 +6,8 @@ import { reopenSession } from '../support/app.js';
 import { bridge, query } from '../support/bridge.js';
 
 /**
- * Creating a note writes nothing until it is worth saving, and the editor commits on
- * the way out. Both are front-end rules about a row in SQLite — only a running
- * application can say whether they met.
+ * Creating a note writes nothing until it is worth saving, and the editor commits on the
+ * way out — two front-end rules about a row in SQLite.
  */
 describe('Creating a note, and finding it again', () => {
   const title = 'Rotate the staging certificate';
@@ -36,10 +35,8 @@ describe('Creating a note, and finding it again', () => {
   });
 
   it('materialises the draft exactly once, not once per committed field', async () => {
-    // Closing commits the title, then the content, with no change detection between the
-    // two: the second call still carries DRAFT_ID while the row already exists, and
-    // `draftMaterialisedAs` is what redirects it. Without that, the corpus would have
-    // grown by two.
+    // ⚠️ Closing commits the title then the content with no change detection between
+    // them: the second call still carries `DRAFT_ID` while the row already exists.
     expect((await bridge.queryNotes(query())).matched).toBe(corpusBefore + 1);
   });
 
@@ -61,9 +58,8 @@ describe('Creating a note, and finding it again', () => {
   });
 
   it('reads the note back from the database on a fresh front end', async () => {
-    // ⚠️ Not a process restart — see `reopenSession`. What this proves is that the
-    // canvas renders what the commands answer, not something a signal was still
-    // holding: Angular and every store are built again from nothing.
+    // ⚠️ Not a process restart — see `reopenSession`. It proves the canvas renders what
+    // the commands answer, not something a signal was still holding.
     await reopenSession();
 
     await canvas.waitForCard(title);

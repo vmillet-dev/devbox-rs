@@ -12,24 +12,14 @@ export type { ChangelogRelease, ChangelogSection };
  */
 export const RELEASES_URL = `${APP_INFO.repository}/releases`;
 
-/**
- * A seam, like `UpdaterService` and `AppInfoService`: the dialog stays testable in jsdom,
- * which has neither a Tauri bridge nor the `opener` plugin.
- *
- * Not a `resource` held here: nothing needs the changelog until someone opens the panel.
- */
 @Injectable({ providedIn: 'root' })
 export class ChangelogService {
-  /**
-   * Newest release first. Rejects when there is no bridge to ask — the dialog says so
-   * rather than showing an empty sheet.
-   */
+  /** Newest release first. Rejects when there is no bridge, so the dialog can say so. */
   async load(): Promise<readonly ChangelogRelease[]> {
-    // A command without a `Result` on the Rust side: reading an embedded string cannot fail.
+    // No `Result` on the Rust side: reading an embedded string cannot fail.
     return commands.appChangelog();
   }
 
-  /** Opens the releases page in the system browser, outside the WebView. */
   async openReleases(): Promise<void> {
     await openUrl(RELEASES_URL);
   }

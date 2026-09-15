@@ -5,19 +5,15 @@ import { AvailableUpdate, DownloadProgress, UpdaterService } from './updater.ser
 
 export type UpdateStatus = 'idle' | 'available' | 'installing' | 'installed';
 
-/**
- * **Distinct** from `UpdateStatus`: merging them would make the prompt's state depend on
- * a check that led nowhere. `idle` covers both silent cases.
- */
+/** Distinct from `UpdateStatus`: the prompt must not depend on a check that led nowhere. */
 export type CheckState = 'idle' | 'checking' | 'upToDate' | 'failed';
 
 /**
- * Nothing installs without an explicit gesture: a silent update would restart the
- * application mid-keystroke, and the editor's drafts only commit on blur.
+ * Nothing installs without an explicit gesture: a silent update would restart the app
+ * mid-keystroke, and the editor's drafts only commit on blur.
  *
- * ⚠️ A failed **check** stays silent: offline, or on a dev build whose public key is a
- * placeholder, `check()` fails on every launch, and a red banner would be a daily
- * reproach with nothing to fix. A failed **install** follows an explicit action.
+ * ⚠️ A failed check stays silent — offline, or on a dev build with a placeholder public
+ * key, it fails on every launch. A failed install follows an explicit action.
  */
 @Injectable({ providedIn: 'root' })
 export class UpdateStore {
@@ -34,41 +30,32 @@ export class UpdateStore {
   readonly status: Signal<UpdateStatus> = this._status.asReadonly();
   readonly checkState: Signal<CheckState> = this._checkState.asReadonly();
 
-  /**
-   * What the prompt shows. `_update` **survives** `dismiss()` — the dot needs it — so
-   * the offer is the status, not the presence of a version.
-   */
+  /** `_update` survives `dismiss()`, so the offer is the status and not a version. */
   readonly offered = computed<AvailableUpdate | null>(() =>
     this._status() === 'idle' ? null : this._update(),
   );
 
   /**
-   * ⚠️ A third thing next to `UpdateStatus` and `CheckState`, for the same reason those
-   * two were kept apart: "an update exists and is not installed" is not "the prompt is
-   * open". `dismiss()` returns the status to `idle`, which is what closes the dialog —
-   * a dot reading that would vanish with it, which is the opposite of the point.
+   * ⚠️ A third thing next to `UpdateStatus` and `CheckState`: "an update exists and is
+   * not installed" is not "the prompt is open". `dismiss()` moves the status to `idle`,
+   * so a dot reading that would vanish with the dialog it exists to outlive.
    */
   readonly hasPendingUpdate = computed(() => this._update() !== null && this._status() !== 'installed');
 
-  /** An integer 0–100, or `null` while progress is indeterminate. */
   readonly progressPercent = computed<number | null>(() => {
     const progress = this._progress();
     return progress === null ? null : Math.round(progress * 100);
   });
 
   /**
-   * The automatic startup check: silent in every case, and the only one the user can
-   * turn off or silence for a version. An update it finds is still **remembered** —
-   * the dot says so — it simply does not open the prompt.
+   * The startup check: silent, and the only one the settings can turn off. An update it
+   * finds is still remembered — it simply does not open the prompt.
    */
   async check(): Promise<void> {
     await this.runCheck({ silent: true });
   }
 
-  /**
-   * Unlike the startup one it **speaks**: the user clicked and expects an answer,
-   * "there is nothing" included, and a failure goes through `ErrorNotifier`.
-   */
+  /** Unlike the startup one it speaks, "there is nothing" included. */
   async checkNow(): Promise<void> {
     await this.runCheck({ silent: false });
   }
@@ -82,8 +69,6 @@ export class UpdateStore {
       const found = await this.updater.check();
       if (found) {
         this._update.set(found);
-        // A silent check is the one the settings speak for; an explicit "Check for
-        // updates" is a question asked, and answering it with silence would be a bug.
         this._status.set(silent && this.isSilenced(found) ? 'idle' : 'available');
       }
       this._checkState.set(found ? 'idle' : 'upToDate');
@@ -99,10 +84,7 @@ export class UpdateStore {
     }
   }
 
-  /**
-   * On Windows the installer stops the application before `relaunch()` is reached; the
-   * call is still needed elsewhere.
-   */
+  /** On Windows the installer stops the app before `relaunch()`; it is still needed elsewhere. */
   async accept(): Promise<void> {
     if (this._status() !== 'available') return;
 
@@ -124,11 +106,7 @@ export class UpdateStore {
     }
   }
 
-  /**
-   * "Later". The offer closes; `skipThisVersion` decides whether it comes back at the
-   * next launch. The version is what is written down, never a boolean — see
-   * `AppSettings.skippedUpdate`.
-   */
+  /** "Later". A version is what gets written down, never a boolean. */
   async dismiss(skipThisVersion = false): Promise<void> {
     if (this._status() === 'installing') return;
 
@@ -137,8 +115,7 @@ export class UpdateStore {
       this.settings.setSkippedUpdate(version);
     }
 
-    // ⚠️ `_update` is left standing: the dot is what it feeds. Only the status moves,
-    // and the status is what the prompt reads.
+    // ⚠️ `_update` is left standing: the dot is what it feeds. Only the status moves.
     this._status.set('idle');
     await this.updater.discard();
   }

@@ -77,11 +77,7 @@ export class NotesPageComponent {
   private readonly revision = inject(NotesRevision);
   private readonly dialogs = inject(DialogStack);
 
-  /**
-   * An open modal takes the keyboard. Asked of [`DialogStack`] rather than of each
-   * store in turn: the page used to name its five modals here and would have missed
-   * the sixth.
-   */
+  /** Asked of `DialogStack` rather than of each store in turn. */
   protected readonly searchShortcutEnabled = computed(() => !this.dialogs.hasOpenDialog());
 
   constructor() {
@@ -95,11 +91,9 @@ export class NotesPageComponent {
   }
 
   /**
-   * The native side shows the window and says what was wanted; creating the note stays
-   * here, so it goes through the same `create_note` as any other.
-   *
-   * No `default`: the switch is exhaustive over a **generated** union, so a variant
-   * added in Rust stops this compiling until it is handled here.
+   * The native side says what was wanted; creating the note stays here. No `default`:
+   * the switch is exhaustive over a generated union, so a variant added in Rust stops
+   * this compiling until it is handled.
    */
   private runGlobalAction(action: GlobalAction): void {
     switch (action) {
@@ -166,10 +160,7 @@ export class NotesPageComponent {
     this.store.openNote(noteId);
   }
 
-  /**
-   * `PaletteStore` creates nothing itself — it does not know `NotesStore`, and the
-   * other way round would be a cycle.
-   */
+  /** `PaletteStore` does not know `NotesStore`; the other way round would be a cycle. */
   protected async onPaletteChosen(): Promise<void> {
     const content = this.palette.takeNewNoteContent();
     if (content !== null) {

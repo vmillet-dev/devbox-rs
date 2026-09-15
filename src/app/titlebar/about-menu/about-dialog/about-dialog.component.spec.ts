@@ -53,8 +53,7 @@ describe('AboutDialogComponent', () => {
     expect(stack).toContain(`Angular ${VERSION.full}`);
     expect(stack).toContain(`Rust ${APP_INFO.rustVersion}`);
     expect(stack).toContain('Tauri 2.0.0');
-    // The three values are generated or read from the framework, so the one thing a
-    // test can hold is that none of them is missing.
+    // Generated or read from the framework: all a test can hold is that none is missing.
     expect(stack).not.toContain('undefined');
   });
 

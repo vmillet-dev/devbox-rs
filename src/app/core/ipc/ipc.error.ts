@@ -1,25 +1,17 @@
 import type { AppError, ErrorCode } from './bindings';
 
 /**
- * A plain alias of the union **generated** from `ErrorCode`, so a variant added in Rust
- * appears here on regeneration and breaks the build everywhere it is not handled.
- *
- * These are **codes**, never text: a sentence written in Rust would impose its language
- * on the whole interface.
+ * Codes, never text: a sentence written in Rust would impose its language on the whole
+ * interface. A plain alias, so a variant added there breaks the build here.
  */
 export type IpcErrorCode = ErrorCode;
 
-/**
- * Redeclared rather than imported: the generator writes it inline in every signature
- * without ever naming it.
- */
+/** Redeclared rather than imported: the generator writes it inline without naming it. */
 export type IpcResult<T> = { status: 'ok'; data: T } | { status: 'error'; error: AppError };
 
 /**
- * Exhaustive by construction: a variant added to `ErrorCode` fails the build here.
- *
- * ⚠️ Needed despite the typing, because `bindings.ts` **declares** an `AppError` where
- * Tauri may have rejected with something else (see [`IpcError`]).
+ * ⚠️ A runtime guard despite the typing: `bindings.ts` declares an `AppError` where
+ * Tauri may have rejected with something else (see `IpcError`).
  */
 const IPC_ERROR_CODES: Record<IpcErrorCode, true> = {
   noteNotFound: true,
@@ -51,13 +43,11 @@ function describeCause(cause: unknown): string {
 
 /**
  * ⚠️ `code` is `null` when the rejection does not come from our commands: Tauri rejects
- * with a plain **string** for an unknown command or an argument that fails to
- * deserialise, and `bindings.ts` files that in the `error` branch typed as an `AppError`
- * it is not. Hence the fallback to `describeCause`.
+ * with a plain string for an unknown command or a bad argument, and `bindings.ts`
+ * files that in the `error` branch typed as an `AppError` it is not.
  */
 export class IpcError extends Error {
   readonly code: IpcErrorCode | null;
-  /** Values to interpolate into the translated message, e.g. `{ name }`. */
   readonly params: Record<string, string>;
 
   constructor(
@@ -72,10 +62,7 @@ export class IpcError extends Error {
   }
 }
 
-/**
- * The repositories throw rather than propagate the `status`: carrying the discriminant
- * up would make every caller hold a branch `ErrorNotifier` handles once.
- */
+/** Throws rather than propagating the `status`, which every caller would have to branch on. */
 export function unwrap<T>(command: string, result: IpcResult<T>): T {
   if (result.status === 'error') {
     throw new IpcError(command, result.error);

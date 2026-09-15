@@ -5,13 +5,11 @@ import { fileMenu, settings, titlebar } from '../pageobjects/titlebar.page.js';
 import { cursorOf, press, reopenSession } from '../support/app.js';
 
 /**
- * A preference applies as it is typed — there is no OK anywhere in the panel — and
- * `SettingsStore` writes it through one key at a time.
+ * A preference applies as it is typed, one key at a time.
  *
- * ⚠️ What this file does **not** prove is that any of it reached the disk.
- * `reopenSession()` opens a new WebDriver session against the same living process, so
- * the store plugin's in-memory map is still the one answering; a page reload reads the
- * cache, not the file. `15-preferences-on-disk` is where the file itself is read.
+ * ⚠️ What this file does not prove is that any of it reached the disk: `reopenSession()`
+ * opens a new session against the same living process, so the store plugin's in-memory
+ * map is still the one answering. `15-preferences-on-disk` reads the file itself.
  */
 describe('Preferences', () => {
   before(canvas.open);
@@ -24,8 +22,8 @@ describe('Preferences', () => {
   it('applies the theme as it is chosen, with no confirmation step', async () => {
     await settings.select(settings.control.theme, 'light');
 
-    // `:root[data-theme='light']` is what redefines the palette; dark is the base
-    // because the preference lives in a file nothing can read before Angular boots.
+    // Dark is the base because the preference lives in a file nothing can read before
+    // Angular boots.
     expect(await browser.$('html').getAttribute('data-theme')).toBe('light');
   });
 
@@ -43,8 +41,7 @@ describe('Preferences', () => {
     await settings.close();
     await reopenSession();
 
-    // Angular and every store were built again from nothing; these three came back
-    // because `SettingsStore` restored them, not because anything survived in memory.
+    // These came back because `SettingsStore` restored them, not because a signal survived.
     expect(await browser.$('html').getAttribute('data-theme')).toBe('light');
     expect(await browser.$('html').getAttribute('data-density')).toBe('compact');
     expect(await titlebar.activeLocale()).toBe('en');
@@ -55,9 +52,8 @@ describe('Preferences', () => {
     const field = settings.shortcut();
     const before = await field.getValue();
 
-    // A *global* accelerator without a modifier would swallow that key in every
-    // application on the machine — which is also what leaves Tab and Escape working
-    // inside the field.
+    // ⚠️ A global accelerator without a modifier would swallow that key in every
+    // application on the machine — which is also what leaves Tab and Escape working here.
     await field.click();
     await press('p');
     expect(await field.getValue()).toBe(before);
@@ -71,8 +67,7 @@ describe('Preferences', () => {
     await settings.close();
   });
 
-  // Readonly, and pressed in rather than typed into: a text cursor there would promise
-  // the wrong interaction.
+  // Readonly: a text cursor would promise the wrong interaction.
   it('leaves the shortcut field a cursor that does not invite typing', async () => {
     await fileMenu.openPreferences();
     expect(await cursorOf('#setting-shortcut')).not.toBe('text');

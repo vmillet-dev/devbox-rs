@@ -41,10 +41,7 @@ describe('NoteEditorOverlayComponent', () => {
     return fixture.nativeElement.querySelector(selector).textContent.replace(/\s+/g, ' ').trim();
   }
 
-  /**
-   * What successive patches carried for one field: the editor emits one patch for
-   * everything it changes.
-   */
+  /** What successive patches carried for one field. */
   function patched<K extends keyof NotePatch>(field: K): NonNullable<NotePatch[K]>[] {
     const values: NonNullable<NotePatch[K]>[] = [];
     fixture.componentInstance.patchRequested.subscribe((patch) => {
@@ -66,10 +63,6 @@ describe('NoteEditorOverlayComponent', () => {
     fixture.autoDetectChanges();
   }
 
-  /**
-   * The seam the fullscreen preference goes through: `recreateOverlay` keeps the same
-   * instance, which is what "stored in a previous session" means here.
-   */
   function preferences(): PreferencesService {
     return TestBed.inject(PreferencesService);
   }
@@ -82,7 +75,7 @@ describe('NoteEditorOverlayComponent', () => {
   }
 
   beforeEach(() => {
-    // Only virtualize `Date`; Angular's zoneless scheduler relies on real rAF/setTimeout for `whenStable()` to resolve.
+    // ⚠️ Only `Date`: the zoneless scheduler needs real rAF/setTimeout for `whenStable()`.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
 
@@ -326,8 +319,7 @@ describe('NoteEditorOverlayComponent', () => {
       return event;
     }
 
-    /** Spied rather than followed to the repository: what is asserted is that the editor
-     *  hands the paste over, not what attaching does. */
+    /** What is asserted is that the editor hands the paste over, not what attaching does. */
     async function openNote(): Promise<ReturnType<typeof vi.fn>> {
       fixture.componentRef.setInput('note', createNote({ content: '' }));
       await fixture.whenStable();
@@ -509,8 +501,7 @@ describe('NoteEditorOverlayComponent', () => {
       await fixture.whenStable();
 
       const select = fixture.nativeElement.querySelector('.overlay-language-select') as HTMLSelectElement;
-      // Against the label table rather than a copy of it: the select is meant to offer
-      // exactly what the generated union carries, in that order.
+      // Against the label table rather than a copy of it.
       expect([...select.options].map((option) => option.value)).toEqual(Object.keys(LANGUAGE_LABELS));
       expect(select.value).toBe('sql');
     });
@@ -679,8 +670,7 @@ describe('NoteEditorOverlayComponent', () => {
       fixture.componentRef.setInput('note', createNote());
       await fixture.whenStable();
 
-      // Driven through the handler and not the field: a date input sanitizes anything
-      // malformed to "", so the guard is unreachable from the DOM.
+      // Through the handler: a date input sanitizes anything malformed to "".
       (fixture.componentInstance as unknown as { onExpiryChange: (v: string) => void }).onExpiryChange(
         'pas-une-date',
       );
@@ -884,8 +874,7 @@ describe('NoteEditorOverlayComponent', () => {
 
     it('shows the filled body in place of the editable one while previewing', async () => {
       await openTemplated();
-      // Typed rather than left to the field's default: the fake repository substitutes
-      // what it is given, and the default is the back end's job.
+      // Typed rather than left to the field's default, which is the back end's job.
       await type(fieldInputs()[1], '5432');
 
       panelAction('Aperçu')?.click();
@@ -921,15 +910,9 @@ describe('NoteEditorOverlayComponent', () => {
 
   describe('a draft that becomes a note', () => {
     /**
-     * ⚠️ The sequence every new note goes through, and the one that used to lose the
-     * body. Committing the title materialises the draft, which gives it a **real id**
-     * and hands the editor back a note the store has only just created — title set,
-     * content still empty. Keyed on that id, the body draft was replayed from it and
-     * the text typed a moment earlier disappeared; the commit on close then wrote the
-     * empty string to the note.
-     *
-     * The drafts key on the **session** instead, which does not move when a note is
-     * merely saved.
+     * ⚠️ Committing the title materialises the draft, which changes the note's id and
+     * hands the editor back a note whose content is not written yet. Drafts keyed on
+     * that id are replayed over the body; they key on the session instead.
      */
     it('keeps the body typed while the note was still a draft', async () => {
       fixture.componentRef.setInput('session', 1);
@@ -939,8 +922,7 @@ describe('NoteEditorOverlayComponent', () => {
       const body = fixture.nativeElement.querySelector('[data-testid="editor-body"]');
       await type(body, 'openssl req -new');
 
-      // The materialisation lands: a real id, the committed title, and no content yet —
-      // the write that carries it has not come back.
+      // The materialisation lands: a real id, the committed title, and no content yet.
       fixture.componentRef.setInput(
         'note',
         createNote({ id: 'note-42', title: 'Rotate the certificate', content: '' }),

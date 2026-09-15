@@ -4,9 +4,8 @@ import { NotesRepository } from '../data/notes.repository';
 import { Variable, duplicateNames, toVariableRecord } from '../model/variable.model';
 
 /**
- * ⚠️ The local state is a **list**, not the map the back end returns: a row just added
- * has neither name nor value yet, and a map would lose it on the next keystroke.
- * Writes on field exit, as everywhere else here: there is no "Save" button.
+ * ⚠️ The local state is a list, not the map the back end returns: a row just added has
+ * neither name nor value yet, and a map would lose it on the next keystroke.
  */
 @Injectable({ providedIn: 'root' })
 export class VariablesStore {
@@ -20,7 +19,6 @@ export class VariablesStore {
   readonly isLoading = this._isLoading.asReadonly();
   readonly isEmpty = computed(() => !this._isLoading() && this._variables().length === 0);
 
-  /** Two rows with the same name: the second overwrites the first on write. */
   readonly duplicates = computed(() => duplicateNames(this._variables()));
 
   async load(): Promise<void> {
@@ -35,7 +33,6 @@ export class VariablesStore {
     }
   }
 
-  /** An empty row to fill in: nothing is written while it stays empty. */
   add(): void {
     this._variables.update((variables) => [...variables, { name: '', value: '' }]);
   }
@@ -48,15 +45,14 @@ export class VariablesStore {
     this.replace(index, (variable) => ({ ...variable, value }));
   }
 
-  /** Removing is writing: the row will not come back from a blur. */
   async remove(index: number): Promise<void> {
     this._variables.update((variables) => variables.filter((_, position) => position !== index));
     await this.commit();
   }
 
   /**
-   * Sends the **whole** set. What the back end keeps is not adopted back here: it
-   * drops half-filled rows, which have to stay on screen long enough to be finished.
+   * Sends the whole set. What the back end keeps is not adopted back: it drops
+   * half-filled rows, which have to stay on screen long enough to be finished.
    */
   async commit(): Promise<void> {
     await this.notifier.attempt('errors.variablesSaveFailed', () =>

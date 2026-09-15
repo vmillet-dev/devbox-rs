@@ -13,7 +13,6 @@ import { CopyButtonComponent } from '@notes/ui/copy-button/copy-button.component
 import { NoteCardMenuComponent } from './note-card-menu/note-card-menu.component';
 import { NoteActivation, NoteCardComponent } from './note-card.component';
 
-/** A literal, so the expected strings stay on one line. */
 const NEWLINE = String.fromCharCode(10);
 
 const SPACES: readonly Space[] = [
@@ -29,7 +28,7 @@ describe('NoteCardComponent', () => {
   }
 
   beforeEach(() => {
-    // Only virtualize `Date`; Angular's zoneless scheduler relies on real rAF/setTimeout for `whenStable()` to resolve.
+    // ⚠️ Only `Date`: the zoneless scheduler needs real rAF/setTimeout for `whenStable()`.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));
 
@@ -57,12 +56,7 @@ describe('NoteCardComponent', () => {
     expect(badge.language()).toBe('json');
   });
 
-  /**
-   * The badge used to own a row of its own above the title — ~17px plus an 8px margin out
-   * of the 122px a card has, spent before a character of body. Structural rather than
-   * visual on purpose: jsdom lays nothing out, so what is asserted is that they share one
-   * parent, which is what makes them one block of text.
-   */
+  /** Structural, not visual: jsdom lays nothing out, so this asserts a shared parent. */
   it('puts the badge, the marks and the title in one block', async () => {
     fixture.componentRef.setInput('note', createNote({ title: 'My note', attachmentCount: 2 }));
     await fixture.whenStable();
@@ -73,11 +67,7 @@ describe('NoteCardComponent', () => {
     expect(head.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
   });
 
-  /**
-   * ⚠️ Outside the head, and outside the card button with it. The head is text now, so a
-   * glyph inline with the title wrapped onto a line of its own whenever the title ended
-   * near the edge — and that second line cost the body one of its own.
-   */
+  /** ⚠️ Outside the head, and outside the card button with it. */
   it('drives the pin into the card corner rather than the line of text', async () => {
     fixture.componentRef.setInput('note', createNote({ title: 'My note', pinned: true }));
     await fixture.whenStable();
@@ -105,10 +95,6 @@ describe('NoteCardComponent', () => {
     expect(lines.map((line) => line.nativeElement.textContent)).toEqual(['one', 'two', 'three', 'four']);
   });
 
-  /**
-   * A card's preview is the head of the body, which explains nothing when the match sits
-   * at line forty — or in a tag, which the preview never showed at all.
-   */
   describe('what a search put it here for', () => {
     it('shows the matching line instead of the head of the body', async () => {
       fixture.componentRef.setInput(
@@ -141,11 +127,6 @@ describe('NoteCardComponent', () => {
       expect(text('[data-testid="note-card-hit"]')).toBe('Push the tag');
     });
 
-    /**
-     * A todo list has no body, so the branch that renders the excerpt sits behind
-     * `isChecklist()` and was never reached: a list found by its fifth item showed its
-     * first two and `+3 more`, explaining nothing.
-     */
     describe('on a todo list, which has no body to quote into', () => {
       const items = [
         { text: 'Version bumped', done: true },
@@ -185,10 +166,7 @@ describe('NoteCardComponent', () => {
         expect(itemTexts()).toEqual(['Version bumped', 'Lockfiles agree']);
       });
 
-      /**
-       * ⚠️ The excerpt is clipped at 160 characters, so a long item comes back with a
-       * trailing `…` and never equals its own text.
-       */
+      /** ⚠️ The excerpt is clipped at 160 characters and never equals its own text. */
       it('finds the item behind a clipped excerpt', async () => {
         const long = 'x'.repeat(200);
         fixture.componentRef.setInput(
@@ -206,8 +184,7 @@ describe('NoteCardComponent', () => {
 
       /**
        * ⚠️ The template counts within the window; the position in the note is what gets
-       * written. Without the offset, ticking the first visible box edits the first box
-       * of the list — a card silently changing the wrong line.
+       * written. Without the offset a card silently edits the wrong line.
        */
       it('ticks the item it shows, not the one at the same place in the list', async () => {
         const store = TestBed.inject(NotesStore);
@@ -276,11 +253,6 @@ describe('NoteCardComponent', () => {
     expect(tags.map((tag) => tag.nativeElement.textContent)).toEqual(['#a', '#b']);
   });
 
-  /**
-   * Which footer a note gets is decided in Rust and tested there. What is left here is
-   * rendering the variant that arrives, dated ones formatted locally so the label keeps
-   * ageing on screen.
-   */
   describe('footer', () => {
     it('renders an expiry footer as a countdown', async () => {
       fixture.componentRef.setInput(

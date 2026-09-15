@@ -27,8 +27,8 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
 
-    // Hash routing: the files are served from Tauri's internal protocol, where
-    // a reloaded deep URL has no server to rewrite it to index.html.
+    // Hash routing: the files are served from Tauri's internal protocol, where a
+    // reloaded deep URL has no server to rewrite it to index.html.
     provideRouter(routes, withHashLocation()),
 
     provideTransloco({
@@ -41,13 +41,12 @@ export const appConfig: ApplicationConfig = {
       loader: AppTranslocoLoader,
     }),
 
-    // One initialiser for both steps rather than two chained: Angular starts them
+    // ⚠️ One initialiser for both steps rather than two chained: Angular starts them
     // together and awaits their promises as a block, so `restore()` would read a
     // still-empty cache.
     provideAppInitializer(async () => {
-      // ⚠️ Everything is injected **before** the first `await`: an `inject()`
-      // after one leaves the injection context and fails the bootstrap
-      // (NG0203), black window included.
+      // ⚠️ Everything is injected before the first `await`: an `inject()` after one
+      // leaves the injection context and fails the bootstrap (NG0203).
       const preferences = inject(PreferencesService);
       const locale = inject(LocaleService);
       const settings = inject(SettingsStore);
@@ -57,27 +56,22 @@ export const appConfig: ApplicationConfig = {
       const autostart = inject(AutostartService);
 
       await preferences.hydrate();
-      // Before the first render: reading later would show the interface in one
-      // theme then the other. Before `locale.restore()` too, which reads the
+      // ⚠️ Before the first render, and before `locale.restore()`, which reads the
       // language out of it.
       settings.restore();
       locale.restore();
-      // After `restore()`: the front creates the tray by giving it its labels, and
-      // creating it earlier would have shown the default language for a round trip.
+      // ⚠️ After `restore()`: the front creates the tray by giving it its labels, and
+      // earlier would push the default language and a setting the user had changed.
       tray.start();
 
-      // After `settings.restore()` too: starting from the default would push a setting
-      // the user had changed to the native side, for the length of a visible flip.
       shortcuts.start();
       windowBehavior.start();
-      // Not awaited: the real state belongs to the system, and asking must not delay
-      // the first render.
+      // Not awaited: asking the system must not delay the first render.
       void autostart.start();
     }),
 
-    // Update check at launch. ⚠️ The promise is deliberately not returned: Angular awaits
-    // an initialiser's, and the application would sit on a blank screen for the length of
-    // a network call — indefinitely if the endpoint never answers.
+    // ⚠️ The promise is deliberately not returned: Angular awaits an initialiser's, and
+    // the application would sit on a blank screen for the length of a network call.
     provideAppInitializer(() => {
       void inject(UpdateStore).check();
     }),

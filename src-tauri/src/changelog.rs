@@ -2,11 +2,9 @@ pub mod model;
 
 use model::ChangelogRelease;
 
-/// Resolved from the manifest and not from the current directory, for the same
-/// reason as `BINDINGS_PATH`.
-///
-/// The one place user-facing text comes out of Rust, deliberately: it is *data*
-/// shipped as a file, untranslated like the release notes the updater hands over.
+/// Resolved from the manifest, for the same reason as `BINDINGS_PATH`. ⚠️ The one place
+/// user-facing text comes out of Rust: it is data shipped as a file, untranslated like
+/// the release notes the updater hands over.
 const CHANGELOG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../CHANGELOG.md"));
 
 #[tauri::command(async)]

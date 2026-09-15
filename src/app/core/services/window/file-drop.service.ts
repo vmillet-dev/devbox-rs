@@ -5,9 +5,8 @@ import { Unlisten, subscribeCancellable } from '@core/utils/subscription.util';
 export type FileDropSubscriber = (handler: (paths: readonly string[]) => void) => Promise<Unlisten>;
 
 /**
- * ⚠️ Drag and drop is a **window** event, not a DOM one: the WebView never sees
- * the files, the native side announces them with their paths. An HTML
- * `dragover`/`drop` would receive nothing.
+ * ⚠️ A drop is a window event, not a DOM one: the WebView never sees the files, only
+ * Rust does. An HTML `drop` handler would receive nothing.
  */
 export const FILE_DROP_SUBSCRIBER = new InjectionToken<FileDropSubscriber>('FILE_DROP_SUBSCRIBER', {
   providedIn: 'root',

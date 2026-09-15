@@ -12,11 +12,6 @@ import { Space } from '@core/model/space.model';
 import { MenuPanelDirective } from '@shared/directives/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/directives/menu-trigger.directive';
 
-/**
- * Separate from `NoteCardComponent` because it brings what the card has not: an
- * open/closed state and focus handling. It **never emits the note id** — it does not
- * know it, and the card adds it when relaying.
- */
 @Component({
   selector: 'app-note-card-menu',
   imports: [TranslocoPipe, MenuPanelDirective],
@@ -40,23 +35,19 @@ export class NoteCardMenuComponent {
     this.menu.escaped.subscribe(() => this.menu.close());
   }
 
-  /**
-   * Deletion in two steps: the WebView blocks everything during a native `confirm()`.
-   * Reset on every opening and closing.
-   */
+  /** Two steps: the WebView blocks everything during a native `confirm()`. */
   protected readonly confirmingDelete = linkedSignal({
     source: this.menu.open,
     computation: () => false,
   });
 
-  /** Moving a note where it already is makes no sense. */
   protected readonly moveTargets = computed<readonly Space[]>(() =>
     this.spaces().filter((space) => space.id !== this.currentSpaceId()),
   );
 
   protected toggle(event: MouseEvent): void {
-    // The whole card is an opening button: without this, a click on the ⋯ would bubble
-    // up and open the editor along with the menu.
+    // The whole card is an opening button: without this, a click on the ⋯ bubbles up
+    // and opens the editor along with the menu.
     event.stopPropagation();
     this.menu.toggle();
   }

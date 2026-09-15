@@ -1,4 +1,4 @@
-//! No "All spaces" entry on the data side: it is a display mode, and creating one
+//! ⚠️ No "All spaces" entry on the data side: it is a display mode, and creating one
 //! would have notes filed into it.
 
 use serde::{Deserialize, Serialize};
@@ -24,8 +24,8 @@ pub struct SpaceDraft {
 }
 
 impl SpaceDraft {
-    /// ⚠️ Trimming is not cosmetic: `COLLATE NOCASE` does not collapse
-    /// spaces, so "Personal" and " Personal " would coexist, identical on screen.
+    /// ⚠️ Trimming is not cosmetic: `COLLATE NOCASE` does not collapse spaces, so
+    /// "Personal" and " Personal " would coexist, identical on screen.
     pub fn validated_name(&self) -> Result<String, ValidationError> {
         let trimmed = self.name.trim();
         if trimmed.is_empty() {
@@ -39,9 +39,8 @@ impl SpaceDraft {
     }
 }
 
-/// A space cannot be its own refuge: the `ON DELETE CASCADE` would sweep away the
-/// notes right after the transfer. Persistence cannot decide — from both sides, the
-/// space exists.
+/// ⚠️ A space cannot be its own refuge: the `ON DELETE CASCADE` would sweep away the
+/// notes right after the transfer, and persistence cannot tell — the space exists.
 pub fn validate_move_target(id: &str, target_id: &str) -> Result<(), ValidationError> {
     if id == target_id {
         return Err(ValidationError::new(

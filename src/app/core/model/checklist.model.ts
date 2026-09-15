@@ -1,7 +1,3 @@
-/**
- * Plain aliases of the **generated** unions, like `LanguageTag`: an `import type` is
- * erased at compile time, and the value boundary (`commands`) stays in `data/`.
- */
 import type { ChecklistItem, NoteKind } from '@core/ipc/bindings';
 
 export type { ChecklistItem, NoteKind };
@@ -20,11 +16,7 @@ export function checklistProgress(items: readonly ChecklistItem[]): ChecklistPro
   return { done, total, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
 }
 
-/**
- * A todo list's Markdown is **not** rendered here: `copyText` carries what
- * `notes::checklist::to_markdown` produced, which is also what sharing and exporting
- * emit. The front end used to hold a second copy of the `- [x] ` syntax.
- */
+/** ⚠️ The Markdown is not rendered here: `copyText` carries what Rust produced. */
 export function noteCopyText(note: { readonly content: string; readonly copyText: string | null }): string {
   return note.copyText ?? note.content;
 }

@@ -1,7 +1,5 @@
-//! The side tables a note owns: its tags, its checklist items, its `{{field}}`
-//! values. All three are keyed on `note_id` and rewritten whole rather than patched
-//! — the row set *is* the value — so all three read, replace and bulk-load the same
-//! way. A fourth would follow the same three functions.
+//! The side tables a note owns. All three are keyed on `note_id` and rewritten whole
+//! rather than patched — the row set *is* the value.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -13,9 +11,9 @@ use crate::error::StorageError;
 use crate::notes::checklist::ChecklistItem;
 use crate::notes::model::Note;
 
-/// ⚠️ Narrowed by **subquery**, not by a list of bound ids: binding one
-/// parameter per note costs more than the read itself past a few thousand notes.
-/// Reading a superset is harmless — `attach_related` only looks up what it holds.
+/// ⚠️ Narrowed by subquery, not by a list of bound ids: binding one parameter per note
+/// measured slower than reading the table whole past a few thousand notes. Reading a
+/// superset is harmless — `attach_related` only looks up what it holds.
 pub fn all_tags(
     connection: &mut SqliteConnection,
     space_id: Option<&str>,
@@ -48,8 +46,8 @@ pub fn tags_of(
         .load::<String>(connection)?)
 }
 
-/// ⚠️ Re-read rather than sorted: `note_tags.tag` is `COLLATE NOCASE` and a read
-/// orders in that collation, which a byte-wise `sort()` does not reproduce.
+/// ⚠️ Re-read rather than sorted: `note_tags.tag` is `COLLATE NOCASE` and a read orders
+/// in that collation, which a byte-wise `sort()` does not reproduce.
 pub fn replace_tags(
     connection: &mut SqliteConnection,
     note_id: &str,
@@ -108,8 +106,8 @@ pub fn items_of(
         .collect())
 }
 
-/// Wiped then reinserted: the position is part of the key, so reordering would
-/// otherwise move rows one at a time under a key that refuses duplicates.
+/// Wiped then reinserted: the position is part of the key, so reordering would otherwise
+/// move rows one at a time under a key that refuses duplicates.
 pub fn replace_items(
     connection: &mut SqliteConnection,
     note_id: &str,

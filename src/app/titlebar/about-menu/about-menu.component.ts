@@ -9,16 +9,9 @@ import { GettingStartedDialogComponent } from '@titlebar/about-menu/getting-star
 import { ShortcutsDialogComponent } from '@titlebar/about-menu/shortcuts-dialog/shortcuts-dialog.component';
 import { WhatsNewDialogComponent } from '@titlebar/about-menu/whats-new-dialog/whats-new-dialog.component';
 
-/**
- * One signal rather than one flag per panel: they share a backdrop rung and only ever
- * appear one at a time, where four booleans would allow a state with two stacked.
- */
+/** One signal rather than four booleans, which would allow a state with two stacked. */
 export type AboutPanel = 'whatsNew' | 'gettingStarted' | 'shortcuts' | 'about';
 
-/**
- * The update check reports **in place** — that is the whole point of a manual check next
- * to the silent one at startup.
- */
 @Component({
   selector: 'app-about-menu',
   imports: [
@@ -46,10 +39,7 @@ export class AboutMenuComponent {
 
   protected readonly checking = computed(() => this.store.checkState() === 'checking');
 
-  /**
-   * `null` when the menu has nothing to announce. Exhaustive rather than defaulted: a
-   * state added to `CheckState` must break the build here.
-   */
+  /** Exhaustive rather than defaulted: a state added to `CheckState` breaks the build. */
   protected readonly checkStatusRef = computed<TranslationRef | null>(() => {
     switch (this.store.checkState()) {
       case 'checking':
@@ -74,10 +64,7 @@ export class AboutMenuComponent {
     this.menu.close(false);
   }
 
-  /**
-   * The modal's focus trap would hand back to the menu entry, destroyed since: focus
-   * returns to the trigger, the only landmark still on screen.
-   */
+  /** The modal's focus trap would hand back to the menu entry, destroyed since. */
   protected closePanel(): void {
     this.panel.set(null);
     this.menu.focusAnchor();

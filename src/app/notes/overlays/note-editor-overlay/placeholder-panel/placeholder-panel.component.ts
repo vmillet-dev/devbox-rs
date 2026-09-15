@@ -27,14 +27,8 @@ function sameValues(a: Record<string, string>, b: Record<string, string>): boole
 }
 
 /**
- * Unfolded it is the form; folded it fits on one line that **summarises what it hides**
- * — a bare counter read as a section heading nobody thinks to click. Nothing shows for a
- * note with no field: a header always present and always empty is a box nobody ticks.
- *
- * It holds a **local draft** of the values, committed on field exit and re-seeded on the
- * note's **id**, never on the note, whose identity changes on every save.
- *
- * Mutates nothing and fills nothing: it emits, `NotesStore` persists.
+ * Holds a local draft of the values, committed on field exit. Mutates nothing and
+ * fills nothing: it emits, `NotesStore` persists.
  */
 @Component({
   selector: 'app-placeholder-panel',
@@ -47,14 +41,11 @@ export class PlaceholderPanelComponent {
   readonly placeholders = input.required<readonly Placeholder[]>();
 
   /**
-   * ⚠️ The editor **session**, not the note's id. Materialising a draft changes that id
-   * for the same note, and a draft keyed on it was replayed from a note the store had
-   * only just created — losing whatever had been typed into it a moment earlier, with no
-   * later update able to bring it back, since only a change of source replays it.
+   * ⚠️ The editor session, not the note's id: materialising a draft changes that id for
+   * the same note, and a draft keyed on it is replayed over what was just typed.
    */
   readonly session = input.required<number>();
 
-  /** A display preference, held by the editor: it outlives the note. */
   readonly open = input(true);
 
   readonly previewing = input(false);
@@ -75,10 +66,7 @@ export class PlaceholderPanelComponent {
 
   readonly values = this.draft.asReadonly();
 
-  /**
-   * Compared against the draft rather than the values received: between the commit and
-   * the back end's answer the open note still carries the old ones.
-   */
+  /** Against the draft: between the commit and the answer the note still carries the old values. */
   private readonly committed = linkedSignal({
     source: this.session,
     computation: () => untracked(() => storedValues(this.placeholders())),
@@ -95,7 +83,6 @@ export class PlaceholderPanelComponent {
       .filter((entry) => entry.value !== ''),
   );
 
-  /** Two is enough: beyond that the bar would overflow instead of informing. */
   protected readonly visibleSummary = computed(() => this.summary().slice(0, SUMMARY_LIMIT));
   protected readonly hiddenSummary = computed(() => Math.max(0, this.summary().length - SUMMARY_LIMIT));
 
@@ -104,7 +91,6 @@ export class PlaceholderPanelComponent {
     this.valuesChanged.emit(this.draft());
   }
 
-  /** Clears every field, handing back to the defaults written in the text. */
   protected reset(): void {
     this.draft.set({});
     this.valuesChanged.emit(this.draft());
@@ -112,9 +98,8 @@ export class PlaceholderPanelComponent {
   }
 
   /**
-   * Called on a field's exit **and** by the editor before it closes: neither Escape, the
-   * backdrop nor the close button produces a `blur`. Sends only the fields the text
-   * carries today — a value whose token has left the content has no box to show in.
+   * ⚠️ Called on field exit and by the editor before it closes: neither Escape, the
+   * backdrop nor the close button produces a `blur`.
    */
   commit(): void {
     const values = Object.fromEntries(

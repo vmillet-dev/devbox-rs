@@ -1,10 +1,9 @@
 import { Injectable, Signal, signal } from '@angular/core';
 
 /**
- * The trash, the tag manager and the library all write notes, and none of them can
- * reload the canvas: injecting `NotesStore` would close an injection cycle. They bump
- * a counter instead, `NotesStore` reads it among its query parameters, and its
- * `resource` re-runs on its own.
+ * A store that writes notes without knowing `NotesStore` — injecting it would close a
+ * cycle — bumps this instead. `NotesQueryStore` reads it among its query parameters, so
+ * its `resource` re-runs on its own and nothing reloads the canvas by hand.
  */
 @Injectable({ providedIn: 'root' })
 export class NotesRevision {

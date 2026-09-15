@@ -4,29 +4,20 @@ import { ChecklistItem, NoteKind } from './checklist.model';
 
 export { type ChecklistItem, type NoteKind } from './checklist.model';
 
-/** Generated: a variant added in Rust stops the card compiling until it is handled. */
 export type { SearchField, SearchHit } from '@core/ipc/bindings';
 
 export type NoteLifecycle = { readonly kind: 'permanent' } | { readonly kind: 'expires'; readonly at: Date };
 
-/**
- * The back end picks the variant. Two carry a date and not a label, so the text can
- * age on screen without a round trip.
- */
+/** Two variants carry a date and not a label, so the text ages without a round trip. */
 export type NoteFooter =
   | { readonly kind: 'source'; readonly value: string }
   | { readonly kind: 'expiry'; readonly at: Date }
   | { readonly kind: 'age'; readonly at: Date };
 
-/**
- * `footer`, `expiringSoon`, `placeholders`, `attachmentCount`, `copyText` and
- * `searchHit` are **derived by the back end and never written** — they are what
- * `DisplayNote` adds.
- */
+/** Everything `NoteDraft` omits below is derived by the back end and never written. */
 export interface Note {
   readonly id: string;
   readonly spaceId: string;
-  /** May be empty on a brand-new note; the UI then renders `notes.untitled`. */
   readonly title: string;
   readonly language: LanguageTag;
   readonly content: string;
@@ -42,22 +33,14 @@ export interface Note {
   readonly placeholders: readonly Placeholder[];
   readonly attachmentCount: number;
   readonly kind: NoteKind;
-  /** Empty for a snippet. A todo list has these **instead of** `content`. */
+  /** A todo list has these instead of `content`. */
   readonly items: readonly ChecklistItem[];
-  /**
-   * What copying puts on the clipboard when that is not `content`: the Markdown of a
-   * todo list's items. `null` for a snippet — see `noteCopyText`.
-   */
+  /** What copying yields when that is not `content`; `null` for a snippet. */
   readonly copyText: string | null;
-  /**
-   * Why this note is in the results, when the card is not already showing it. `null`
-   * outside a search, and for a note found by its own title — quoting that back would
-   * repeat the biggest thing on the card.
-   */
+  /** Why this note is in the results; `null` outside a search and for a title match. */
   readonly searchHit: SearchHit | null;
 }
 
-/** The id and the timestamps are assigned by persistence; the rest is derived. */
 export type NoteDraft = Omit<
   Note,
   | 'id'
@@ -86,24 +69,17 @@ export interface NotesQuery {
   readonly languages: readonly LanguageTag[];
   readonly now: Date;
   /**
-   * ⚠️ `Date#getTimezoneOffset()`. The sections reason in **local** days:
-   * without this offset a note created at 11 pm lands in the wrong one.
+   * ⚠️ `Date#getTimezoneOffset()`. The sections reason in local days: without this
+   * offset a note created at 11 pm lands in the wrong one.
    */
   readonly tzOffsetMinutes: number;
-  /**
-   * Hoists pinned notes: their own section when the view is chronological, the head of
-   * the list when it is flat. The canvas always says `true`.
-   */
+  /** Their own section when the view is chronological, the head of the list when flat. */
   readonly pinnedFirst: boolean;
 }
 
-/**
- * No flat list: it would invite re-filtering or re-sorting what the back end has
- * already done.
- */
+/** No flat list: one would invite re-filtering what the back end has already done. */
 export interface NotesView {
   readonly sections: readonly NoteSection[];
-  /** Rail tags, scoped to the active space and not to the current filter. */
   readonly availableTags: readonly string[];
   readonly availableLanguages: readonly LanguageTag[];
   readonly isFiltering: boolean;
@@ -121,22 +97,16 @@ export interface NoteSection {
 }
 
 /**
- * No value map beside it: the list of fields comes from the text, the values from the
- * database, and the back end pairs them here — a value whose token has left the
- * content is not a field, it is waiting for it back.
+ * The fields come from the text and the values from the database; the back end pairs
+ * them here, so a value whose token has left the content simply stops being a field.
  */
 export interface Placeholder {
   readonly name: string;
   readonly defaultValue: string;
-  /** Empty until something is typed; the back end then reads `defaultValue`. */
   readonly value: string;
 }
 
-/**
- * Deliberately **not** a `Note`: nothing here is decorated, a discarded note being
- * restored or purged, never opened. `purgeAt` is derived — retention can change
- * between versions.
- */
+/** Not a `Note`: a discarded note is restored or purged, never opened, so nothing is decorated. */
 export interface TrashedNote {
   readonly id: string;
   readonly spaceId: string;
@@ -146,7 +116,6 @@ export interface TrashedNote {
   readonly tags: readonly string[];
   readonly deletedAt: Date;
   readonly purgeAt: Date;
-  /** A todo list has no `content`: the panel shows a label, not a blank preview. */
   readonly kind: NoteKind;
 }
 
@@ -159,15 +128,11 @@ export interface TagUsage {
 export interface Attachment {
   readonly id: string;
   readonly noteId: string;
-  /** The original name, displayed as is. Never used as a path. */
+  /** The original name, displayed as is. ⚠️ Never used as a path. */
   readonly fileName: string;
   readonly mimeType: string;
   readonly byteSize: number;
   readonly createdAt: Date;
 }
 
-/**
- * Plain counters that cross the bridge as themselves: re-declaring them would only be
- * an identity mapper kept for symmetry.
- */
 export type { ExportReport, ImportReport };

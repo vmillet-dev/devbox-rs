@@ -2,12 +2,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
-/**
- * The strip bounds its preview to 220 px so as not to push the editor off screen; this
- * view bounds only on the window. It re-reads nothing: the bytes are the ones the
- * preview already loaded, and a multi-megabyte `data:` URI has no business crossing the
- * bridge twice.
- */
+/** Re-reads nothing: a multi-megabyte `data:` URI has no business crossing twice. */
 @Component({
   selector: 'app-image-lightbox',
   imports: [DialogComponent, TranslocoPipe],

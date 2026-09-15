@@ -3,8 +3,8 @@ use crate::closed_enum::closed_enum;
 use super::model::{Note, NoteDraft, NotePatch};
 
 closed_enum! {
-    /// **Closed**: the front end receives it as a generated TypeScript union, so
-    /// an unknown value stops compiling there instead of being refused at runtime.
+    /// Closed: the front receives a generated union, so an unknown value stops compiling
+    /// there instead of being refused at runtime.
     pub enum Language {
         Json = "json",
         Js = "js",
@@ -39,9 +39,8 @@ pub fn for_draft(draft: &NoteDraft) -> Language {
     }
 }
 
-/// "+ New note" creates an empty note, then we paste: creation sees no content,
-/// so without this the note would stay in `txt`. The three refusals are what keep
-/// detection from becoming a permanent correction.
+/// Creation sees no content — the paste comes after — so without this the note stays in
+/// `txt`. The three refusals keep detection from becoming a permanent correction.
 pub fn after_patch(before: &Note, patch: &NotePatch) -> Option<Language> {
     if patch.language.is_some()
         || before.language != Language::default()
@@ -58,7 +57,7 @@ pub fn after_patch(before: &Note, patch: &NotePatch) -> Option<Language> {
     Some(from_content(content))
 }
 
-/// The order of attempts runs from the most discriminating signal to the vaguest.
+/// ⚠️ The order of attempts runs from the most discriminating signal to the vaguest.
 pub fn from_content(content: &str) -> Language {
     let trimmed = content.trim();
     if trimmed.is_empty() {
@@ -73,7 +72,7 @@ pub fn from_content(content: &str) -> Language {
     }
 
     let lower = trimmed.to_lowercase();
-    // Before the markup check, which reads `<?php` as an XML processing instruction.
+    // ⚠️ Before the markup check, which reads `<?php` as an XML processing instruction.
     if lower.starts_with("<?php") {
         return Language::Php;
     }
@@ -89,8 +88,7 @@ pub fn from_content(content: &str) -> Language {
     if is_python(trimmed) {
         return Language::Py;
     }
-    // All five before TypeScript and JavaScript, which claim `=>` and `const`: a Rust
-    // match arm or a C# lambda used to be enough to take a snippet from its own language.
+    // ⚠️ All five before TypeScript and JavaScript, which claim `=>` and `const`.
     if is_go(trimmed) {
         return Language::Go;
     }
@@ -181,7 +179,7 @@ fn is_sql(lower: &str) -> bool {
     starts_with_any(lower, &STATEMENTS)
 }
 
-/// A section **and** an assignment: `[…]` alone could be an array on its own line.
+/// A section and an assignment: `[…]` alone could be an array on its own line.
 fn is_toml(content: &str) -> bool {
     any_line(content, is_toml_section) && any_line(content, is_assignment)
 }
@@ -224,9 +222,8 @@ fn is_go(content: &str) -> bool {
         })
 }
 
-/// Deliberately narrow. `enum`, `struct` and `trait` are shared with languages checked
-/// after this one, so only what Rust does not lend counts: `fn`, `impl`, `let mut`, a
-/// macro call, and a `use` carrying a path.
+/// Deliberately narrow: `enum`, `struct` and `trait` are shared with languages checked
+/// after this one, so only what Rust does not lend counts.
 fn is_rust(content: &str) -> bool {
     content.contains("println!")
         || content.contains("let mut ")
@@ -237,8 +234,7 @@ fn is_rust(content: &str) -> bool {
         })
 }
 
-/// `public class` is left to neither this nor C#: both write it, and a snippet that
-/// says nothing else says nothing.
+/// `public class` is left to neither this nor C#: both write it.
 fn is_java(content: &str) -> bool {
     content.contains("System.out.print")
         || content.contains("public static void main")
@@ -286,8 +282,8 @@ fn is_javascript(content: &str) -> bool {
         || any_line(content, |line| starts_with_any(line, &KEYWORDS))
 }
 
-/// A selector **and** a declaration: the brace alone would not tell a
-/// stylesheet from a function body.
+/// A selector and a declaration: the brace alone would not tell a stylesheet from a
+/// function body.
 fn is_css(content: &str) -> bool {
     if !content.contains('{') || !content.contains('}') {
         return false;
@@ -318,8 +314,8 @@ fn is_yaml(content: &str) -> bool {
         || any_line(content, |line| line.starts_with("- ") || is_mapping(line))
 }
 
-/// The space required after the colon rules out a URL, whose `http://…` would
-/// otherwise read as a key.
+/// The space required after the colon rules out a URL, whose `http://…` would otherwise
+/// read as a key.
 fn is_mapping(line: &str) -> bool {
     let Some((key, value)) = line.split_once(':') else {
         return false;
@@ -571,8 +567,8 @@ mod tests {
         assert_eq!(from_content("class Note { }"), Language::Js);
     }
 
-    /// The five compiled languages are tried **before** TypeScript and JavaScript,
-    /// which claim `=>` and `const`. Every line below used to come back `js` or `txt`.
+    /// The five compiled languages are tried before TypeScript and JavaScript, which
+    /// claim `=>` and `const`.
     #[test]
     fn a_compiled_language_is_not_taken_for_javascript() {
         assert_eq!(
@@ -629,7 +625,7 @@ int main(void) { return 0; }"
     }
 
     /// `<?php` opens with a `<`, which the markup check reads as a processing
-    /// instruction: without its own branch first, every PHP snippet came back `xml`.
+    /// instruction, so PHP needs its own branch first.
     #[test]
     fn php_is_recognised_before_the_markup_check_claims_it() {
         assert_eq!(
@@ -643,8 +639,8 @@ echo 'hi';"
         assert_eq!(from_content("<?xml version=\"1.0\"?>"), Language::Xml);
     }
 
-    /// The new branches sit in front of the old ones, so this is what says they take
-    /// nothing that was not theirs.
+    /// The new branches sit in front of the old ones: this says they take nothing that
+    /// was not theirs.
     #[test]
     fn the_languages_detected_before_them_are_left_alone() {
         assert_eq!(from_content("export enum Kind { A }"), Language::Ts);

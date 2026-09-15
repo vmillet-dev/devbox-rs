@@ -1,12 +1,9 @@
 //! What the IPC surface costs, by class of command.
 //!
-//! ⚠️ **Below the command boundary, not through Tauri.** A command is four lines — validate,
-//! lock, delegate, translate the error — so `store::*` plus `view::*` plus the serde round
-//! trip captures nearly all of the cost. `tauri::test::mock_app` would drag the whole app
-//! lifecycle in and buy only the IPC transport, which this codebase does not control. So
-//! these numbers are not "the IPC is fast": they are what the work behind a command costs.
-//!
-//! The three commands in `desktop.rs` are out of scope: they touch no database.
+//! ⚠️ Below the command boundary, not through Tauri: a command is four lines, so
+//! `store::*` plus `view::*` plus the serde round trip captures nearly all of the cost.
+//! `tauri::test::mock_app` would drag the whole app lifecycle in and buy only the IPC
+//! transport, which this codebase does not control.
 //!
 //! ```
 //! cargo bench -- --save-baseline main
@@ -53,8 +50,7 @@ fn run_query(corpus: &mut Corpus, request: &NotesQuery) -> String {
     serde_json::to_string(&built).expect("a serialisable view")
 }
 
-/// The one number that matters most: it runs on every keystroke, behind the 150 ms
-/// debounce, and #21 says it reads the whole corpus to do it.
+/// The one that matters most: it runs on every keystroke, behind the 150 ms debounce.
 fn whole_corpus_read(c: &mut Criterion) {
     let mut corpus = build();
     let mut group = c.benchmark_group("whole-corpus read");
@@ -72,7 +68,7 @@ fn whole_corpus_read(c: &mut Criterion) {
     });
 
     // ⚠️ Unaccented on purpose: the fold has to strip the accents off every byte of the
-    // corpus before it can answer, which is the branch the 6.3 ms figure was taken on.
+    // corpus before it can answer.
     group.bench_function("query_notes, search folding accents", |b| {
         b.iter(|| black_box(run_query(&mut corpus, &query("deploiement"))));
     });

@@ -4,11 +4,7 @@ import { NotesRepository } from '../data/notes.repository';
 import { TrashedNote } from '../model/note.model';
 import { NotesRevision } from './notes-revision';
 
-/**
- * Loaded **when the panel opens** and not continuously: a permanent resource would
- * fire a query on every deletion. It bumps `NotesRevision` rather than reloading the
- * canvas itself.
- */
+/** Loaded when the panel opens: a permanent resource would query on every deletion. */
 @Injectable({ providedIn: 'root' })
 export class TrashStore {
   private readonly repository = inject(NotesRepository);
@@ -33,7 +29,7 @@ export class TrashStore {
     this._isOpen.set(false);
   }
 
-  /** The back end purges what retention has caught up with **before** answering. */
+  /** The back end purges what retention has caught up with before answering. */
   async load(): Promise<void> {
     this._isLoading.set(true);
     try {
@@ -41,7 +37,7 @@ export class TrashStore {
     } catch (error) {
       this.notifier.reportFailure('errors.trashLoadFailed', error);
     } finally {
-      // `finally` rather than `attempt`: the flag brackets the call, and must be
+      // ⚠️ `finally` rather than `attempt`: the flag brackets the call and must be
       // cleared even when what follows the await throws.
       this._isLoading.set(false);
     }

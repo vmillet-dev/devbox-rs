@@ -8,17 +8,13 @@ import { checklistMarkdown } from './note.fixture';
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * In-memory `NotesRepository` double. It deliberately does **not** reimplement filtering,
- * grouping, tag normalisation or `{{field}}` parsing: those live in Rust and are tested
- * there, and duplicating them would let a front-end spec pass against rules the real back
- * end does not apply.
+ * ⚠️ It deliberately does not reimplement filtering, grouping, tag normalisation or
+ * `{{field}}` parsing: those live in Rust, and a second copy would let a front-end spec
+ * pass against rules the real back end does not apply. What it emulates is persistence,
+ * plus a trivial single-section view a spec can replace with `setView`.
  *
- * What it emulates is persistence — it owns the notes, assigns ids and timestamps — plus a
- * trivial single-section view; a spec needing a specific one sets it with `setView`.
- * Deletion is a **soft** one here too, which is what makes undo observable.
- *
- * `Pick<…, keyof …>` is the public surface of the real class: `keyof` drops its private
- * members, and a method renamed or dropped there fails this file at compile time.
+ * `Pick<…, keyof …>` is the real class's public surface: a method renamed there fails
+ * this file at compile time.
  */
 export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRepository> {
   private notes: readonly Note[];
@@ -33,13 +29,11 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
   lastQuery: NotesQuery | null = null;
   queryCount = 0;
 
-  /** Calls recorded for the operations that return only a count. */
   movedTo: { ids: readonly string[]; spaceId: string } | null = null;
   taggedWith: { ids: readonly string[]; tags: readonly string[] } | null = null;
   retagged: { tags: readonly string[]; into: string } | null = null;
   deletedTags: string[] = [];
 
-  /** Global `{{field}}` values, the corpus-wide fallback of a note's own. */
   private variables: Record<string, string> = {};
 
   private gate: Promise<void> | null = null;
@@ -54,10 +48,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
     this.forcedView = { ...this.trivialView(), ...view };
   }
 
-  /**
-   * Suspends every query until `release()`: the store only reports loading before its
-   * first view lands, so observing that state needs a query that stays in flight.
-   */
+  /** Suspends every query until `release()`, so a spec can observe the in-flight state. */
   hold(): void {
     this.gate = new Promise<void>((resolve) => (this.openGate = resolve));
   }
@@ -224,8 +215,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
     });
   }
 
-  /** `updatedAt` is deliberately left alone — that is the point of the command it stands
-   * for. */
+  /** ⚠️ `updatedAt` is left alone — that is the point of the command this stands for. */
   setPlaceholderValues(id: string, values: Record<string, string>): Promise<Note> {
     return guard(this, () => {
       const existing = this.notes.find((note) => note.id === id);
@@ -245,10 +235,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
     });
   }
 
-  /**
-   * The real one delegates to Rust; the double substitutes naively, global variables
-   * included, since they are what a typed value falls back to.
-   */
+  /** The real one delegates to Rust; the double substitutes naively. */
   fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
     return guard(this, () =>
       Object.entries({ ...this.variables, ...values }).reduce(

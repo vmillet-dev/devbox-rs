@@ -16,15 +16,14 @@ pub struct NotesQuery {
     pub space_id: Option<String>,
     pub search: String,
     pub filter: NoteFilter,
-    /// A note passes if it carries **at least one** of these tags.
+    /// A note passes if it carries at least one of these tags.
     pub tags: Vec<String>,
     pub languages: Vec<Language>,
     pub now: DateTime<Utc>,
-    /// ⚠️ `Date#getTimezoneOffset()`, whose sign is the **opposite** of the offset
+    /// ⚠️ `Date#getTimezoneOffset()`, whose sign is the opposite of the offset
     /// (−120 for UTC+2). Sections reason in local days.
     pub tz_offset_minutes: i32,
-    /// Hoists pinned notes: their own section when the view is chronological, the
-    /// head of the list when it is flat. The canvas always says `true`.
+    /// Their own section when the view is chronological, the head of the list when flat.
     pub pinned_first: bool,
 }
 
@@ -47,21 +46,18 @@ pub struct Facets {
 #[serde(rename_all = "camelCase")]
 pub struct NotesView {
     pub sections: Vec<NoteSection>,
-    /// Attached to the **space**, not the current filter: facets drawn from
-    /// already filtered notes would empty the rail on the first selection.
+    /// Attached to the space, not the current filter: facets drawn from already
+    /// filtered notes would empty the rail on the first selection.
     pub available_tags: Vec<String>,
     pub available_languages: Vec<Language>,
-    /// Distinguishes "no result" from "empty space".
     pub is_filtering: bool,
     /// `u32` and not `usize`: Specta refuses a type JSON cannot render losslessly.
     pub matched: u32,
 }
 
-/// Which part of a note a search found, when the card is not already showing it.
-///
-/// ⚠️ No `Title` variant, deliberately: the title is the biggest thing on a card, so a
-/// note found by it needs no explanation and an excerpt would repeat what the reader is
-/// looking at. "Matched on the title" is [`SearchMatch::Title`], which carries nothing.
+/// ⚠️ No `Title` variant, deliberately: a note found by its own title needs no
+/// explanation, and an excerpt would repeat the biggest thing on the card. That case is
+/// [`SearchMatch::Title`], which carries nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum SearchField {
@@ -70,13 +66,12 @@ pub enum SearchField {
     Item,
 }
 
-/// What made a note match, and where — so a card can show the line that put it in the
-/// results rather than its first three, which may have nothing to do with the query.
+/// What made a note match, and where.
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchHit {
     pub field: SearchField,
-    /// The matching **line**, not the whole body: a card has room for one.
+    /// The matching line, not the whole body: a card has room for one.
     pub excerpt: String,
 }
 
@@ -89,8 +84,7 @@ pub struct NoteSection {
     pub show_create_ghost: bool,
 }
 
-/// **Translation key** on the front-end side (`sections.<key>`): no readable label
-/// crosses the bridge.
+/// A translation key on the front-end side: no readable label crosses the bridge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum NoteSectionKey {
@@ -101,8 +95,7 @@ pub enum NoteSectionKey {
     Results,
 }
 
-/// Separate from [`build`], which reads no database: pushing the counter down
-/// there would force a hash map into every section-splitting test.
+/// Separate from [`build`], which reads no database.
 pub fn apply_attachment_counts<S: std::hash::BuildHasher>(
     view: &mut NotesView,
     counts: &HashMap<String, u32, S>,
@@ -129,8 +122,7 @@ pub fn apply_global_defaults(view: &mut NotesView, globals: &BTreeMap<String, St
 
 pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> NotesView {
     let needle = fold(request.search.trim());
-    // Collected while filtering rather than looked for again afterwards: the match has
-    // just been found, and finding it twice on 800 notes is paid for twice.
+    // Collected while filtering: finding the same match twice is paid for twice.
     let mut hits: HashMap<String, SearchHit> = HashMap::new();
     if !needle.is_empty() {
         notes.retain(|note| match find_match(note, &needle) {
@@ -143,8 +135,8 @@ pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> Note
         });
     }
 
-    // A quick filter restricts a view that stays chronological; a search or a
-    // facet switches to a flat list.
+    // A quick filter restricts a view that stays chronological; a search or a facet
+    // switches to a flat list.
     let is_filtering = !needle.is_empty()
         || request
             .tags
@@ -169,9 +161,9 @@ pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> Note
         matched,
     };
 
-    // A pass of its own, like the attachment counter and the global defaults: the notes
-    // become `DisplayNote`s inside `build_sections`, and threading a second value
-    // through it would have cost every section-splitting test an argument.
+    // A pass of its own, like the attachment counter: the notes become `DisplayNote`s
+    // inside `build_sections`, and threading a second value through would cost every
+    // section-splitting test an argument.
     apply_search_hits(&mut view, &mut hits);
     view
 }
@@ -190,9 +182,9 @@ fn apply_search_hits(view: &mut NotesView, hits: &mut HashMap<String, SearchHit>
 
 /// `needle` is expected to have been through [`fold`] and trimmed.
 ///
-/// ⚠️ Folded in Rust and not in SQL: without ICU, SQLite's `LOWER()` only handles
-/// ASCII, so `Étape` would not match `étape`. The items count as much as the
-/// content — a todo list has no body to be found by.
+/// ⚠️ Folded in Rust and not in SQL: without ICU, SQLite's `LOWER()` only handles ASCII,
+/// so `Étape` would not match `étape`. The items count as much as the content — a todo
+/// list has no body to be found by.
 fn find_match(note: &Note, needle: &str) -> Option<SearchMatch> {
     if contains_folded(&note.title, needle) {
         return Some(SearchMatch::Title);
@@ -216,8 +208,8 @@ fn find_match(note: &Note, needle: &str) -> Option<SearchMatch> {
         .map(|item| SearchMatch::elsewhere(SearchField::Item, &item.text))
 }
 
-/// Answered by [`find_match`]: a note either fails to match, matches on something the
-/// card already shows, or matches on something it does not and can quote.
+/// A note either fails to match, matches on something the card already shows, or
+/// matches on something it does not and can quote.
 enum SearchMatch {
     Title,
     Elsewhere(SearchHit),
@@ -233,10 +225,9 @@ impl SearchMatch {
 }
 
 /// A card shows one line, and a body is free to hold a minified payload on one of them.
-/// Without this the whole of it would cross the bridge to be thrown away by `overflow`.
 const EXCERPT_CHARS: usize = 160;
 
-/// Characters and not bytes: `s[..160]` panics in the middle of a `é`.
+/// ⚠️ Characters and not bytes: `s[..160]` panics in the middle of a `é`.
 fn clip(text: &str) -> String {
     let mut clipped: String = text.chars().take(EXCERPT_CHARS).collect();
     if text.chars().nth(EXCERPT_CHARS).is_some() {
@@ -245,24 +236,14 @@ fn clip(text: &str) -> String {
     clipped
 }
 
-/// Lowercase **and** accent-free, so `etape` finds `Étape`. Both sides go through
-/// here, which makes the match symmetric: an accented needle finds unaccented text
-/// too, since a search field is not where anyone wants to be precise about it.
+/// Lowercase and accent-free, so `etape` finds `Étape`. Both sides go through here,
+/// which makes the match symmetric. Only what a canonical decomposition separates is
+/// folded: `ø` and `ß` are letters of their own and stay.
 ///
-/// Decomposing to NFD and dropping the combining marks handles every script rather
-/// than the Latin letters someone thought to list. Only what a canonical
-/// decomposition separates is folded: `ø` and `ß` are letters of their own and stay.
-///
-/// ⚠️ Decomposed one character at a time, and not through the `nfd()` iterator over
-/// the whole string: on 800 notes of 13 kB of accented text, release, the streaming
-/// version cost 76 ms against 15 ms here for the same answer. Its lookahead buffering
-/// earns nothing when every mark is dropped anyway — canonical order cannot matter to
-/// a fold that keeps none of it.
-///
-/// The ASCII branches are the common ones, not micro-optimisations: a snippet of code
-/// is ASCII from end to end, and a French sentence is ASCII between its accents. That
-/// is also what pays for the accents: the same corpus took 27 ms through
-/// `to_lowercase()`, which folded no accent at all.
+/// ⚠️ Decomposed one character at a time, not through the `nfd()` iterator over the whole
+/// string — measured 5× slower for the same answer, its lookahead buffering earning
+/// nothing when every mark is dropped anyway. The ASCII branches are the common case,
+/// not a micro-optimisation: code is ASCII end to end, prose between its accents.
 fn fold(text: &str) -> String {
     if text.is_ascii() {
         return text.to_ascii_lowercase();
@@ -285,10 +266,9 @@ fn fold(text: &str) -> String {
     folded
 }
 
-/// ⚠️ Do **not** hand-roll a fold-as-you-compare scan to save the copy: measured
-/// on 800 notes of 13 kB, a needle matching nothing took 11.0 ms that way against
-/// 6.3 ms here. `str::contains` runs Two-Way (O(n+m)); a window scan is O(n·m),
-/// and searching is precisely the case where most notes do not match.
+/// ⚠️ Do not hand-roll a fold-as-you-compare scan to save the copy: `str::contains` runs
+/// Two-Way (O(n+m)) where a window scan is O(n·m), and searching is precisely the case
+/// where most notes do not match. Measured at nearly twice the cost.
 fn contains_folded(haystack: &str, needle: &str) -> bool {
     fold(haystack).contains(needle)
 }
@@ -297,9 +277,9 @@ const A_WEEK: TimeDelta = TimeDelta::days(7);
 
 const MAX_TZ_OFFSET_MINUTES: u32 = 14 * 60;
 
-/// ⚠️ The sign flips: JavaScript counts the minutes to **add** to local time to
-/// get UTC (−120 for UTC+2), where chrono expects the offset east. The bound is
-/// checked **before** the multiplication, which would otherwise overflow.
+/// ⚠️ The sign flips: JavaScript counts the minutes to add to local time to get UTC
+/// (−120 for UTC+2), where chrono expects the offset east. The bound is checked before
+/// the multiplication, which would otherwise overflow.
 fn offset_from_minutes(tz_offset_minutes: i32) -> FixedOffset {
     let utc = FixedOffset::east_opt(0).expect("UTC is a valid offset");
 
@@ -338,8 +318,7 @@ fn section(
     }
 }
 
-/// Pinning hoists here too, otherwise the setting would only ever show before the
-/// first keystroke. The partition is **stable**: at equal pinning, SQL decides.
+/// The partition is stable: at equal pinning, SQL decides.
 fn results(mut notes: Vec<Note>, pinned_first: bool, now: DateTime<Utc>) -> Vec<NoteSection> {
     if pinned_first {
         notes.sort_by_key(|note| !note.pinned);
@@ -544,8 +523,6 @@ mod tests {
     mod search {
         use super::*;
 
-        /// The rule these assert on is "does it match at all", which is what
-        /// [`find_match`] answers on its way to saying where.
         fn matches_search(note: &Note, needle: &str) -> bool {
             find_match(note, needle).is_some()
         }
@@ -576,7 +553,7 @@ mod tests {
             assert!(matches_search(&note, &fold("ÉTAPE")));
         }
 
-        /// The point of the whole fold: nobody reaches for the accent key to search.
+        /// Nobody reaches for the accent key to search.
         #[test]
         fn an_unaccented_needle_finds_accented_text() {
             let note = Note {
@@ -602,8 +579,7 @@ mod tests {
             assert!(matches_search(&note, &fold("Étape")));
         }
 
-        /// Not everything an eye reads as an accent is one: only what a canonical
-        /// decomposition separates is folded away.
+        /// Only what a canonical decomposition separates is folded away.
         #[test]
         fn a_letter_of_its_own_is_not_folded_into_another() {
             let note = Note {
@@ -645,9 +621,6 @@ mod tests {
         }
     }
 
-    /// A card's preview is the head of the body, which has nothing to do with the
-    /// query when the match sits at line forty. What the view answers with is the
-    /// line that actually matched.
     mod hits {
         use super::*;
 
@@ -689,8 +662,7 @@ mod tests {
                 ..sample()
             };
 
-            // The title is the biggest thing on the card: quoting it back would
-            // repeat what the reader is already looking at.
+            // Quoting the title back would repeat the biggest thing on the card.
             assert!(hit_for(note, "rollout").is_none());
         }
 
@@ -800,8 +772,8 @@ mod tests {
 
         #[test]
         fn an_absurd_offset_falls_back_to_utc_without_overflowing() {
-            // Negating i32::MIN or multiplying i32::MAX by 60 panics in debug while
-            // the connection mutex is held — poisoning it for the rest of the process.
+            // ⚠️ Negating i32::MIN or multiplying i32::MAX by 60 panics in debug while
+            // the connection mutex is held, poisoning it for the rest of the process.
             for absurd in [i32::MIN, i32::MAX, -100_000, 100_000, 841, -841] {
                 assert_eq!(offset_from_minutes(absurd).local_minus_utc(), 0);
             }

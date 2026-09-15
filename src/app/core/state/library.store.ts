@@ -7,16 +7,15 @@ import { ImportReport } from '@core/model/note.model';
 import { TransferRepository } from '../data/transfer.repository';
 import { NotesRevision } from './notes-revision';
 
-/** The name offered to the picker: dated, so two exports do not overlap. */
+/** Dated, so two exports do not overlap. */
 function defaultFileName(now: Date): string {
   return `devbox-${now.toISOString().slice(0, 10)}.json`;
 }
 
 /**
- * The most common gesture — export then re-import at once — adds nothing at all, and
- * saying so explicitly stops it looking like a breakdown. A note whose language or kind
- * came from a newer version arrived all the same, brought down to what this build knows;
- * the report is the only place that says so.
+ * Export then re-import at once adds nothing at all, and saying so explicitly stops it
+ * looking like a breakdown. A note degraded from a newer version arrived all the same,
+ * and the report is the only place that says so.
  */
 function importedKey(report: ImportReport): string {
   if (report.notesImported === 0) return 'file.importedNothing';
@@ -29,9 +28,8 @@ function fileNameOf(path: string): string {
 }
 
 /**
- * **Every operation reports**, including when it changed nothing: an import that adds
- * nothing because everything is already there and one that fails look too alike on
- * screen to stay silent. Reports go under the titlebar — the menu closes on the click.
+ * Every operation reports, including when it changed nothing. Reports go under the
+ * titlebar: the menu closes on the click, and a native dialog would cover it.
  */
 @Injectable({ providedIn: 'root' })
 export class LibraryStore {
@@ -80,10 +78,7 @@ export class LibraryStore {
     await this.write((path) => this.repository.exportSelection(path, ids), now);
   }
 
-  /**
-   * Sharing stops at the clipboard: nothing is sent anywhere, which is also why there
-   * is nothing to confirm.
-   */
+  /** Sharing stops at the clipboard: nothing is sent anywhere. */
   async copyAsMarkdown(ids: readonly string[]): Promise<void> {
     if (!this.requireSelection(ids)) return;
 
@@ -118,8 +113,8 @@ export class LibraryStore {
         return false;
       }
 
-      // The file name is part of the report: a successful export whose landing place
-      // is unknown is no use.
+      // The file name is part of the report: an export whose landing place is unknown
+      // is no use.
       this.status.notify({
         key: 'file.exported',
         params: { notes: String(report.notes), path: fileNameOf(path) },

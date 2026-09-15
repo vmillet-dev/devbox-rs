@@ -4,42 +4,33 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	/**  No command returns the raw list: it would invite re-filtering on the front end. */
+	/**  ⚠️ No command returns the raw list: it would invite re-filtering on the front end. */
 	queryNotes: (query: NotesQuery) => typedError<NotesView, AppError>(__TAURI_INVOKE("query_notes", { query })),
 	createNote: (draft: NoteDraft) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("create_note", { draft })),
 	updateNote: (id: string, patch: NotePatch) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("update_note", { id, patch })),
 	/**
-	 *  **Moves to the trash**: the note comes back through [`restore_notes`] for
+	 *  Moves to the trash: the note comes back through [`restore_notes`] for
 	 *  [`trash::RETENTION`].
 	 */
 	deleteNote: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_note", { id })),
 	deleteNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("delete_notes", { ids })),
 	restoreNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("restore_notes", { ids })),
-	/**
-	 *  Purges what retention has caught up with **first**: the trash must never
-	 *  show a note a restart would erase.
-	 */
+	/**  Purges first: the trash must never show a note a restart would erase. */
 	listTrash: () => typedError<TrashedNote[], AppError>(__TAURI_INVOKE("list_trash")),
 	purgeNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("purge_notes", { ids })),
 	emptyTrash: () => typedError<number, AppError>(__TAURI_INVOKE("empty_trash")),
 	moveNotes: (ids: string[], spaceId: string) => typedError<number, AppError>(__TAURI_INVOKE("move_notes", { ids, spaceId })),
-	/**
-	 *  Normalized here as everywhere else, or an `#urgent` typed in the action bar
-	 *  would not join the `urgent` already stored.
-	 */
+	/**  Normalized here as everywhere else, or a typed `#urgent` would not join `urgent`. */
 	tagNotes: (ids: string[], tags: string[]) => typedError<number, AppError>(__TAURI_INVOKE("tag_notes", { ids, tags })),
 	listTags: () => typedError<TagUsage[], AppError>(__TAURI_INVOKE("list_tags")),
-	/**  Renaming onto an existing tag **is** a merge: a note cannot carry one twice. */
+	/**  Renaming onto an existing tag is a merge: a note cannot carry one twice. */
 	renameTag: (tag: string, into: string) => typedError<number, AppError>(__TAURI_INVOKE("rename_tag", { tag, into })),
 	mergeTags: (tags: string[], into: string) => typedError<number, AppError>(__TAURI_INVOKE("merge_tags", { tags, into })),
-	/**
-	 *  A list rather than one tag at a time: the panel deletes a whole selection, and
-	 *  one round trip per tag was one lock and one transaction per tag.
-	 */
+	/**  A list rather than one tag at a time: one round trip per tag is one lock per tag. */
 	deleteTags: (tags: string[]) => typedError<number, AppError>(__TAURI_INVOKE("delete_tags", { tags })),
 	/**
-	 *  No note identifier: the palette fills an unsaved draft as readily as the note
-	 *  it just opened. The database is read only for the **global variables**.
+	 *  No note identifier: the palette fills an unsaved draft as readily as a saved note.
+	 *  The database is read only for the global variables.
 	 */
 	fillPlaceholders: (content: string, values: { [key in string]: string }) => typedError<string, AppError>(__TAURI_INVOKE("fill_placeholders", { content, values })),
 	/**
@@ -48,63 +39,44 @@ export const commands = {
 	 */
 	setPlaceholderValues: (id: string, values: { [key in string]: string }) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("set_placeholder_values", { id, values })),
 	listGlobalPlaceholders: () => typedError<{ [key in string]: string }, AppError>(__TAURI_INVOKE("list_global_placeholders")),
-	/**
-	 *  Stores the **whole** set: what is not sent is what the user removed. No note is
-	 *  touched, not even its `updated_at`.
-	 */
+	/**  Stores the whole set: what is not sent is what the user removed. */
 	setGlobalPlaceholders: (values: { [key in string]: string }) => typedError<{ [key in string]: string }, AppError>(__TAURI_INVOKE("set_global_placeholders", { values })),
 	listSpaces: () => typedError<Space[], AppError>(__TAURI_INVOKE("list_spaces")),
 	createSpace: (draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("create_space", { draft })),
 	renameSpace: (id: string, draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("rename_space", { id, draft })),
-	/**  Hoists a space to the head of the list, or lets it fall back among the others. */
 	pinSpace: (id: string, pinned: boolean) => typedError<Space, AppError>(__TAURI_INVOKE("pin_space", { id, pinned })),
 	deleteSpace: (id: string, targetSpaceId: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_space", { id, targetSpaceId })),
 	attachFile: (noteId: string, path: string) => typedError<Attachment, AppError>(__TAURI_INVOKE("attach_file", { noteId, path })),
-	/**
-	 *  The bytes do **not** cross the bridge: the clipboard is read natively, where the
-	 *  image arrives as raw RGBA, then encoded to PNG.
-	 */
+	/**  The bytes do not cross the bridge: the clipboard is read natively, as raw RGBA. */
 	attachClipboardImage: (noteId: string, fileName: string) => typedError<Attachment, AppError>(__TAURI_INVOKE("attach_clipboard_image", { noteId, fileName })),
 	listAttachments: (noteId: string) => typedError<Attachment[], AppError>(__TAURI_INVOKE("list_attachments", { noteId })),
 	readAttachment: (id: string) => typedError<string, AppError>(__TAURI_INVOKE("read_attachment", { id })),
 	/**
-	 *  The call starts from **Rust**, not the `WebView`: opening a path from the front
-	 *  end would have meant allowing `opener:allow-open-path` over a whole directory.
+	 *  ⚠️ The call starts from Rust: opening a path from the front end would mean allowing
+	 *  `opener:allow-open-path` over a whole directory.
 	 */
 	openAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("open_attachment", { id })),
-	/**
-	 *  The path comes from a native picker; the write stays here, the only place that
-	 *  knows the directory.
-	 */
+	/**  The path comes from a native picker; the write stays here. */
 	saveAttachment: (id: string, path: string) => typedError<null, AppError>(__TAURI_INVOKE("save_attachment", { id, path })),
 	deleteAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_attachment", { id })),
-	/**
-	 *  The spaces travel with the notes: without them an import would hold an id with
-	 *  nowhere to file it.
-	 */
+	/**  The spaces travel with the notes, or an import holds an id with nowhere to file it. */
 	exportNotes: (path: string, spaceId: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_notes", { path, spaceId })),
 	exportSelection: (path: string, ids: string[]) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_selection", { path, ids })),
 	/**
-	 *  The file is read **before** the lock is taken: parsing a large export while
-	 *  holding the connection would block every other command for the length of it.
+	 *  ⚠️ The file is read before the lock is taken: parsing a large export while holding the
+	 *  connection would block every other command for the length of it.
 	 */
 	importNotes: (path: string) => typedError<ImportReport, AppError>(__TAURI_INVOKE("import_notes", { path })),
 	/**  Nothing is sent anywhere: "share" stops at the clipboard. */
 	shareNotes: (ids: string[]) => typedError<string, AppError>(__TAURI_INVOKE("share_notes", { ids })),
 	appChangelog: () => __TAURI_INVOKE<ChangelogRelease[]>("app_changelog"),
 	/**
-	 *  Replaces only the menu when the tray already exists, so a language change does
-	 *  not make it flicker.
-	 * 
-	 *  No `Result`: an absent tray is not a failure the front end can handle, and
-	 *  [`tray_exists`] is what then keeps closing from hiding the window where nothing
-	 *  could call it back.
+	 *  Replaces only the menu when the tray already exists, so a language change does not
+	 *  make it flicker. No `Result`: an absent tray is not a failure the front can handle,
+	 *  and [`tray_exists`] is what then keeps closing from hiding the window.
 	 */
 	syncTray: (labels: TrayLabels) => __TAURI_INVOKE<void>("sync_tray", { labels }),
-	/**
-	 *  Returns the ones another application keeps: the native side can only fail
-	 *  silently, and a log line is not an interface — the front end displays this.
-	 */
+	/**  The native side can only fail silently, and a log line is not an interface. */
 	setGlobalShortcuts: (bindings: ShortcutBindings) => __TAURI_INVOKE<string[]>("set_global_shortcuts", { bindings }),
 	setWindowBehavior: (behavior: WindowBehavior) => __TAURI_INVOKE<void>("set_window_behavior", { behavior }),
 };
@@ -125,7 +97,7 @@ export type AppError = {
 export type Attachment = {
 	id: string,
 	noteId: string,
-	/**  The original name, the one displayed. Never used as a path. */
+	/**  The original name, the one displayed. ⚠️ Never used as a path. */
 	fileName: string,
 	mimeType: string,
 	/**  `u32` and not `u64`: Specta refuses what JSON cannot carry without loss. */
@@ -134,20 +106,14 @@ export type Attachment = {
 };
 
 export type ChangelogRelease = {
-	/**
-	 *  `0.1.1`, or whatever the heading names — `Unreleased` included. Keep a
-	 *  Changelog's square brackets are dropped.
-	 */
+	/**  `0.1.1`, or whatever the heading names. Square brackets are dropped. */
 	version: string,
 	/**  `None` when the heading carries no date; never invented. */
 	date: string | null,
 	sections: ChangelogSection[],
 };
 
-/**
- *  One `### ` heading, or the anonymous one a release gets when it lists its entries
- *  without a category.
- */
+/**  One `### ` heading, or the anonymous one a release with no category gets. */
 export type ChangelogSection = {
 	/**  Empty for that anonymous category: the front then renders no heading. */
 	title: string,
@@ -155,7 +121,7 @@ export type ChangelogSection = {
 };
 
 /**
- *  No identifier: the position **is** the identity — `note_items` is keyed on
+ *  No identifier: the position is the identity — `note_items` is keyed on
  *  `(note_id, position)`, and a write rewrites the whole list.
  */
 export type ChecklistItem = {
@@ -167,30 +133,25 @@ export type ChecklistItem = {
 export type DisplayNote = {
 	footer: NoteFooter,
 	expiringSoon: boolean,
-	/**  The **list** is derived from the text; the values are persisted. */
+	/**  The list is derived from the text; the values are persisted. */
 	placeholders: Placeholder[],
 	/**  Filled in afterwards by whoever holds a connection: `decorate` reads no database. */
 	attachmentCount: number,
 	/**
-	 *  What copying puts on the clipboard when that is **not** the content: a todo
-	 *  list travels as the Markdown of its items, a snippet as `None`. Decided here
-	 *  so `checklist::to_markdown` stays the only place the `- [x] ` syntax exists.
+	 *  ⚠️ What copying yields when that is not the content. Decided here so
+	 *  `checklist::to_markdown` stays the only place the `- [x] ` syntax exists.
 	 */
 	copyText: string | null,
 	/**
-	 *  Why this note is in the results, when the card is not already showing it.
-	 *  Filled in afterwards by `view::build`, like the attachment count above it —
-	 *  `None` outside a search, and for a note found by its own title.
+	 *  Filled in afterwards by `view::build`; `None` outside a search, and for a note
+	 *  found by its own title.
 	 */
 	searchHit: SearchHit | null,
 } & Note;
 
 /**
- *  Adding a variant breaks the front-end build until `CODE_KEYS`
- *  (`core/errors/error-notifier.service.ts`) and both locales have their key.
- * 
- *  No "schema too recent" variant: that failure aborts startup during the
- *  migration, so no command can ever return it.
+ *  ⚠️ Adding a variant breaks the front-end build until `CODE_KEYS`
+ *  (`core/services/errors/error-notifier.service.ts`) and both locales have their key.
  */
 export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" | "attachmentNotFound" | "fileAccess" | "importFormat" | 
 /**  The `field` parameter names the offending field. */
@@ -204,33 +165,30 @@ export type ExportReport = {
 };
 
 /**
- *  **One** event carrying a closed value, not one topic per action: the topic
- *  strings used to be mirrored in `app-events.service.ts`, where a typo made a
- *  subscription silently inert. It crosses as a generated TypeScript union, so
- *  a variant added here stops the front end compiling until its `switch` handles it.
+ *  One event carrying a closed value, not one topic per action: a topic string
+ *  mirrored on both sides makes a typo into a silently inert subscription. It
+ *  crosses as a generated union, so a variant added here stops the front compiling.
  */
-export type GlobalAction = 
-/**  The clipboard, as a note. */
-"capture" | "new-note" | "palette";
+export type GlobalAction = "capture" | "new-note" | "palette";
 
 /**
- *  `skipped`: notes already present (same id) or whose space is missing from the
- *  file — an import has to be replayable without duplicating.
+ *  `skipped`: notes already present or whose space is missing from the file — an import
+ *  has to be replayable without duplicating.
  */
 export type ImportReport = {
 	spacesCreated: number,
 	notesImported: number,
 	notesSkipped: number,
 	/**
-	 *  Imported, but with a `language` or a `kind` this build does not know brought
-	 *  down to the default. Counted so the loss is said rather than discovered.
+	 *  Imported with a `language` or `kind` this build does not know brought down to the
+	 *  default. Counted so the loss is said rather than discovered.
 	 */
 	notesDegraded: number,
 };
 
 /**
- *  **Closed**: the front end receives it as a generated TypeScript union, so
- *  an unknown value stops compiling there instead of being refused at runtime.
+ *  Closed: the front receives a generated union, so an unknown value stops compiling
+ *  there instead of being refused at runtime.
  */
 export type Language = "json" | "js" | "ts" | "py" | "rs" | "go" | "java" | "cs" | "php" | "c" | "sql" | "yml" | "toml" | "xml" | "html" | "css" | "sh" | "md" | 
 /**  Default, and the signal that the front end chose nothing. */
@@ -250,15 +208,15 @@ export type Note = {
 	updatedAt: string,
 	lifecycle: NoteLifecycle,
 	/**
-	 *  ⚠️ `default`: `transfer::Bundle` deserializes `Note` itself, and a required
-	 *  key would make every export file written before todo-lists unreadable.
+	 *  ⚠️ `default`: `transfer::Bundle` deserializes `Note` itself, and a required key
+	 *  would make every export file written before todo lists unreadable.
 	 */
 	kind?: NoteKind,
-	/**  Empty for a snippet. A checklist has these **instead of** `content`. */
+	/**  A checklist has these instead of `content`. */
 	items?: ChecklistItem[],
 	/**
-	 *  Written by `set_placeholder_values` and by nothing else: filling a field is
-	 *  not editing the note, so it leaves `updated_at` alone.
+	 *  Written by `set_placeholder_values` and by nothing else: filling a field is not
+	 *  editing the note, so it leaves `updated_at` alone.
 	 */
 	placeholderValues?: { [key in string]: string },
 };
@@ -280,29 +238,25 @@ export type NoteDraft = {
 export type NoteFilter = "all" | "pinned" | "untriaged";
 
 /**
- *  The **decision**, not the rendering: the dated variants carry a date and not a
- *  label — "4 min ago" has to age on screen without a round trip.
+ *  The decision, not the rendering: the dated variants carry a date and not a label,
+ *  so "4 min ago" ages on screen without a round trip.
  */
 export type NoteFooter = { kind: "source"; value: string } | { kind: "expiry"; at: string } | { kind: "age"; at: string };
 
 /**
- *  **Closed**, like `Language`: the front end receives it as a generated
- *  TypeScript union, so an unknown value stops compiling there.
+ *  Closed, like `Language`: the front receives a generated union, so an unknown
+ *  value stops compiling there.
  */
 export type NoteKind = 
-/**  Default, and what every note written before todo-lists reads back as. */
-"snippet" | 
-/**  A todo list: no body, an ordered list of items instead. */
-"checklist";
+/**  Default, and what every note written before todo lists reads back as. */
+"snippet" | "checklist";
 
-export type NoteLifecycle = { kind: "permanent" } | 
-/**  "Untriaged" until this date. */
-{ kind: "expires"; at: string };
+export type NoteLifecycle = { kind: "permanent" } | { kind: "expires"; at: string };
 
 /**
- *  A field set to `None` stays **unchanged**. `#[specta(optional)]` makes the key
- *  omissible on the TypeScript side; without it the front would send `null` for
- *  what it does not touch, overwriting it.
+ *  ⚠️ A field set to `None` stays unchanged, and `#[specta(optional)]` makes the key
+ *  omissible on the TypeScript side — without it the front sends `null` for what it does
+ *  not touch, overwriting it.
  */
 export type NotePatch = {
 	spaceId?: string | null,
@@ -314,10 +268,7 @@ export type NotePatch = {
 	pinned?: boolean | null,
 	lifecycle?: NoteLifecycle | null,
 	kind?: NoteKind | null,
-	/**
-	 *  Replaces the **whole** list, like `tags`: a position is all the identity an
-	 *  item has.
-	 */
+	/**  Replaces the whole list, like `tags`: a position is all the identity an item has. */
 	items?: ChecklistItem[] | null,
 };
 
@@ -328,10 +279,7 @@ export type NoteSection = {
 	showCreateGhost: boolean,
 };
 
-/**
- *  **Translation key** on the front-end side (`sections.<key>`): no readable label
- *  crosses the bridge.
- */
+/**  A translation key on the front-end side: no readable label crosses the bridge. */
 export type NoteSectionKey = "pinned" | "today" | "week" | "older" | "results";
 
 export type NotesQuery = {
@@ -339,31 +287,27 @@ export type NotesQuery = {
 	spaceId: string | null,
 	search: string,
 	filter: NoteFilter,
-	/**  A note passes if it carries **at least one** of these tags. */
+	/**  A note passes if it carries at least one of these tags. */
 	tags: string[],
 	languages: Language[],
 	now: string,
 	/**
-	 *  ⚠️ `Date#getTimezoneOffset()`, whose sign is the **opposite** of the offset
+	 *  ⚠️ `Date#getTimezoneOffset()`, whose sign is the opposite of the offset
 	 *  (−120 for UTC+2). Sections reason in local days.
 	 */
 	tzOffsetMinutes: number,
-	/**
-	 *  Hoists pinned notes: their own section when the view is chronological, the
-	 *  head of the list when it is flat. The canvas always says `true`.
-	 */
+	/**  Their own section when the view is chronological, the head of the list when flat. */
 	pinnedFirst: boolean,
 };
 
 export type NotesView = {
 	sections: NoteSection[],
 	/**
-	 *  Attached to the **space**, not the current filter: facets drawn from
-	 *  already filtered notes would empty the rail on the first selection.
+	 *  Attached to the space, not the current filter: facets drawn from already
+	 *  filtered notes would empty the rail on the first selection.
 	 */
 	availableTags: string[],
 	availableLanguages: Language[],
-	/**  Distinguishes "no result" from "empty space". */
 	isFiltering: boolean,
 	/**  `u32` and not `usize`: Specta refuses a type JSON cannot render losslessly. */
 	matched: number,
@@ -373,34 +317,29 @@ export type Placeholder = {
 	name: string,
 	defaultValue: string,
 	/**
-	 *  A value gone orphan — its token renamed in the text — stays out of sight
-	 *  here without being erased.
+	 *  A value gone orphan — its token renamed in the text — stays out of sight without
+	 *  being erased.
 	 */
 	value: string,
 };
 
 /**
- *  Which part of a note a search found, when the card is not already showing it.
- * 
- *  ⚠️ No `Title` variant, deliberately: the title is the biggest thing on a card, so a
- *  note found by it needs no explanation and an excerpt would repeat what the reader is
- *  looking at. "Matched on the title" is [`SearchMatch::Title`], which carries nothing.
+ *  ⚠️ No `Title` variant, deliberately: a note found by its own title needs no
+ *  explanation, and an excerpt would repeat the biggest thing on the card. That case is
+ *  [`SearchMatch::Title`], which carries nothing.
  */
 export type SearchField = "tag" | "body" | "item";
 
-/**
- *  What made a note match, and where — so a card can show the line that put it in the
- *  results rather than its first three, which may have nothing to do with the query.
- */
+/**  What made a note match, and where. */
 export type SearchHit = {
 	field: SearchField,
-	/**  The matching **line**, not the whole body: a card has room for one. */
+	/**  The matching line, not the whole body: a card has room for one. */
 	excerpt: string,
 };
 
 /**
- *  Three fields rather than a map: a missing shortcut would be an action no key
- *  reaches any more, and a map would leave the compiler silent about it.
+ *  Three fields rather than a map, which would leave the compiler silent about a
+ *  missing shortcut.
  */
 export type ShortcutBindings = {
 	capture: string,
@@ -432,8 +371,8 @@ export type TrashedNote = {
 } & Note;
 
 /**
- *  Labels cross the bridge **already translated**: the interface language is a
- *  front-end preference, and a translation table in Rust would be a second one.
+ *  Labels cross the bridge already translated: the interface language is a front-end
+ *  preference, and a translation table in Rust would be a second one.
  */
 export type TrayLabels = {
 	open: string,
@@ -444,9 +383,8 @@ export type TrayLabels = {
 };
 
 /**
- *  Set from the preferences panel and pushed here, like the tray labels: the
- *  preference lives in `preferences.json`, and reading it back from Rust would be
- *  a second source to keep in step.
+ *  Pushed from the preferences panel like the tray labels: reading `preferences.json`
+ *  back from Rust would be a second source to keep in step.
  */
 export type WindowBehavior = {
 	closeToTray: boolean,
