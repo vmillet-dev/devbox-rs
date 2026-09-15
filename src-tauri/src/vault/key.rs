@@ -77,6 +77,42 @@ impl Vault {
         Aes256Gcm::new(&Key::<Aes256Gcm>::from(*self.key))
     }
 
+    /// `nonce ++ ciphertext ++ tag`, raw. What a file holds — a column holds the base64 of
+    /// this, because the columns are TEXT.
+    pub fn seal_bytes(&self, plaintext: &[u8]) -> Result<Vec<u8>, StorageError> {
+        let mut nonce = [0u8; NONCE_BYTES];
+        getrandom::fill(&mut nonce)
+            .map_err(|error| StorageError::Vault(format!("no randomness: {error}")))?;
+
+        let sealed = self
+            .cipher()
+            .encrypt((&nonce).into(), plaintext)
+            .map_err(|_| StorageError::Vault("could not seal a value".to_string()))?;
+
+        let mut joined = Vec::with_capacity(NONCE_BYTES + sealed.len());
+        joined.extend_from_slice(&nonce);
+        joined.extend_from_slice(&sealed);
+
+        Ok(joined)
+    }
+
+    /// ⚠️ Whole, never streamed: GCM only authenticates a message once all of it has been
+    /// seen, and handing back bytes before the tag is checked would defeat the point.
+    pub fn open_bytes(&self, sealed: &[u8]) -> Result<Vec<u8>, StorageError> {
+        if sealed.len() <= NONCE_BYTES {
+            return Err(StorageError::Vault(
+                "a file is too short to be sealed".to_string(),
+            ));
+        }
+
+        let (nonce, body) = sealed.split_at(NONCE_BYTES);
+        let nonce: &[u8; NONCE_BYTES] = nonce.try_into().expect("a checked length");
+
+        self.cipher()
+            .decrypt(nonce.into(), body)
+            .map_err(|_| StorageError::Vault("a file would not open".to_string()))
+    }
+
     /// `nonce ++ ciphertext ++ tag`, base64. The columns are TEXT, so what goes in one has
     /// to survive being read back as a string.
     pub fn seal(&self, plaintext: &str) -> Result<String, StorageError> {

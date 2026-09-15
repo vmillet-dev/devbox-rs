@@ -54,6 +54,13 @@ export const commands = {
 	/**
 	 *  ⚠️ The call starts from Rust: opening a path from the front end would mean allowing
 	 *  `opener:allow-open-path` over a whole directory.
+	 * 
+	 *  ⚠️ **This is the one place a decrypted copy reaches the disk.** Handing a file to the
+	 *  application the desktop chose for it means handing over a path, and that file has to
+	 *  be readable. The copy goes under a directory of ours in the OS temporary folder and is
+	 *  swept at the next launch — it cannot be deleted on close, because the application that
+	 *  opened it still holds it. The README says so; replacing this with "save as" was the
+	 *  alternative and was turned down, one click being the point.
 	 */
 	openAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("open_attachment", { id })),
 	/**  The path comes from a native picker; the write stays here. */

@@ -209,6 +209,10 @@ pub(crate) fn sweep(handle: &tauri::AppHandle) {
     if let Err(error) = attachments::sweep_orphan_files(handle, &db) {
         log::warn!("Orphan attachment files not swept: {error}");
     }
+    // ⚠️ The decrypted copies `open_attachment` had to write. They cannot be deleted on
+    // close — the application that opened one still holds it — so this is the guarantee:
+    // gone by the next launch.
+    attachments::sealed::sweep_plaintext();
 }
 
 /// ⚠️ Both are refused when there is no tray to find the window in (see `desktop`).

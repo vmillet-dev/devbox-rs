@@ -8,6 +8,7 @@
 
 pub mod file;
 pub mod key;
+pub mod migrate;
 
 use serde::Serialize;
 use specta::Type;
@@ -63,7 +64,54 @@ pub fn create_vault(passphrase: String, app: AppHandle, db: State<'_, Db>) -> Re
 
     let vault = file::create(&directory, &passphrase, Cost::default())?;
 
-    adopt(&app, &db, vault)
+    adopt(&app, &db, vault)?;
+
+    // ⚠️ After `adopt`, which is what opened the database: a library created a moment ago
+    // has nothing to seal, and one that predates the passphrase has everything.
+    seal_what_was_there(&app, &db)
+}
+
+/// ⚠️ The rows first, in one transaction, and the files after it commits. A file write
+/// does not roll back — a file left readable is recoverable, a row sealed twice is not.
+fn seal_what_was_there(app: &AppHandle, db: &State<'_, Db>) -> Result<(), AppError> {
+    let stored_names = {
+        let mut connection = crate::db::lock(db)?;
+        let done = {
+            let (connection, vault) = connection.split();
+            migrate::seal_existing(connection, vault)?
+        };
+
+        if done.is_empty() {
+            return Ok(());
+        }
+
+        log::info!(
+            "Sealed an existing library: {} note(s), {} space(s), {} item(s), {} value(s), {} attachment record(s)",
+            done.notes,
+            done.spaces,
+            done.items,
+            done.values,
+            done.attachments
+        );
+
+        crate::attachments::store::all_stored_names(&mut connection)?
+    };
+
+    let directory = crate::attachments::directory(app)?;
+    let connection = crate::db::lock(db)?;
+    let vault = connection.vault();
+
+    for name in stored_names {
+        let path = directory.join(&name);
+        // ⚠️ Best effort, one file at a time, and never fatal: a library whose notes are
+        // sealed is worth keeping even if one screenshot resisted. The alternative is
+        // refusing to start over a file nobody may ever open.
+        if let Err(error) = crate::attachments::sealed::seal_in_place(vault, &path) {
+            log::warn!("Attachment {name} left as it was: {error}");
+        }
+    }
+
+    Ok(())
 }
 
 /// ⚠️ Deliberately slow: deriving the key is the whole defence against someone trying
