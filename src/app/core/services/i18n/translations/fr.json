@@ -30,6 +30,7 @@
     "loading": "Chargement des notes…",
     "noResults": "Aucune note ne correspond à cette recherche.",
     "searchMatched": "{{count}} résultat(s)",
+    "clearFilters": "Tout afficher",
     "attachmentsCount": "{{count}} pièce(s) jointe(s)",
     "placeholdersCount": "{{count}} champ(s) à remplir",
     "selectNote": "Sélectionner la note {{title}}",
@@ -350,7 +351,7 @@
       "extendWithClick": "Étendre la sélection au clic",
       "trash": "Mettre à la corbeille",
       "undo": "Annuler la dernière suppression",
-      "clearSelection": "Vider la sélection"
+      "clearSelection": "Annuler la sélection, puis les filtres"
     },
     "editor": {
       "close": "Fermer l'éditeur en enregistrant",

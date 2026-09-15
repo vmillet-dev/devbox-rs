@@ -30,6 +30,7 @@
     "loading": "Loading notes…",
     "noResults": "No note matches this search.",
     "searchMatched": "{{count}} result(s)",
+    "clearFilters": "Show everything",
     "attachmentsCount": "{{count}} attachment(s)",
     "placeholdersCount": "{{count}} field(s) to fill",
     "selectNote": "Select note {{title}}",
@@ -350,7 +351,7 @@
       "extendWithClick": "Extend the selection with a click",
       "trash": "Send to the trash",
       "undo": "Undo the last deletion",
-      "clearSelection": "Clear the selection"
+      "clearSelection": "Clear the selection, then the filters"
     },
     "editor": {
       "close": "Close the editor, saving",

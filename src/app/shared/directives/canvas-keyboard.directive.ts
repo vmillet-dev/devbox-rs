@@ -4,12 +4,14 @@ import { DialogStack } from '@shared/layout/dialog/dialog-stack';
 import { Note } from '@core/model/note.model';
 import { NoteCopyService } from '@core/state/note-copy.service';
 import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { NotesQueryStore } from '@core/state/notes-query.store';
 import { NotesStore } from '@core/state/notes.store';
 import { CardBox, FocusDirection, nextFocusIndex } from '@core/utils/grid-navigation.util';
 
 interface CanvasContext {
   readonly focused: Note | null;
   readonly notes: NotesStore;
+  readonly canvas: NotesQueryStore;
   readonly selection: NoteSelectionStore;
   readonly copy: (content: string) => void;
   readonly move: (direction: FocusDirection) => void;
@@ -112,7 +114,11 @@ const CANVAS_KEYS: readonly CanvasKey[] = [
     keys: ['Escape'],
     labelKey: 'shortcuts.canvas.clearSelection',
     on: ['Escape'],
-    run: ({ selection }) => when(selection.hasSelection(), () => selection.clearSelection()),
+    // Falls through: the selection first, then the filters. Both are states the canvas
+    // is *in*, and Escape is the key for leaving one.
+    run: ({ selection, canvas }) =>
+      when(selection.hasSelection(), () => selection.clearSelection()) ||
+      when(canvas.matched() !== null, () => canvas.clearFilters()),
   },
 ];
 
@@ -144,6 +150,7 @@ export class CanvasKeyboardDirective {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly selection = inject(NoteSelectionStore);
   private readonly notes = inject(NotesStore);
+  private readonly canvas = inject(NotesQueryStore);
   private readonly copier = inject(NoteCopyService);
   private readonly dialogs = inject(DialogStack);
 
@@ -169,6 +176,7 @@ export class CanvasKeyboardDirective {
     return {
       focused: this.selection.focusedNote(),
       notes: this.notes,
+      canvas: this.canvas,
       selection: this.selection,
       copy: (content) => void this.copier.copy(content),
       move: (direction) => this.moveFocus(direction),

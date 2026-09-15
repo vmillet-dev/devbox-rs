@@ -182,6 +182,83 @@ describe('NotesQueryStore', () => {
     });
   });
 
+  /**
+   * The search, the tags and the languages were each undone where they were set — three
+   * bands of the header, one gesture apiece. This is the way out in one.
+   */
+  describe('clearing the filters', () => {
+    it('drops the search, the tags and the languages together', async () => {
+      const { canvas, repository } = await createNotesHarness([createNote()]);
+      canvas.setSearchQuery('deploy');
+      canvas.toggleTag('urgent');
+      canvas.toggleLanguage('json');
+      // ⚠️ Waited for: the params are a `computed` feeding a `resource`, so three setters
+      // undone before it runs would collapse to no change at all and prove nothing.
+      await vi.waitFor(() => expect(repository.lastQuery?.search).toBe('deploy'));
+      const before = repository.queryCount;
+
+      canvas.clearFilters();
+      await awaitQuery(repository, before);
+
+      expect(repository.lastQuery?.search).toBe('');
+      expect(repository.lastQuery?.tags).toEqual([]);
+      expect(repository.lastQuery?.languages).toEqual([]);
+      // The field is what the user is looking at, and it has to look empty too.
+      expect(canvas.searchQuery()).toBe('');
+    });
+
+    /**
+     * ⚠️ Not through `setSearchQuery`: its debounce would leave the canvas filtered for
+     * another 150 ms after the user asked it not to be.
+     */
+    it('takes the search out of the query without waiting for the debounce', async () => {
+      const { canvas, repository } = await createNotesHarness([createNote()]);
+      canvas.setSearchQuery('deploy');
+      await vi.waitFor(() => expect(repository.lastQuery?.search).toBe('deploy'));
+      const before = repository.queryCount;
+
+      canvas.clearFilters();
+      await awaitQuery(repository, before);
+
+      expect(repository.lastQuery?.search).toBe('');
+    });
+
+    /**
+     * ⚠️ Clearing has to **cancel** the pending call, not merely set the signals past it.
+     * A keystroke from a moment ago is still on its way; it lands 150 ms later and puts
+     * the query back, so the canvas filters itself again with an empty field to explain
+     * it. Setting the two signals alone left exactly that.
+     *
+     * Real timers here, and a real wait: the bug needs the debounce to actually elapse,
+     * and faking it only proves the assertion ran before the timer did.
+     */
+    it('drops a keystroke still in flight when the filters are cleared', async () => {
+      const { canvas, repository } = await createNotesHarness([createNote()]);
+      const query = vi.spyOn(repository, 'query');
+
+      canvas.setSearchQuery('deploy');
+      canvas.clearFilters();
+      await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_MS * 3));
+
+      const searched = query.mock.calls.map(([sent]) => sent.search);
+      expect(searched).not.toContain('deploy');
+      expect(canvas.searchQuery()).toBe('');
+    });
+
+    it('leaves the quick filter alone, which has a control of its own', async () => {
+      const { canvas, repository } = await createNotesHarness([createNote()]);
+      canvas.setFilter('pinned');
+      canvas.toggleTag('urgent');
+      const before = repository.queryCount;
+
+      canvas.clearFilters();
+      await awaitQuery(repository, before);
+
+      expect(repository.lastQuery?.filter).toBe('pinned');
+      expect(canvas.activeFilter()).toBe('pinned');
+    });
+  });
+
   describe('search debounce', () => {
     beforeEach(() => {
       // Only Date and timers: faking requestAnimationFrame would hang the

@@ -1,7 +1,7 @@
 import { $, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
-import { cursorOf, reloadCanvas, testid } from '../support/app.js';
+import { blur, cursorOf, press, reloadCanvas, testid } from '../support/app.js';
 import { bridge, draft, homeSpaceId } from '../support/bridge.js';
 
 /**
@@ -110,6 +110,35 @@ describe('Search, filters and facets', () => {
 
     it('hides the count again once nothing is being filtered', async () => {
       await canvas.clearSearch();
+      expect(await $(testid('search-matched')).isExisting()).toBe(false);
+    });
+
+    /**
+     * The search, the tags and the languages were undone one at a time, each where it was
+     * set — three bands of the header. The count doubles as the way out of all three.
+     */
+    it('drops the search, the tag and the language in one click', async () => {
+      await canvas.search('Docker');
+      await canvas.toggleTag('ops');
+      await canvas.toggleLanguage('sh');
+
+      await $(testid('search-matched')).click();
+      await canvas.open();
+
+      expect(await $(testid('search-input')).getValue()).toBe('');
+      expect(await $(testid('search-matched')).isExisting()).toBe(false);
+      expect(await canvas.tagPill('ops').getAttribute('aria-pressed')).toBe('false');
+      expect(await canvas.languageChip('sh').getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('does the same on Escape, once there is no selection to clear', async () => {
+      await canvas.search('Docker');
+      // ⚠️ Focus has to leave the field: the canvas keyboard ignores a keystroke aimed at
+      // an input, which is what leaves Ctrl+K and typing alone.
+      await blur();
+      await press('Escape');
+      await canvas.open();
+
       expect(await $(testid('search-matched')).isExisting()).toBe(false);
     });
 

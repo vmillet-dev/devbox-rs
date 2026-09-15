@@ -40,8 +40,29 @@
 
 // Takes the shortcut hint's place, and its alignment with it.
 .count {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   margin-left: auto;
   white-space: nowrap;
   font-size: 11px;
   color: var(--text-2);
+  cursor: pointer;
+}
+
+.count:hover,
+.count:focus-visible {
+  color: var(--amber);
+}
+
+.count:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.count-clear {
+  font-size: 10px;
 }
