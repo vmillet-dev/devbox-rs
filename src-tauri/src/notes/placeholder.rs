@@ -19,6 +19,8 @@ pub struct Placeholder {
     pub value: String,
 }
 
+/// ⚠️ Mirrored by `isVariableName` (`core/model/variable.model.ts`), which only says so
+/// before a badly named row vanishes on save. This is where the rule lives.
 fn is_field_name(name: &str) -> bool {
     !name.is_empty()
         && name
