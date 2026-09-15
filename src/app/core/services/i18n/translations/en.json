@@ -172,7 +172,9 @@
     "attachmentOpenFailed": "Could not open the attachment with an application.",
     "attachmentSaveFailed": "Could not save the attachment to that location.",
     "variablesLoadFailed": "Could not load the variables.",
-    "variablesSaveFailed": "Could not save the variables."
+    "variablesSaveFailed": "Could not save the variables.",
+    "unlockFailed": "Unlocking failed.",
+    "vaultStateFailed": "Could not tell whether the library is encrypted."
   },
   "tray": {
     "open": "Open {{app}}",
@@ -486,5 +488,19 @@
     "empty": "No release described yet.",
     "installed": "installed",
     "close": "Close"
+  },
+  "vault": {
+    "createTitle": "Protect this library",
+    "createLead": "Choose a passphrase. {{app}} will ask for it once at every launch.",
+    "noRecovery": "⚠️ This passphrase cannot be recovered. Lose it and the library goes with it — a plaintext export is the only copy that does not depend on it.",
+    "unlockTitle": "Unlock the library",
+    "unlockLead": "Enter your passphrase to open your notes.",
+    "passphrase": "Passphrase",
+    "confirmation": "Confirmation",
+    "tooShort": "At least {{length}} characters.",
+    "mismatched": "The two entries differ.",
+    "createAction": "Protect and continue",
+    "unlockAction": "Unlock",
+    "working": "Unlocking…"
   }
 }

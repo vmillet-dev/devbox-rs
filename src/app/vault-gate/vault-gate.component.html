@@ -1,0 +1,64 @@
+<main class="gate">
+  <form class="panel" (submit)="submit($event)">
+    <h1 class="title">
+      {{ (isCreating() ? 'vault.createTitle' : 'vault.unlockTitle') | transloco }}
+    </h1>
+    <p class="lead">
+      {{ (isCreating() ? 'vault.createLead' : 'vault.unlockLead') | transloco }}
+    </p>
+
+    <!-- ⚠️ Said once, at the only moment it can still be acted on. -->
+    @if (isCreating()) {
+      <p class="warning" role="note">{{ 'vault.noRecovery' | transloco }}</p>
+    }
+
+    <label class="field">
+      <span class="label">{{ 'vault.passphrase' | transloco }}</span>
+      <input
+        class="input"
+        type="password"
+        autocomplete="off"
+        spellcheck="false"
+        [value]="passphrase()"
+        [attr.aria-invalid]="vault.refused() || tooShort() ? 'true' : null"
+        [attr.aria-describedby]="vault.refused() || tooShort() ? 'vault-problem' : null"
+        (input)="onPassphrase($any($event.target).value)"
+        data-testid="vault-passphrase"
+        #passphraseField
+      />
+    </label>
+
+    @if (isCreating()) {
+      <label class="field">
+        <span class="label">{{ 'vault.confirmation' | transloco }}</span>
+        <input
+          class="input"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          [value]="confirmation()"
+          (input)="onConfirmation($any($event.target).value)"
+          data-testid="vault-confirmation"
+        />
+      </label>
+    }
+
+    <!-- One line, whichever problem is current: two stacked would read as two faults. -->
+    <p class="problem" id="vault-problem" role="status" data-testid="vault-problem">
+      @if (vault.refused()) {
+        {{ 'errors.wrongPassphrase' | transloco }}
+      } @else if (tooShort()) {
+        {{ 'vault.tooShort' | transloco: { length: minimumLength } }}
+      } @else if (mismatched()) {
+        {{ 'vault.mismatched' | transloco }}
+      }
+    </p>
+
+    <button class="submit" type="submit" [disabled]="!canSubmit()" data-testid="vault-submit">
+      {{
+        (vault.isWorking() ? 'vault.working' : isCreating() ? 'vault.createAction' : 'vault.unlockAction')
+          | transloco
+      }}
+    </button>
+  </form>
+</main>

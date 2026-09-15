@@ -172,7 +172,9 @@
     "attachmentOpenFailed": "Impossible d'ouvrir la pièce jointe avec une application.",
     "attachmentSaveFailed": "Impossible d'enregistrer la pièce jointe à cet emplacement.",
     "variablesLoadFailed": "Impossible de charger les variables.",
-    "variablesSaveFailed": "Impossible d'enregistrer les variables."
+    "variablesSaveFailed": "Impossible d'enregistrer les variables.",
+    "unlockFailed": "Le déverrouillage a échoué.",
+    "vaultStateFailed": "Impossible de savoir si la bibliothèque est chiffrée."
   },
   "tray": {
     "open": "Ouvrir {{app}}",
@@ -486,5 +488,19 @@
     "empty": "Aucune version décrite pour l'instant.",
     "installed": "installée",
     "close": "Fermer"
+  },
+  "vault": {
+    "createTitle": "Protéger cette bibliothèque",
+    "createLead": "Choisissez une phrase de passe. Elle sera demandée à chaque lancement de {{app}}, une seule fois.",
+    "noRecovery": "⚠️ Cette phrase ne peut pas être récupérée. Perdue, la bibliothèque l’est aussi — un export en clair est la seule copie qui n’en dépend pas.",
+    "unlockTitle": "Déverrouiller la bibliothèque",
+    "unlockLead": "Entrez votre phrase de passe pour ouvrir vos notes.",
+    "passphrase": "Phrase de passe",
+    "confirmation": "Confirmation",
+    "tooShort": "Au moins {{length}} caractères.",
+    "mismatched": "Les deux saisies diffèrent.",
+    "createAction": "Protéger et continuer",
+    "unlockAction": "Déverrouiller",
+    "working": "Déverrouillage…"
   }
 }
