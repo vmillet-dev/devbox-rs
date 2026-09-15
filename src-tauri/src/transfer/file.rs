@@ -67,6 +67,7 @@ mod tests {
             spaces: vec![Space {
                 id: "s-1".to_string(),
                 name: "Personal".to_string(),
+                pinned: false,
             }],
             notes: vec![sample()],
         }

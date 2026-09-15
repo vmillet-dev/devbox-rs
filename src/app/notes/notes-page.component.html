@@ -5,6 +5,7 @@
     (spaceChanged)="spaces.selectSpace($event)"
     (spaceCreated)="spaces.createSpace($event)"
     (spaceRenamed)="onSpaceRenamed($event)"
+    (pinRequested)="spaces.togglePinned($event)"
     (spaceDeleted)="onSpaceDeleted($event)"
   />
   <app-search-box

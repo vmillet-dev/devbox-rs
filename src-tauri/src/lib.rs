@@ -34,7 +34,7 @@ use notes::{
     query_notes, rename_tag, restore_notes, set_global_placeholders, set_placeholder_values,
     tag_notes, update_note,
 };
-use spaces::{create_space, delete_space, list_spaces, rename_space};
+use spaces::{create_space, delete_space, list_spaces, pin_space, rename_space};
 use transfer::{export_notes, export_selection, import_notes, share_notes};
 
 /// Resolved from the manifest and not from the current directory: a relative path
@@ -78,6 +78,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             list_spaces,
             create_space,
             rename_space,
+            pin_space,
             delete_space,
             attach_file,
             attach_clipboard_image,

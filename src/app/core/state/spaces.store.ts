@@ -95,6 +95,24 @@ export class SpacesStore {
   }
 
   /**
+   * ⚠️ Reloads rather than patching the one row. Pinning changes the **order** of the
+   * list, and the order is the back end's — putting the returned space back where it
+   * was would leave it flagged and still buried.
+   */
+  async togglePinned(id: string): Promise<boolean> {
+    const current = this.spaces().find((space) => space.id === id);
+    if (!current) return false;
+
+    const updated = await this.notifier.attempt('errors.spacePinFailed', () =>
+      this.repository.setPinned(id, !current.pinned),
+    );
+    if (!updated) return false;
+
+    this.spacesResource.reload();
+    return true;
+  }
+
+  /**
    * `targetSpaceId` becomes active: the notes have just landed there, and falling
    * back to "all spaces" would lose sight of where they went.
    */

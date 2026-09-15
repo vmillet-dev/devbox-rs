@@ -8,6 +8,7 @@ diesel::table! {
     spaces (id) {
         id -> Text,
         name -> Text,
+        pinned -> Bool,
     }
 }
 

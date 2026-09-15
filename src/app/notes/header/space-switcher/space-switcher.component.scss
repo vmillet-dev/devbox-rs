@@ -211,3 +211,39 @@
   font-size: 11px;
   color: var(--text-2);
 }
+
+// In the edit panel with the rename and the delete, not in the row: the row is the
+// space's own click surface and already carries the ⋯ that opens this.
+.space-pin-toggle {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.space-pin-toggle:hover {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+
+.space-pin-toggle.on {
+  color: var(--amber);
+}
+
+.space-pin-toggle:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+// Small, and before the name: it says where the space sits in the order.
+.space-pin-mark {
+  font-size: 9px;
+  margin-right: 4px;
+}

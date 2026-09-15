@@ -20,7 +20,7 @@ describe('NoteSectionComponent', () => {
     TestBed.configureTestingModule({
       imports: [NoteSectionComponent],
       // A draft needs somewhere to be filed: creating with no space is refused.
-      providers: [provideAppTesting({ spaces: [{ id: 'space-1', name: 'Space one' }] })],
+      providers: [provideAppTesting({ spaces: [{ id: 'space-1', name: 'Space one', pinned: false }] })],
     });
     fixture = TestBed.createComponent(NoteSectionComponent);
     fixture.componentRef.setInput('section', createSection('today'));

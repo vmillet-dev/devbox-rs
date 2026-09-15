@@ -5,9 +5,9 @@ import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { NoteCardMenuComponent } from './note-card-menu.component';
 
 const SPACES: readonly Space[] = [
-  { id: 'work', name: 'Work' },
-  { id: 'personal', name: 'Personal' },
-  { id: 'archive', name: 'Archive' },
+  { id: 'work', name: 'Work', pinned: false },
+  { id: 'personal', name: 'Personal', pinned: false },
+  { id: 'archive', name: 'Archive', pinned: false },
 ];
 
 describe('NoteCardMenuComponent', () => {

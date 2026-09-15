@@ -56,6 +56,8 @@ export const commands = {
 	listSpaces: () => typedError<Space[], AppError>(__TAURI_INVOKE("list_spaces")),
 	createSpace: (draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("create_space", { draft })),
 	renameSpace: (id: string, draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("rename_space", { id, draft })),
+	/**  Hoists a space to the head of the list, or lets it fall back among the others. */
+	pinSpace: (id: string, pinned: boolean) => typedError<Space, AppError>(__TAURI_INVOKE("pin_space", { id, pinned })),
 	deleteSpace: (id: string, targetSpaceId: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_space", { id, targetSpaceId })),
 	attachFile: (noteId: string, path: string) => typedError<Attachment, AppError>(__TAURI_INVOKE("attach_file", { noteId, path })),
 	/**
@@ -410,6 +412,8 @@ export type Space = {
 	id: string,
 	/**  Uniqueness is case-insensitive, decided by persistence. */
 	name: string,
+	/**  Hoisted to the head of the list, the way a pinned note is on the canvas. */
+	pinned?: boolean,
 };
 
 export type SpaceDraft = {

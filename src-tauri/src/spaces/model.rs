@@ -12,6 +12,9 @@ pub struct Space {
     pub id: String,
     /// Uniqueness is case-insensitive, decided by persistence.
     pub name: String,
+    /// Hoisted to the head of the list, the way a pinned note is on the canvas.
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]

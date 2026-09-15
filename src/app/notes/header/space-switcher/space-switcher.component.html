@@ -20,6 +20,18 @@
         <div class="space-edit-panel">
           <p class="space-edit-title">{{ edited.name }}</p>
 
+          <button
+            type="button"
+            class="space-pin-toggle"
+            data-testid="space-pin"
+            [class.on]="edited.pinned"
+            [attr.aria-pressed]="edited.pinned"
+            (click)="pinRequested.emit(edited.id)"
+          >
+            <span aria-hidden="true">📌</span>
+            {{ (edited.pinned ? 'notes.unpinSpace' : 'notes.pinSpace') | transloco }}
+          </button>
+
           <form class="space-create-form" (submit)="submitRename($event, renameInput.value)">
             <input
               #renameInput
@@ -114,6 +126,10 @@
                 [attr.aria-checked]="space.id === activeSpace()?.id"
                 (click)="select(space)"
               >
+                @if (space.pinned) {
+                  <span class="space-pin-mark" aria-hidden="true">📌</span>
+                  <span class="visually-hidden">{{ 'notes.pinnedSpace' | transloco }}</span>
+                }
                 {{ space.name }}
               </button>
               <button

@@ -17,8 +17,8 @@ import { NoteActivation, NoteCardComponent } from './note-card.component';
 const NEWLINE = String.fromCharCode(10);
 
 const SPACES: readonly Space[] = [
-  { id: 'work', name: 'Work' },
-  { id: 'personal', name: 'Personal' },
+  { id: 'work', name: 'Work', pinned: false },
+  { id: 'personal', name: 'Personal', pinned: false },
 ];
 
 describe('NoteCardComponent', () => {

@@ -10,16 +10,49 @@ use uuid::Uuid;
 /// An empty list is valid: it is the state of the first launch.
 pub fn list(connection: &mut SqliteConnection) -> Result<Vec<Space>, StorageError> {
     let rows = spaces::table
-        .select((spaces::id, spaces::name))
+        .select((spaces::id, spaces::name, spaces::pinned))
+        // Pinned first, then by name — the same shape the canvas gives notes.
+        .order(spaces::pinned.desc())
         // Raw fragment: Diesel does not model collations, and sorting as BINARY
         // would place "personal" after "Zebra".
-        .order(sql::<Text>("name COLLATE NOCASE"))
-        .load::<(String, String)>(connection)?;
+        .then_order_by(sql::<Text>("name COLLATE NOCASE"))
+        .load::<(String, String, bool)>(connection)?;
 
     Ok(rows
         .into_iter()
-        .map(|(id, name)| Space { id, name })
+        .map(|(id, name, pinned)| Space { id, name, pinned })
         .collect())
+}
+
+/// Reads one back, so a write answers with the row rather than with what it sent —
+/// a rename must not quietly drop whether the space was pinned.
+fn find(connection: &mut SqliteConnection, id: &str) -> Result<Space, StorageError> {
+    spaces::table
+        .find(id)
+        .select((spaces::id, spaces::name, spaces::pinned))
+        .first::<(String, String, bool)>(connection)
+        .optional()?
+        .map(|(id, name, pinned)| Space { id, name, pinned })
+        .ok_or_else(|| StorageError::SpaceNotFound(id.to_string()))
+}
+
+/// Hoists a space to the head of the list, or lets it fall back among the others.
+pub fn set_pinned(
+    connection: &mut SqliteConnection,
+    id: &str,
+    pinned: bool,
+) -> Result<Space, StorageError> {
+    connection.transaction(|connection| {
+        if !exists(connection, id)? {
+            return Err(StorageError::SpaceNotFound(id.to_string()));
+        }
+
+        diesel::update(spaces::table.find(id))
+            .set(spaces::pinned.eq(pinned))
+            .execute(connection)?;
+
+        find(connection, id)
+    })
 }
 
 /// The foreign key would catch it too, but with an unreadable SQLite message
@@ -74,6 +107,7 @@ pub fn create(connection: &mut SqliteConnection, name: &str) -> Result<Space, St
         let space = Space {
             id: Uuid::new_v4().to_string(),
             name: name.to_string(),
+            pinned: false,
         };
 
         diesel::insert_into(spaces::table)
@@ -100,10 +134,7 @@ pub fn rename(
             .set(spaces::name.eq(name))
             .execute(connection)?;
 
-        Ok(Space {
-            id: id.to_string(),
-            name: name.to_string(),
-        })
+        find(connection, id)
     })
 }
 

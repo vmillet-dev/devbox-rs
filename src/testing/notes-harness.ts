@@ -28,8 +28,8 @@ export interface NotesHarness {
 
 /** `space-1` is the space the note fixture belongs to. */
 export const HARNESS_SPACES: readonly Space[] = [
-  { id: 'space-1', name: 'Space one' },
-  { id: 'space-2', name: 'Space two' },
+  { id: 'space-1', name: 'Space one', pinned: false },
+  { id: 'space-2', name: 'Space two', pinned: false },
 ];
 
 export async function createNotesHarness(
