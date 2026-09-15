@@ -2,7 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LocaleService } from '@core/services/i18n/locale.service';
-import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
+import { VaultStore } from '@core/state/vault.store';
+import { provideAppTesting } from '@testing/testing.providers';
 import { TitlebarComponent } from './titlebar.component';
 
 describe('TitlebarComponent', () => {
@@ -18,11 +19,21 @@ describe('TitlebarComponent', () => {
     Object.defineProperty(navigator, 'language', { value: tag, configurable: true });
   }
 
+  /** The titlebar is on screen before the library is, so a spec has to say which. */
+  async function unlock(): Promise<void> {
+    await TestBed.inject(VaultStore).load();
+    await fixture.whenStable();
+  }
+
+  function menus(): HTMLElement {
+    return fixture.nativeElement.querySelector('.titlebar-menus');
+  }
+
   beforeEach(() => {
     TestBed.resetTestingModule();
     localStorage.clear();
     stubSystemLanguage('fr-FR');
-    TestBed.configureTestingModule({ imports: [TitlebarComponent], providers: [provideTranslocoTesting()] });
+    TestBed.configureTestingModule({ imports: [TitlebarComponent], providers: [provideAppTesting()] });
     fixture = TestBed.createComponent(TitlebarComponent);
     fixture.autoDetectChanges();
   });
@@ -41,13 +52,24 @@ describe('TitlebarComponent', () => {
     expect(fixture.nativeElement.querySelector('.dots').getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('groups the menus on the left, ahead of the title', () => {
-    const menus = fixture.nativeElement.querySelector('.titlebar-menus');
+  it('groups the menus on the left, ahead of the title', async () => {
+    await unlock();
     const title = fixture.nativeElement.querySelector('.titlebar-title');
 
-    expect(menus.querySelector('app-file-menu')).not.toBeNull();
-    expect(menus.querySelector('app-about-menu')).not.toBeNull();
-    expect(menus.compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(menus().querySelector('app-file-menu')).not.toBeNull();
+    expect(menus().querySelector('app-about-menu')).not.toBeNull();
+    expect(menus().compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  /** ⚠️ Every File entry acts on the library, and the component itself injects
+   *  `SpacesStore`, which would query a database nobody has opened yet. */
+  it('keeps the File menu out of the titlebar until the library is open', async () => {
+    expect(menus().querySelector('app-file-menu')).toBeNull();
+    expect(menus().querySelector('app-about-menu')).not.toBeNull();
+
+    await unlock();
+
+    expect(menus().querySelector('app-file-menu')).not.toBeNull();
   });
 
   it('renders a locale option per available locale, marking French active by default', () => {
