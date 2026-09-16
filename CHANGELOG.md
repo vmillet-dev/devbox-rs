@@ -12,6 +12,29 @@ Keep the shape — a `## ` heading per release, `### ` headings for the categori
 bullet per entry — or the entry will not be rendered. It is deliberately untranslated, like
 the release notes the updater hands over.
 
+## [0.2.0] - 2026-09-16
+
+### ✨ Added
+
+- Say what a bulk action touches, and offer to take it back (#146)
+- Check the library is sound, and offer a way out when it is not (#145)
+- Take a rolling copy of the library at launch (#144)
+- Declare the two mirrored rules once, in Rust (#142)
+- Give the four files with no spec one each (#141)
+- Encrypt the library at rest, behind a passphrase (#135)
+
+### 🐛 Fixed
+
+- Write only the columns an edit moved (#140)
+- Compare the query params exhaustively, like the patch table next door (#139)
+- Seed the first launch as one write (#138)
+- Let a storage failure reach the screen instead of killing the launch (#137)
+- Choose the durability rather than inherit it (#136)
+
+### 🧰 Under the hood
+
+- Measure what a query costs as the corpus grows (#143)
+
 ## [0.1.4] - 2026-09-16
 
 ### ✨ Added
