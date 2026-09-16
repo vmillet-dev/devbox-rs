@@ -12,6 +12,54 @@ Keep the shape — a `## ` heading per release, `### ` headings for the categori
 bullet per entry — or the entry will not be rendered. It is deliberately untranslated, like
 the release notes the updater hands over.
 
+## [0.1.4] - 2026-09-16
+
+### ✨ Added
+
+- Measure what the commands cost, and save a baseline (#126)
+- Let a space be pinned to the head of the list (#125)
+- Leave a filtered canvas in one gesture (#123)
+- Say how many notes a search matched, and why each one is there (#112)
+- Give a card's body the line the badge row was taking (#111)
+- Let an update be silenced, and say it is still there (#100)
+- Remember the window's size and position (#99)
+- Add Rust, Go, Java, C#, PHP and C to the language list (#96)
+
+### 🔧 Changed
+
+- Let a red E2E leg block the run (#109)
+
+### 🐛 Fixed
+
+- Show a todo list the item a search found it by (#124)
+- Keep the tag rail's Manage button out of the row that scrolls (#122)
+- Make the e2e suite tell the truth, and fix what it was telling (#101)
+- Degrade a bundle from a newer version instead of refusing it whole (#95)
+- Fold the accents in search, not just the case (#94)
+- Give every text field its text cursor back (#93)
+- Make fullscreen actually fill the screen (#92)
+- Align the attachments band with the editor's other bands (#90)
+
+### 🧰 Under the hood
+
+- Keep the comments that say what the code cannot (#128)
+- Refilm the README, and drop the screenshot the GIF repeats (#113)
+- Give a card title its width back, and plant the pin in the corner (#114)
+- Say which platforms DevBox ships for, and stop implying macOS (#110)
+- Make the e2e suite pass, and fix the data loss it was reporting
+- Film the README on a full board (#105)
+- Show a note created while its editor was closing (#104)
+- Make the README a front door (#103)
+- Bump the rust-minor group across 1 directory with 8 updates (#91)
+- Bump eslint from 9.39.5 to 10.10.0 (#89)
+- Bump @eslint/js from 9.39.5 to 10.0.1 (#87)
+- Bump png from 0.17.16 to 0.18.1 in /src-tauri (#84)
+- Bump the npm-minor group with 15 updates (#86)
+- Bump base64 from 0.22.1 to 0.23.1 in /src-tauri (#85)
+- Bump toml from 0.9.12+spec-1.1.0 to 1.1.3+spec-1.1.0 in /src-tauri (#83)
+- Bump the actions group with 7 updates (#81)
+- Review the Rust back-end (#75)
+
 ## [0.1.3] - 2026-09-13
 
 ### ✨ Added
