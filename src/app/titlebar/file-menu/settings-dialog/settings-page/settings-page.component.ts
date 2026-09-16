@@ -82,6 +82,10 @@ export class SettingsPageComponent {
     this.settings.setShowPinnedFirst(checkedValue(event));
   }
 
+  protected onAutomaticBackups(event: Event): void {
+    this.settings.setAutomaticBackups(checkedValue(event));
+  }
+
   protected onCopyConfirmation(event: Event): void {
     this.settings.setCopyConfirmation(checkedValue(event));
   }

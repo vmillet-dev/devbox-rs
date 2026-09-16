@@ -92,11 +92,25 @@ describe('SettingsPageComponent', () => {
     toggle('setting-close-to-tray').click();
     toggle('setting-pinned-first').click();
     toggle('setting-copy-confirmation').click();
+    toggle('setting-automatic-backups').click();
     await fixture.whenStable();
 
     expect(settings.closeToTray()).toBe(false);
     expect(settings.showPinnedFirst()).toBe(false);
     expect(settings.copyConfirmation()).toBe(false);
+    expect(settings.automaticBackups()).toBe(false);
+  });
+
+  /** ⚠️ Rust reads this at launch, before the front end exists — turning it off has to
+   *  reach the preferences file, which is the only thing the back end sees. */
+  it('shows the copies as on, and writes the choice through', async () => {
+    expect(toggle('setting-automatic-backups').checked).toBe(true);
+
+    toggle('setting-automatic-backups').click();
+    await fixture.whenStable();
+
+    expect(settings.automaticBackups()).toBe(false);
+    expect(toggle('setting-automatic-backups').checked).toBe(false);
   });
 
   describe('the update entry', () => {

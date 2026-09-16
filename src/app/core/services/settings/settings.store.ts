@@ -67,6 +67,7 @@ export class SettingsStore {
   readonly closeToTray = this.setting('closeToTray', asBoolean);
   readonly paletteShortcut = this.setting('paletteShortcut', asAccelerator);
   readonly showPinnedFirst = this.setting('showPinnedFirst', asBoolean);
+  readonly automaticBackups = this.setting('automaticBackups', asBoolean);
   readonly copyConfirmation = this.setting('copyConfirmation', asBoolean);
   readonly updateNotifications = this.setting('updateNotifications', asBoolean);
   readonly skippedUpdate = this.setting('skippedUpdate', asText);
@@ -129,6 +130,10 @@ export class SettingsStore {
 
   setShowPinnedFirst(enabled: boolean): void {
     this.showPinnedFirst.write(enabled);
+  }
+
+  setAutomaticBackups(enabled: boolean): void {
+    this.automaticBackups.write(enabled);
   }
 
   setCopyConfirmation(enabled: boolean): void {

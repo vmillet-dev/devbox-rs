@@ -151,6 +151,22 @@
     </div>
 
     <p class="setting-note">{{ 'settings.security.note' | transloco }}</p>
+
+    <div class="setting-row">
+      <label class="setting-label" for="setting-automatic-backups">
+        {{ 'settings.security.automaticBackups' | transloco }}
+      </label>
+      <input
+        id="setting-automatic-backups"
+        class="setting-switch"
+        type="checkbox"
+        data-testid="setting-automatic-backups"
+        [checked]="settings.automaticBackups()"
+        (change)="onAutomaticBackups($event)"
+      />
+    </div>
+
+    <p class="setting-note">{{ 'settings.security.backupsNote' | transloco }}</p>
   </section>
 
   <section class="setting-group">

@@ -22,6 +22,10 @@ use crate::vault::file::FILE_NAME as VAULT_FILE_NAME;
 
 pub(crate) const DIRECTORY: &str = "backups";
 
+/// Where the front end writes its preferences, and the key it writes this one under.
+const PREFERENCES: &str = "preferences.json";
+const SETTING: &str = "devbox.automaticBackups";
+
 /// How many are kept. Enough to reach past the launch that went wrong without turning the
 /// data directory into a second library.
 pub(crate) const KEEP: usize = 3;
@@ -110,9 +114,35 @@ pub(crate) fn rotate(
     Ok(Some(target))
 }
 
+/// ⚠️ Anything but a plain `"false"` keeps the copies. A preferences file that is
+/// missing, truncated, or written by a version that spells this differently must not
+/// silently switch a safety net off — the only thing that turns it off is somebody
+/// turning it off.
+pub(crate) fn wanted(stored: Option<&str>) -> bool {
+    stored != Some("false")
+}
+
+/// ⚠️ Read from the preferences file rather than handed over by the front end: the copy
+/// is taken at unlock, before the front has booted far enough to tell anyone anything.
+fn wanted_by_preference(app: &AppHandle) -> bool {
+    use tauri_plugin_store::StoreExt;
+
+    let stored = app
+        .store(PREFERENCES)
+        .ok()
+        .and_then(|store| store.get(SETTING))
+        .and_then(|value| value.as_str().map(str::to_owned));
+
+    wanted(stored.as_deref())
+}
+
 /// The launch copy. ⚠️ Never fatal and never in the way: a library that cannot be
 /// copied still has to open.
 pub(crate) fn take(app: &AppHandle, db: &crate::db::Db) {
+    if !wanted_by_preference(app) {
+        return;
+    }
+
     let Ok(directory) = app.path().app_data_dir() else {
         return;
     };
@@ -261,6 +291,17 @@ mod tests {
         // The newest survive, not the first ones taken.
         assert_eq!(taken_at(&kept[0]).unwrap(), at(5 * 25));
         std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// ⚠️ Fail safe: only a deliberate "false" stops the copies.
+    #[test]
+    fn only_a_preference_turning_them_off_turns_them_off() {
+        assert!(wanted(Some("true")));
+        assert!(wanted(None), "a missing preference keeps the copies");
+        assert!(wanted(Some("")), "a truncated value keeps them too");
+        assert!(wanted(Some("False")), "and anything this build cannot read");
+
+        assert!(!wanted(Some("false")));
     }
 
     /// A directory somebody dropped in there is not a backup, and must not hold the

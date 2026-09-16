@@ -80,7 +80,8 @@ database without the key file and you have copied something nobody can open agai
 DevBox takes a **rolling copy at launch**, at most one a day, and keeps the last three in
 `backups/`. Each one is a full library — database and key file together — so restoring is
 copying a folder back. It is written with `VACUUM INTO` rather than by copying the file,
-because under WAL the database on its own is not a consistent snapshot.
+because under WAL the database on its own is not a consistent snapshot. Turn it off in
+Preferences → Security if you would rather it did not.
 
 ⚠️ These copies sit **next to the original**, which is the accident they cover: an emptied
 trash, a botched update, a file gone wrong. They are not a defence against a dead disk.

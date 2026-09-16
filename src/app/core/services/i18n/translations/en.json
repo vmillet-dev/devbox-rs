@@ -441,7 +441,9 @@
       "current": "Current passphrase",
       "next": "New passphrase",
       "cancel": "Cancel",
-      "changed": "Passphrase changed."
+      "changed": "Passphrase changed.",
+      "automaticBackups": "Copy the library at launch",
+      "backupsNote": "At most one copy a day, the last three kept beside the library — enough for an emptied trash or an update gone wrong. Not a defence against a dead disk: export somewhere else for that."
     },
     "notifications": {
       "title": "Notifications",
