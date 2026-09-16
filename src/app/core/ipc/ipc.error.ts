@@ -25,6 +25,7 @@ const IPC_ERROR_CODES: Record<IpcErrorCode, true> = {
   wrongPassphrase: true,
   locked: true,
   passphraseRequired: true,
+  libraryDamaged: true,
   storage: true,
 };
 

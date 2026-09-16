@@ -21,6 +21,11 @@ export class VaultRepository {
     unwrap('unlock_vault', await commands.unlockVault(passphrase));
   }
 
+  /** Answers where everything was moved, which is what the interface has to say. */
+  async setAsideDamagedLibrary(): Promise<string> {
+    return unwrap('set_aside_damaged_library', await commands.setAsideDamagedLibrary());
+  }
+
   async changePassphrase(current: string, next: string): Promise<void> {
     unwrap('change_passphrase', await commands.changePassphrase(current, next));
   }

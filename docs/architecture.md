@@ -1823,6 +1823,29 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   ⚠️ `synchronous = NORMAL`, WAL's default, written down because it is a durability choice:
   a power cut can cost the last committed transaction and cannot corrupt the file. `FULL`
   would fsync every commit to protect a note the user can retype.
+- **Every open runs `PRAGMA quick_check`, and a damaged file is its own answer.** Nothing
+  checked the database was still readable, so the first symptom was a query failing somewhere
+  in the interface, reported as a storage error — "try again" about a file that will never get
+  better on its own. `db::quick_check` runs in `db::open` ⚠️ **before the migrations**: they
+  write, and running them over a damaged file is how a salvageable database becomes an
+  unsalvageable one. `quick_check` and not `integrity_check` — the quick one skips the most
+  expensive cross-checks and reads the file once, milliseconds at this size; the full check
+  belongs behind a button, never on the path to a window. SQLite answers a single `ok`, or one
+  row per problem, and those rows become `StorageError::Damaged` → `ErrorCode::LibraryDamaged`.
+- **Detecting it without a way out would be a loop.** An application that refuses to start and
+  explains why, every launch, leaves deleting a file by hand as the only move — so
+  `recovery::set_aside` is the other half of the check. It tries `VACUUM INTO` first (best
+  effort, and deliberately so: a partly readable database usually gives most of itself back,
+  and a failure there must not stop the user getting a working application), then moves the
+  database, its `-wal` / `-shm` sidecars and ⚠️ **`attachments/`** into `damaged/<timestamp>/`.
+  The attachments are not a detail: a fresh library calls every file there an orphan, so the
+  next launch's sweep would delete the pictures of the notes just set aside — the one way this
+  recovery could destroy what it exists to save. ⚠️ `vault.json` stays where it is. The
+  passphrase does not change, the rescued copy needs that exact key, and asking someone to
+  choose a new passphrase in the middle of losing their library would be its own small cruelty.
+  `set_aside_damaged_library` refuses while the library is open — moving the file under a live
+  connection is how a damaged database becomes a lost one — and answers the folder it wrote,
+  because "set aside" is only true if the user can be told where.
 - **Ordering is the back-end's call.** `notes::store::fetch` orders by `updated_at DESC, id`;
   the front-end preserves the order it receives, so this one query decides what the user sees
   first. Note the deliberate asymmetry: the order is by `updated_at` while sections group by

@@ -58,6 +58,11 @@ export class VaultGateComponent {
     afterNextRender(() => this.passphraseField()?.nativeElement.focus());
   }
 
+  /** The way out of a damaged library; the store says where everything went. */
+  protected async setAside(): Promise<void> {
+    await this.vault.setAsideDamagedLibrary();
+  }
+
   protected onPassphrase(value: string): void {
     this.passphrase.set(value);
     this.vault.clearRefusal();

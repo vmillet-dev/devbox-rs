@@ -110,6 +110,13 @@ export const commands = {
 	 *  a key somebody else got hold of.
 	 */
 	changePassphrase: (current: string, next: string) => typedError<null, AppError>(__TAURI_INVOKE("change_passphrase", { current, next })),
+	/**
+	 *  Sets the damaged library aside so the next unlock starts on a fresh one.
+	 * 
+	 *  ⚠️ Answers the folder it moved everything into, and the interface says it out loud:
+	 *  "set aside" is only true if the user can be told where.
+	 */
+	setAsideDamagedLibrary: () => typedError<string, AppError>(__TAURI_INVOKE("set_aside_damaged_library")),
 	appChangelog: () => __TAURI_INVOKE<ChangelogRelease[]>("app_changelog"),
 	/**
 	 *  Replaces only the menu when the tray already exists, so a language change does not
@@ -211,7 +218,12 @@ export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" 
 /**  A command ran before the library was unlocked. */
 "locked" | 
 /**  The import needs the phrase the export was protected with. */
-"passphraseRequired" | "storage";
+"passphraseRequired" | 
+/**
+ *  SQLite says the file is corrupt. The only code the interface answers with an
+ *  action rather than a message.
+ */
+"libraryDamaged" | "storage";
 
 export type ExportReport = {
 	notes: number,

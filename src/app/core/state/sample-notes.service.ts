@@ -7,7 +7,8 @@ import { NotesRepository } from '../data/notes.repository';
 import { SpacesRepository } from '../data/spaces.repository';
 import { NoteDraft } from '../model/note.model';
 
-const SEEDED_KEY = 'devbox.notes.samplesSeeded';
+/** ⚠️ Exported because `VaultStore` clears it: a library set aside has to seed again. */
+export const SEEDED_KEY = 'devbox.notes.samplesSeeded';
 
 /** The space these drafts belong to does not exist yet; `seed_samples` fills it in. */
 const UNFILED = '';

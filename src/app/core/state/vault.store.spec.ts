@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { IpcError } from '@core/ipc/ipc.error';
 import { VaultRepository } from '@core/data/vault.repository';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { PreferencesService } from '@core/services/preferences/preferences.service';
+import { SEEDED_KEY } from './sample-notes.service';
+import { StatusNotifier } from '@core/services/notifications/status.service';
 import { FakeVaultRepository } from '@testing/fake-vault-repository';
 import { provideAppTesting } from '@testing/testing.providers';
 import { VaultStore } from './vault.store';
@@ -148,6 +151,69 @@ describe('VaultStore', () => {
       await store.unlock('not it');
 
       expect(store.isWorking()).toBe(false);
+    });
+  });
+
+  describe('a library that will not open', () => {
+    const DAMAGED = new IpcError('unlock_vault', {
+      code: 'libraryDamaged',
+      params: {},
+      detail: 'the library is damaged',
+    });
+
+    /**
+     * ⚠️ Neither a refusal nor a failure: retyping the passphrase cannot help, so the
+     * screen has to stop offering the field and offer a way out instead.
+     */
+    it('is its own state, not a refused passphrase', async () => {
+      repository.failNext = DAMAGED;
+
+      expect(await store.unlock('a passphrase')).toBe(false);
+      expect(store.damaged()).toBe(true);
+      expect(store.refused()).toBe(false);
+      expect(notifier.notice()).toBeNull();
+    });
+
+    it('moves it aside and says where it went', async () => {
+      repository.failNext = DAMAGED;
+      await store.unlock('a passphrase');
+
+      expect(await store.setAsideDamagedLibrary()).toBe(true);
+
+      expect(repository.setAside).toHaveLength(1);
+      expect(store.damaged()).toBe(false);
+      expect(TestBed.inject(StatusNotifier).status()?.key).toBe('vault.setAside');
+      expect(TestBed.inject(StatusNotifier).status()?.params?.['path']).toBe(repository.setAside[0]);
+    });
+
+    /**
+     * ⚠️ Without this the fresh library opens on a canvas with no space — and a note
+     * cannot be created without one, so the application comes back working and unusable.
+     */
+    it('forgets the samples marker, so the fresh library seeds like a first launch', async () => {
+      const preferences = TestBed.inject(PreferencesService);
+      preferences.write(SEEDED_KEY, 'true');
+
+      await store.setAsideDamagedLibrary();
+
+      expect(preferences.read(SEEDED_KEY)).toBeNull();
+    });
+
+    it('reports a failure and leaves the library where it was', async () => {
+      repository.failNext = DAMAGED;
+      await store.unlock('a passphrase');
+      repository.failNext = new IpcError('set_aside_damaged_library', {
+        code: 'fileAccess',
+        params: {},
+        detail: 'in use',
+      });
+
+      expect(await store.setAsideDamagedLibrary()).toBe(false);
+
+      // A cause the back end named wins over the action; 'errors.setAsideFailed' is
+      // what a failure with nothing to say falls back to.
+      expect(notifier.notice()?.ref.key).toBe('errors.fileAccess');
+      expect(store.damaged()).toBe(true);
     });
   });
 

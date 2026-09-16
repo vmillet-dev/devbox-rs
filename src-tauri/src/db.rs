@@ -102,6 +102,38 @@ impl DerefMut for LibraryGuard<'_> {
     }
 }
 
+/// ⚠️ `quick_check` and not `integrity_check`: the quick one skips the most expensive
+/// cross-checks and reads the file once, which is milliseconds on a library this size.
+/// The full check belongs behind a button, never on the path to a window.
+///
+/// ⚠️ Run before anything writes. A damaged file discovered on the first failing query is
+/// discovered too late — by then the launch copies are copies of a broken database, and
+/// a backup that propagates the damage on a schedule is worse than none.
+pub(crate) fn quick_check(connection: &mut SqliteConnection) -> Result<(), StorageError> {
+    #[derive(QueryableByName)]
+    struct Answer {
+        #[diesel(sql_type = diesel::sql_types::Text)]
+        quick_check: String,
+    }
+
+    let answers: Vec<Answer> = diesel::sql_query("PRAGMA quick_check")
+        .load(connection)
+        .map_err(|error| StorageError::Damaged(error.to_string()))?;
+
+    // SQLite answers a single "ok", or one row per problem it found.
+    if answers.len() == 1 && answers[0].quick_check == "ok" {
+        return Ok(());
+    }
+
+    Err(StorageError::Damaged(
+        answers
+            .iter()
+            .map(|answer| answer.quick_check.as_str())
+            .collect::<Vec<_>>()
+            .join("; "),
+    ))
+}
+
 /// ⚠️ Every failure here names the file. This is the one error a user meets before any
 /// window has anything in it, and "migration failed" without a path leaves them nowhere
 /// to look — the database is in a directory they have never opened.
@@ -113,6 +145,16 @@ pub fn open(path: &Path, vault: Vault) -> Result<Library, StorageError> {
     let mut connection =
         SqliteConnection::establish(&path.to_string_lossy()).map_err(|error| named(&error))?;
     configure(&mut connection).map_err(|error| named(&error))?;
+
+    // ⚠️ Before the migrations, which write: running them over a damaged file is how a
+    // salvageable database becomes an unsalvageable one.
+    if let Err(error) = quick_check(&mut connection) {
+        return Err(StorageError::Damaged(format!(
+            "{}: {error}",
+            path.display()
+        )));
+    }
+
     migration::run(&mut connection).map_err(|error| named(&error))?;
 
     Ok(Library { connection, vault })
@@ -250,6 +292,54 @@ mod tests {
             .foreign_keys;
 
         assert_eq!(enabled, 1);
+    }
+
+    /// ⚠️ The point of checking at all: SQLite discovers this on the first query that
+    /// happens to read the broken page, which can be days later — and by then every
+    /// launch copy is a copy of a broken file.
+    #[test]
+    fn a_damaged_file_is_named_as_such_rather_than_opened() {
+        let directory =
+            std::env::temp_dir().join(format!("devbox-damaged-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join(DB_FILE_NAME);
+
+        // A real library, with enough in it to fill more than the first page.
+        {
+            let mut library = open(&path, test_vault().unwrap()).unwrap();
+            for at in 0..40 {
+                crate::spaces::store::create(&mut library, &format!("Space {at}")).unwrap();
+            }
+        }
+
+        // Garbage over a page that is not the header: the header alone would fail to
+        // open rather than fail to check, which is a different story.
+        let mut bytes = std::fs::read(&path).unwrap();
+        assert!(bytes.len() > 4096, "the corpus did not reach a second page");
+        for byte in bytes.iter_mut().skip(4096).take(512) {
+            *byte = 0x42;
+        }
+        std::fs::write(&path, &bytes).unwrap();
+
+        let Err(error) = open(&path, test_vault().unwrap()) else {
+            panic!("a damaged database opened as if it were sound");
+        };
+
+        assert!(matches!(error, StorageError::Damaged(_)), "{error}");
+        assert!(
+            format!("{error}").contains(&path.display().to_string()),
+            "the failure does not name the file: {error}"
+        );
+
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// A sound library answers the check and says nothing about it.
+    #[test]
+    fn a_sound_library_passes_the_check_it_runs_at_every_open() {
+        let mut library = open_in_memory().unwrap();
+
+        assert!(quick_check(library.db()).is_ok());
     }
 
     /// ⚠️ The one storage error a user can meet with an empty window: a message without

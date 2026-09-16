@@ -1,65 +1,87 @@
 <main class="gate">
-  <form class="panel" (submit)="submit($event)">
-    <h1 class="title">
-      {{ (isCreating() ? 'vault.createTitle' : 'vault.unlockTitle') | transloco }}
-    </h1>
-    <p class="lead">
-      {{ (isCreating() ? 'vault.createLead' : 'vault.unlockLead') | transloco }}
-    </p>
+  @if (vault.damaged()) {
+    <!--
+      ⚠️ Not a message beside the field: retyping the passphrase cannot help, so the form
+      would be an invitation to do the one thing that will not work.
+    -->
+    <section class="panel" data-testid="vault-damaged">
+      <h1 class="title">{{ 'vault.damagedTitle' | transloco }}</h1>
+      <p class="lead">{{ 'vault.damagedLead' | transloco }}</p>
+      <p class="warning" role="note">{{ 'vault.damagedNote' | transloco }}</p>
 
-    <!-- ⚠️ Said once, at the only moment it can still be acted on. -->
-    @if (isCreating()) {
-      <p class="warning" role="note">{{ 'vault.noRecovery' | transloco }}</p>
-    }
+      <button
+        class="submit"
+        type="button"
+        [disabled]="vault.isWorking()"
+        data-testid="vault-set-aside"
+        (click)="setAside()"
+      >
+        {{ (vault.isWorking() ? 'vault.working' : 'vault.damagedAction') | transloco }}
+      </button>
+    </section>
+  } @else {
+    <form class="panel" (submit)="submit($event)">
+      <h1 class="title">
+        {{ (isCreating() ? 'vault.createTitle' : 'vault.unlockTitle') | transloco }}
+      </h1>
+      <p class="lead">
+        {{ (isCreating() ? 'vault.createLead' : 'vault.unlockLead') | transloco }}
+      </p>
 
-    <label class="field">
-      <span class="label">{{ 'vault.passphrase' | transloco }}</span>
-      <input
-        class="input"
-        type="password"
-        autocomplete="off"
-        spellcheck="false"
-        [value]="passphrase()"
-        [attr.aria-invalid]="vault.refused() || tooShort() ? 'true' : null"
-        [attr.aria-describedby]="vault.refused() || tooShort() ? 'vault-problem' : null"
-        (input)="onPassphrase($any($event.target).value)"
-        data-testid="vault-passphrase"
-        #passphraseField
-      />
-    </label>
+      <!-- ⚠️ Said once, at the only moment it can still be acted on. -->
+      @if (isCreating()) {
+        <p class="warning" role="note">{{ 'vault.noRecovery' | transloco }}</p>
+      }
 
-    @if (isCreating()) {
       <label class="field">
-        <span class="label">{{ 'vault.confirmation' | transloco }}</span>
+        <span class="label">{{ 'vault.passphrase' | transloco }}</span>
         <input
           class="input"
           type="password"
           autocomplete="off"
           spellcheck="false"
-          [value]="confirmation()"
-          (input)="onConfirmation($any($event.target).value)"
-          data-testid="vault-confirmation"
+          [value]="passphrase()"
+          [attr.aria-invalid]="vault.refused() || tooShort() ? 'true' : null"
+          [attr.aria-describedby]="vault.refused() || tooShort() ? 'vault-problem' : null"
+          (input)="onPassphrase($any($event.target).value)"
+          data-testid="vault-passphrase"
+          #passphraseField
         />
       </label>
-    }
 
-    <!-- One line, whichever problem is current: two stacked would read as two faults. -->
-    <p class="problem" id="vault-problem" role="status" data-testid="vault-problem">
-      @if (vault.refused()) {
-        {{ 'errors.wrongPassphrase' | transloco }}
-      } @else if (tooShort()) {
-        {{ 'vault.tooShort' | transloco: { length: minimumLength } }}
-      } @else if (mismatched()) {
-        {{ 'vault.mismatched' | transloco }}
+      @if (isCreating()) {
+        <label class="field">
+          <span class="label">{{ 'vault.confirmation' | transloco }}</span>
+          <input
+            class="input"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            [value]="confirmation()"
+            (input)="onConfirmation($any($event.target).value)"
+            data-testid="vault-confirmation"
+          />
+        </label>
       }
-    </p>
 
-    <button class="submit" type="submit" [disabled]="!canSubmit()" data-testid="vault-submit">
-      @if (vault.isWorking()) {
-        {{ (isCreating() ? 'vault.creating' : 'vault.working') | transloco }}
-      } @else {
-        {{ (isCreating() ? 'vault.createAction' : 'vault.unlockAction') | transloco }}
-      }
-    </button>
-  </form>
+      <!-- One line, whichever problem is current: two stacked would read as two faults. -->
+      <p class="problem" id="vault-problem" role="status" data-testid="vault-problem">
+        @if (vault.refused()) {
+          {{ 'errors.wrongPassphrase' | transloco }}
+        } @else if (tooShort()) {
+          {{ 'vault.tooShort' | transloco: { length: minimumLength } }}
+        } @else if (mismatched()) {
+          {{ 'vault.mismatched' | transloco }}
+        }
+      </p>
+
+      <button class="submit" type="submit" [disabled]="!canSubmit()" data-testid="vault-submit">
+        @if (vault.isWorking()) {
+          {{ (isCreating() ? 'vault.creating' : 'vault.working') | transloco }}
+        } @else {
+          {{ (isCreating() ? 'vault.createAction' : 'vault.unlockAction') | transloco }}
+        }
+      </button>
+    </form>
+  }
 </main>

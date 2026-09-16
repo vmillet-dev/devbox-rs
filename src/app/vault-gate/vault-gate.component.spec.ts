@@ -54,6 +54,42 @@ describe('VaultGateComponent', () => {
     await fixture.whenStable();
   }
 
+  describe('a library that will not open', () => {
+    beforeEach(async () => {
+      await open('locked');
+      repository.failNext = new IpcError('unlock_vault', {
+        code: 'libraryDamaged',
+        params: {},
+        detail: 'damaged',
+      });
+      await type('vault-passphrase', 'an end-to-end passphrase');
+      submitButton().click();
+      await fixture.whenStable();
+    });
+
+    /** ⚠️ The form would be an invitation to do the one thing that cannot work. */
+    it('replaces the passphrase form with a way out', () => {
+      expect(field('vault-passphrase')).toBeNull();
+      expect(fixture.debugElement.query(By.css('[data-testid="vault-damaged"]'))).not.toBeNull();
+    });
+
+    it('says what will happen to the damaged library before it happens', () => {
+      const panel = fixture.debugElement.query(By.css('[data-testid="vault-damaged"]'))
+        .nativeElement as HTMLElement;
+
+      expect(panel.textContent).toContain('pièces jointes');
+      expect(panel.textContent).toContain('phrase de passe ne change pas');
+    });
+
+    it('sets the library aside and comes back to the passphrase', async () => {
+      fixture.debugElement.query(By.css('[data-testid="vault-set-aside"]')).nativeElement.click();
+      await fixture.whenStable();
+
+      expect(repository.setAside).toHaveLength(1);
+      expect(field('vault-passphrase')).not.toBeNull();
+    });
+  });
+
   describe('unlocking an existing library', () => {
     beforeEach(async () => {
       await open('locked');

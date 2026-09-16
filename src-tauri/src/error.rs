@@ -47,6 +47,10 @@ pub enum StorageError {
     SchemaTooRecent(String),
     #[error("Migration failed: {0}")]
     Migration(String),
+    /// ⚠️ Its own variant because the answer is its own: everything else is "try again",
+    /// this one is "this file will not get better on its own".
+    #[error("The library is damaged: {0}")]
+    Damaged(String),
     /// Deriving a key, sealing a value, or opening one that will not open.
     #[error("Vault error: {0}")]
     Vault(String),
@@ -92,6 +96,9 @@ pub enum ErrorCode {
     Locked,
     /// The import needs the phrase the export was protected with.
     PassphraseRequired,
+    /// SQLite says the file is corrupt. The only code the interface answers with an
+    /// action rather than a message.
+    LibraryDamaged,
     Storage,
 }
 
@@ -159,6 +166,7 @@ impl From<StorageError> for AppError {
             StorageError::WrongPassphrase => Self::new(ErrorCode::WrongPassphrase, detail),
             StorageError::PassphraseRequired => Self::new(ErrorCode::PassphraseRequired, detail),
             StorageError::Locked => Self::new(ErrorCode::Locked, detail),
+            StorageError::Damaged(_) => Self::new(ErrorCode::LibraryDamaged, detail),
             StorageError::File(_) => Self::new(ErrorCode::FileAccess, detail),
             StorageError::ImportFormat(_) => Self::new(ErrorCode::ImportFormat, detail),
             // Nothing here gives the front anything to do beyond reporting the failure.

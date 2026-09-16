@@ -11,6 +11,9 @@ export class FakeVaultRepository implements Pick<VaultRepository, keyof VaultRep
   failNext: IpcError | null = null;
 
   passphrases: string[] = [];
+
+  /** Where a set-aside library was moved, and how many times it was asked for. */
+  setAside: string[] = [];
   changes: { current: string; next: string }[] = [];
 
   /** ⚠️ Through the guard like the rest: reading the state is a command too, and it is
@@ -32,6 +35,18 @@ export class FakeVaultRepository implements Pick<VaultRepository, keyof VaultRep
   }
 
   /** Records the pair; `failNext` is how a spec makes the current phrase wrong. */
+  async setAsideDamagedLibrary(): Promise<string> {
+    const failure = this.failNext;
+    this.failNext = null;
+    if (failure !== null) throw failure;
+
+    const target = `/data/damaged/${this.setAside.length + 1}`;
+    this.setAside.push(target);
+    this.answer = 'locked';
+
+    return target;
+  }
+
   async changePassphrase(current: string, next: string): Promise<void> {
     this.changes.push({ current, next });
     const failure = this.failNext;
