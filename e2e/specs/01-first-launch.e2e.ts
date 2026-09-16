@@ -20,6 +20,11 @@ describe('First launch', () => {
    * canvas. It waits for notes to exist and never for how many, or the assertion below
    * would be its own witness.
    */
+  /** ⚠️ A scenario that throws on the board would leave every later one reading it. */
+  afterEach(async () => {
+    await board.show('date');
+  });
+
   before(async () => {
     // ⚠️ Before anything is asked of the library: this is the only file that meets the
     // gate, and no command is answered — not even a read — until it has been passed.
@@ -58,10 +63,20 @@ describe('First launch', () => {
    * folders out would be permanent, because a space exists and both of the front end's
    * guards then read "already seeded".
    */
-  it('seeds its folders too, in the order the board reads them', async () => {
+  /**
+   * ⚠️ Nothing here compares a seeded name: the samples are translated, and the locale
+   * comes from the system — French on a developer's machine, English on the runners. What
+   * is asserted is the shape and the order, which are the same in every language.
+   */
+  it('seeds its folders too, in an order that does not depend on luck', async () => {
     const folders = await bridge.listFolders(await homeSpaceId());
+    expect(folders).toHaveLength(2);
 
-    expect(folders.map((folder) => folder.name)).toEqual(['Snippets', 'Prise en main']);
+    // ⚠️ A millisecond apart. Sharing one instant left `created_at` tying and the order
+    // falling back to a random UUID, so the two zones swapped between installs.
+    const at = folders.map((folder) => new Date(folder.createdAt).getTime());
+    expect(at[0]).toBeLessThan(at[1]!);
+
     // Assigned by rotation, so the two zones are told apart on the board at a glance.
     expect(folders[0]?.colour).not.toBe(folders[1]?.colour);
   });
@@ -84,13 +99,14 @@ describe('First launch', () => {
    * install: the feature was finished and undiscoverable.
    */
   it('opens a board that already has something on it', async () => {
+    const folders = await bridge.listFolders(await homeSpaceId());
     await canvas.open();
     await board.show('board');
 
-    expect(await board.zoneNames()).toEqual(['Snippets', 'Prise en main']);
+    // Against what the store answered, not against a word: the board's order is the
+    // store's order, whatever language the names happen to be in.
+    expect(await board.zoneNames()).toEqual(folders.map((folder) => folder.name));
     expect(await board.looseTitles()).toHaveLength(1);
-
-    await board.show('date');
   });
 
   it('gives every card a click surface of its own', async () => {
