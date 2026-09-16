@@ -33,8 +33,9 @@
 }
 
 // Dimmed in place: the card keeps its seat, it just stops asking for attention.
-app-note-card.dimmed {
-  opacity: 0.3;
+// ⚠️ On the wrapper, not on `app-note-card`: the wrapper is what carries the class.
+.loose-card.dimmed {
+  opacity: 0.32;
 }
 
 .board-empty {
@@ -55,6 +56,8 @@ app-note-card.dimmed {
 }
 
 .loose-card {
+  @include board-card;
+
   position: absolute;
 }
 

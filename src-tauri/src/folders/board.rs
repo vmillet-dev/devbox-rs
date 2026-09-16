@@ -42,6 +42,11 @@ pub const BOARD_MARGIN: i32 = 16;
 pub const LOOSE_COLUMNS: i32 = 4;
 /// Room for the "no folder · N" label above the loose cards.
 pub const LOOSE_LABEL: i32 = 34;
+/// ⚠️ The zone body scrolls, so a vertical scrollbar can take a slice of the row. Without
+/// this allowance two cards plus their gap come to *exactly* the inner width, the second
+/// wraps, the wrap causes the scrollbar, and the scrollbar keeps it wrapped — a zone that
+/// says "2" and shows one.
+pub const SCROLLBAR: i32 = 18;
 
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -181,7 +186,7 @@ pub fn zone_at(frames: &[(String, BoardFrame)], point: BoardPoint) -> Option<Str
 /// The width every zone gets on its first layout: [`ZONE_COLUMNS`] cards and the gaps.
 #[must_use]
 pub fn default_zone_width() -> i32 {
-    ZONE_PADDING * 2 + ZONE_COLUMNS * CARD_WIDTH + (ZONE_COLUMNS - 1) * GAP
+    ZONE_PADDING * 2 + ZONE_COLUMNS * CARD_WIDTH + (ZONE_COLUMNS - 1) * GAP + SCROLLBAR
 }
 
 /// Tall enough for the notes it already holds, and never shorter than one row — an empty
@@ -409,9 +414,12 @@ pub fn build<S: std::hash::BuildHasher>(
 mod tests {
     use super::*;
 
+    /// ⚠️ Two cards *and* room for the scrollbar: at exactly the inner width the second
+    /// card wraps, which is what causes the scrollbar that keeps it wrapped.
     #[test]
-    fn a_zone_is_two_cards_wide_whatever_it_holds() {
-        assert_eq!(default_zone_width(), 12 + 240 + 12 + 240 + 12);
+    fn a_zone_is_two_cards_wide_with_room_for_the_scrollbar() {
+        assert_eq!(default_zone_width(), 12 + 240 + 12 + 240 + 12 + SCROLLBAR);
+        assert!(default_zone_width() - ZONE_PADDING * 2 > ZONE_COLUMNS * CARD_WIDTH + GAP);
     }
 
     #[test]

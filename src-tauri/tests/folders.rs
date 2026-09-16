@@ -1096,3 +1096,57 @@ mod gesture {
         );
     }
 }
+
+/// ⚠️ A chip naming the folder every card is already in is noise, and the breadcrumb above
+/// says it once. Same reason the board resolves none.
+#[test]
+fn a_card_inside_an_opened_folder_carries_no_chip() {
+    use devbox_lib::folders::store::by_id;
+    use devbox_lib::notes::view::{self, NoteFilter, NotesQuery};
+
+    let mut connection = open_in_memory().unwrap();
+    let sql = space(&mut connection, "SQL");
+    let perf = create(&mut connection, &sql, "Perf", t0()).unwrap();
+    let note = note_in(&mut connection, &sql);
+    file_many(
+        &mut connection,
+        std::slice::from_ref(&note.id),
+        Some(&perf.id),
+        t1(),
+    )
+    .unwrap();
+
+    let scoped = NotesQuery {
+        space_id: Some(sql.clone()),
+        folder_id: Some(perf.id.clone()),
+        search: String::new(),
+        filter: NoteFilter::All,
+        tags: Vec::new(),
+        languages: Vec::new(),
+        now: t1(),
+        tz_offset_minutes: 0,
+        pinned_first: true,
+    };
+    let wide = NotesQuery {
+        folder_id: None,
+        ..scoped.clone()
+    };
+
+    // Scoped to the folder: the decoration pass is skipped, exactly as the command does.
+    let (notes, facets) = devbox_lib::notes::store::fetch(&mut connection, &scoped).unwrap();
+    let inside = view::build(notes, facets, &scoped);
+    assert!(inside.sections[0].notes[0].folder.is_none());
+
+    // Outside it, the chip is what says where the note lives.
+    let folders = by_id(&mut connection, Some(&sql)).unwrap();
+    let (notes, facets) = devbox_lib::notes::store::fetch(&mut connection, &wide).unwrap();
+    let mut outside = view::build(notes, facets, &wide);
+    view::apply_folders(&mut outside, &folders);
+    assert_eq!(
+        outside.sections[0].notes[0]
+            .folder
+            .as_ref()
+            .map(|folder| folder.name.as_str()),
+        Some("Perf")
+    );
+}

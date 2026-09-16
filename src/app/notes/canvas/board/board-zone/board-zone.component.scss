@@ -68,8 +68,9 @@
 }
 
 // Dimmed in place: the card keeps its seat, it just stops asking for attention.
-app-note-card.dimmed {
-  opacity: 0.3;
+// ⚠️ On the wrapper, not on `app-note-card`: the wrapper is what carries the class.
+.zone-card.dimmed {
+  opacity: 0.32;
 }
 
 // Quiet at rest but never hidden: `visibility: hidden` would take it out of the tab order.
@@ -96,7 +97,7 @@ app-note-card.dimmed {
 }
 
 .zone-card {
-  position: relative;
+  @include board-card;
 }
 
 .zone-card:hover .card-grip,
