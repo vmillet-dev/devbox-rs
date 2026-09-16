@@ -7,7 +7,9 @@ use chrono::{DateTime, Utc};
 
 use devbox_lib::db::iso8601;
 use devbox_lib::db::open_in_memory;
-use devbox_lib::db::schema::{note_items, note_placeholders, note_tags, spaces as spaces_table};
+use devbox_lib::db::schema::{
+    note_items, note_placeholders, note_tags, notes as notes_table, spaces as spaces_table,
+};
 use devbox_lib::error::StorageError;
 use devbox_lib::notes::checklist::{ChecklistItem, NoteKind};
 use devbox_lib::notes::language::Language;
@@ -195,6 +197,70 @@ fn dropping_an_expiry_clears_the_stored_date() {
         list(&mut connection).unwrap()[0].lifecycle,
         NoteLifecycle::Permanent
     ));
+}
+
+/// ⚠️ The scenario in full: a newer build writes a language this one cannot name, this
+/// one reads it as the fallback — and writing every column back used to make that
+/// fallback permanent, in the database, with no error anywhere along the way.
+#[test]
+fn an_edit_keeps_a_language_this_build_cannot_read() {
+    let mut connection = open_in_memory().unwrap();
+    let space = spaces::create(&mut connection, "Perso").unwrap().id;
+    let created = create(&mut connection, draft(&space), t0()).unwrap();
+
+    // Written the way a newer build would have written it.
+    diesel::update(notes_table::table.find(&created.id))
+        .set(notes_table::language.eq("rust"))
+        .execute(connection.db())
+        .unwrap();
+
+    // The read degrades, which is deliberate and unchanged.
+    assert_eq!(list(&mut connection).unwrap()[0].language, Language::Txt);
+
+    let patch = NotePatch {
+        title: Some("Nouveau titre".to_string()),
+        ..NotePatch::default()
+    };
+    update(&mut connection, &created.id, &patch, t1()).unwrap();
+
+    let stored: String = notes_table::table
+        .find(&created.id)
+        .select(notes_table::language)
+        .first(connection.db())
+        .unwrap();
+    assert_eq!(
+        stored, "rust",
+        "the edit overwrote a language it could not read"
+    );
+}
+
+/// A column the patch never named is left alone, which is what the guarantee above
+/// rests on — and it costs nine columns less per title change.
+#[test]
+fn an_edit_writes_only_what_it_moved() {
+    let mut connection = open_in_memory().unwrap();
+    let space = spaces::create(&mut connection, "Perso").unwrap().id;
+    let created = create(&mut connection, draft(&space), t0()).unwrap();
+
+    // A value no patch will touch, and that this build would happily rewrite.
+    diesel::update(notes_table::table.find(&created.id))
+        .set(notes_table::kind.eq("runbook"))
+        .execute(connection.db())
+        .unwrap();
+
+    let patch = NotePatch {
+        pinned: Some(true),
+        ..NotePatch::default()
+    };
+    update(&mut connection, &created.id, &patch, t1()).unwrap();
+
+    let (kind, pinned): (String, bool) = notes_table::table
+        .find(&created.id)
+        .select((notes_table::kind, notes_table::pinned))
+        .first(connection.db())
+        .unwrap();
+    assert_eq!(kind, "runbook");
+    assert!(pinned);
 }
 
 #[test]

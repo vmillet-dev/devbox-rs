@@ -105,6 +105,33 @@ impl NoteRow {
     }
 }
 
+/// What an update actually writes.
+///
+/// ⚠️ Every column is optional so an untouched one is left alone — `None` emits no
+/// assignment at all. That is what stops a value this build cannot parse from being
+/// overwritten: an older binary reads `language = "rust"` as `txt`, and writing all ten
+/// columns back would have made that fallback permanent, in the database, with no error
+/// anywhere. `updated_at` is not optional because refreshing it is what the patch path
+/// exists for.
+#[derive(AsChangeset)]
+#[diesel(table_name = notes)]
+struct NoteChanges {
+    space_id: Option<String>,
+    title: Option<String>,
+    language: Option<String>,
+    content: Option<String>,
+    source: Option<String>,
+    pinned: Option<bool>,
+    updated_at: String,
+    lifecycle_kind: Option<String>,
+    /// ⚠️ Twice optional, and both layers matter: the outer one skips the column, the
+    /// inner one is the `NULL` a permanent note needs written. Diesel’s own idiom for a
+    /// nullable column, and the three cases are exactly the three the lint asks about.
+    #[allow(clippy::option_option)]
+    lifecycle_expires_at: Option<Option<String>>,
+    kind: Option<String>,
+}
+
 /// ⚠️ Every row or none: a value that will not open stops the read rather than handing
 /// back a note with an empty body. A wrong key is not a degraded note.
 fn open_all(rows: Vec<NoteRow>, vault: &Vault) -> Result<Vec<Note>, StorageError> {
@@ -359,24 +386,29 @@ pub fn update(
             return Err(StorageError::SpaceNotFound(space_id.clone()));
         }
 
+        // ⚠️ Compared against the note as it was read, not against the patch's own
+        // fields: `apply` moves more than it is handed — a new body re-detects the
+        // language — and a column the patch never named can still have changed.
+        let before = note.clone();
         patch.apply(&mut note, now);
 
-        // Columns listed rather than an `AsChangeset`, which would also rewrite
-        // `created_at`.
         let row = NoteRow::seal(&note, vault)?;
+        let moved = |changed: bool, value: &String| changed.then(|| value.clone());
+        let lifecycle_moved = note.lifecycle != before.lifecycle;
+
         diesel::update(notes::table.find(&note.id))
-            .set((
-                notes::space_id.eq(&row.space_id),
-                notes::title.eq(&row.title),
-                notes::language.eq(&row.language),
-                notes::content.eq(&row.content),
-                notes::source.eq(&row.source),
-                notes::pinned.eq(row.pinned),
-                notes::updated_at.eq(&row.updated_at),
-                notes::lifecycle_kind.eq(&row.lifecycle_kind),
-                notes::lifecycle_expires_at.eq(&row.lifecycle_expires_at),
-                notes::kind.eq(&row.kind),
-            ))
+            .set(NoteChanges {
+                space_id: moved(note.space_id != before.space_id, &row.space_id),
+                title: moved(note.title != before.title, &row.title),
+                language: moved(note.language != before.language, &row.language),
+                content: moved(note.content != before.content, &row.content),
+                source: moved(note.source != before.source, &row.source),
+                pinned: (note.pinned != before.pinned).then_some(row.pinned),
+                updated_at: row.updated_at.clone(),
+                lifecycle_kind: moved(lifecycle_moved, &row.lifecycle_kind),
+                lifecycle_expires_at: lifecycle_moved.then(|| row.lifecycle_expires_at.clone()),
+                kind: moved(note.kind != before.kind, &row.kind),
+            })
             .execute(connection)?;
 
         if patch.tags.is_some() {
