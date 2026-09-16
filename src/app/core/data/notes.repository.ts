@@ -33,6 +33,14 @@ export class NotesRepository {
     return toNote(unwrap('create_note', await commands.createNote(toWireNoteDraft(draft))));
   }
 
+  /**
+   * The first launch, as one write. The space does not exist yet, so each draft carries
+   * no space of its own — the back end files them into the one it creates.
+   */
+  async seedSamples(spaceName: string, drafts: readonly NoteDraft[]): Promise<void> {
+    unwrap('seed_samples', await commands.seedSamples(spaceName, drafts.map(toWireNoteDraft)));
+  }
+
   async update(id: string, patch: NotePatch): Promise<Note> {
     return toNote(unwrap('update_note', await commands.updateNote(id, toWireNotePatch(patch))));
   }

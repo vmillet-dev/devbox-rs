@@ -56,6 +56,7 @@ use crate::attachments;
 use crate::count::saturating_u32 as count;
 use crate::db::{Db, Library, lock};
 use crate::error::{AppError, StorageError};
+use crate::spaces::model::SpaceDraft;
 use model::{DisplayNote, NoteDraft, NotePatch, TagUsage};
 use trash::TrashedNote;
 use view::{NotesQuery, NotesView};
@@ -84,6 +85,29 @@ pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<DisplayNote, A
     let note = store::create(&mut connection, draft, Utc::now())?;
 
     Ok(display(&mut connection, note)?)
+}
+
+/// The first launch, and the only command that writes a space and notes at once.
+///
+/// ⚠️ One transaction, because six round trips were six chances to be killed halfway:
+/// a space with nothing in it reads as "already seeded" to both of the front end's
+/// guards, and the canvas stays empty for the life of that install. The strings stay on
+/// the front end, where the translations are — only the atomicity comes from here.
+#[tauri::command(async)]
+#[specta::specta]
+/// Answers nothing: the caller needs to know the library was seeded, not what was made,
+/// and it reloads the spaces either way.
+pub fn seed_samples(
+    space_name: String,
+    drafts: Vec<NoteDraft>,
+    db: State<'_, Db>,
+) -> Result<(), AppError> {
+    let name = SpaceDraft { name: space_name }.validated_name()?;
+
+    let mut connection = lock(&db)?;
+    store::seed(&mut connection, &name, drafts, Utc::now())?;
+
+    Ok(())
 }
 
 #[tauri::command(async)]

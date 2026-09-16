@@ -7,6 +7,17 @@ export const commands = {
 	/**  ⚠️ No command returns the raw list: it would invite re-filtering on the front end. */
 	queryNotes: (query: NotesQuery) => typedError<NotesView, AppError>(__TAURI_INVOKE("query_notes", { query })),
 	createNote: (draft: NoteDraft) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("create_note", { draft })),
+	/**
+	 *  The first launch, and the only command that writes a space and notes at once.
+	 * 
+	 *  ⚠️ One transaction, because six round trips were six chances to be killed halfway:
+	 *  a space with nothing in it reads as "already seeded" to both of the front end's
+	 *  guards, and the canvas stays empty for the life of that install. The strings stay on
+	 *  the front end, where the translations are — only the atomicity comes from here.
+	 *  Answers nothing: the caller needs to know the library was seeded, not what was made,
+	 *  and it reloads the spaces either way.
+	 */
+	seedSamples: (spaceName: string, drafts: NoteDraft[]) => typedError<null, AppError>(__TAURI_INVOKE("seed_samples", { spaceName, drafts })),
 	updateNote: (id: string, patch: NotePatch) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("update_note", { id, patch })),
 	/**
 	 *  Moves to the trash: the note comes back through [`restore_notes`] for
