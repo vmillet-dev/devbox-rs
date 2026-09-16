@@ -21,8 +21,9 @@ export class FakeTransferRepository implements Pick<TransferRepository, keyof Tr
   /** When set, an import with anything else is refused the way the engine refuses it. */
   expectedPassphrase: string | null = null;
 
-  exportReport: ExportReport = { notes: 3, spaces: 1, attachments: 0, protected: false };
+  exportReport: ExportReport = { notes: 3, spaces: 1, folders: 0, attachments: 0, protected: false };
   importReport: ImportReport = {
+    foldersCreated: 0,
     spacesCreated: 1,
     notesImported: 2,
     notesSkipped: 0,

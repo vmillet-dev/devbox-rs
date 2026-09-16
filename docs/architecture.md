@@ -880,6 +880,34 @@ palette and the delete; the switcher, the breadcrumb and the zone menu on the bo
 project it, so they cannot drift apart. Deleting from the breadcrumb goes back, with the
 notes now loose.
 
+### A folder travels; its coordinates do not
+
+The folder is part of what a note is. Where its zone sat on a board is not.
+
+**Out.** `Bundle` gains the folders actually cited, beside the spaces it already carries,
+and each note carries its `folderId`. Only the cited ones travel, for the same reason only
+the cited spaces do: exporting one space should not recreate a whole tree on the other side.
+⚠️ `#[serde(default)]` on both new fields, exactly as `kind` and `items` carry it — an
+export written before folders must stay readable, and there is **no `FORMAT_VERSION` bump**
+because such a file still parses.
+
+⚠️ **No coordinates, and nothing had to be stripped to achieve that.** `Folder` carries no
+geometry: where a zone sits lives in columns only the board's own query reads. That is the
+whole reason the geometry was kept off the model in the first place, and a test reads the
+written file to prove no `x` ever reaches it.
+
+**In.** A folder is matched **by name inside the destination space**, case-insensitively,
+and created when absent — the rule spaces already follow. Spaces are merged first, because a
+folder needs its space to exist.
+
+⚠️ A note's `folderId` is the _sending_ library's, so it is remapped, and **dropped when the
+file did not carry the folder**: a dangling id would be refused by the foreign key, losing
+the whole import over a note that is merely unfiled. A folder whose space did not make it is
+dropped for the same reason its notes were.
+
+`ImportReport` gains `foldersCreated` next to `spacesCreated`, and a library that arrived
+arranged says so — every library operation reports, including when it changed nothing.
+
 ### Editing a note
 
 The editor overlay is where every note mutation starts (title, body, language, tags, pin,

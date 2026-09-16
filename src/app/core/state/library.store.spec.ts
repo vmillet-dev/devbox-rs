@@ -96,9 +96,37 @@ describe('LibraryStore', () => {
           degraded: '0',
           attachments: '0',
           missing: '0',
+          folders: '0',
           path: 'devbox-2026-08-27.devbox',
         },
       });
+    });
+
+    /** A library received arranged is worth saying so: the folders are half of what came in. */
+    it('says how many folders a library arrived with', async () => {
+      harness.dialog.openPath = 'C:/notes/devbox.devbox';
+      harness.repository.importReport = {
+        ...harness.repository.importReport,
+        notesImported: 6,
+        foldersCreated: 3,
+      };
+
+      expect(await harness.store.import()).toBe(true);
+      expect(harness.status.status()?.key).toBe('file.importedIntoFolders');
+      expect(harness.status.status()?.params?.['folders']).toBe('3');
+    });
+
+    /** Every library operation reports, including when it changed nothing. */
+    it('counts a library that brought folders but no new note as a change', async () => {
+      harness.dialog.openPath = 'C:/notes/devbox.devbox';
+      harness.repository.importReport = {
+        ...harness.repository.importReport,
+        notesImported: 0,
+        notesSkipped: 4,
+        foldersCreated: 2,
+      };
+
+      expect(await harness.store.import()).toBe(true);
     });
 
     // A bundle from a newer DevBox imports rather than failing whole, and the note it
@@ -106,6 +134,7 @@ describe('LibraryStore', () => {
     it('says when a note came from a newer version', async () => {
       harness.dialog.openPath = 'C:/in.json';
       harness.repository.importReport = {
+        foldersCreated: 0,
         spacesCreated: 0,
         notesImported: 5,
         notesSkipped: 0,
@@ -122,6 +151,7 @@ describe('LibraryStore', () => {
     it('counts the attachments that came back with the notes', async () => {
       harness.dialog.openPath = 'C:/in.devbox';
       harness.repository.importReport = {
+        foldersCreated: 0,
         spacesCreated: 0,
         notesImported: 2,
         notesSkipped: 0,
@@ -141,6 +171,7 @@ describe('LibraryStore', () => {
     it('says when the archive named an attachment it did not carry', async () => {
       harness.dialog.openPath = 'C:/in.devbox';
       harness.repository.importReport = {
+        foldersCreated: 0,
         spacesCreated: 0,
         notesImported: 2,
         notesSkipped: 0,
@@ -157,6 +188,7 @@ describe('LibraryStore', () => {
     it('says so plainly when everything was already there', async () => {
       harness.dialog.openPath = 'C:/in.json';
       harness.repository.importReport = {
+        foldersCreated: 0,
         spacesCreated: 0,
         notesImported: 0,
         notesSkipped: 4,
@@ -292,7 +324,7 @@ describe('LibraryStore', () => {
      *  user believe an export of screenshots carried none. */
     it('counts the attachments that travelled with the notes', async () => {
       harness.dialog.savePath = 'C:/backups/devbox.devbox';
-      harness.repository.exportReport = { notes: 3, spaces: 1, attachments: 2, protected: false };
+      harness.repository.exportReport = { notes: 3, spaces: 1, folders: 0, attachments: 2, protected: false };
 
       await exportEverything(harness);
 
@@ -304,7 +336,7 @@ describe('LibraryStore', () => {
 
     it('does not pretend to have exported an empty library', async () => {
       harness.dialog.savePath = 'C:/out.json';
-      harness.repository.exportReport = { notes: 0, spaces: 0, attachments: 0, protected: false };
+      harness.repository.exportReport = { notes: 0, spaces: 0, folders: 0, attachments: 0, protected: false };
 
       await exportEverything(harness);
 

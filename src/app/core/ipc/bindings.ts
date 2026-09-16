@@ -349,6 +349,7 @@ export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" 
 export type ExportReport = {
 	notes: number,
 	spaces: number,
+	folders: number,
 	/**
 	 *  What actually went into the archive. A record whose file has gone missing is left
 	 *  out rather than failing the export.
@@ -396,6 +397,12 @@ export type GlobalAction = "capture" | "new-note" | "palette";
  */
 export type ImportReport = {
 	spacesCreated: number,
+	/**
+	 *  Matched by name inside the destination space, and created when absent — the rule
+	 *  spaces already follow. Every library operation reports, including when it changed
+	 *  nothing.
+	 */
+	foldersCreated: number,
 	notesImported: number,
 	notesSkipped: number,
 	/**

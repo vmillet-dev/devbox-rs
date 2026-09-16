@@ -11,6 +11,7 @@ use specta::Type;
 
 use crate::attachments::model::Attachment;
 use crate::error::{StorageError, ValidationError};
+use crate::folders::model::Folder;
 use crate::notes::checklist::{self, NoteKind};
 use crate::notes::language::Language;
 use crate::notes::model::Note;
@@ -29,6 +30,14 @@ pub struct Bundle {
     pub version: u32,
     pub exported_at: DateTime<Utc>,
     pub spaces: Vec<Space>,
+    /// The folders actually cited, for the same reason only the cited spaces travel.
+    /// ⚠️ `default` so an export written before folders stays readable — and no
+    /// `FORMAT_VERSION` bump, because such a file still parses.
+    ///
+    /// ⚠️ No geometry: `Folder` carries none. Where a zone sits is columns only the board
+    /// query reads, so a board received from elsewhere cannot land on top of yours.
+    #[serde(default)]
+    pub folders: Vec<Folder>,
     pub notes: Vec<Note>,
     /// The records only — the bytes are entries of the archive, keyed by
     /// [`crate::attachments::model::stored_name`]. ⚠️ `default` so a `.json` export written
@@ -42,6 +51,7 @@ pub struct Bundle {
 pub struct ExportReport {
     pub notes: u32,
     pub spaces: u32,
+    pub folders: u32,
     /// What actually went into the archive. A record whose file has gone missing is left
     /// out rather than failing the export.
     pub attachments: u32,
@@ -57,6 +67,10 @@ pub struct ExportReport {
 #[serde(rename_all = "camelCase")]
 pub struct ImportReport {
     pub spaces_created: u32,
+    /// Matched by name inside the destination space, and created when absent — the rule
+    /// spaces already follow. Every library operation reports, including when it changed
+    /// nothing.
+    pub folders_created: u32,
     pub notes_imported: u32,
     pub notes_skipped: u32,
     /// Imported with a `language` or `kind` this build does not know brought down to the
@@ -366,6 +380,7 @@ mod tests {
                 name: "Personal".to_string(),
                 pinned: false,
             }],
+            folders: Vec::new(),
             notes: vec![sample()],
             attachments: Vec::new(),
         };

@@ -424,6 +424,7 @@ fn a_tag_usage_carries_its_count_under_a_camel_case_key() {
 fn an_import_report_names_what_it_skipped() {
     let json = serde_json::to_value(ImportReport {
         spaces_created: 1,
+        folders_created: 5,
         notes_imported: 2,
         notes_skipped: 3,
         notes_degraded: 4,
@@ -433,6 +434,7 @@ fn an_import_report_names_what_it_skipped() {
     .unwrap();
 
     assert_eq!(json["spacesCreated"], 1);
+    assert_eq!(json["foldersCreated"], 5);
     assert_eq!(json["notesImported"], 2);
     assert_eq!(json["notesSkipped"], 3);
     assert_eq!(json["notesDegraded"], 4);
@@ -450,6 +452,7 @@ fn an_export_bundle_reads_back_the_notes_it_wrote() {
             name: "Personal".to_string(),
             pinned: false,
         }],
+        folders: Vec::new(),
         notes: vec![sample()],
         attachments: Vec::new(),
     };

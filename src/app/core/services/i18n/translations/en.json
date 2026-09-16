@@ -408,7 +408,8 @@
     "copied": "{{notes}} note(s) copied as Markdown to the clipboard.",
     "needsSelection": "Select at least one note.",
     "emptyLibrary": "Nothing to export: this library has no notes.",
-    "preferences": "Preferences…"
+    "preferences": "Preferences…",
+    "importedIntoFolders": "{{notes}} note(s) imported from {{path}} into {{folders}} new folder(s), {{skipped}} skipped."
   },
   "shortcuts": {
     "unavailable": "Global shortcut(s) unavailable: {{list}}. Another application is already using them.",

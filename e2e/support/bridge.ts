@@ -6,6 +6,8 @@ import { homeSpaceMarker } from './profile.js';
 import type {
   Attachment,
   DisplayNote,
+  BoardQuery,
+  BoardView,
   Folder,
   FolderColour,
   FolderDraft,
@@ -60,6 +62,7 @@ export const bridge = {
   renameFolder: (id: string, name: string) => invoke<Folder>('rename_folder', { id, name }),
   recolourFolder: (id: string, colour: FolderColour) => invoke<Folder>('recolour_folder', { id, colour }),
   deleteFolder: (id: string) => invoke<null>('delete_folder', { id }),
+  boardView: (query: BoardQuery) => invoke<BoardView>('board_view', { query }),
   /** `folderId` of `null` unfiles; the answer is what each note left, never a count. */
   fileNotes: (ids: string[], folderId: string | null) =>
     invoke<NoteFiling[]>('file_notes', { ids, folderId }),
