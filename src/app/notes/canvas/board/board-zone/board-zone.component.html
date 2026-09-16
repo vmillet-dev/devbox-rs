@@ -1,18 +1,33 @@
 @let folder = zone().folder;
-@let frame = zone().frame;
+@let box = frame();
 
 <section
   class="zone"
   data-testid="board-zone"
   [attr.data-folder-id]="folder.id"
   [class]="'zone is-' + folder.colour"
-  [style.left.px]="frame.x"
-  [style.top.px]="frame.y"
-  [style.width.px]="frame.width"
-  [style.height.px]="frame.height"
+  [class.drop-target]="isDropTarget()"
+  [class.moving]="isMoving()"
+  [style.left.px]="box.x"
+  [style.top.px]="box.y"
+  [style.width.px]="box.width"
+  [style.height.px]="box.height"
   [attr.aria-labelledby]="headingId()"
 >
   <header class="zone-head">
+    @if (editable()) {
+      <!-- ⚠️ A grip, not the whole header: the title is a button that descends into the
+           folder, and a drag started on it would have to swallow its own click. -->
+      <button
+        type="button"
+        class="zone-grip"
+        data-testid="board-zone-grip"
+        [attr.aria-label]="'board.moveZone' | transloco: { name: folder.name }"
+        (pointerdown)="headGrabbed.emit($event)"
+      >
+        <span aria-hidden="true">⠿</span>
+      </button>
+    }
     <i class="zone-swatch" aria-hidden="true"></i>
     <!-- A button, not a heading alone: clicking the title is what descends into it. -->
     <button
@@ -25,20 +40,48 @@
       {{ folder.name }}
     </button>
     <span class="zone-count">{{ zone().notes.length }}</span>
+    @if (isDropTarget()) {
+      <span class="zone-drop" data-testid="board-zone-drop">{{ 'board.dropHere' | transloco }}</span>
+    }
   </header>
 
   <div class="zone-body">
     @for (entry of zone().notes; track entry.note.id) {
       <!-- ⚠️ Dimmed, never dropped: reflowing the survivors throws away the spatial
            memory the board exists for. -->
-      <app-note-card
-        [note]="entry.note"
+      <div
+        class="zone-card"
+        [attr.data-note-id]="entry.note.id"
         [class.dimmed]="!entry.matches"
-        (opened)="noteActivated.emit($event)"
-      />
+        [class.lifted]="draggingNoteId() === entry.note.id"
+      >
+        @if (editable()) {
+          <button
+            type="button"
+            class="card-grip"
+            data-testid="board-card-grip"
+            [attr.aria-label]="'board.moveCard' | transloco: { title: entry.note.title }"
+            (pointerdown)="grabCard($event, entry)"
+          >
+            <span aria-hidden="true">⠿</span>
+          </button>
+        }
+        <app-note-card [note]="entry.note" (opened)="noteActivated.emit($event)" />
+      </div>
     }
     @if (zone().notes.length === 0) {
       <p class="zone-empty">{{ 'board.emptyZone' | transloco }}</p>
     }
   </div>
+
+  @if (editable()) {
+    <!-- ⚠️ Resizing captures and releases nothing: membership comes from the drop. -->
+    <button
+      type="button"
+      class="zone-resize"
+      data-testid="board-zone-resize"
+      [attr.aria-label]="'board.resizeZone' | transloco: { name: folder.name }"
+      (pointerdown)="resizeGrabbed.emit($event)"
+    ></button>
+  }
 </section>

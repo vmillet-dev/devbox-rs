@@ -2,9 +2,19 @@ import { Injectable, Signal, computed, effect, inject, resource, signal, untrack
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { PreferencesService } from '@core/services/preferences/preferences.service';
 import { ClockService } from '@core/services/time/clock.service';
+import { FoldersRepository } from '../data/folders.repository';
 import { BoardRepository } from '../data/board.repository';
+import { debounced } from '@core/services/time/debounce';
 import { LanguageTag } from '../model/language.model';
-import { BoardNote, BoardQuery, BoardView, BoardZone, NotesViewMode } from '../model/board.model';
+import {
+  BoardFrame,
+  BoardNote,
+  BoardPoint,
+  BoardQuery,
+  BoardView,
+  BoardZone,
+  NotesViewMode,
+} from '../model/board.model';
 import { NoteFilter } from '../model/note.model';
 import { NotesQueryStore } from './notes-query.store';
 import { NotesRevision } from './notes-revision';
@@ -17,6 +27,12 @@ import { SpacesStore } from './spaces.store';
 function preferenceKey(spaceId: string): string {
   return `devbox.notes.view.${spaceId}`;
 }
+
+/**
+ * ⚠️ Long enough that dragging three cards in a row is one write, short enough that a
+ * quit right after a drop has already been beaten to it.
+ */
+export const LAYOUT_SAVE_DEBOUNCE_MS = 400;
 
 interface BoardParams {
   readonly spaceId: string;
@@ -62,6 +78,7 @@ function sameBoardParams(a: BoardParams | undefined, b: BoardParams | undefined)
 @Injectable({ providedIn: 'root' })
 export class BoardStore {
   private readonly repository = inject(BoardRepository);
+  private readonly folders = inject(FoldersRepository);
   private readonly notifier = inject(ErrorNotifier);
   private readonly preferences = inject(PreferencesService);
   private readonly clock = inject(ClockService);
@@ -140,8 +157,29 @@ export class BoardStore {
     this.viewResource.hasValue() ? this.viewResource.value() : null,
   );
 
-  readonly zones = computed<readonly BoardZone[]>(() => this.view()?.zones ?? []);
-  readonly loose = computed<readonly BoardNote[]>(() => this.view()?.loose ?? []);
+  /**
+   * What a gesture has moved but not yet written. ⚠️ Laid over the view rather than
+   * written into it: without this the card snaps back to where the server last saw it for
+   * as long as the save is in flight.
+   */
+  private readonly stagedFrames = signal<ReadonlyMap<string, BoardFrame>>(new Map());
+  private readonly stagedCards = signal<ReadonlyMap<string, BoardPoint>>(new Map());
+
+  readonly zones = computed<readonly BoardZone[]>(() => {
+    const staged = this.stagedFrames();
+    return (this.view()?.zones ?? []).map((zone) => {
+      const frame = staged.get(zone.folder.id);
+      return frame ? { ...zone, frame } : zone;
+    });
+  });
+
+  readonly loose = computed<readonly BoardNote[]>(() => {
+    const staged = this.stagedCards();
+    return (this.view()?.loose ?? []).map((entry) => {
+      const position = staged.get(entry.note.id);
+      return position ? { ...entry, position } : entry;
+    });
+  });
   readonly isFiltering = computed(() => this.view()?.isFiltering ?? false);
   readonly width = computed(() => this.view()?.width ?? 0);
   readonly height = computed(() => this.view()?.height ?? 0);
@@ -170,5 +208,90 @@ export class BoardStore {
 
   reload(): void {
     this.viewResource.reload();
+  }
+
+  /**
+   * Where a zone ended up. Staged and written behind the debounce, never per pointermove:
+   * a drag is one write, not one per pixel.
+   */
+  moveZone(folderId: string, frame: BoardFrame): void {
+    this.stagedFrames.update((staged) => new Map(staged).set(folderId, frame));
+    this.flushLayout();
+  }
+
+  /** Only ever called for a loose card: a filed one flows inside its zone. */
+  moveCard(noteId: string, position: BoardPoint): void {
+    this.stagedCards.update((staged) => new Map(staged).set(noteId, position));
+    this.flushLayout();
+  }
+
+  /**
+   * A drop decides membership, in both directions. `folderId` of `null` takes the note out
+   * of its folder and leaves it where it was dropped.
+   *
+   * ⚠️ Filing goes through the batch command, which answers what it changed — the same
+   * path the selection bar takes, so the two cannot drift.
+   */
+  async dropCard(noteId: string, folderId: string | null, position: BoardPoint): Promise<boolean> {
+    if (folderId === null) {
+      this.moveCard(noteId, position);
+    }
+
+    const filed = await this.notifier.attempt('errors.fileFailed', () =>
+      this.folders.fileMany([noteId], folderId),
+    );
+    if (filed === null) return false;
+
+    if (filed.length > 0) {
+      this.revision.bump();
+    }
+    return true;
+  }
+
+  /** Drawing a band on empty canvas creates a folder, placed where it was drawn. */
+  async createZone(name: string, frame: BoardFrame): Promise<boolean> {
+    const trimmed = name.trim();
+    const spaceId = this.spaces.activeSpaceId();
+    if (!trimmed || spaceId === null) return false;
+
+    const created = await this.notifier.attempt(
+      'errors.folderCreateFailed',
+      () => this.folders.create({ spaceId, name: trimmed }),
+      { name: trimmed },
+    );
+    if (!created) return false;
+
+    // ⚠️ Written straight through rather than staged: the board is about to reload, and a
+    // staged frame keyed on a folder the reload has only just heard of would be dropped.
+    await this.notifier.attempt('errors.boardSaveFailed', () =>
+      this.repository.saveLayout([{ folderId: created.id, frame }], []),
+    );
+    this.revision.bump();
+    return true;
+  }
+
+  /** ⚠️ Every staged move, or a batch interrupted halfway leaves half a board. */
+  private readonly writeLayout = debounced(() => void this.persistLayout(), LAYOUT_SAVE_DEBOUNCE_MS);
+
+  private flushLayout(): void {
+    this.writeLayout(undefined);
+  }
+
+  private async persistLayout(): Promise<void> {
+    const zones = [...this.stagedFrames()].map(([folderId, frame]) => ({ folderId, frame }));
+    const cards = [...this.stagedCards()].map(([noteId, position]) => ({ noteId, position }));
+    if (zones.length === 0 && cards.length === 0) return;
+
+    const written = await this.notifier.attempt('errors.boardSaveFailed', () =>
+      this.repository.saveLayout(zones, cards),
+    );
+
+    // ⚠️ Cleared only once it is stored: dropping the overlay on a failure would snap
+    // every card back with nothing on screen saying why.
+    if (written !== null) {
+      this.stagedFrames.set(new Map());
+      this.stagedCards.set(new Map());
+      this.reload();
+    }
   }
 }

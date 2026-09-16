@@ -225,6 +225,161 @@ export const board = {
     );
   },
 
+  /**
+   * A pointer drag, dispatched from inside the page.
+   *
+   * ⚠️ Synthetic, like every other input this suite sends: the embedded driver drops
+   * WebDriver actions. So this proves the wiring — grip to store to command to database —
+   * and not the WebView's own pointer capture, which the unit specs cover instead.
+   */
+  /** Drags a loose card until it lands inside the given zone. */
+  async dragCardInto(noteId: string, folderId: string): Promise<void> {
+    await browser.execute(
+      (cardSelector: string, zoneSelector: string, gripSelector: string) => {
+        const card = document.querySelector(cardSelector);
+        const zone = document.querySelector(zoneSelector);
+        const grip = document.querySelector(gripSelector);
+        const surface = document.querySelector('[data-testid="board-surface"]');
+        if (!card || !zone || !grip || !surface) throw new Error('nothing to drag');
+
+        const cardBox = card.getBoundingClientRect();
+        const zoneBox = zone.getBoundingClientRect();
+        const gripBox = grip.getBoundingClientRect();
+        // Where the card's own corner has to end up for the drop to land in the zone.
+        const dx = zoneBox.left + 60 - cardBox.left;
+        const dy = zoneBox.top + 80 - cardBox.top;
+
+        const from = { x: gripBox.left + gripBox.width / 2, y: gripBox.top + gripBox.height / 2 };
+        const send = (target: Element, type: string, x: number, y: number) =>
+          target.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              button: 0,
+              pointerId: 1,
+            }),
+          );
+
+        send(grip, 'pointerdown', from.x, from.y);
+        send(surface, 'pointermove', from.x + dx, from.y + dy);
+        send(surface, 'pointerup', from.x + dx, from.y + dy);
+      },
+      `${testid('board-loose-card')}[data-note-id="${noteId}"]`,
+      `${testid('board-zone')}[data-folder-id="${folderId}"]`,
+      board.cardGrip(noteId),
+    );
+    await browser.pause(1200);
+  },
+
+  async drag(gripSelector: string, to: { dx: number; dy: number }): Promise<void> {
+    await browser.execute(
+      (selector: string, dx: number, dy: number) => {
+        const grip = document.querySelector(selector);
+        const surface = document.querySelector('[data-testid="board-surface"]');
+        if (!grip || !surface) throw new Error(`nothing to drag at ${selector}`);
+
+        const box = grip.getBoundingClientRect();
+        const from = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+        const send = (target: Element, type: string, x: number, y: number) =>
+          target.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              button: 0,
+              pointerId: 1,
+            }),
+          );
+
+        send(grip, 'pointerdown', from.x, from.y);
+        send(surface, 'pointermove', from.x + dx, from.y + dy);
+        send(surface, 'pointerup', from.x + dx, from.y + dy);
+      },
+      gripSelector,
+      to.dx,
+      to.dy,
+    );
+    // Past the layout debounce, so the assertion reads what was actually written.
+    await browser.pause(1200);
+  },
+
+  /** Draws a band on the empty background, in surface coordinates. */
+  async drawZone(at: { x: number; y: number; width: number; height: number }): Promise<void> {
+    await browser.execute(
+      (x: number, y: number, width: number, height: number) => {
+        const surface = document.querySelector('[data-testid="board-surface"]');
+        if (!surface) throw new Error('no board surface');
+
+        const box = surface.getBoundingClientRect();
+        const send = (type: string, cx: number, cy: number) =>
+          surface.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              clientX: cx,
+              clientY: cy,
+              button: 0,
+              pointerId: 1,
+            }),
+          );
+
+        send('pointerdown', box.left + x, box.top + y);
+        send('pointermove', box.left + x + width, box.top + y + height);
+        send('pointerup', box.left + x + width, box.top + y + height);
+      },
+      at.x,
+      at.y,
+      at.width,
+      at.height,
+    );
+    await browser.pause(400);
+  },
+
+  cardGrip: (noteId: string) => `[data-note-id="${noteId}"] ${testid('board-card-grip')}`,
+  zoneGrip: (folderId: string) =>
+    `${testid('board-zone')}[data-folder-id="${folderId}"] ${testid('board-zone-grip')}`,
+  zoneResize: (folderId: string) =>
+    `${testid('board-zone')}[data-folder-id="${folderId}"] ${testid('board-zone-resize')}`,
+
+  /** The frame of one zone as the board actually placed it. */
+  frameOf(folderId: string): Promise<{ left: string; top: string; width: string; height: string }> {
+    return browser.execute(
+      (selector: string) => {
+        const zone = document.querySelector<HTMLElement>(selector);
+        if (!zone) throw new Error(`no zone ${selector}`);
+        return {
+          left: zone.style.left,
+          top: zone.style.top,
+          width: zone.style.width,
+          height: zone.style.height,
+        };
+      },
+      `${testid('board-zone')}[data-folder-id="${folderId}"]`,
+    );
+  },
+
+  /** Where a loose card sits, which is the only place a card has one. */
+  positionOf(noteId: string): Promise<{ left: string; top: string }> {
+    return browser.execute(
+      (selector: string) => {
+        const card = document.querySelector<HTMLElement>(selector);
+        if (!card) throw new Error(`no loose card ${selector}`);
+        return { left: card.style.left, top: card.style.top };
+      },
+      `${testid('board-loose-card')}[data-note-id="${noteId}"]`,
+    );
+  },
+
+  async nameZone(name: string): Promise<void> {
+    await $(testid('folder-name-input')).waitForExist({ timeout: 5_000 });
+    await setField(testid('folder-name-input'), name);
+    await $(testid('folder-name-submit')).click();
+    await browser.pause(800);
+  },
+
   /** ⚠️ Dimmed, never dropped: the card is still there, it has only stopped shouting. */
   isDimmed(title: string): Promise<boolean> {
     return browser.execute(
@@ -232,7 +387,7 @@ export const board = {
         [...document.querySelectorAll(cardSelector)]
           .find((card) => (card.querySelector(titleSelector)?.textContent ?? '').trim() === wanted)
           ?.classList.contains('dimmed') ?? false,
-      'app-note-card',
+      '.zone-card, .loose-card',
       testid('note-card-title'),
       title,
     );

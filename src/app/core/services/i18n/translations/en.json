@@ -113,7 +113,14 @@
     "needsASpace": "Pick a space to see its board.",
     "loose": "No folder · {{count}}",
     "emptyZone": "No note here.",
-    "empty": "Nothing to arrange yet."
+    "empty": "Nothing to arrange yet.",
+    "moveCard": "Move the note {{title}}",
+    "moveZone": "Move the folder {{name}}",
+    "resizeZone": "Resize the folder {{name}}",
+    "dropHere": "Drop here",
+    "nameTheZone": "Name this folder",
+    "nameTheZoneHint": "The colour is assigned; change it from the folder menu.",
+    "dragHint": "Dragging a note into a zone files it; dropping it on the background takes it out."
   },
   "sections": {
     "pinned": "Pinned",
@@ -219,7 +226,9 @@
     "folderDeleteFailed": "The folder could not be deleted.",
     "folderGone": "That folder no longer exists.",
     "folderNameTaken": "A folder named “{{name}}” already exists in this space.",
-    "boardLoadFailed": "The board could not be loaded."
+    "boardLoadFailed": "The board could not be loaded.",
+    "boardSaveFailed": "The board layout could not be saved.",
+    "fileFailed": "The note could not be filed."
   },
   "tray": {
     "open": "Open {{app}}",

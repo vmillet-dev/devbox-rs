@@ -93,6 +93,9 @@
         [height]="board.height()"
         (noteActivated)="onNoteActivated($event)"
         (folderOpened)="folders.selectFolder($event)"
+        (cardDropped)="onCardDropped($event)"
+        (zoneMoved)="board.moveZone($event.folderId, $event.frame)"
+        (zoneDrawn)="onZoneDrawn($event)"
       />
     }
   } @else {
@@ -199,6 +202,10 @@
     (confirmed)="tags.confirm()"
     (cancelled)="tags.cancel()"
   />
+}
+
+@if (pendingZone(); as frame) {
+  <app-folder-name-prompt (submitted)="onZoneNamed(frame, $event)" (cancelled)="pendingZone.set(null)" />
 }
 
 @if (store.undoBanner(); as action) {

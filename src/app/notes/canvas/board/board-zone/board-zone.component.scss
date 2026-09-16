@@ -71,3 +71,82 @@
 app-note-card.dimmed {
   opacity: 0.3;
 }
+
+// Quiet at rest but never hidden: `visibility: hidden` would take it out of the tab order.
+.card-grip,
+.zone-grip {
+  @include unstyled-control;
+
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-2);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0.4;
+}
+
+.card-grip {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  z-index: 2;
+  background: var(--bg-2);
+}
+
+.zone-card {
+  position: relative;
+}
+
+.zone-card:hover .card-grip,
+.card-grip:hover,
+.card-grip:focus-visible,
+.zone-head:hover .zone-grip,
+.zone-grip:hover,
+.zone-grip:focus-visible {
+  opacity: 1;
+  color: var(--text-0);
+}
+
+.card-grip:focus-visible,
+.zone-grip:focus-visible,
+.zone-resize:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+// The card is drawn on the surface while it travels; its seat stays, faintly.
+.zone-card.lifted {
+  opacity: 0.25;
+}
+
+.zone.drop-target {
+  border-width: 2px;
+  background: color-mix(in srgb, var(--folder-hue) 14%, transparent);
+}
+
+.zone.moving {
+  box-shadow: 0 14px 30px rgb(0 0 0 / 45%);
+}
+
+.zone-drop {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--folder-hue);
+}
+
+.zone-resize {
+  @include unstyled-control;
+
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 14px;
+  height: 14px;
+  border-right: 2px solid var(--folder-hue);
+  border-bottom: 2px solid var(--folder-hue);
+  border-radius: 0 0 3px;
+  cursor: nwse-resize;
+  touch-action: none;
+}

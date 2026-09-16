@@ -571,8 +571,11 @@ mod board {
     fn a_board_draws_every_folder_as_a_zone_holding_its_notes() {
         let mut connection = open_in_memory().unwrap();
         let sql = space(&mut connection, "SQL");
+        // ⚠️ Distinct instants: `list` orders by `(created_at, id)`, so two folders made
+        // in the same millisecond fall back to their UUIDs — stable across launches, which
+        // is what the board needs, but not something a test can name.
         let migrations = create(&mut connection, &sql, "Migrations", t0()).unwrap();
-        create(&mut connection, &sql, "Perf", t0()).unwrap();
+        create(&mut connection, &sql, "Perf", t1()).unwrap();
         let filed = note_in(&mut connection, &sql);
         note_in(&mut connection, &sql);
         file_many(
@@ -832,5 +835,264 @@ mod board {
 
         assert_eq!(board.zones.len(), 1);
         assert!(board.loose.is_empty());
+    }
+}
+
+mod gesture {
+    use super::*;
+
+    use devbox_lib::folders::board::{
+        BoardFrame, BoardPoint, CardPlacement, MIN_ZONE_HEIGHT, MIN_ZONE_WIDTH, ZonePlacement,
+        clamp, clamp_point, zone_at,
+    };
+    use devbox_lib::folders::store::board as geometry;
+
+    fn frames(connection: &mut Library, space_id: &str) -> HashMap<String, BoardFrame> {
+        connection
+            .transaction(|connection, _vault| geometry::frames(connection, space_id))
+            .unwrap()
+    }
+
+    fn positions(connection: &mut Library, space_id: &str) -> HashMap<String, BoardPoint> {
+        connection
+            .transaction(|connection, _vault| geometry::positions(connection, space_id))
+            .unwrap()
+    }
+
+    #[test]
+    fn a_moved_zone_and_a_moved_card_are_written_as_one_batch() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let perf = create(&mut connection, &sql, "Perf", t0()).unwrap();
+        let note = note_in(&mut connection, &sql);
+
+        let frame = BoardFrame {
+            x: 600,
+            y: 320,
+            width: 520,
+            height: 400,
+        };
+        let point = BoardPoint { x: 48, y: 720 };
+        geometry::save_layout(
+            &mut connection,
+            &[ZonePlacement {
+                folder_id: perf.id.clone(),
+                frame,
+            }],
+            &[CardPlacement {
+                note_id: note.id.clone(),
+                position: point,
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(frames(&mut connection, &sql).get(&perf.id), Some(&frame));
+        assert_eq!(positions(&mut connection, &sql).get(&note.id), Some(&point));
+    }
+
+    /// ⚠️ A zone nothing can be dropped into is not a zone. Clamped rather than refused:
+    /// answering an error mid-gesture leaves the interface holding a frame nothing stored.
+    #[test]
+    fn a_zone_squashed_to_nothing_keeps_room_for_one_card() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let perf = create(&mut connection, &sql, "Perf", t0()).unwrap();
+
+        geometry::save_layout(
+            &mut connection,
+            &[ZonePlacement {
+                folder_id: perf.id.clone(),
+                frame: BoardFrame {
+                    x: -50,
+                    y: -50,
+                    width: 4,
+                    height: 4,
+                },
+            }],
+            &[],
+        )
+        .unwrap();
+
+        let stored = frames(&mut connection, &sql);
+        let frame = stored.get(&perf.id).unwrap();
+        assert_eq!(frame.x, 0);
+        assert_eq!(frame.y, 0);
+        assert_eq!(frame.width, MIN_ZONE_WIDTH);
+        assert_eq!(frame.height, MIN_ZONE_HEIGHT);
+    }
+
+    /// ⚠️ A filed card flows inside its zone. Writing a position for one would put back the
+    /// row `file_many` had just dropped, and the table would stop meaning "this is loose".
+    #[test]
+    fn a_card_filed_since_the_drag_is_not_given_a_position_back() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let perf = create(&mut connection, &sql, "Perf", t0()).unwrap();
+        let note = note_in(&mut connection, &sql);
+        file_many(
+            &mut connection,
+            std::slice::from_ref(&note.id),
+            Some(&perf.id),
+            t1(),
+        )
+        .unwrap();
+
+        geometry::save_layout(
+            &mut connection,
+            &[],
+            &[CardPlacement {
+                note_id: note.id.clone(),
+                position: BoardPoint { x: 10, y: 10 },
+            }],
+        )
+        .unwrap();
+
+        assert!(!positions(&mut connection, &sql).contains_key(&note.id));
+    }
+
+    /// Every zone or none: half a board is a board nobody arranged.
+    #[test]
+    fn a_batch_naming_a_folder_that_is_gone_writes_nothing_at_all() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let perf = create(&mut connection, &sql, "Perf", t0()).unwrap();
+        let note = note_in(&mut connection, &sql);
+
+        let refused = geometry::save_layout(
+            &mut connection,
+            &[
+                ZonePlacement {
+                    folder_id: perf.id.clone(),
+                    frame: BoardFrame {
+                        x: 600,
+                        y: 320,
+                        width: 520,
+                        height: 400,
+                    },
+                },
+                ZonePlacement {
+                    folder_id: "gone".to_string(),
+                    frame: BoardFrame {
+                        x: 0,
+                        y: 0,
+                        width: 520,
+                        height: 400,
+                    },
+                },
+            ],
+            &[CardPlacement {
+                note_id: note.id.clone(),
+                position: BoardPoint { x: 48, y: 720 },
+            }],
+        );
+
+        assert!(matches!(refused, Err(StorageError::FolderNotFound(_))));
+        assert!(frames(&mut connection, &sql).is_empty());
+        assert!(positions(&mut connection, &sql).is_empty());
+    }
+
+    #[test]
+    fn an_empty_batch_is_not_an_error() {
+        let mut connection = open_in_memory().unwrap();
+
+        assert!(geometry::save_layout(&mut connection, &[], &[]).is_ok());
+    }
+
+    /// Membership comes from the drop, and from nothing else.
+    #[test]
+    fn a_point_names_the_zone_it_falls_in() {
+        let zones = vec![
+            (
+                "a".to_string(),
+                BoardFrame {
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                },
+            ),
+            (
+                "b".to_string(),
+                BoardFrame {
+                    x: 200,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                },
+            ),
+        ];
+
+        assert_eq!(
+            zone_at(&zones, BoardPoint { x: 50, y: 50 }),
+            Some("a".into())
+        );
+        assert_eq!(
+            zone_at(&zones, BoardPoint { x: 250, y: 50 }),
+            Some("b".into())
+        );
+    }
+
+    /// The free background is a legitimate answer: dropping there unfiles the note.
+    #[test]
+    fn a_point_on_the_background_names_no_zone() {
+        let zones = vec![(
+            "a".to_string(),
+            BoardFrame {
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 100,
+            },
+        )];
+
+        assert_eq!(zone_at(&zones, BoardPoint { x: 150, y: 50 }), None);
+        // The far edges belong to the next zone along, not to this one.
+        assert_eq!(zone_at(&zones, BoardPoint { x: 100, y: 50 }), None);
+        assert_eq!(zone_at(&zones, BoardPoint { x: 0, y: 0 }), Some("a".into()));
+    }
+
+    /// Drawn later means drawn on top, so it is what a drop lands in.
+    #[test]
+    fn overlapping_zones_hand_the_drop_to_the_topmost() {
+        let zones = vec![
+            (
+                "under".to_string(),
+                BoardFrame {
+                    x: 0,
+                    y: 0,
+                    width: 200,
+                    height: 200,
+                },
+            ),
+            (
+                "over".to_string(),
+                BoardFrame {
+                    x: 50,
+                    y: 50,
+                    width: 100,
+                    height: 100,
+                },
+            ),
+        ];
+
+        assert_eq!(
+            zone_at(&zones, BoardPoint { x: 100, y: 100 }),
+            Some("over".into())
+        );
+    }
+
+    #[test]
+    fn a_runaway_drag_cannot_put_anything_off_the_board() {
+        assert_eq!(clamp_point(BoardPoint { x: -40, y: -40 }).x, 0);
+        assert_eq!(
+            clamp(BoardFrame {
+                x: 10,
+                y: 10,
+                width: 1_000_000,
+                height: 10
+            })
+            .width,
+            devbox_lib::folders::board::MAX_SIDE
+        );
     }
 }

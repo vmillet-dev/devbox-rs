@@ -9,7 +9,7 @@ use diesel::prelude::*;
 use crate::db::Library;
 use crate::db::schema::{folders, note_positions, notes};
 use crate::error::StorageError;
-use crate::folders::board::{BoardFrame, BoardPoint};
+use crate::folders::board::{self, BoardFrame, BoardPoint, CardPlacement, ZonePlacement};
 
 /// What a board read resolves before anything can be drawn: where each zone sits, and
 /// where each loose card does.
@@ -115,6 +115,53 @@ pub fn forget_positions(
         .execute(connection)?;
 
     Ok(())
+}
+
+/// One transaction for the whole gesture: a board half written is a board nobody arranged.
+pub fn save_layout(
+    connection: &mut Library,
+    zones: &[ZonePlacement],
+    cards: &[CardPlacement],
+) -> Result<(), StorageError> {
+    if zones.is_empty() && cards.is_empty() {
+        return Ok(());
+    }
+
+    connection.transaction(|connection, _vault| {
+        for placement in zones {
+            if !crate::folders::store::exists(connection, &placement.folder_id)? {
+                return Err(StorageError::FolderNotFound(placement.folder_id.clone()));
+            }
+            set_frame(
+                connection,
+                &placement.folder_id,
+                board::clamp(placement.frame),
+            )?;
+        }
+
+        for placement in cards {
+            // ⚠️ Only a loose note has a place of its own. A card filed between the drag
+            // and the save flows inside its zone, and writing a position for it would put
+            // a row back that `file_many` had just dropped.
+            let filed: Option<String> = notes::table
+                .find(&placement.note_id)
+                .select(notes::folder_id)
+                .first::<Option<String>>(connection)
+                .optional()?
+                .flatten();
+            if filed.is_some() {
+                continue;
+            }
+
+            set_position(
+                connection,
+                &placement.note_id,
+                board::clamp_point(placement.position),
+            )?;
+        }
+
+        Ok(())
+    })
 }
 
 /// Reads the geometry, filling in whatever has never been laid out, in one transaction.
