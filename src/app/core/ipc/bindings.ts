@@ -72,6 +72,16 @@ export const commands = {
 	 *  sits in is noise, and a loose card has no folder to name.
 	 */
 	boardView: (query: BoardQuery) => typedError<BoardView, AppError>(__TAURI_INVOKE("board_view", { query })),
+	/**
+	 *  Where the zones and the loose cards ended up, written as one batch behind the front
+	 *  end's debounce.
+	 * 
+	 *  ⚠️ One command and one transaction for the whole gesture: a drag that ends outside the
+	 *  window, or an application that quits mid-gesture, must not leave half a board behind.
+	 *  Filing is **not** here — membership comes from [`file_notes`], which answers what it
+	 *  changed so the undo can put it back.
+	 */
+	saveBoardLayout: (zones: ZonePlacement[], cards: CardPlacement[]) => typedError<null, AppError>(__TAURI_INVOKE("save_board_layout", { zones, cards })),
 	createFolder: (draft: FolderDraft) => typedError<Folder, AppError>(__TAURI_INVOKE("create_folder", { draft })),
 	renameFolder: (id: string, name: string) => typedError<Folder, AppError>(__TAURI_INVOKE("rename_folder", { id, name })),
 	recolourFolder: (id: string, colour: FolderColour) => typedError<Folder, AppError>(__TAURI_INVOKE("recolour_folder", { id, colour })),
@@ -251,6 +261,16 @@ export type BoardZone = {
 	folder: Folder,
 	frame: BoardFrame,
 	notes: BoardNote[],
+};
+
+/**
+ *  One loose card that moved. ⚠️ Filing is not here: membership comes from
+ *  [`crate::folders::file_notes`], which answers what it changed so the undo can put it
+ *  back. A position is a local gesture and has no undo of its own.
+ */
+export type CardPlacement = {
+	noteId: string,
+	position: BoardPoint,
 };
 
 export type ChangelogRelease = {
@@ -657,6 +677,12 @@ export type VaultState =
 export type WindowBehavior = {
 	closeToTray: boolean,
 	minimizeToTray: boolean,
+};
+
+/**  One zone that moved. A batch of these is what a gesture eventually writes. */
+export type ZonePlacement = {
+	folderId: string,
+	frame: BoardFrame,
 };
 
 /* Tauri Specta runtime */

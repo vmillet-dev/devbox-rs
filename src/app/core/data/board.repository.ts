@@ -6,7 +6,14 @@ import type {
   BoardView as WireBoardView,
   BoardZone as WireBoardZone,
 } from '@core/ipc/bindings';
-import { BoardNote, BoardQuery, BoardView, BoardZone } from '../model/board.model';
+import {
+  BoardNote,
+  BoardQuery,
+  BoardView,
+  BoardZone,
+  CardPlacement,
+  ZonePlacement,
+} from '../model/board.model';
 import { toIsoString, toNote } from './note.mapper';
 
 /**
@@ -39,5 +46,10 @@ export class BoardRepository {
       now: toIsoString(query.now, 'now'),
     };
     return toBoardView(unwrap('board_view', await commands.boardView(wire)));
+  }
+
+  /** One command for the whole gesture: a board half written is a board nobody arranged. */
+  async saveLayout(zones: readonly ZonePlacement[], cards: readonly CardPlacement[]): Promise<void> {
+    unwrap('save_board_layout', await commands.saveBoardLayout([...zones], [...cards]));
   }
 }

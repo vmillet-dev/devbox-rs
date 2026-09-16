@@ -7,7 +7,8 @@ import { FakeSpacesRepository } from '@testing/fake-spaces-repository';
 import { provideAppTesting } from '@testing/testing.providers';
 import { Folder } from '../model/folder.model';
 import { Space } from '../model/space.model';
-import { BoardStore } from './board.store';
+import { FakeFoldersRepository } from '@testing/fake-folders-repository';
+import { BoardStore, LAYOUT_SAVE_DEBOUNCE_MS } from './board.store';
 import { NotesQueryStore } from './notes-query.store';
 import { SpacesStore } from './spaces.store';
 
@@ -29,14 +30,17 @@ interface Harness {
   readonly spaces: SpacesStore;
   readonly canvas: NotesQueryStore;
   readonly repository: FakeBoardRepository;
+  readonly folders: FakeFoldersRepository;
   readonly preferences: PreferencesService;
 }
 
 async function createStore(repository = new FakeBoardRepository()): Promise<Harness> {
+  const folders = new FakeFoldersRepository();
   TestBed.configureTestingModule({
     providers: [
       provideAppTesting({
         boardRepository: repository,
+        foldersRepository: folders,
         spacesRepository: new FakeSpacesRepository(SPACES),
       }),
     ],
@@ -50,6 +54,7 @@ async function createStore(repository = new FakeBoardRepository()): Promise<Harn
     spaces,
     canvas: TestBed.inject(NotesQueryStore),
     repository,
+    folders,
     preferences: TestBed.inject(PreferencesService),
   };
 }
@@ -195,6 +200,101 @@ describe('BoardStore', () => {
     await onBoard(harness);
 
     expect(harness.store.matched()).toBeNull();
+  });
+
+  describe('what a gesture writes', () => {
+    /** ⚠️ One write per gesture, not one per pointermove. */
+    it('coalesces everything moved into a single batch', async () => {
+      const harness = await createStore(
+        new FakeBoardRepository({
+          zones: [fakeZone({ folder: PERF })],
+          loose: [fakeBoardNote(createNote({ id: 'a' }), { position: { x: 0, y: 0 } })],
+        }),
+      );
+      await onBoard(harness);
+
+      harness.store.moveZone('perf', { x: 40, y: 40, width: 500, height: 300 });
+      harness.store.moveCard('a', { x: 80, y: 600 });
+      expect(harness.repository.saved).toHaveLength(0);
+
+      await vi.waitFor(() => expect(harness.repository.saved).toHaveLength(1), {
+        timeout: LAYOUT_SAVE_DEBOUNCE_MS * 6,
+      });
+      const batch = harness.repository.saved[0];
+      expect(batch?.zones).toEqual([{ folderId: 'perf', frame: { x: 40, y: 40, width: 500, height: 300 } }]);
+      expect(batch?.cards).toEqual([{ noteId: 'a', position: { x: 80, y: 600 } }]);
+    });
+
+    /** ⚠️ Without the overlay the card snaps back to where the server last saw it. */
+    it('shows the move at once, before it is written', async () => {
+      const harness = await createStore(
+        new FakeBoardRepository({
+          zones: [fakeZone({ folder: PERF, frame: { x: 16, y: 16, width: 516, height: 200 } })],
+        }),
+      );
+      await onBoard(harness);
+
+      harness.store.moveZone('perf', { x: 400, y: 300, width: 516, height: 200 });
+
+      expect(harness.store.zones()[0]?.frame.x).toBe(400);
+    });
+
+    it('keeps the overlay when the write fails, rather than snapping back silently', async () => {
+      const harness = await createStore(new FakeBoardRepository({ zones: [fakeZone({ folder: PERF })] }));
+      await onBoard(harness);
+      harness.repository.failNext = new Error('disk full');
+
+      harness.store.moveZone('perf', { x: 400, y: 300, width: 516, height: 200 });
+      await vi.waitFor(() => expect(harness.repository.failNext).toBeNull(), {
+        timeout: LAYOUT_SAVE_DEBOUNCE_MS * 6,
+      });
+
+      expect(harness.store.zones()[0]?.frame.x).toBe(400);
+    });
+
+    /** Membership goes through the batch command, the same path the selection bar takes. */
+    it('files a card dropped in a zone', async () => {
+      const harness = await createStore();
+      await onBoard(harness);
+
+      await harness.store.dropCard('a', 'perf', { x: 0, y: 0 });
+
+      expect(harness.folders.filings.get('a')).toBe('perf');
+    });
+
+    it('unfiles a card dropped on the background, and remembers where it landed', async () => {
+      const harness = await createStore();
+      await onBoard(harness);
+      await harness.store.dropCard('a', 'perf', { x: 0, y: 0 });
+
+      await harness.store.dropCard('a', null, { x: 320, y: 480 });
+
+      expect(harness.folders.filings.get('a')).toBeNull();
+      await vi.waitFor(() => expect(harness.repository.saved.length).toBeGreaterThan(0), {
+        timeout: LAYOUT_SAVE_DEBOUNCE_MS * 6,
+      });
+      expect(harness.repository.saved.at(-1)?.cards).toEqual([{ noteId: 'a', position: { x: 320, y: 480 } }]);
+    });
+
+    it('creates a folder from a drawn band, at the frame it was drawn', async () => {
+      const harness = await createStore();
+      await onBoard(harness);
+
+      const frame = { x: 700, y: 120, width: 400, height: 300 };
+      expect(await harness.store.createZone('Reporting', frame)).toBe(true);
+
+      const created = (await harness.folders.loadAll('sql'))[0];
+      expect(created?.name).toBe('Reporting');
+      expect(harness.repository.saved.at(-1)?.zones).toEqual([{ folderId: created?.id, frame }]);
+    });
+
+    it('refuses a band with no name rather than making an untitled folder', async () => {
+      const harness = await createStore();
+      await onBoard(harness);
+
+      expect(await harness.store.createZone('   ', { x: 0, y: 0, width: 400, height: 300 })).toBe(false);
+      expect(await harness.folders.loadAll('sql')).toHaveLength(0);
+    });
   });
 
   it('reports a failed load and draws nothing', async () => {

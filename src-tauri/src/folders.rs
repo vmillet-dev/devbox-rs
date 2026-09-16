@@ -14,7 +14,7 @@ use crate::db::{Db, lock};
 use crate::error::AppError;
 use crate::notes::view::{NoteFilter, NotesQuery};
 use crate::{attachments, notes};
-use board::{BoardQuery, BoardView};
+use board::{BoardQuery, BoardView, CardPlacement, ZonePlacement};
 use model::{Folder, FolderColour, FolderDraft, NoteFiling};
 
 /// The second way to look at a space: folders as zones, their notes inside them, the
@@ -83,6 +83,25 @@ fn whole_space(query: &BoardQuery) -> NotesQuery {
         tz_offset_minutes: 0,
         pinned_first: true,
     }
+}
+
+/// Where the zones and the loose cards ended up, written as one batch behind the front
+/// end's debounce.
+///
+/// ⚠️ One command and one transaction for the whole gesture: a drag that ends outside the
+/// window, or an application that quits mid-gesture, must not leave half a board behind.
+/// Filing is **not** here — membership comes from [`file_notes`], which answers what it
+/// changed so the undo can put it back.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn save_board_layout(
+    zones: Vec<ZonePlacement>,
+    cards: Vec<CardPlacement>,
+    db: State<'_, Db>,
+) -> Result<(), AppError> {
+    let mut connection = lock(&db)?;
+
+    Ok(store::board::save_layout(&mut connection, &zones, &cards)?)
 }
 
 /// `None` = every space, like [`crate::notes::view::NotesQuery::space_id`].

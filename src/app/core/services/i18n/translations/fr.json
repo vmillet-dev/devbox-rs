@@ -113,7 +113,14 @@
     "needsASpace": "Choisissez un espace pour voir son tableau.",
     "loose": "Hors dossier · {{count}}",
     "emptyZone": "Aucune note ici.",
-    "empty": "Rien à disposer pour le moment."
+    "empty": "Rien à disposer pour le moment.",
+    "moveCard": "Déplacer la note {{title}}",
+    "moveZone": "Déplacer le dossier {{name}}",
+    "resizeZone": "Redimensionner le dossier {{name}}",
+    "dropHere": "Déposer ici",
+    "nameTheZone": "Nommer ce dossier",
+    "nameTheZoneHint": "La couleur est attribuée ; changez-la depuis le menu du dossier.",
+    "dragHint": "Glisser une note dans une zone la range ; la lâcher sur le fond l’en sort."
   },
   "sections": {
     "pinned": "Épinglées",
@@ -219,7 +226,9 @@
     "folderDeleteFailed": "Le dossier n’a pas pu être supprimé.",
     "folderGone": "Ce dossier n’existe plus.",
     "folderNameTaken": "Un dossier « {{name}} » existe déjà dans cet espace.",
-    "boardLoadFailed": "Le tableau n’a pas pu être chargé."
+    "boardLoadFailed": "Le tableau n’a pas pu être chargé.",
+    "boardSaveFailed": "La disposition du tableau n’a pas pu être enregistrée.",
+    "fileFailed": "La note n’a pas pu être rangée."
   },
   "tray": {
     "open": "Ouvrir {{app}}",

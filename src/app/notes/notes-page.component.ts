@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AppEventsService, GlobalAction } from '@core/ipc/app-events.service';
 import { DialogStack } from '@shared/layout/dialog/dialog-stack';
@@ -17,7 +17,9 @@ import { SpacesStore } from '@core/state/spaces.store';
 import { TagsStore } from '@core/state/tags.store';
 import { TrashStore } from '@core/state/trash.store';
 import { CanvasKeyboardDirective } from '@shared/directives/canvas-keyboard.directive';
-import { BoardComponent } from './canvas/board/board.component';
+import { BoardFrame } from '@core/model/board.model';
+import { BoardComponent, CardDrop } from './canvas/board/board.component';
+import { FolderNamePromptComponent } from './overlays/folder-name-prompt/folder-name-prompt.component';
 import { FilterChipsComponent } from './header/filter-chips/filter-chips.component';
 import {
   FolderRecolouring,
@@ -54,6 +56,7 @@ import { UndoBarComponent } from './overlays/undo-bar/undo-bar.component';
     FolderSwitcherComponent,
     ViewSwitchComponent,
     BoardComponent,
+    FolderNamePromptComponent,
     NewNoteButtonComponent,
     SelectionBarComponent,
     TagRailComponent,
@@ -146,6 +149,23 @@ export class NotesPageComponent {
 
   protected onFolderRecoloured({ id, colour }: FolderRecolouring): void {
     void this.folders.recolourFolder(id, colour);
+  }
+
+  /** Where a band was drawn, held until it has been given a name. */
+  protected readonly pendingZone = signal<BoardFrame | null>(null);
+
+  protected onCardDropped({ noteId, folderId, position }: CardDrop): void {
+    void this.board.dropCard(noteId, folderId, position);
+  }
+
+  protected onZoneDrawn(frame: BoardFrame): void {
+    this.pendingZone.set(frame);
+  }
+
+  protected async onZoneNamed(frame: BoardFrame, name: string): Promise<void> {
+    this.pendingZone.set(null);
+    await this.board.createZone(name, frame);
+    this.folders.reload();
   }
 
   protected onNoteActivated({ noteId, toggleChecked, extendRange }: NoteActivation): void {

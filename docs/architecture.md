@@ -797,6 +797,52 @@ it — `note-section/` for the date view, `board/` for the board, and `note-card
 their nearest common ancestor. ⚠️ The region keeps the `canvas` test hook whichever view
 fills it: it is the address on screen, and the e2e helpers wait on it.
 
+### Arranging the board
+
+⚠️ **HTML5 drag and drop does not work in this WebView and cannot be turned on.**
+`dragDropEnabled` has to stay `true` for the native file drop that feeds attachments, which
+is exactly what stops the WebView from ever seeing `dragstart` and `drop`. Every gesture on
+the board is therefore pointer events — `pointerdown` + `setPointerCapture` +
+`pointermove` + `pointerup` — as checklist reordering already is.
+
+Four gestures, one state machine (`board.component.ts`), and the arithmetic in plain
+functions next to it (`board-gesture.ts`, which has no signals and no DOM):
+
+| Gesture       | Started from         | Ends as                                     |
+| ------------- | -------------------- | ------------------------------------------- |
+| move a card   | the card's ⠿ grip    | `file_notes` — the zone under it, or `null` |
+| move a zone   | the header's ⠿ grip  | a frame in the layout batch                 |
+| resize a zone | the corner handle    | a frame in the layout batch                 |
+| draw a zone   | the empty background | a folder, named on the spot, at that frame  |
+
+**A grip, not the card.** The card is a `<button>` that opens the note, so a drag started on
+it would have to swallow its own click. The grips are siblings, quiet at rest and never
+hidden — `visibility: hidden` would take them out of the tab order.
+
+⚠️ **The gesture commits on `pointerup` and nowhere else.** A drag that never travelled
+past `DRAG_THRESHOLD_PX` writes nothing — it was a click — and `pointercancel` throws the
+whole thing away rather than leaving a card at coordinates nobody chose.
+
+**Moving a zone carries its notes, and resizing one captures and releases nothing.** Both
+fall out of the flow rather than being coded: a filed card has no coordinates, so it is
+carried by its zone for free, and a stretched frame has nothing to capture. ⚠️ Unreal's own
+rule — a comment box owns whatever it overlaps — was considered and refused: it silently
+refiles notes the day a frame is stretched. **Membership comes from the drop, in both
+directions, and from nothing else.**
+
+**One write per gesture.** `BoardStore` stages what moved and writes it behind a 400 ms
+debounce as a single `save_board_layout`, one transaction. ⚠️ The staged geometry is laid
+_over_ the view rather than written into it, and it is cleared only once the write
+succeeded — dropping the overlay on a failure would snap every card back with nothing on
+screen saying why.
+
+⚠️ `save_board_layout` skips a card that has been filed since the drag: a position row
+means "this note is loose", and writing one back would undo what `file_many` just did.
+
+**The keyboard twin is not optional**, and it is the path that already existed: tick cards
+with `X`, then "Ranger dans" in the selection bar — the same batch command the drop uses,
+so the two cannot drift. The gesture adds to it; it does not replace it.
+
 ### Editing a note
 
 The editor overlay is where every note mutation starts (title, body, language, tags, pin,

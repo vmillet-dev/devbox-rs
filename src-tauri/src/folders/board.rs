@@ -109,6 +109,75 @@ pub struct BoardView {
     pub height: i32,
 }
 
+/// One zone that moved. A batch of these is what a gesture eventually writes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ZonePlacement {
+    pub folder_id: String,
+    pub frame: BoardFrame,
+}
+
+/// One loose card that moved. ⚠️ Filing is not here: membership comes from
+/// [`crate::folders::file_notes`], which answers what it changed so the undo can put it
+/// back. A position is a local gesture and has no undo of its own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CardPlacement {
+    pub note_id: String,
+    pub position: BoardPoint,
+}
+
+/// Refuses a frame nothing could be dropped into, and keeps a zone on the board.
+///
+/// ⚠️ Clamped rather than rejected: a resize that ends at a silly size is a slip, and
+/// answering an error mid-gesture would leave the interface holding a frame the database
+/// refused.
+#[must_use]
+pub fn clamp(frame: BoardFrame) -> BoardFrame {
+    BoardFrame {
+        x: frame.x.max(0),
+        y: frame.y.max(0),
+        width: frame.width.clamp(MIN_ZONE_WIDTH, MAX_SIDE),
+        height: frame.height.clamp(MIN_ZONE_HEIGHT, MAX_SIDE),
+    }
+}
+
+#[must_use]
+pub fn clamp_point(point: BoardPoint) -> BoardPoint {
+    BoardPoint {
+        x: point.x.clamp(0, MAX_SIDE),
+        y: point.y.clamp(0, MAX_SIDE),
+    }
+}
+
+/// A zone must stay big enough to hold the header and one card, or it becomes a target
+/// nothing can be dropped into.
+pub const MIN_ZONE_WIDTH: i32 = ZONE_PADDING * 2 + CARD_WIDTH;
+pub const MIN_ZONE_HEIGHT: i32 = ZONE_HEADER + ZONE_PADDING * 2 + CARD_HEIGHT;
+/// Far enough for any board, near enough that a runaway drag cannot make the surface
+/// unusable.
+pub const MAX_SIDE: i32 = 100_000;
+
+/// Which zone a point falls in, topmost first. `None` is the free background, which is a
+/// legitimate answer: dropping there takes a note out of its folder.
+///
+/// ⚠️ Membership comes from the drop and from nothing else. Unreal's own rule — a comment
+/// owns whatever it overlaps — was considered and refused: it silently refiles notes the
+/// day a frame is stretched.
+#[must_use]
+pub fn zone_at(frames: &[(String, BoardFrame)], point: BoardPoint) -> Option<String> {
+    frames
+        .iter()
+        .rev()
+        .find(|(_, frame)| {
+            point.x >= frame.x
+                && point.x < frame.x + frame.width
+                && point.y >= frame.y
+                && point.y < frame.y + frame.height
+        })
+        .map(|(id, _)| id.clone())
+}
+
 /// The width every zone gets on its first layout: [`ZONE_COLUMNS`] cards and the gaps.
 #[must_use]
 pub fn default_zone_width() -> i32 {

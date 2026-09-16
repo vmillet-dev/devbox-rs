@@ -1,6 +1,13 @@
 import { guard } from './fail-next';
 import { BoardRepository } from '@core/data/board.repository';
-import { BoardNote, BoardQuery, BoardView, BoardZone } from '@core/model/board.model';
+import {
+  BoardNote,
+  BoardQuery,
+  BoardView,
+  BoardZone,
+  CardPlacement,
+  ZonePlacement,
+} from '@core/model/board.model';
 
 const EMPTY: BoardView = {
   zones: [],
@@ -20,6 +27,9 @@ export class FakeBoardRepository implements Pick<BoardRepository, keyof BoardRep
   lastQuery: BoardQuery | null = null;
   queryCount = 0;
 
+  /** Every batch it was handed, so a spec can assert one gesture wrote once. */
+  readonly saved: { zones: readonly ZonePlacement[]; cards: readonly CardPlacement[] }[] = [];
+
   /** When set, the next call to any method rejects with this error, then clears. */
   failNext: Error | null = null;
 
@@ -36,6 +46,12 @@ export class FakeBoardRepository implements Pick<BoardRepository, keyof BoardRep
       this.lastQuery = query;
       this.queryCount += 1;
       return this.view;
+    });
+  }
+
+  saveLayout(zones: readonly ZonePlacement[], cards: readonly CardPlacement[]): Promise<void> {
+    return guard(this, () => {
+      this.saved.push({ zones: [...zones], cards: [...cards] });
     });
   }
 }
