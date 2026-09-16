@@ -27,6 +27,8 @@ export interface AppSettings {
   readonly closeToTray: boolean;
   readonly paletteShortcut: string;
   readonly showPinnedFirst: boolean;
+  /** ⚠️ Read by Rust at launch, before the front end exists: `backup::wanted`. */
+  readonly automaticBackups: boolean;
   readonly copyConfirmation: boolean;
   readonly updateNotifications: boolean;
   /**
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   closeToTray: true,
   paletteShortcut: DEFAULT_SHORTCUTS.palette,
   showPinnedFirst: true,
+  automaticBackups: true,
   copyConfirmation: true,
   updateNotifications: true,
   skippedUpdate: '',

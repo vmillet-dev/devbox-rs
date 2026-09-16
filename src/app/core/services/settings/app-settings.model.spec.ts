@@ -49,6 +49,14 @@ describe('app settings model', () => {
       expect(DEFAULT_SETTINGS.startWithSystem).toBe(false);
     });
 
+    /**
+     * ⚠️ On, and Rust agrees by reading anything that is not a plain "false" as on: a
+     * safety net nobody asked to remove stays.
+     */
+    it('copies the library unless somebody says otherwise', () => {
+      expect(DEFAULT_SETTINGS.automaticBackups).toBe(true);
+    });
+
     /** The other half of the mirror lives in `ShortcutBindings::defaults()`. */
     it('takes the palette shortcut from the one table that declares it', () => {
       expect(DEFAULT_SETTINGS.paletteShortcut).toBe(DEFAULT_SHORTCUTS.palette);
