@@ -1807,6 +1807,14 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   filtering by tag, or querying what expires before a date, is a `WHERE` clause instead of a
   full re-read — which is why `query_notes` needed no migration. `PRAGMA foreign_keys` is set
   per connection, which is what makes the `ON DELETE CASCADE` on notes and tags actually fire.
+- **The four pragmas in `db::configure` are each a decision, and each has a test.**
+  `foreign_keys` because the cascades are inert without it; `journal_mode = WAL` so a reader
+  never blocks the writer; `busy_timeout = 5000` because SQLite's own default is **zero**,
+  which turns a file another process holds for twenty milliseconds — a checkpoint, an
+  antivirus, a second instance — into a storage error on the first write; and
+  ⚠️ `synchronous = NORMAL`, WAL's default, written down because it is a durability choice:
+  a power cut can cost the last committed transaction and cannot corrupt the file. `FULL`
+  would fsync every commit to protect a note the user can retype.
 - **Ordering is the back-end's call.** `notes::store::fetch` orders by `updated_at DESC, id`;
   the front-end preserves the order it receives, so this one query decides what the user sees
   first. Note the deliberate asymmetry: the order is by `updated_at` while sections group by
