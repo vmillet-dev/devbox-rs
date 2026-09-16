@@ -66,6 +66,41 @@ impl std::fmt::Debug for Vault {
 }
 
 impl Vault {
+    /// The key the library's values are actually sealed with — random, never derived.
+    ///
+    /// ⚠️ This is what makes changing the passphrase a hundred bytes of rewriting instead
+    /// of re-encrypting every note and every attachment: the phrase only ever protects
+    /// this key, and a new phrase wraps the same one again. The cost is the other side of
+    /// that coin — whoever gets hold of this key keeps access across a change, so a
+    /// changed passphrase answers a leaked *phrase*, never a leaked key.
+    pub fn random() -> Result<Self, StorageError> {
+        let mut key = Zeroizing::new([0u8; 32]);
+        getrandom::fill(key.as_mut())
+            .map_err(|error| StorageError::Vault(format!("no randomness: {error}")))?;
+
+        Ok(Self { key })
+    }
+
+    /// Seals this key under another one, for the key file to hold.
+    pub fn wrapped_with(&self, wrapping: &Self) -> Result<Vec<u8>, StorageError> {
+        wrapping.seal_bytes(self.key.as_ref())
+    }
+
+    /// ⚠️ The other direction, and the only check there is: a phrase that does not open
+    /// the wrapped key is the wrong phrase, said by the authentication tag rather than by
+    /// a known value sealed beside it.
+    pub fn unwrapped_with(wrapping: &Self, wrapped: &[u8]) -> Result<Self, StorageError> {
+        let opened = Zeroizing::new(wrapping.open_bytes(wrapped)?);
+        let key: [u8; 32] = opened
+            .as_slice()
+            .try_into()
+            .map_err(|_| StorageError::Vault("the wrapped key is the wrong size".to_string()))?;
+
+        Ok(Self {
+            key: Zeroizing::new(key),
+        })
+    }
+
     /// ⚠️ Slow on purpose — this is the whole defence against someone trying passphrases
     /// against a copied file. It is paid once, at unlock, never per value.
     pub fn derive(passphrase: &str, salt: &[u8], cost: Cost) -> Result<Self, StorageError> {

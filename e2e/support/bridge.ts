@@ -76,6 +76,8 @@ export const bridge = {
   importNotes: (path: string, passphrase: string | null = null) =>
     invoke<ImportReport>('import_notes', { path, passphrase }),
   exportIsProtected: (path: string) => invoke<boolean>('export_is_protected', { path }),
+
+  changePassphrase: (current: string, next: string) => invoke<null>('change_passphrase', { current, next }),
 } as const;
 
 /** A `NoteDraft` is exhaustive on the wire; a scenario cares about two or three fields. */

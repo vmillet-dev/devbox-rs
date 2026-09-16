@@ -33,7 +33,7 @@ use notes::{
 };
 use spaces::{create_space, delete_space, list_spaces, pin_space, rename_space};
 use transfer::{export_is_protected, export_notes, export_selection, import_notes, share_notes};
-use vault::{create_vault, unlock_vault, vault_state};
+use vault::{change_passphrase, create_vault, unlock_vault, vault_state};
 
 /// ⚠️ Resolved from the manifest: a relative path writes the file next to whatever the
 /// current directory happens to be, without saying a word.
@@ -93,6 +93,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             vault_state,
             create_vault,
             unlock_vault,
+            change_passphrase,
             app_changelog,
             sync_tray,
             set_global_shortcuts,

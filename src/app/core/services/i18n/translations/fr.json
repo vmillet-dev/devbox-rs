@@ -174,6 +174,7 @@
     "attachmentSaveFailed": "Impossible d'enregistrer la pièce jointe à cet emplacement.",
     "variablesLoadFailed": "Impossible de charger les variables.",
     "variablesSaveFailed": "Impossible d'enregistrer les variables.",
+    "passphraseChangeFailed": "Impossible de changer la phrase de passe. L'ancienne ouvre toujours la bibliothèque.",
     "unlockFailed": "Le déverrouillage a échoué.",
     "vaultStateFailed": "Impossible de savoir si la bibliothèque est chiffrée."
   },
@@ -428,6 +429,19 @@
       "shortcutHint": "Cliquez dans le champ puis composez la combinaison. Un raccourci déjà pris par une autre application est signalé au démarrage.",
       "shortcutReset": "Rétablir",
       "showPinnedFirst": "Épinglées en premier"
+    },
+    "security": {
+      "title": "Sécurité",
+      "passphrase": "Phrase de passe",
+      "change": "Changer…",
+      "changing": "Changement…",
+      "note": "Elle ouvre la bibliothèque à chaque lancement. La changer ne rechiffre rien : les notes restent scellées avec la même clé, d'où une seconde plutôt qu'une réécriture.",
+      "dialogTitle": "Changer la phrase de passe",
+      "dialogLead": "La nouvelle s'applique au prochain lancement. Cette session continue telle quelle.",
+      "current": "Phrase actuelle",
+      "next": "Nouvelle phrase",
+      "cancel": "Annuler",
+      "changed": "Phrase de passe changée."
     },
     "notifications": {
       "title": "Notifications",

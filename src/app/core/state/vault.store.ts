@@ -45,6 +45,18 @@ export class VaultStore {
     return this.attempt(() => this.repository.unlock(passphrase));
   }
 
+  /**
+   * A new phrase over the same library. ⚠️ Nothing is re-encrypted — the phrase only ever
+   * wrapped the key the notes are sealed with — so this cannot leave a library half
+   * readable, and the session carries on as it was.
+   */
+  async changePassphrase(current: string, next: string): Promise<boolean> {
+    return this.attempt(
+      () => this.repository.changePassphrase(current, next),
+      'errors.passphraseChangeFailed',
+    );
+  }
+
   /** Typing again is what withdraws the refusal — it should not outlive the correction. */
   clearRefusal(): void {
     this._refused.set(false);
@@ -55,7 +67,7 @@ export class VaultStore {
    * to a typo, and it belongs beside the field that caused it. Anything else is a failure
    * and goes where failures go.
    */
-  private async attempt(action: () => Promise<void>): Promise<boolean> {
+  private async attempt(action: () => Promise<void>, failureKey = 'errors.unlockFailed'): Promise<boolean> {
     this._isWorking.set(true);
     this._refused.set(false);
     try {
@@ -68,7 +80,7 @@ export class VaultStore {
         return false;
       }
 
-      this.notifier.reportFailure('errors.unlockFailed', error);
+      this.notifier.reportFailure(failureKey, error);
       return false;
     } finally {
       this._isWorking.set(false);

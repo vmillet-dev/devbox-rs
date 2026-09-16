@@ -45,11 +45,11 @@ else.
 What is sealed on disk: note titles, bodies and sources, checklist items, space names,
 `{{field}}` values, attachment file names, and the attachment files themselves.
 
-| What               | How                                                                                                                                                                                                                |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Key derivation** | Argon2id, 64 MiB and 3 passes, over a random salt kept beside the database                                                                                                                                         |
-| **Encryption**     | AES-256-GCM, a fresh nonce per write; the authentication tag refuses a tampered value rather than decrypting it into nonsense                                                                                      |
-| **Not sealed**     | tags, dates, ids and the links between rows — what the database filters, sorts and joins on. Sealing them would mean loading the whole library to answer a query, and tag names are the visible cost of that trade |
+| What               | How                                                                                                                                                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Key derivation** | Argon2id, 64 MiB and 3 passes, over a random salt kept beside the database. The passphrase seals the library key rather than being it, so you can change it from Preferences → Security without re-encrypting anything |
+| **Encryption**     | AES-256-GCM, a fresh nonce per write; the authentication tag refuses a tampered value rather than decrypting it into nonsense                                                                                          |
+| **Not sealed**     | tags, dates, ids and the links between rows — what the database filters, sorts and joins on. Sealing them would mean loading the whole library to answer a query, and tag names are the visible cost of that trade     |
 
 ⚠️ **There is no recovery.** No account, no escrow, no reset: a lost passphrase is a lost
 library. An export written in the clear is the only copy that does not depend on it.

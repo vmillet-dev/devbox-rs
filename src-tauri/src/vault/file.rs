@@ -1,8 +1,9 @@
 //! The key file, beside the database.
 //!
-//! ⚠️ Outside the library on purpose: it carries what is needed to derive the key, so it
-//! has to be readable before anything can be opened. It holds no key — a salt, the cost
-//! the key was derived at, and a known value sealed under it.
+//! ⚠️ Outside the library on purpose: it carries what is needed to derive the key that
+//! opens it, so it has to be readable before anything else can be. What it holds is a
+//! salt, the cost, and the library's own key **sealed under the phrase** — never a key in
+//! the clear, and no separate check value: opening the wrapped key is the check.
 //!
 //! ⚠️ Losing this file loses the library, exactly as losing the passphrase does. An export
 //! is the only copy that does not depend on it.
@@ -19,21 +20,20 @@ use crate::error::StorageError;
 
 pub const FILE_NAME: &str = "vault.json";
 
-/// Bumped when a file written today would stop being readable.
-const FORMAT_VERSION: u32 = 1;
-
-/// What the check value holds. Its content is irrelevant — that it opens is the answer.
-const CHECK_PLAINTEXT: &str = "devbox-vault-v1";
+/// Bumped when a file written today would stop being readable. 2 wraps the library key
+/// under the phrase where 1 derived the library key from it — which is what lets the
+/// phrase change without touching a single note.
+const FORMAT_VERSION: u32 = 2;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct KeyFile {
     version: u32,
     kdf: Kdf,
-    /// ⚠️ A known value sealed under the derived key. Without it a wrong passphrase would
-    /// unlock happily and the whole library would read as gibberish — and the first write
-    /// would then seal real notes under the wrong key.
-    check: String,
+    /// ⚠️ The library's key, sealed under the one derived from the passphrase. A wrong
+    /// phrase fails to open it, which is what stops an unlock from succeeding on a key
+    /// nobody can reproduce and sealing real notes under it.
+    key: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -64,24 +64,51 @@ pub fn create(directory: &Path, passphrase: &str, cost: Cost) -> Result<Vault, S
         ));
     }
 
-    let salt = fresh_salt()?;
-    let vault = Vault::derive(passphrase, &salt, cost)?;
-
-    let file = KeyFile {
-        version: FORMAT_VERSION,
-        kdf: Kdf {
-            algorithm: "argon2id".to_string(),
-            memory_kib: cost.memory_kib,
-            passes: cost.passes,
-            lanes: cost.lanes,
-            salt: BASE64.encode(salt),
-        },
-        check: vault.seal(CHECK_PLAINTEXT)?,
-    };
-
-    write_atomically(&path, &file)?;
+    let vault = Vault::random()?;
+    write_wrapped(&path, &vault, passphrase, cost)?;
 
     Ok(vault)
+}
+
+/// A new phrase over the same library. ⚠️ Nothing is re-encrypted: the key the notes are
+/// sealed with does not change, only what wraps it — so this cannot half-succeed and
+/// leave some notes unreadable, and it costs one derivation rather than a full rewrite.
+pub fn change_passphrase(
+    directory: &Path,
+    current: &str,
+    next: &str,
+    cost: Cost,
+) -> Result<(), StorageError> {
+    let vault = unlock(directory, current)?;
+
+    write_wrapped(&path_in(directory), &vault, next, cost)
+}
+
+/// ⚠️ A fresh salt every time, change included: two phrases must not share a derivation,
+/// or knowing one would say something about the other.
+fn write_wrapped(
+    path: &Path,
+    vault: &Vault,
+    passphrase: &str,
+    cost: Cost,
+) -> Result<(), StorageError> {
+    let salt = fresh_salt()?;
+    let wrapping = Vault::derive(passphrase, &salt, cost)?;
+
+    write_atomically(
+        path,
+        &KeyFile {
+            version: FORMAT_VERSION,
+            kdf: Kdf {
+                algorithm: "argon2id".to_string(),
+                memory_kib: cost.memory_kib,
+                passes: cost.passes,
+                lanes: cost.lanes,
+                salt: BASE64.encode(salt),
+            },
+            key: BASE64.encode(vault.wrapped_with(&wrapping)?),
+        },
+    )
 }
 
 /// ⚠️ Answers [`StorageError::WrongPassphrase`] and nothing more detailed: which of the
@@ -121,12 +148,12 @@ pub fn unlock(directory: &Path, passphrase: &str) -> Result<Vault, StorageError>
         passes: file.kdf.passes,
         lanes: file.kdf.lanes,
     };
-    let vault = Vault::derive(passphrase, &salt, cost)?;
+    let wrapping = Vault::derive(passphrase, &salt, cost)?;
+    let wrapped = BASE64
+        .decode(&file.key)
+        .map_err(|_| StorageError::Vault("the wrapped key is not base64".to_string()))?;
 
-    match vault.open(&file.check) {
-        Ok(check) if check == CHECK_PLAINTEXT => Ok(vault),
-        _ => Err(StorageError::WrongPassphrase),
-    }
+    Vault::unwrapped_with(&wrapping, &wrapped).map_err(|_| StorageError::WrongPassphrase)
 }
 
 /// ⚠️ Staged then renamed. A key file half-written is a library nobody opens again, and
@@ -181,8 +208,8 @@ mod tests {
         std::fs::remove_dir_all(&directory).ok();
     }
 
-    /// ⚠️ The whole point of the check value: without it this would succeed and every
-    /// later write would seal real notes under a key nobody can reproduce.
+    /// ⚠️ Without the wrapped key to open, this would succeed and every later write
+    /// would seal real notes under a key nobody can reproduce.
     #[test]
     fn a_wrong_passphrase_is_refused_rather_than_accepted_quietly() {
         let directory = scratch();
@@ -194,15 +221,100 @@ mod tests {
         std::fs::remove_dir_all(&directory).ok();
     }
 
+    /// The key it carries is sealed; the phrase that opens it is nowhere.
     #[test]
-    fn the_key_file_holds_no_key_and_no_passphrase() {
+    fn the_key_file_holds_no_passphrase_and_no_key_in_the_clear() {
         let directory = scratch();
-        create(&directory, "correct horse", cheap()).unwrap();
+        let vault = create(&directory, "correct horse", cheap()).unwrap();
 
         let written = std::fs::read_to_string(path_in(&directory)).unwrap();
+        let sealed = vault.seal("a note").unwrap();
 
         assert!(!written.contains("correct horse"));
         assert!(written.contains("argon2id"));
+        // Nothing in the file opens what the library sealed — only the phrase does.
+        let file: serde_json::Value = serde_json::from_str(&written).unwrap();
+        let wrapped = file["key"].as_str().unwrap().to_string();
+        assert!(unlock(&directory, &wrapped).is_err());
+        assert_eq!(
+            unlock(&directory, "correct horse")
+                .unwrap()
+                .open(&sealed)
+                .unwrap(),
+            "a note"
+        );
+
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// ⚠️ The point of wrapping a random key rather than deriving one: the notes stay
+    /// sealed exactly as they were, and a change cannot half-rewrite a library.
+    #[test]
+    fn a_changed_passphrase_opens_the_notes_the_old_one_sealed() {
+        let directory = scratch();
+        let sealed = create(&directory, "correct horse", cheap())
+            .unwrap()
+            .seal("a note")
+            .unwrap();
+
+        change_passphrase(&directory, "correct horse", "battery staple", cheap()).unwrap();
+
+        let reopened = unlock(&directory, "battery staple").unwrap();
+        assert_eq!(reopened.open(&sealed).unwrap(), "a note");
+
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn the_old_passphrase_stops_opening_the_library() {
+        let directory = scratch();
+        create(&directory, "correct horse", cheap()).unwrap();
+
+        change_passphrase(&directory, "correct horse", "battery staple", cheap()).unwrap();
+
+        assert!(matches!(
+            unlock(&directory, "correct horse").unwrap_err(),
+            StorageError::WrongPassphrase
+        ));
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// ⚠️ Refused *before* anything is written: a change that took a wrong current phrase
+    /// on trust would lock the library behind a phrase nobody chose.
+    #[test]
+    fn a_change_that_cannot_name_the_current_passphrase_writes_nothing() {
+        let directory = scratch();
+        create(&directory, "correct horse", cheap()).unwrap();
+        let before = std::fs::read_to_string(path_in(&directory)).unwrap();
+
+        let error = change_passphrase(&directory, "not it", "battery staple", cheap()).unwrap_err();
+
+        assert!(matches!(error, StorageError::WrongPassphrase));
+        assert_eq!(
+            std::fs::read_to_string(path_in(&directory)).unwrap(),
+            before
+        );
+        assert!(unlock(&directory, "correct horse").is_ok());
+
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// Two phrases over one library must not share a derivation.
+    #[test]
+    fn a_change_draws_a_fresh_salt() {
+        let directory = scratch();
+        create(&directory, "correct horse", cheap()).unwrap();
+        let before: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(path_in(&directory)).unwrap()).unwrap();
+
+        change_passphrase(&directory, "correct horse", "battery staple", cheap()).unwrap();
+
+        let after: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(path_in(&directory)).unwrap()).unwrap();
+        assert_ne!(before["kdf"]["salt"], after["kdf"]["salt"]);
+        assert_ne!(before["key"], after["key"]);
+
+        std::fs::remove_dir_all(&directory).ok();
     }
 
     /// The cost travels with the file, so raising the default later does not lock an

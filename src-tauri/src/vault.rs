@@ -162,6 +162,48 @@ fn unlock_with(passphrase: &str, app: &AppHandle, db: &State<'_, Db>) -> Result<
     Ok(())
 }
 
+/// A new phrase over the same library, from the preferences panel.
+///
+/// ⚠️ Not a re-encryption: the key the notes are sealed with is the one being rewrapped,
+/// so nothing in the database moves and the library stays open on the key it already had.
+/// The consequence is worth knowing — this answers a phrase somebody else learned, never
+/// a key somebody else got hold of.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn change_passphrase(
+    mut current: String,
+    mut next: String,
+    app: AppHandle,
+    db: State<'_, Db>,
+) -> Result<(), AppError> {
+    // ⚠️ Wiped before this returns, whatever it returns — see `create_vault`.
+    let result = change_with(&current, &next, &app, &db);
+    current.zeroize();
+    next.zeroize();
+
+    result
+}
+
+fn change_with(
+    current: &str,
+    next: &str,
+    app: &AppHandle,
+    db: &State<'_, Db>,
+) -> Result<(), AppError> {
+    validate(next)?;
+
+    // ⚠️ Asked and released rather than held: the two derivations below cost a second
+    // each, and keeping the connection for them would freeze every other command.
+    if db.lock().map_err(|_| StorageError::Unavailable)?.is_none() {
+        return Err(StorageError::Locked.into());
+    }
+
+    let directory = app.path().app_data_dir().map_err(storage)?;
+    file::change_passphrase(&directory, current, next, Cost::default())?;
+
+    Ok(())
+}
+
 /// Opens the library under the key and hands it to the rest of the application. The
 /// sweeps are the caller's to run, because a first launch has to seal what is there first.
 fn open_library(app: &AppHandle, db: &State<'_, Db>, vault: key::Vault) -> Result<(), AppError> {

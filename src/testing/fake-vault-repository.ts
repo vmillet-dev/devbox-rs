@@ -11,6 +11,7 @@ export class FakeVaultRepository implements Pick<VaultRepository, keyof VaultRep
   failNext: IpcError | null = null;
 
   passphrases: string[] = [];
+  changes: { current: string; next: string }[] = [];
 
   async state(): Promise<VaultState> {
     return this.answer;
@@ -22,6 +23,14 @@ export class FakeVaultRepository implements Pick<VaultRepository, keyof VaultRep
 
   async unlock(passphrase: string): Promise<void> {
     return this.attempt(passphrase);
+  }
+
+  /** Records the pair; `failNext` is how a spec makes the current phrase wrong. */
+  async changePassphrase(current: string, next: string): Promise<void> {
+    this.changes.push({ current, next });
+    const failure = this.failNext;
+    this.failNext = null;
+    if (failure !== null) throw failure;
   }
 
   private async attempt(passphrase: string): Promise<void> {

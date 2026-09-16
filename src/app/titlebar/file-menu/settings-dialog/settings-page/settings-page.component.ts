@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { ChangePassphraseDialogComponent } from '../change-passphrase-dialog/change-passphrase-dialog.component';
 import {
   DENSITIES,
   Density,
@@ -22,7 +23,7 @@ function checkedValue(event: Event): boolean {
 
 @Component({
   selector: 'app-settings-page',
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, ChangePassphraseDialogComponent],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -34,6 +35,16 @@ export class SettingsPageComponent {
   protected readonly themes = THEME_CHOICES;
   protected readonly densities = DENSITIES;
   protected readonly defaultShortcut = DEFAULT_SHORTCUTS.palette;
+
+  protected readonly isChangingPassphrase = signal(false);
+
+  protected openPassphraseChange(): void {
+    this.isChangingPassphrase.set(true);
+  }
+
+  protected closePassphraseChange(): void {
+    this.isChangingPassphrase.set(false);
+  }
 
   protected onUpdateNotifications(event: Event): void {
     this.settings.setUpdateNotifications(checkedValue(event));

@@ -174,6 +174,7 @@
     "attachmentSaveFailed": "Could not save the attachment to that location.",
     "variablesLoadFailed": "Could not load the variables.",
     "variablesSaveFailed": "Could not save the variables.",
+    "passphraseChangeFailed": "Could not change the passphrase. The old one still opens the library.",
     "unlockFailed": "Unlocking failed.",
     "vaultStateFailed": "Could not tell whether the library is encrypted."
   },
@@ -428,6 +429,19 @@
       "shortcutHint": "Click the field, then press the combination. A shortcut another application already holds is reported at startup.",
       "shortcutReset": "Reset",
       "showPinnedFirst": "Show pinned first"
+    },
+    "security": {
+      "title": "Security",
+      "passphrase": "Passphrase",
+      "change": "Change…",
+      "changing": "Changing…",
+      "note": "It opens the library at every launch. Changing it re-encrypts nothing: your notes stay sealed with the same key, which is why it takes a second rather than a rewrite.",
+      "dialogTitle": "Change the passphrase",
+      "dialogLead": "The new one applies at the next launch. This session carries on as it is.",
+      "current": "Current passphrase",
+      "next": "New passphrase",
+      "cancel": "Cancel",
+      "changed": "Passphrase changed."
     },
     "notifications": {
       "title": "Notifications",

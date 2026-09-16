@@ -1666,8 +1666,19 @@ in this process’s memory for the length of the session, and there is no idle r
   base64 for a TEXT column and raw bytes for a file. The key is a `Zeroizing<[u8; 32]>` and
   the hand-written `Debug` prints `Vault(…)`, so it cannot reach a log line.
 - **`vault/file.rs`** — `vault.json` beside the database: format version, KDF parameters,
-  salt, and a check value. Opening that check value is what tells a wrong passphrase from a
-  corrupt file. Written staged-then-renamed, and `create` refuses to overwrite one.
+  salt, and **the library's key sealed under the phrase**. ⚠️ The phrase does not derive the
+  key the notes are sealed with, it wraps it: the key is random, and a new phrase re-wraps
+  the same one. That is what makes a passphrase change a hundred bytes of rewriting rather
+  than re-encrypting every note and every attachment — an operation that could not be
+  atomic across the database and the files, and would leave a half-readable library if it
+  stopped halfway. Opening the wrapped key is also the check: a phrase that fails to open
+  it is the wrong phrase, said by the authentication tag, so there is no separate check
+  value to attack. Written staged-then-renamed, and `create` refuses to overwrite one.
+
+  ⚠️ The other side of that coin, and the reason it is worth writing down: changing the
+  passphrase answers a phrase somebody **learned**, never a key somebody **took**. Whoever
+  got hold of the unwrapped key keeps it, exactly as with LUKS or KeePass.
+
 - **`vault/migrate.rs`** — `seal_existing`, one transaction that seals a library written
   before any of this. ⚠️ It runs from `create_vault` **after** the library is open and
   **before** the startup sweeps: the orphan-attachment sweep reads stored file names and
@@ -1690,6 +1701,18 @@ to answer.
 ⚠️ The unlocked state lives in Rust and not in the front end: a page reload must not ask
 again for a library this process already has open. That is also what keeps `reopenSession()`
 working in the end-to-end suite, where the front end reboots and the process does not.
+
+### Changing the passphrase
+
+`change_passphrase` (from Préférences → Sécurité) unlocks with the current phrase, then
+rewrites the key file with a fresh salt and the same library key wrapped under the new
+one. ⚠️ It refuses before writing anything when the current phrase is wrong — a change
+that took it on trust would lock the library behind a phrase nobody chose. The open
+session is untouched: the key in memory is the one that was already there.
+
+⚠️ The command asks for the connection only to check that the library is open, then
+releases it: the two derivations cost about a second each, and holding the mutex across
+them would freeze every other command.
 
 ### Attachments, and the one plaintext copy
 

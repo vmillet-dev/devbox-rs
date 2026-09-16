@@ -90,6 +90,15 @@ export const commands = {
 	 *  main thread would freeze the window over every attempt.
 	 */
 	unlockVault: (passphrase: string) => typedError<null, AppError>(__TAURI_INVOKE("unlock_vault", { passphrase })),
+	/**
+	 *  A new phrase over the same library, from the preferences panel.
+	 * 
+	 *  ⚠️ Not a re-encryption: the key the notes are sealed with is the one being rewrapped,
+	 *  so nothing in the database moves and the library stays open on the key it already had.
+	 *  The consequence is worth knowing — this answers a phrase somebody else learned, never
+	 *  a key somebody else got hold of.
+	 */
+	changePassphrase: (current: string, next: string) => typedError<null, AppError>(__TAURI_INVOKE("change_passphrase", { current, next })),
 	appChangelog: () => __TAURI_INVOKE<ChangelogRelease[]>("app_changelog"),
 	/**
 	 *  Replaces only the menu when the tray already exists, so a language change does not

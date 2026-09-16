@@ -20,4 +20,8 @@ export class VaultRepository {
   async unlock(passphrase: string): Promise<void> {
     unwrap('unlock_vault', await commands.unlockVault(passphrase));
   }
+
+  async changePassphrase(current: string, next: string): Promise<void> {
+    unwrap('change_passphrase', await commands.changePassphrase(current, next));
+  }
 }
