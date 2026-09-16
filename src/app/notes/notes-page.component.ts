@@ -5,6 +5,7 @@ import { DialogStack } from '@shared/layout/dialog/dialog-stack';
 import { AttachmentsStore } from '@core/state/attachments.store';
 import { LibraryStore } from '@core/state/library.store';
 import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { BoardStore } from '@core/state/board.store';
 import { FoldersStore } from '@core/state/folders.store';
 import { NotesQueryStore } from '@core/state/notes-query.store';
 import { NotesRevision } from '@core/state/notes-revision';
@@ -16,6 +17,7 @@ import { SpacesStore } from '@core/state/spaces.store';
 import { TagsStore } from '@core/state/tags.store';
 import { TrashStore } from '@core/state/trash.store';
 import { CanvasKeyboardDirective } from '@shared/directives/canvas-keyboard.directive';
+import { BoardComponent } from './canvas/board/board.component';
 import { FilterChipsComponent } from './header/filter-chips/filter-chips.component';
 import {
   FolderRecolouring,
@@ -24,7 +26,7 @@ import {
 } from './header/folder-switcher/folder-switcher.component';
 import { LanguageRailComponent } from './header/language-rail/language-rail.component';
 import { NewNoteButtonComponent } from './header/new-note-button/new-note-button.component';
-import { NoteActivation } from './canvas/note-section/note-card/note-card.component';
+import { NoteActivation } from './canvas/note-card/note-card.component';
 import { NoteEditorOverlayComponent } from './overlays/note-editor-overlay/note-editor-overlay.component';
 import { NoteSectionComponent } from './canvas/note-section/note-section.component';
 import { PlaceholderFormComponent } from './overlays/placeholder-form/placeholder-form.component';
@@ -39,6 +41,7 @@ import {
 } from './header/space-switcher/space-switcher.component';
 import { TagManagerComponent } from './overlays/tag-manager/tag-manager.component';
 import { TagRailComponent } from './header/tag-rail/tag-rail.component';
+import { ViewSwitchComponent } from './header/view-switch/view-switch.component';
 import { TrashPanelComponent } from './overlays/trash-panel/trash-panel.component';
 import { UndoBarComponent } from './overlays/undo-bar/undo-bar.component';
 
@@ -49,6 +52,8 @@ import { UndoBarComponent } from './overlays/undo-bar/undo-bar.component';
     SearchBoxComponent,
     FilterChipsComponent,
     FolderSwitcherComponent,
+    ViewSwitchComponent,
+    BoardComponent,
     NewNoteButtonComponent,
     SelectionBarComponent,
     TagRailComponent,
@@ -74,6 +79,7 @@ export class NotesPageComponent {
   protected readonly store = inject(NotesStore);
   protected readonly spaces = inject(SpacesStore);
   protected readonly folders = inject(FoldersStore);
+  protected readonly board = inject(BoardStore);
   protected readonly palette = inject(PaletteStore);
   protected readonly trash = inject(TrashStore);
   protected readonly tags = inject(TagsStore);

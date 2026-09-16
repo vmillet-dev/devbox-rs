@@ -1,0 +1,38 @@
+<div class="board" data-testid="board">
+  <!-- Sized by the back end from what is actually on it: the surface is what is panned. -->
+  <div class="board-surface" [style.width.px]="width()" [style.height.px]="height()">
+    @for (zone of zones(); track zone.folder.id) {
+      <app-board-zone
+        [zone]="zone"
+        (noteActivated)="noteActivated.emit($event)"
+        (opened)="folderOpened.emit($event)"
+      />
+    }
+
+    @if (loose().length > 0) {
+      <p
+        class="loose-label"
+        data-testid="board-loose-label"
+        [style.left.px]="16"
+        [style.top.px]="looseLabelTop()"
+      >
+        {{ 'board.loose' | transloco: { count: loose().length } }}
+      </p>
+      @for (entry of loose(); track entry.note.id) {
+        <app-note-card
+          class="loose-card"
+          data-testid="board-loose-card"
+          [note]="entry.note"
+          [class.dimmed]="!entry.matches"
+          [style.left.px]="entry.position?.x ?? 16"
+          [style.top.px]="entry.position?.y ?? 16"
+          (opened)="noteActivated.emit($event)"
+        />
+      }
+    }
+
+    @if (zones().length === 0 && loose().length === 0) {
+      <p class="board-empty" data-testid="board-empty">{{ 'board.empty' | transloco }}</p>
+    }
+  </div>
+</div>

@@ -744,6 +744,59 @@ note sits beside it, are local state that must never enter the `Note` or `Folder
 `transfer::Bundle` deserialises them itself, so a coordinate stored there would travel in
 every export and land on top of the receiving machine's own arrangement.
 
+### The board: the second view of a space
+
+A switch in the header chooses between **Date** and **Tableau**. The date view is not
+replaced and stays the default; the board is another way to look at the same notes, and it
+is remembered **per space** — one key each, `devbox.notes.view.<spaceId>`, so arranging one
+space does not switch the others. ⚠️ It is unavailable on "all spaces", where a folder
+belongs to no board: the switch disables rather than disappears, and falls back to the date
+view.
+
+**The board has a query of its own.** `board_view` answers folders and positions, not
+sections — `build_sections` must never learn about a folder. It reads the whole space and
+marks each note `matches`, because the search, the quick filter, the tag rail and the
+language rail all **dim** on the board rather than narrow it. ⚠️ Reflowing the survivors
+into a list would throw away the spatial memory the board exists for, which is the one
+thing the date view cannot give.
+
+**Cards flow inside a zone and sit freely outside it.** That is the whole geometry:
+
+| What                 | Where it is stored                                   |
+| -------------------- | ---------------------------------------------------- |
+| a zone's frame       | `folders.x/y/w/h`, nullable — all four move together |
+| a loose card's place | `note_positions`, one row per **unfiled** note       |
+| a filed card's place | nowhere: it flows, in canvas order                   |
+
+⚠️ A `note_positions` row means "this note is loose". `file_many` deletes the rows of the
+notes it files, so the table's meaning stays exact and a zone never has two competing
+notions of where a card is. It is also why `#133` can say the inside of a folder is not
+spatial without contradicting anything.
+
+**The first layout is materialised, not computed on the fly.** `store::board::geometry`
+reads the frames and positions and writes one for anything that has never been laid out, in
+a single transaction. ⚠️ A read that writes, deliberately: computing a place without storing
+it would let the first drag land next to cards that have no stored place of their own, and
+the board would look shuffled at every launch. It is idempotent — the second read of a space
+writes nothing — and a folder added later lands in the slot reading order gives it rather
+than on top of the first zone, because the arrangement is computed against every folder and
+only the missing frames are written.
+
+The layout rules live in `folders/board.rs`, which imports neither Diesel nor Tauri:
+`arrange_zones` flows zones three across, each row clearing the tallest zone above it;
+`arrange_loose` flows loose cards four across underneath; `surface` sizes the pannable area
+from whatever reaches furthest. **Pan only, no zoom** — a zoom is a second thing to persist
+and to reset, and full-size cards are what makes panning worth having.
+
+⚠️ `apply_folders` deliberately does **not** run for the board: a chip naming the zone a
+card already sits in is noise, and a loose card has no folder to name. The card component is
+the same one the canvas draws, so it renders no chip simply because `folder` is `None`.
+
+On the front end, `notes/canvas/` is the region and the two views are alternatives inside
+it — `note-section/` for the date view, `board/` for the board, and `note-card/` risen to
+their nearest common ancestor. ⚠️ The region keeps the `canvas` test hook whichever view
+fills it: it is the address on screen, and the e2e helpers wait on it.
+
 ### Editing a note
 
 The editor overlay is where every note mutation starts (title, body, language, tags, pin,
@@ -1897,6 +1950,13 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   re-runs `CREATE TABLE spaces` nor keeps a second, drifting source of truth. A pre-Diesel
   binary reopening such a database now fails loudly at startup instead of writing into a schema
   it believes it understands.
+- **The board geometry is columns nothing else reads.** `folders.x/y/w/h` are nullable and
+  move together — `NULL` means "never laid out", which every folder made before the board
+  existed is. `note_positions` is keyed on `note_id` alone and holds a row only for an
+  **unfiled** note; filing one deletes its row. ⚠️ None of it is on the `Note` or `Folder`
+  model, and that is what makes `#134` free: `transfer::Bundle` deserialises both, so a
+  coordinate there would travel in every export and land on top of the arrangement the
+  receiving machine already has.
 - **A folder is a row, and membership is a column.** `folders` holds `(id, space_id, name,
 colour, created_at)` and `notes.folder_id` points into it. ⚠️ The column was added with no
   `DEFAULT`, because SQLite only accepts an added `REFERENCES` column whose default is `NULL`

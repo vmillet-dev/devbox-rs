@@ -3,6 +3,7 @@ import { CLIPBOARD_ADAPTER } from '@core/services/clipboard/clipboard.service';
 import { FILE_DIALOG_ADAPTER } from '@core/services/dialogs/file-dialog.service';
 import { APP_WINDOW_ADAPTER } from '@core/services/window/app-window.service';
 import { AttachmentsRepository } from '@core/data/attachments.repository';
+import { BoardRepository } from '@core/data/board.repository';
 import { FoldersRepository } from '@core/data/folders.repository';
 import { NotesRepository } from '@core/data/notes.repository';
 import { SpacesRepository } from '@core/data/spaces.repository';
@@ -16,6 +17,7 @@ import { UpdaterService } from '@core/services/updates/updater.service';
 import { FakeAppInfo } from './fake-app-info';
 import { FakeAppWindow } from './fake-app-window';
 import { FakeAttachmentsRepository } from './fake-attachments-repository';
+import { FakeBoardRepository } from './fake-board-repository';
 import { FakeClipboard } from './fake-clipboard';
 import { FakeFileDialog } from './fake-file-dialog';
 import { FakeFoldersRepository } from './fake-folders-repository';
@@ -34,6 +36,7 @@ interface DataDoubles {
   readonly notesRepository?: FakeNotesRepository;
   readonly spacesRepository?: FakeSpacesRepository;
   readonly foldersRepository?: FakeFoldersRepository;
+  readonly boardRepository?: FakeBoardRepository;
   readonly attachmentsRepository?: FakeAttachmentsRepository;
   readonly transferRepository?: FakeTransferRepository;
   readonly vaultRepository?: FakeVaultRepository;
@@ -58,6 +61,10 @@ export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
     {
       provide: FoldersRepository,
       useValue: doubles.foldersRepository ?? new FakeFoldersRepository(doubles.folders ?? []),
+    },
+    {
+      provide: BoardRepository,
+      useValue: doubles.boardRepository ?? new FakeBoardRepository(),
     },
     {
       provide: AttachmentsRepository,

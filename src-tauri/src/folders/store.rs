@@ -3,6 +3,8 @@
 //! catches nothing. The order does not move — `created_at` stays in the clear, and
 //! reading order is what the board lays zones out in.
 
+pub mod board;
+
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
@@ -277,8 +279,14 @@ pub fn file_many(
             .map(|(note_id, folder_id)| NoteFiling { note_id, folder_id })
             .collect();
 
-        let touched: Vec<&String> = filed.iter().map(|filing| &filing.note_id).collect();
-        diesel::update(notes::table.filter(notes::id.eq_any(touched)))
+        let touched: Vec<String> = filed.iter().map(|filing| filing.note_id.clone()).collect();
+        if folder_id.is_some() {
+            // ⚠️ A position row means "loose": a filed card flows inside its zone and has
+            // no place of its own to keep consistent.
+            board::forget_positions(connection, &touched)?;
+        }
+
+        diesel::update(notes::table.filter(notes::id.eq_any(&touched)))
             .set((
                 notes::folder_id.eq(folder_id),
                 notes::updated_at.eq(iso8601::format(now)),

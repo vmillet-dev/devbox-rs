@@ -305,7 +305,7 @@ describe('NotesPageComponent', () => {
       await vi.waitFor(() => expect(loading.nativeElement.textContent).toContain('Chargement des notes'));
 
       expect(loading.debugElement.queryAll(By.directive(NoteSectionComponent))).toHaveLength(0);
-      expect(loading.nativeElement.querySelector('.canvas').getAttribute('aria-busy')).toBe('true');
+      expect(loading.nativeElement.querySelector('.canvas-region').getAttribute('aria-busy')).toBe('true');
       held.release();
     });
 

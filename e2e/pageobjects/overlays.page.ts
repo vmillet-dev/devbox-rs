@@ -1,6 +1,14 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { confirmTwice, readEach, setField, setNativeValue, submitFormOf, testid } from '../support/app.js';
+import {
+  confirmTwice,
+  readEach,
+  setField,
+  setNativeValue,
+  submitFormOf,
+  testid,
+  waitForCanvas,
+} from '../support/app.js';
 
 /** The space switcher, which is a menu, a create form and an edit panel in one. */
 export const spaces = {
@@ -116,6 +124,119 @@ export const folders = {
   },
 
   createBlocked: () => $(testid('folder-create-blocked')),
+};
+
+/** The Date / Tableau switch and the board it draws. */
+export const board = {
+  option: (mode: 'date' | 'board') => $(testid(`view-${mode}`)),
+
+  pressed: (mode: 'date' | 'board') => $(testid(`view-${mode}`)).getAttribute('aria-pressed'),
+
+  isShowing: () => $(testid('board')).isExisting(),
+
+  async waitForBoard(): Promise<void> {
+    await $(testid('board')).waitForExist({ timeout: 15_000 });
+    // Settled means the cards have arrived, not merely that the surface has.
+    await browser.pause(400);
+  },
+
+  /** Idempotent: clicking the showing view again would change nothing but still re-render. */
+  async show(mode: 'date' | 'board'): Promise<void> {
+    if ((await board.pressed(mode)) === 'true') return;
+
+    await board.option(mode).click();
+    if (mode === 'board') {
+      await board.waitForBoard();
+    } else {
+      await waitForCanvas();
+    }
+  },
+
+  zoneNames: (): Promise<string[]> => readEach(testid('board-zone-open'), 'text'),
+
+  /**
+   * ⚠️ Read in one call, like `canvas.titles()`: a round trip per card leaves a window in
+   * which the board re-renders, and the list that comes back mixes two states.
+   */
+  zoneTitles(folderName: string): Promise<string[]> {
+    return browser.execute(
+      (zoneSelector: string, openSelector: string, cardTitle: string, wanted: string) =>
+        [...document.querySelectorAll(zoneSelector)]
+          .filter((zone) => (zone.querySelector(openSelector)?.textContent ?? '').trim() === wanted)
+          .flatMap((zone) =>
+            [...zone.querySelectorAll(cardTitle)].map((title) => (title.textContent ?? '').trim()),
+          ),
+      testid('board-zone'),
+      testid('board-zone-open'),
+      testid('note-card-title'),
+      folderName,
+    );
+  },
+
+  looseTitles: (): Promise<string[]> =>
+    readEach(testid('board-loose-card'), 'text', testid('note-card-title')),
+
+  async zoneCard(folderName: string, title: string) {
+    const zone = $(`${testid('board-zone')}[data-folder-id="${await board.folderId(folderName)}"]`);
+    const id = await browser.execute(
+      (zoneSelector: string, cardSelector: string, titleSelector: string, wanted: string) =>
+        [...(document.querySelector(zoneSelector)?.querySelectorAll(cardSelector) ?? [])]
+          .find((card) => (card.querySelector(titleSelector)?.textContent ?? '').trim() === wanted)
+          ?.getAttribute('data-note-id') ?? null,
+      `${testid('board-zone')}[data-folder-id="${await board.folderId(folderName)}"]`,
+      testid('note-card'),
+      testid('note-card-title'),
+      title,
+    );
+
+    if (id === null) {
+      throw new Error(`no card titled "${title}" in zone "${folderName}"`);
+    }
+    return zone.$(`${testid('note-card')}[data-note-id="${id}"]`);
+  },
+
+  async folderId(name: string): Promise<string> {
+    const id = await browser.execute(
+      (zoneSelector: string, openSelector: string, wanted: string) =>
+        [...document.querySelectorAll(zoneSelector)]
+          .find((zone) => (zone.querySelector(openSelector)?.textContent ?? '').trim() === wanted)
+          ?.getAttribute('data-folder-id') ?? null,
+      testid('board-zone'),
+      testid('board-zone-open'),
+      name,
+    );
+
+    if (id === null) {
+      throw new Error(`no zone named "${name}" on the board`);
+    }
+    return id;
+  },
+
+  /** The frames as the board actually placed them, which is what a restart must reproduce. */
+  zoneFrames(): Promise<{ left: string; top: string; width: string }[]> {
+    return browser.execute(
+      (selector: string) =>
+        [...document.querySelectorAll<HTMLElement>(selector)].map((zone) => ({
+          left: zone.style.left,
+          top: zone.style.top,
+          width: zone.style.width,
+        })),
+      testid('board-zone'),
+    );
+  },
+
+  /** ⚠️ Dimmed, never dropped: the card is still there, it has only stopped shouting. */
+  isDimmed(title: string): Promise<boolean> {
+    return browser.execute(
+      (cardSelector: string, titleSelector: string, wanted: string) =>
+        [...document.querySelectorAll(cardSelector)]
+          .find((card) => (card.querySelector(titleSelector)?.textContent ?? '').trim() === wanted)
+          ?.classList.contains('dimmed') ?? false,
+      'app-note-card',
+      testid('note-card-title'),
+      title,
+    );
+  },
 };
 
 export const trash = {

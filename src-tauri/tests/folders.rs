@@ -1,6 +1,8 @@
 //! The folder as data: a region of a space that notes are filed into, and that never
 //! takes a note with it when it goes.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 
 use devbox_lib::db::{Library, iso8601, open_in_memory};
@@ -491,4 +493,347 @@ fn a_draft_can_name_the_folder_it_is_born_in() {
     .unwrap();
 
     assert_eq!(born.folder_id, Some(perf.id));
+}
+
+mod board {
+    use super::*;
+
+    use devbox_lib::folders::board::{self, BoardFrame, BoardPoint, BoardQuery, BoardView};
+    use devbox_lib::folders::store::board as geometry;
+    use devbox_lib::notes::store::fetch;
+    use devbox_lib::notes::view::{NoteFilter, NotesQuery};
+
+    fn request(space_id: &str) -> BoardQuery {
+        BoardQuery {
+            space_id: space_id.to_string(),
+            search: String::new(),
+            filter: NoteFilter::All,
+            tags: Vec::new(),
+            languages: Vec::new(),
+            now: t1(),
+        }
+    }
+
+    /// What `board_view` does, minus the decoration passes that need a connection.
+    fn view(connection: &mut Library, query: &BoardQuery) -> BoardView {
+        let folders = list(connection, Some(&query.space_id)).unwrap();
+        let (notes, facets) = fetch(
+            connection,
+            &NotesQuery {
+                space_id: Some(query.space_id.clone()),
+                folder_id: None,
+                search: String::new(),
+                filter: NoteFilter::All,
+                tags: Vec::new(),
+                languages: Vec::new(),
+                now: query.now,
+                tz_offset_minutes: 0,
+                pinned_first: true,
+            },
+        )
+        .unwrap();
+
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        let mut loose_ids: Vec<String> = Vec::new();
+        for note in &notes {
+            match &note.folder_id {
+                Some(id) => *counts.entry(id.clone()).or_default() += 1,
+                None => loose_ids.push(note.id.clone()),
+            }
+        }
+
+        let folder_ids: Vec<String> = folders.iter().map(|folder| folder.id.clone()).collect();
+        let (frames, positions) = geometry::geometry(
+            connection,
+            &query.space_id,
+            &folder_ids,
+            &counts,
+            &loose_ids,
+        )
+        .unwrap();
+
+        board::build(notes, folders, &frames, &positions, facets, query)
+    }
+
+    fn titled(connection: &mut Library, space_id: &str, title: &str) -> Note {
+        create_note(
+            connection,
+            NoteDraft {
+                title: title.to_string(),
+                ..draft(space_id)
+            },
+            t0(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_board_draws_every_folder_as_a_zone_holding_its_notes() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        // ⚠️ Distinct instants: `list` orders by `(created_at, id)`, so two folders made
+        // in the same millisecond fall back to their UUIDs — stable across launches, which
+        // is what the board needs, but not something a test can name.
+        let migrations = create(&mut connection, &sql, "Migrations", t0()).unwrap();
+        create(&mut connection, &sql, "Perf", t1()).unwrap();
+        let filed = note_in(&mut connection, &sql);
+        note_in(&mut connection, &sql);
+        file_many(
+            &mut connection,
+            std::slice::from_ref(&filed.id),
+            Some(&migrations.id),
+            t1(),
+        )
+        .unwrap();
+
+        let board = view(&mut connection, &request(&sql));
+
+        assert_eq!(board.zones.len(), 2);
+        assert_eq!(board.zones[0].folder.name, "Migrations");
+        assert_eq!(board.zones[0].notes.len(), 1);
+        assert!(board.zones[1].notes.is_empty());
+        assert_eq!(board.loose.len(), 1);
+    }
+
+    /// A filed card flows inside its zone; only a loose one carries a place of its own.
+    #[test]
+    fn a_filed_card_has_no_position_and_a_loose_one_does() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let perf = create(&mut connection, &sql, "Perf", t0()).unwrap();
+        let filed = note_in(&mut connection, &sql);
+        note_in(&mut connection, &sql);
+        file_many(
+            &mut connection,
+            std::slice::from_ref(&filed.id),
+            Some(&perf.id),
+            t1(),
+        )
+        .unwrap();
+
+        let board = view(&mut connection, &request(&sql));
+
+        assert!(board.zones[0].notes[0].position.is_none());
+        assert!(board.loose[0].position.is_some());
+    }
+
+    /// The board would look shuffled at every launch otherwise.
+    #[test]
+    fn the_first_layout_is_written_down_and_read_back_unchanged() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        create(&mut connection, &sql, "Migrations", t0()).unwrap();
+        create(&mut connection, &sql, "Perf", t0()).unwrap();
+        note_in(&mut connection, &sql);
+
+        let first = view(&mut connection, &request(&sql));
+        let second = view(&mut connection, &request(&sql));
+
+        assert_eq!(
+            first
+                .zones
+                .iter()
+                .map(|zone| zone.frame)
+                .collect::<Vec<_>>(),
+            second
+                .zones
+                .iter()
+                .map(|zone| zone.frame)
+                .collect::<Vec<_>>(),
+        );
+        assert_eq!(first.loose[0].position, second.loose[0].position);
+    }
+
+    /// A frame the user moved is theirs; a later read must not lay it out again.
+    #[test]
+    fn a_stored_frame_survives_the_next_read() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let perf = create(&mut connection, &sql, "Perf", t0()).unwrap();
+        view(&mut connection, &request(&sql));
+
+        let moved = BoardFrame {
+            x: 700,
+            y: 500,
+            width: 300,
+            height: 200,
+        };
+        connection
+            .transaction(|connection, _vault| geometry::set_frame(connection, &perf.id, moved))
+            .unwrap();
+
+        assert_eq!(view(&mut connection, &request(&sql)).zones[0].frame, moved);
+    }
+
+    #[test]
+    fn a_folder_added_later_lands_beside_the_others_rather_than_on_top() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        create(&mut connection, &sql, "Migrations", t0()).unwrap();
+        let first = view(&mut connection, &request(&sql)).zones[0].frame;
+
+        create(&mut connection, &sql, "Perf", t1()).unwrap();
+        let board = view(&mut connection, &request(&sql));
+
+        assert_eq!(board.zones[0].frame, first);
+        assert_ne!(board.zones[1].frame, first);
+    }
+
+    /// Dimmed, never dropped: reflowing the survivors throws away the only thing the board
+    /// has that the date view does not.
+    #[test]
+    fn a_search_dims_what_it_does_not_match_and_removes_nothing() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let perf = create(&mut connection, &sql, "Perf", t0()).unwrap();
+        let wanted = titled(&mut connection, &sql, "Index sur orders");
+        titled(&mut connection, &sql, "Dump nocturne");
+        file_many(
+            &mut connection,
+            std::slice::from_ref(&wanted.id),
+            Some(&perf.id),
+            t1(),
+        )
+        .unwrap();
+
+        let board = view(
+            &mut connection,
+            &BoardQuery {
+                search: "orders".to_string(),
+                ..request(&sql)
+            },
+        );
+
+        assert_eq!(board.zones[0].notes.len(), 1);
+        assert_eq!(board.loose.len(), 1);
+        assert!(board.zones[0].notes[0].matches);
+        assert!(!board.loose[0].matches);
+        assert_eq!(board.matched, 1);
+        assert!(board.is_filtering);
+    }
+
+    /// Accents fold both ways here too: it is `notes::view`'s own matcher, not a second one.
+    #[test]
+    fn the_board_search_folds_accents_like_the_canvas_does() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        titled(&mut connection, &sql, "Étape suivante");
+
+        let board = view(
+            &mut connection,
+            &BoardQuery {
+                search: "etape".to_string(),
+                ..request(&sql)
+            },
+        );
+
+        assert!(board.loose[0].matches);
+    }
+
+    #[test]
+    fn a_quick_filter_dims_rather_than_narrows_too() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        create_note(
+            &mut connection,
+            NoteDraft {
+                pinned: true,
+                ..draft(&sql)
+            },
+            t0(),
+        )
+        .unwrap();
+        create_note(&mut connection, draft(&sql), t0()).unwrap();
+
+        let board = view(
+            &mut connection,
+            &BoardQuery {
+                filter: NoteFilter::Pinned,
+                ..request(&sql)
+            },
+        );
+
+        assert_eq!(board.loose.len(), 2);
+        assert_eq!(board.matched, 1);
+    }
+
+    /// Filing a card into a zone drops the place it had on the background.
+    #[test]
+    fn filing_a_loose_note_forgets_where_it_sat() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let perf = create(&mut connection, &sql, "Perf", t0()).unwrap();
+        let note = note_in(&mut connection, &sql);
+        view(&mut connection, &request(&sql));
+
+        let placed = connection
+            .transaction(|connection, _vault| geometry::positions(connection, &sql))
+            .unwrap();
+        assert!(placed.contains_key(&note.id));
+
+        file_many(
+            &mut connection,
+            std::slice::from_ref(&note.id),
+            Some(&perf.id),
+            t1(),
+        )
+        .unwrap();
+
+        let after = connection
+            .transaction(|connection, _vault| geometry::positions(connection, &sql))
+            .unwrap();
+        assert!(!after.contains_key(&note.id));
+    }
+
+    #[test]
+    fn a_stored_position_is_what_a_later_read_hands_back() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let note = note_in(&mut connection, &sql);
+        view(&mut connection, &request(&sql));
+
+        let chosen = BoardPoint { x: 640, y: 480 };
+        connection
+            .transaction(|connection, _vault| geometry::set_position(connection, &note.id, chosen))
+            .unwrap();
+
+        assert_eq!(
+            view(&mut connection, &request(&sql)).loose[0].position,
+            Some(chosen)
+        );
+    }
+
+    #[test]
+    fn the_surface_grows_to_hold_whatever_is_furthest_out() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let note = note_in(&mut connection, &sql);
+        view(&mut connection, &request(&sql));
+
+        connection
+            .transaction(|connection, _vault| {
+                geometry::set_position(connection, &note.id, BoardPoint { x: 3000, y: 2000 })
+            })
+            .unwrap();
+
+        let board = view(&mut connection, &request(&sql));
+        assert!(board.width > 3000);
+        assert!(board.height > 2000);
+    }
+
+    /// A board of one space says nothing about the next one.
+    #[test]
+    fn a_board_never_reaches_into_another_space() {
+        let mut connection = open_in_memory().unwrap();
+        let sql = space(&mut connection, "SQL");
+        let veille = space(&mut connection, "Veille");
+        create(&mut connection, &sql, "Perf", t0()).unwrap();
+        create(&mut connection, &veille, "Liens", t0()).unwrap();
+        note_in(&mut connection, &veille);
+
+        let board = view(&mut connection, &request(&sql));
+
+        assert_eq!(board.zones.len(), 1);
+        assert!(board.loose.is_empty());
+    }
 }

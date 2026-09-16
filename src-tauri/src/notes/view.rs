@@ -208,6 +208,12 @@ fn apply_search_hits(view: &mut NotesView, hits: &mut HashMap<String, SearchHit>
 /// ⚠️ Folded in Rust and not in SQL: without ICU, SQLite's `LOWER()` only handles ASCII,
 /// so `Étape` would not match `étape`. The items count as much as the content — a todo
 /// list has no body to be found by.
+/// ⚠️ The one place a needle meets a note. The board reuses it rather than growing a
+/// second, subtly different match — it dims what does not match instead of dropping it.
+pub fn matches_search(note: &Note, needle: &str) -> bool {
+    find_match(note, needle).is_some()
+}
+
 fn find_match(note: &Note, needle: &str) -> Option<SearchMatch> {
     if contains_folded(&note.title, needle) {
         return Some(SearchMatch::Title);
@@ -267,7 +273,7 @@ fn clip(text: &str) -> String {
 /// string — measured 5× slower for the same answer, its lookahead buffering earning
 /// nothing when every mark is dropped anyway. The ASCII branches are the common case,
 /// not a micro-optimisation: code is ASCII end to end, prose between its accents.
-fn fold(text: &str) -> String {
+pub(crate) fn fold(text: &str) -> String {
     if text.is_ascii() {
         return text.to_ascii_lowercase();
     }
@@ -546,10 +552,6 @@ mod tests {
 
     mod search {
         use super::*;
-
-        fn matches_search(note: &Note, needle: &str) -> bool {
-            find_match(note, needle).is_some()
-        }
 
         #[test]
         fn the_title_the_tags_and_the_content_are_all_searched() {

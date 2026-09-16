@@ -95,6 +95,8 @@ export class NotesQueryStore {
 
   /** Follows the typing without waiting: this is what the field shows. */
   readonly searchQuery = this._searchQuery.asReadonly();
+  /** What actually crosses the bridge — the board queries on the same settled value. */
+  readonly debouncedSearch = this._debouncedSearch.asReadonly();
   readonly activeFilter = this._activeFilter.asReadonly();
   readonly selectedTags = this._selectedTags.asReadonly();
   readonly selectedLanguages = this._selectedLanguages.asReadonly();

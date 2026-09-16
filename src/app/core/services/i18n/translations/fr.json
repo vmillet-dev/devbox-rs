@@ -106,6 +106,15 @@
     "deleteConfirm": "Confirmer ?",
     "deleteKeepsNotes": "Les notes restent, simplement sans dossier."
   },
+  "board": {
+    "viewSwitchLabel": "Choisir la vue",
+    "dateView": "Date",
+    "boardView": "Tableau",
+    "needsASpace": "Choisissez un espace pour voir son tableau.",
+    "loose": "Hors dossier · {{count}}",
+    "emptyZone": "Aucune note ici.",
+    "empty": "Rien à disposer pour le moment."
+  },
   "sections": {
     "pinned": "Épinglées",
     "today": "Aujourd'hui",
@@ -209,7 +218,8 @@
     "folderRecolourFailed": "La couleur du dossier n’a pas pu être changée.",
     "folderDeleteFailed": "Le dossier n’a pas pu être supprimé.",
     "folderGone": "Ce dossier n’existe plus.",
-    "folderNameTaken": "Un dossier « {{name}} » existe déjà dans cet espace."
+    "folderNameTaken": "Un dossier « {{name}} » existe déjà dans cet espace.",
+    "boardLoadFailed": "Le tableau n’a pas pu être chargé."
   },
   "tray": {
     "open": "Ouvrir {{app}}",

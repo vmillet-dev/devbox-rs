@@ -6,7 +6,7 @@ import { SpacesStore } from '@core/state/spaces.store';
 import { createNote } from '@testing/note.fixture';
 import { createSection } from '@testing/section.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
-import { NoteCardComponent } from './note-card/note-card.component';
+import { NoteCardComponent } from '../note-card/note-card.component';
 import { NoteSectionComponent } from './note-section.component';
 
 describe('NoteSectionComponent', () => {
