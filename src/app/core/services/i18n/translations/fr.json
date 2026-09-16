@@ -152,6 +152,8 @@
     "storageUnavailable": "Le stockage est indisponible. Redémarrez {{app}}.",
     "wrongPassphrase": "Phrase de passe incorrecte.",
     "locked": "La bibliothèque est verrouillée.",
+    "libraryDamaged": "Cette bibliothèque est endommagée et ne peut pas être ouverte.",
+    "setAsideFailed": "La bibliothèque n'a pas pu être mise de côté. Rien n'a été déplacé.",
     "passphraseRequired": "Ce fichier est protégé par une phrase de passe.",
     "updateFailed": "La mise à jour a échoué. {{app}} reste utilisable dans sa version actuelle.",
     "updateCheckFailed": "La recherche de mise à jour a échoué. Réessayez plus tard.",
@@ -531,6 +533,11 @@
     "createAction": "Protéger et continuer",
     "unlockAction": "Déverrouiller",
     "working": "Déverrouillage…",
+    "damagedTitle": "Cette bibliothèque est endommagée",
+    "damagedLead": "SQLite refuse de lire la base de {{app}}. Une phrase de passe n'y changera rien — c'est le fichier qui est abîmé, et y écrire maintenant l'abîmerait davantage.",
+    "damagedAction": "La mettre de côté et repartir à neuf",
+    "damagedNote": "⚠️ La base endommagée et ses pièces jointes sont déplacées dans un dossier à part, et ce qui reste lisible est récupéré à côté. Votre phrase de passe ne change pas. {{app}} ouvre ensuite une bibliothèque vide.",
+    "setAside": "Bibliothèque mise de côté dans {{path}}. Saisissez votre phrase de passe pour repartir à neuf.",
     "creating": "Protection de la bibliothèque…"
   }
 }

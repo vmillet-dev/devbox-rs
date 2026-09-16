@@ -152,6 +152,8 @@
     "storageUnavailable": "Storage is unavailable. Restart {{app}}.",
     "wrongPassphrase": "Wrong passphrase.",
     "locked": "The library is locked.",
+    "libraryDamaged": "This library is damaged and cannot be opened.",
+    "setAsideFailed": "The library could not be set aside. Nothing was moved.",
     "passphraseRequired": "This file is protected by a passphrase.",
     "updateFailed": "The update failed. {{app}} remains usable on its current version.",
     "updateCheckFailed": "The update check failed. Try again later.",
@@ -531,6 +533,11 @@
     "createAction": "Protect and continue",
     "unlockAction": "Unlock",
     "working": "Unlocking…",
+    "damagedTitle": "This library is damaged",
+    "damagedLead": "SQLite refuses to read {{app}}'s database. A passphrase will not help — the file itself is broken, and writing to it now would make it worse.",
+    "damagedAction": "Set it aside and start fresh",
+    "damagedNote": "⚠️ The damaged database and its attachments are moved into a folder of their own, and what can still be read is rescued beside them. Your passphrase does not change. {{app}} then opens on an empty library.",
+    "setAside": "Library set aside in {{path}}. Enter your passphrase to start on a fresh one.",
     "creating": "Protecting the library…"
   }
 }

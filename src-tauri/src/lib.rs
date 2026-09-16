@@ -8,6 +8,7 @@ pub mod db;
 pub mod desktop;
 pub mod error;
 pub mod notes;
+pub mod recovery;
 pub mod spaces;
 pub mod transfer;
 pub mod vault;
@@ -32,6 +33,7 @@ use notes::{
     query_notes, rename_tag, restore_notes, seed_samples, set_global_placeholders,
     set_placeholder_values, tag_notes, update_note,
 };
+use recovery::set_aside_damaged_library;
 use spaces::{create_space, delete_space, list_spaces, pin_space, rename_space};
 use transfer::{export_is_protected, export_notes, export_selection, import_notes, share_notes};
 use vault::{change_passphrase, create_vault, unlock_vault, vault_state};
@@ -96,6 +98,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             create_vault,
             unlock_vault,
             change_passphrase,
+            set_aside_damaged_library,
             app_changelog,
             sync_tray,
             set_global_shortcuts,

@@ -59,6 +59,15 @@ export class PreferencesService {
     void this.store?.set(key, value).catch(() => undefined);
   }
 
+  /**
+   * ⚠️ Removed, not emptied: a guard that reads "has this key" — the samples marker —
+   * would take an empty string for an answer.
+   */
+  forget(key: string): void {
+    this.cache.delete(key);
+    void this.store?.delete(key).catch(() => undefined);
+  }
+
   private adoptLegacyValues(): void {
     const adopted: string[] = [];
     try {

@@ -83,6 +83,12 @@ copying a folder back. It is written with `VACUUM INTO` rather than by copying t
 because under WAL the database on its own is not a consistent snapshot. Turn it off in
 Preferences → Security if you would rather it did not.
 
+DevBox also checks the database is still sound every time it opens one. If it is not, it
+says so rather than starting on it, and offers to set it aside: the database, its
+attachments and whatever could still be rescued from it move into `damaged/`, and the next
+unlock starts on a fresh library. Your passphrase does not change — so what was set aside,
+like the copies in `backups/`, still opens with the one you already have.
+
 ⚠️ These copies sit **next to the original**, which is the accident they cover: an emptied
 trash, a botched update, a file gone wrong. They are not a defence against a dead disk.
 For that, export somewhere else — or copy that folder to another machine.
