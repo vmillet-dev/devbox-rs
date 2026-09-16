@@ -33,19 +33,35 @@ function sameStrings(a: readonly string[], b: readonly string[]): boolean {
 }
 
 /**
+ * Exhaustive by construction, like `UNCHANGED` in `notes.store.ts`: a new
+ * `QueryParams` field stops this compiling until it says how it compares.
+ *
+ * ⚠️ A hand-written chain of `&&` was the same table with a hole waiting to happen, and
+ * the hole is silent: the forgotten field changes, the comparator answers "same", the
+ * `resource` does not re-run, and the retained view keeps the interface looking right
+ * while it ignores the filter.
+ */
+const SAME: {
+  readonly [K in keyof QueryParams]: (a: QueryParams[K], b: QueryParams[K]) => boolean;
+} = {
+  spaceId: Object.is,
+  search: Object.is,
+  filter: Object.is,
+  day: Object.is,
+  revision: Object.is,
+  tags: sameStrings,
+  languages: sameStrings,
+};
+
+/**
  * ⚠️ `resource` compares its params by identity: without this comparator, the fresh
  * literal `queryParams` builds on every clock tick fires a full query every 30 s.
  */
 function sameQueryParams(a: QueryParams, b: QueryParams): boolean {
-  return (
-    a.spaceId === b.spaceId &&
-    a.search === b.search &&
-    a.filter === b.filter &&
-    a.day === b.day &&
-    a.revision === b.revision &&
-    sameStrings(a.tags, b.tags) &&
-    sameStrings(a.languages, b.languages)
-  );
+  return (Object.keys(SAME) as (keyof QueryParams)[]).every((key) => {
+    const same = SAME[key] as (a: unknown, b: unknown) => boolean;
+    return same(a[key], b[key]);
+  });
 }
 
 function toggled<T>(selection: ReadonlySet<T>, value: T): ReadonlySet<T> {
