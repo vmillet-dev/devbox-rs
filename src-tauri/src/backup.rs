@@ -1,0 +1,279 @@
+//! A rolling copy of the library, taken at launch.
+//!
+//! ⚠️ The trash protects a note from being deleted; nothing protected the **file**. A
+//! dead disk, a botched migration or an emptied trash took the library with it, and an
+//! export only helps the person who remembered to make one.
+//!
+//! ⚠️ `VACUUM INTO` rather than a file copy: under WAL the database file on its own is
+//! not a consistent snapshot — the committed pages may still be in the write-ahead log —
+//! so copying it can produce something that opens short of what was written.
+
+use std::path::{Path, PathBuf};
+
+use tauri::{AppHandle, Manager};
+
+use chrono::{DateTime, TimeDelta, Utc};
+use diesel::prelude::*;
+use diesel::sql_types::Text;
+
+use crate::db::{DB_FILE_NAME, Library};
+use crate::error::StorageError;
+use crate::vault::file::FILE_NAME as VAULT_FILE_NAME;
+
+pub(crate) const DIRECTORY: &str = "backups";
+
+/// How many are kept. Enough to reach past the launch that went wrong without turning the
+/// data directory into a second library.
+pub(crate) const KEEP: usize = 3;
+
+/// ⚠️ At most one a day, not one per launch: five launches in an hour would otherwise
+/// rotate every older copy out, which is exactly the history a backup is for.
+const MIN_AGE: TimeDelta = TimeDelta::hours(24);
+
+/// ⚠️ Colons are legal in an instant and not in a Windows path.
+fn stamp(now: DateTime<Utc>) -> String {
+    now.format("%Y-%m-%d_%H-%M-%S").to_string()
+}
+
+fn taken_at(entry: &Path) -> Option<DateTime<Utc>> {
+    let name = entry.file_name()?.to_str()?;
+    let parsed = chrono::NaiveDateTime::parse_from_str(name, "%Y-%m-%d_%H-%M-%S").ok()?;
+
+    Some(parsed.and_utc())
+}
+
+/// The copies on disk, newest first.
+fn existing(directory: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return Vec::new();
+    };
+
+    let mut taken: Vec<(DateTime<Utc>, PathBuf)> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .filter_map(|path| taken_at(&path).map(|at| (at, path)))
+        .collect();
+
+    // Newest first, which is the order both the age check and the pruning want.
+    taken.sort_by_key(|(at, _)| std::cmp::Reverse(*at));
+
+    taken.into_iter().map(|(_, path)| path).collect()
+}
+
+/// Takes one if the newest is older than a day, then prunes to [`KEEP`].
+///
+/// ⚠️ The key file travels with the database, and must: the library is sealed, and a
+/// copy of it without `vault.json` is a file nobody can ever open again.
+pub(crate) fn rotate(
+    library: &Path,
+    connection: &mut Library,
+    now: DateTime<Utc>,
+) -> Result<Option<PathBuf>, StorageError> {
+    let directory = library.join(DIRECTORY);
+    let taken = existing(&directory);
+
+    if let Some(newest) = taken.first()
+        && let Some(at) = taken_at(newest)
+        && now.signed_duration_since(at) < MIN_AGE
+    {
+        return Ok(None);
+    }
+
+    let target = directory.join(stamp(now));
+    std::fs::create_dir_all(&target)
+        .map_err(|error| StorageError::File(format!("{}: {error}", target.display())))?;
+
+    let copy = target.join(DB_FILE_NAME);
+    diesel::sql_query("VACUUM INTO ?")
+        .bind::<Text, _>(copy.to_string_lossy().to_string())
+        .execute(connection.db())
+        .map_err(|error| {
+            // A half-written copy is worse than none: it would be the newest, and would
+            // hold the next day's rotation off.
+            let _ = std::fs::remove_dir_all(&target);
+            StorageError::File(format!("{}: {error}", copy.display()))
+        })?;
+
+    std::fs::copy(library.join(VAULT_FILE_NAME), target.join(VAULT_FILE_NAME)).map_err(
+        |error| {
+            let _ = std::fs::remove_dir_all(&target);
+            StorageError::File(format!("{VAULT_FILE_NAME}: {error}"))
+        },
+    )?;
+
+    for old in existing(&directory).into_iter().skip(KEEP) {
+        // Best effort: a copy that resists deletion is not worth failing a launch over.
+        let _ = std::fs::remove_dir_all(old);
+    }
+
+    Ok(Some(target))
+}
+
+/// The launch copy. ⚠️ Never fatal and never in the way: a library that cannot be
+/// copied still has to open.
+pub(crate) fn take(app: &AppHandle, db: &crate::db::Db) {
+    let Ok(directory) = app.path().app_data_dir() else {
+        return;
+    };
+
+    let mut connection = match crate::db::lock(db) {
+        Ok(connection) => connection,
+        Err(error) => {
+            log::warn!("No backup taken: {error}");
+            return;
+        }
+    };
+
+    match rotate(&directory, &mut connection, Utc::now()) {
+        Ok(Some(target)) => log::info!("Library copied to {}", target.display()),
+        Ok(None) => {}
+        Err(error) => log::warn!("No backup taken: {error}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db;
+    use crate::notes::store as notes;
+    use crate::spaces::store as spaces;
+
+    fn scratch() -> PathBuf {
+        let directory =
+            std::env::temp_dir().join(format!("devbox-backup-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+
+        directory
+    }
+
+    fn at(offset_hours: i64) -> DateTime<Utc> {
+        db::iso8601::parse("2026-07-25T09:00:00.000Z").unwrap() + TimeDelta::hours(offset_hours)
+    }
+
+    /// A library with one note in it, and the key file beside it, as a real one is.
+    fn library(directory: &Path) -> (Library, String) {
+        let vault = crate::vault::file::create(
+            directory,
+            "a passphrase",
+            crate::vault::key::Cost {
+                memory_kib: 64,
+                passes: 1,
+                lanes: 1,
+            },
+        )
+        .unwrap();
+
+        let mut connection = db::open(&directory.join(DB_FILE_NAME), vault).unwrap();
+        let space = spaces::create(&mut connection, "Perso").unwrap().id;
+        let note = notes::create(
+            &mut connection,
+            crate::notes::model::NoteDraft {
+                space_id: space,
+                title: "À sauvegarder".to_string(),
+                language: crate::notes::language::Language::Txt,
+                content: "psql -h prod".to_string(),
+                source: String::new(),
+                tags: Vec::new(),
+                pinned: false,
+                lifecycle: crate::notes::model::NoteLifecycle::Permanent,
+                kind: crate::notes::checklist::NoteKind::Snippet,
+                items: Vec::new(),
+            },
+            at(0),
+        )
+        .unwrap()
+        .id;
+
+        (connection, note)
+    }
+
+    /// ⚠️ The only test that matters: a copy that cannot be opened is not a backup.
+    #[test]
+    fn a_copy_opens_as_a_library_and_holds_the_notes() {
+        let directory = scratch();
+        let (mut connection, note_id) = library(&directory);
+
+        let target = rotate(&directory, &mut connection, at(0)).unwrap().unwrap();
+
+        let reopened = crate::vault::file::unlock(&target, "a passphrase").unwrap();
+        let mut copy = db::open(&target.join(DB_FILE_NAME), reopened).unwrap();
+        let written = notes::all(&mut copy, None).unwrap();
+
+        assert_eq!(written.len(), 1);
+        assert_eq!(written[0].id, note_id);
+        assert_eq!(written[0].title, "À sauvegarder");
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// ⚠️ Without the key file the copy is a file nobody can ever open again.
+    #[test]
+    fn the_key_file_travels_with_the_database() {
+        let directory = scratch();
+        let (mut connection, _) = library(&directory);
+
+        let target = rotate(&directory, &mut connection, at(0)).unwrap().unwrap();
+
+        assert!(target.join(VAULT_FILE_NAME).is_file());
+        assert!(target.join(DB_FILE_NAME).is_file());
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// ⚠️ Five launches in an hour must not rotate the history out.
+    #[test]
+    fn a_second_launch_the_same_day_takes_nothing() {
+        let directory = scratch();
+        let (mut connection, _) = library(&directory);
+        rotate(&directory, &mut connection, at(0)).unwrap().unwrap();
+
+        let again = rotate(&directory, &mut connection, at(3)).unwrap();
+
+        assert!(again.is_none());
+        assert_eq!(existing(&directory.join(DIRECTORY)).len(), 1);
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn a_launch_the_next_day_takes_another() {
+        let directory = scratch();
+        let (mut connection, _) = library(&directory);
+        rotate(&directory, &mut connection, at(0)).unwrap();
+
+        rotate(&directory, &mut connection, at(25))
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(existing(&directory.join(DIRECTORY)).len(), 2);
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn only_the_last_few_are_kept() {
+        let directory = scratch();
+        let (mut connection, _) = library(&directory);
+
+        for day in 0..6 {
+            rotate(&directory, &mut connection, at(day * 25)).unwrap();
+        }
+
+        let kept = existing(&directory.join(DIRECTORY));
+        assert_eq!(kept.len(), KEEP);
+        // The newest survive, not the first ones taken.
+        assert_eq!(taken_at(&kept[0]).unwrap(), at(5 * 25));
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// A directory somebody dropped in there is not a backup, and must not hold the
+    /// rotation off by looking like the newest one.
+    #[test]
+    fn something_that_is_not_a_copy_is_ignored() {
+        let directory = scratch();
+        let (mut connection, _) = library(&directory);
+        std::fs::create_dir_all(directory.join(DIRECTORY).join("notes de Valentin")).unwrap();
+
+        let target = rotate(&directory, &mut connection, at(0)).unwrap();
+
+        assert!(target.is_some());
+        std::fs::remove_dir_all(&directory).ok();
+    }
+}

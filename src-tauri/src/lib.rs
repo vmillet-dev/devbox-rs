@@ -2,6 +2,7 @@
 // from the crate root, and `tests/` is a separate crate. Everything else is `pub(crate)`,
 // which is what gives `unreachable_pub` and `dead_code` something to say.
 pub mod attachments;
+mod backup;
 pub mod changelog;
 pub mod db;
 pub mod desktop;
@@ -223,13 +224,17 @@ fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// What makes retention hold even if nobody opens the trash. Neither sweep is fatal:
-/// the application has to start.
+/// The launch chores: a rolling copy of the library, then what makes retention hold
+/// even if nobody opens the trash. None of them is fatal — the application has to start.
 ///
 /// ⚠️ Moved behind the unlock with the database itself. A sweep needs to read the notes,
 /// and before the passphrase there is nothing to read.
 pub(crate) fn sweep(handle: &tauri::AppHandle) {
     let db = handle.state::<db::Db>();
+
+    // ⚠️ Before the sweeps, not after: the copy is worth most when it holds what the
+    // retention is about to purge.
+    backup::take(handle, &db);
 
     notes::trash::sweep_at_startup(handle, &db);
     if let Err(error) = attachments::sweep_orphan_files(handle, &db) {

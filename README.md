@@ -64,6 +64,28 @@ give it a passphrase and it travels sealed, attachments included, or write it in
 for a file any DevBox can read. The application asks which, every time, and says which one
 it wrote.
 
+## Where your library lives, and how it is backed up
+
+Two files, and they only mean anything together — the database is sealed, and the key
+file is what opens it:
+
+|             |                                  |
+| ----------- | -------------------------------- |
+| **Windows** | `%APPDATA%\com.devbox.app\`      |
+| **Linux**   | `~/.local/share/com.devbox.app/` |
+
+In it: `devbox.sqlite3`, `vault.json`, `attachments/`, and `preferences.json`. ⚠️ Copy the
+database without the key file and you have copied something nobody can open again.
+
+DevBox takes a **rolling copy at launch**, at most one a day, and keeps the last three in
+`backups/`. Each one is a full library — database and key file together — so restoring is
+copying a folder back. It is written with `VACUUM INTO` rather than by copying the file,
+because under WAL the database on its own is not a consistent snapshot.
+
+⚠️ These copies sit **next to the original**, which is the accident they cover: an emptied
+trash, a botched update, a file gone wrong. They are not a defence against a dead disk.
+For that, export somewhere else — or copy that folder to another machine.
+
 ## Install
 
 DevBox runs on **Windows and Linux**. There is no macOS build: it cannot be tested here,
