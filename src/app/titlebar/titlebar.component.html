@@ -3,7 +3,14 @@
     <div class="dots" aria-hidden="true">
       <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
     </div>
-    <app-file-menu />
+    <!--
+      ⚠️ Not merely disabled while the library is locked: every entry acts on it, and
+      creating the component would have `SpacesStore` query a database nobody has opened
+      yet. The About menu reads nothing of the library, so it stays.
+    -->
+    @if (vault.isUnlocked()) {
+      <app-file-menu />
+    }
     <app-about-menu />
   </div>
 

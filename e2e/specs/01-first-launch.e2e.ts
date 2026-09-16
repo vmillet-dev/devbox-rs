@@ -2,6 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { banners, fileMenu, titlebar } from '../pageobjects/titlebar.page.js';
+import { passTheGate } from '../support/app.js';
 import { bridge, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -19,6 +20,10 @@ describe('First launch', () => {
    * would be its own witness.
    */
   before(async () => {
+    // ⚠️ Before anything is asked of the library: this is the only file that meets the
+    // gate, and no command is answered — not even a read — until it has been passed.
+    await passTheGate();
+
     await browser.waitUntil(async () => (await bridge.queryNotes(query())).matched > 0, {
       timeout: 30_000,
       timeoutMsg: 'the first launch seeded no note',
@@ -76,6 +81,9 @@ describe('First launch', () => {
 
   it('boots without an error banner', async () => {
     // NG0203, a missing capability and a failed migration all land here.
-    expect(await banners.error().isExisting()).toBe(false);
+    const banner = banners.error();
+    const shown = (await banner.isExisting()) ? await banner.getText() : '';
+
+    expect(shown).toBe('');
   });
 });

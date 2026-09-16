@@ -2,6 +2,16 @@
   <app-titlebar />
   <app-error-banner />
   <app-status-toast />
-  <router-outlet />
+  <!--
+    ⚠️ The outlet is not merely hidden while the library is locked: it is not created.
+    The canvas queries notes the moment it mounts, and there would be nothing to answer
+    with — which is why no store carries a "locked" branch.
+  -->
+  @if (vault.isUnlocked()) {
+    <router-outlet />
+  } @else if (vault.state() !== null) {
+    <app-vault-gate />
+  }
   <app-update-prompt />
+  <app-passphrase-prompt />
 </div>

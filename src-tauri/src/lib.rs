@@ -9,6 +9,7 @@ pub mod error;
 pub mod notes;
 pub mod spaces;
 pub mod transfer;
+pub mod vault;
 
 pub(crate) mod app_info;
 pub(crate) mod closed_enum;
@@ -31,7 +32,8 @@ use notes::{
     tag_notes, update_note,
 };
 use spaces::{create_space, delete_space, list_spaces, pin_space, rename_space};
-use transfer::{export_notes, export_selection, import_notes, share_notes};
+use transfer::{export_is_protected, export_notes, export_selection, import_notes, share_notes};
+use vault::{change_passphrase, create_vault, unlock_vault, vault_state};
 
 /// ⚠️ Resolved from the manifest: a relative path writes the file next to whatever the
 /// current directory happens to be, without saying a word.
@@ -87,6 +89,11 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             export_selection,
             import_notes,
             share_notes,
+            export_is_protected,
+            vault_state,
+            create_vault,
+            unlock_vault,
+            change_passphrase,
             app_changelog,
             sync_tray,
             set_global_shortcuts,
@@ -185,23 +192,29 @@ fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let directory = app.path().app_data_dir()?;
     std::fs::create_dir_all(&directory)?;
 
-    let connection = db::open(&directory.join(db::DB_FILE_NAME))?;
-    app.manage(db::Db::new(connection));
-
-    sweep(app.handle());
+    // ⚠️ Nothing is opened here any more: the key comes from a passphrase the front end
+    // has not asked for yet. `vault::unlock` is what fills this and runs the sweeps.
+    app.manage(db::Db::new(None));
 
     Ok(())
 }
 
 /// What makes retention hold even if nobody opens the trash. Neither sweep is fatal:
 /// the application has to start.
-fn sweep(handle: &tauri::AppHandle) {
+///
+/// ⚠️ Moved behind the unlock with the database itself. A sweep needs to read the notes,
+/// and before the passphrase there is nothing to read.
+pub(crate) fn sweep(handle: &tauri::AppHandle) {
     let db = handle.state::<db::Db>();
 
     notes::trash::sweep_at_startup(handle, &db);
     if let Err(error) = attachments::sweep_orphan_files(handle, &db) {
         log::warn!("Orphan attachment files not swept: {error}");
     }
+    // ⚠️ The decrypted copies `open_attachment` had to write. They cannot be deleted on
+    // close — the application that opened one still holds it — so this is the guarantee:
+    // gone by the next launch.
+    attachments::sealed::sweep_plaintext(handle);
 }
 
 /// ⚠️ Both are refused when there is no tray to find the window in (see `desktop`).
@@ -239,8 +252,18 @@ pub fn run() {
         .setup(|app| setup(app))
         .on_window_event(on_window_event)
         .invoke_handler(builder.invoke_handler())
-        .run(tauri::generate_context!())
-        .expect("error while launching the Tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while launching the Tauri application")
+        .run(|handle, event| {
+            // ⚠️ Built and run rather than `run` alone, for this one event: a decrypted
+            // copy handed to another application should not outlive the session that
+            // asked for it. Best effort by design — one the desktop still holds is
+            // locked and stays, and a crash reaches none of this, which is what the
+            // sweep at launch is for.
+            if matches!(event, tauri::RunEvent::Exit) {
+                attachments::sealed::sweep_plaintext(handle);
+            }
+        });
 }
 
 #[cfg(test)]

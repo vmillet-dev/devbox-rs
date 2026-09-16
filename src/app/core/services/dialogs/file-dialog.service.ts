@@ -14,7 +14,10 @@ export const FILE_DIALOG_ADAPTER = new InjectionToken<FileDialogAdapter>('FILE_D
   factory: () => ({ open, save }),
 });
 
-const BUNDLE_FILTER = { name: APP_INFO.name, extensions: ['json'] };
+/** ⚠️ `json` stays on the way in: an export written before the archive existed is still
+ * importable, and the picker has to let the user reach it. */
+const OPEN_FILTER = { name: APP_INFO.name, extensions: ['devbox', 'json'] };
+const SAVE_FILTER = { name: APP_INFO.name, extensions: ['devbox'] };
 
 /** `null` covers both a cancellation and the plugin being unavailable. */
 @Injectable({ providedIn: 'root' })
@@ -22,7 +25,7 @@ export class FileDialogService {
   private readonly adapter = inject(FILE_DIALOG_ADAPTER);
 
   async pickBundle(): Promise<string | null> {
-    return this.pick({ multiple: false, filters: [BUNDLE_FILTER] });
+    return this.pick({ multiple: false, filters: [OPEN_FILTER] });
   }
 
   async pickAttachment(): Promise<string | null> {
@@ -30,7 +33,7 @@ export class FileDialogService {
   }
 
   async chooseBundleDestination(defaultPath: string): Promise<string | null> {
-    return this.destination({ defaultPath, filters: [BUNDLE_FILTER] });
+    return this.destination({ defaultPath, filters: [SAVE_FILTER] });
   }
 
   /** No filter: an attachment can be of any type. */

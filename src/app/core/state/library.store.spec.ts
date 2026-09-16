@@ -6,9 +6,12 @@ import { FakeClipboard } from '@testing/fake-clipboard';
 import { FakeFileDialog } from '@testing/fake-file-dialog';
 import { FakeTransferRepository } from '@testing/fake-transfer-repository';
 import { provideAppTesting } from '@testing/testing.providers';
-import { LibraryStore } from './library.store';
+import { LibraryStore, PassphraseAnswer } from './library.store';
 
 const NOW = new Date('2026-08-27T09:00:00Z');
+
+/** Declining the protection: what most of these scenarios are not about. */
+const IN_THE_CLEAR: PassphraseAnswer = { kind: 'none' };
 
 interface Harness {
   readonly store: LibraryStore;
@@ -38,6 +41,33 @@ function createStore(): Harness {
   };
 }
 
+/** The prompt is a promise the store is waiting on; nothing advances until it is given one. */
+async function asking(harness: Harness): Promise<void> {
+  for (let turn = 0; turn < 50; turn++) {
+    if (harness.store.passphraseRequest() !== null && !harness.store.passphraseWorking()) return;
+    await Promise.resolve();
+  }
+}
+
+async function answer(harness: Harness, ...answers: PassphraseAnswer[]): Promise<void> {
+  for (const given of answers) {
+    await asking(harness);
+
+    expect(harness.store.passphraseRequest()).not.toBeNull();
+    harness.store.answerPassphrase(given);
+  }
+}
+
+async function exportEverything(
+  harness: Harness,
+  spaceId: string | null = null,
+  given: PassphraseAnswer = IN_THE_CLEAR,
+): Promise<void> {
+  const done = harness.store.export(spaceId, NOW);
+  await answer(harness, given);
+  await done;
+}
+
 describe('LibraryStore', () => {
   let harness: Harness;
 
@@ -55,12 +85,19 @@ describe('LibraryStore', () => {
     });
 
     it('reports what came in, naming the file it read', async () => {
-      harness.dialog.openPath = 'C:/notes/devbox-2026-08-27.json';
+      harness.dialog.openPath = 'C:/notes/devbox-2026-08-27.devbox';
 
       expect(await harness.store.import()).toBe(true);
       expect(harness.status.status()).toEqual({
         key: 'file.imported',
-        params: { notes: '2', skipped: '0', degraded: '0', path: 'devbox-2026-08-27.json' },
+        params: {
+          notes: '2',
+          skipped: '0',
+          degraded: '0',
+          attachments: '0',
+          missing: '0',
+          path: 'devbox-2026-08-27.devbox',
+        },
       });
     });
 
@@ -73,11 +110,48 @@ describe('LibraryStore', () => {
         notesImported: 5,
         notesSkipped: 0,
         notesDegraded: 1,
+        attachmentsImported: 0,
+        attachmentsMissing: 0,
       };
 
       expect(await harness.store.import()).toBe(true);
       expect(harness.status.status()?.key).toBe('file.importedFromNewerVersion');
       expect(harness.status.status()?.params).toMatchObject({ notes: '5', degraded: '1' });
+    });
+
+    it('counts the attachments that came back with the notes', async () => {
+      harness.dialog.openPath = 'C:/in.devbox';
+      harness.repository.importReport = {
+        spacesCreated: 0,
+        notesImported: 2,
+        notesSkipped: 0,
+        notesDegraded: 0,
+        attachmentsImported: 3,
+        attachmentsMissing: 0,
+      };
+
+      expect(await harness.store.import()).toBe(true);
+      expect(harness.status.status()?.key).toBe('file.importedWithAttachments');
+      expect(harness.status.status()?.params).toMatchObject({ attachments: '3' });
+    });
+
+    /** ⚠️ The note arrives with a thumbnail that will never load, and this is the only
+     *  thing that says why. It outranks the degraded notice on purpose: a missing file is
+     *  a defect, a degraded field is a shrug. */
+    it('says when the archive named an attachment it did not carry', async () => {
+      harness.dialog.openPath = 'C:/in.devbox';
+      harness.repository.importReport = {
+        spacesCreated: 0,
+        notesImported: 2,
+        notesSkipped: 0,
+        notesDegraded: 1,
+        attachmentsImported: 0,
+        attachmentsMissing: 2,
+      };
+
+      expect(await harness.store.import()).toBe(true);
+      expect(harness.status.status()?.key).toBe('file.importedWithoutSomeAttachments');
+      expect(harness.status.status()?.params).toMatchObject({ missing: '2' });
     });
 
     it('says so plainly when everything was already there', async () => {
@@ -87,6 +161,8 @@ describe('LibraryStore', () => {
         notesImported: 0,
         notesSkipped: 4,
         notesDegraded: 0,
+        attachmentsImported: 0,
+        attachmentsMissing: 0,
       };
 
       expect(await harness.store.import()).toBe(false);
@@ -102,24 +178,92 @@ describe('LibraryStore', () => {
       expect(harness.notifier.notice()?.ref.key).toBe('errors.importFailed');
       expect(harness.status.status()).toBeNull();
     });
+
+    it('asks nothing of a file that is not protected', async () => {
+      harness.dialog.openPath = 'C:/in.devbox';
+
+      expect(await harness.store.import()).toBe(true);
+      expect(harness.store.passphraseRequest()).toBeNull();
+      expect(harness.repository.importedWith).toBeNull();
+    });
+
+    it('asks for the phrase a protected file was sealed with, and hands it over', async () => {
+      harness.dialog.openPath = 'C:/in.devbox';
+      harness.repository.fileIsProtected = true;
+      harness.repository.expectedPassphrase = 'the shared phrase';
+
+      const done = harness.store.import();
+      await answer(harness, { kind: 'phrase', value: 'the shared phrase' });
+
+      expect(await done).toBe(true);
+      expect(harness.repository.importedWith).toBe('the shared phrase');
+    });
+
+    /** ⚠️ A typo must not cost the import: the phrase is asked for again, and the refusal
+     *  is said beside the field rather than in the error banner. */
+    it('asks again when the phrase is refused', async () => {
+      harness.dialog.openPath = 'C:/in.devbox';
+      harness.repository.fileIsProtected = true;
+      harness.repository.expectedPassphrase = 'the shared phrase';
+
+      const done = harness.store.import();
+      await answer(harness, { kind: 'phrase', value: 'a typo' });
+      await answer(harness, { kind: 'phrase', value: 'the shared phrase' });
+
+      expect(await done).toBe(true);
+      expect(harness.notifier.notice()).toBeNull();
+      expect(harness.status.status()?.key).toBe('file.imported');
+    });
+
+    it('says the phrase was refused the second time it asks', async () => {
+      harness.dialog.openPath = 'C:/in.devbox';
+      harness.repository.fileIsProtected = true;
+      harness.repository.expectedPassphrase = 'the shared phrase';
+
+      const done = harness.store.import();
+      await answer(harness, { kind: 'phrase', value: 'a typo' });
+      await asking(harness);
+
+      expect(harness.store.passphraseRequest()).toMatchObject({ purpose: 'unlock', refused: true });
+
+      harness.store.answerPassphrase({ kind: 'cancelled' });
+      await done;
+    });
+
+    it('imports nothing and reports no failure when the prompt is given up on', async () => {
+      harness.dialog.openPath = 'C:/in.devbox';
+      harness.repository.fileIsProtected = true;
+
+      const done = harness.store.import();
+      await answer(harness, { kind: 'cancelled' });
+
+      expect(await done).toBe(false);
+      expect(harness.notifier.notice()).toBeNull();
+      expect(harness.status.status()).toBeNull();
+      expect(harness.repository.importedWith).toBeNull();
+    });
   });
 
   describe('export', () => {
     it('proposes a dated file name', async () => {
       harness.dialog.savePath = 'C:/out.json';
 
-      await harness.store.export(null, NOW);
+      await exportEverything(harness);
 
-      expect(harness.dialog.saveCalls[0].defaultPath).toBe('devbox-2026-08-27.json');
+      expect(harness.dialog.saveCalls[0].defaultPath).toBe('devbox-2026-08-27.devbox');
     });
 
     it('passes the active space through, or null for everything', async () => {
       harness.dialog.savePath = 'C:/out.json';
 
-      await harness.store.export('space-1', NOW);
-      expect(harness.repository.exportedTo).toEqual({ path: 'C:/out.json', spaceId: 'space-1' });
+      await exportEverything(harness, 'space-1');
+      expect(harness.repository.exportedTo).toEqual({
+        path: 'C:/out.json',
+        spaceId: 'space-1',
+        passphrase: null,
+      });
 
-      await harness.store.export(null, NOW);
+      await exportEverything(harness);
       expect(harness.repository.exportedTo?.spaceId).toBeNull();
     });
 
@@ -128,26 +272,41 @@ describe('LibraryStore', () => {
 
       await harness.store.export(null, NOW);
 
+      expect(harness.store.passphraseRequest()).toBeNull();
       expect(harness.repository.exportedTo).toBeNull();
       expect(harness.status.status()).toBeNull();
     });
 
     it('says how many notes went out, and where', async () => {
-      harness.dialog.savePath = 'C:/backups/devbox.json';
+      harness.dialog.savePath = 'C:/backups/devbox.devbox';
 
-      await harness.store.export(null, NOW);
+      await exportEverything(harness);
 
       expect(harness.status.status()).toEqual({
         key: 'file.exported',
-        params: { notes: '3', path: 'devbox.json' },
+        params: { notes: '3', attachments: '0', path: 'devbox.devbox' },
+      });
+    });
+
+    /** The attachments now travel, and a report that stayed silent about them would let a
+     *  user believe an export of screenshots carried none. */
+    it('counts the attachments that travelled with the notes', async () => {
+      harness.dialog.savePath = 'C:/backups/devbox.devbox';
+      harness.repository.exportReport = { notes: 3, spaces: 1, attachments: 2, protected: false };
+
+      await exportEverything(harness);
+
+      expect(harness.status.status()).toEqual({
+        key: 'file.exportedWithAttachments',
+        params: { notes: '3', attachments: '2', path: 'devbox.devbox' },
       });
     });
 
     it('does not pretend to have exported an empty library', async () => {
       harness.dialog.savePath = 'C:/out.json';
-      harness.repository.exportReport = { notes: 0, spaces: 0 };
+      harness.repository.exportReport = { notes: 0, spaces: 0, attachments: 0, protected: false };
 
-      await harness.store.export(null, NOW);
+      await exportEverything(harness);
 
       expect(harness.status.status()?.key).toBe('file.emptyLibrary');
     });
@@ -155,7 +314,9 @@ describe('LibraryStore', () => {
     it('restricts the file to the selection when asked', async () => {
       harness.dialog.savePath = 'C:/out.json';
 
-      await harness.store.exportSelection(['note-1', 'note-2'], NOW);
+      const done = harness.store.exportSelection(['note-1', 'note-2'], NOW);
+      await answer(harness, IN_THE_CLEAR);
+      await done;
 
       expect(harness.repository.exportedIds).toEqual(['note-1', 'note-2']);
       expect(harness.status.status()?.params).toMatchObject({ notes: '2' });
@@ -167,6 +328,68 @@ describe('LibraryStore', () => {
       expect(harness.notifier.notice()?.ref.key).toBe('file.needsSelection');
       expect(harness.dialog.saveCalls).toHaveLength(0);
     });
+
+    /** ⚠️ The file is the one thing here most likely to leave the machine: the phrase goes
+     *  through to the command, and the report says the file was sealed with it. */
+    it('seals the file with the phrase that was given', async () => {
+      harness.dialog.savePath = 'C:/backups/devbox.devbox';
+
+      await exportEverything(harness, null, { kind: 'phrase', value: 'a shared phrase' });
+
+      expect(harness.repository.exportedTo?.passphrase).toBe('a shared phrase');
+      expect(harness.status.status()).toEqual({
+        key: 'file.exportedProtected',
+        params: { notes: '3', attachments: '0', path: 'devbox.devbox' },
+      });
+    });
+
+    it('asks after the destination is known, naming the file it is about to write', async () => {
+      harness.dialog.savePath = 'C:/backups/devbox.devbox';
+
+      const done = harness.store.export(null, NOW);
+      await asking(harness);
+
+      expect(harness.store.passphraseRequest()).toEqual({
+        purpose: 'protect',
+        fileName: 'devbox.devbox',
+        refused: false,
+      });
+
+      harness.store.answerPassphrase(IN_THE_CLEAR);
+      await done;
+    });
+
+    it('writes nothing when the prompt is cancelled', async () => {
+      harness.dialog.savePath = 'C:/out.devbox';
+
+      const done = harness.store.export(null, NOW);
+      await answer(harness, { kind: 'cancelled' });
+      await done;
+
+      expect(harness.repository.exportedTo).toBeNull();
+      expect(harness.status.status()).toBeNull();
+    });
+  });
+
+  /** ⚠️ A dialog that vanished and came back on a typo would read as a fault, so the
+   *  prompt stays up while the phrase is being derived from — and refuses a second answer. */
+  it('keeps the prompt on screen while the phrase is being used', async () => {
+    harness.dialog.openPath = 'C:/in.devbox';
+    harness.repository.fileIsProtected = true;
+    harness.repository.expectedPassphrase = 'the shared phrase';
+
+    const done = harness.store.import();
+    await answer(harness, { kind: 'phrase', value: 'a typo' });
+
+    expect(harness.store.passphraseRequest()).not.toBeNull();
+    expect(harness.store.passphraseWorking()).toBe(true);
+
+    harness.store.answerPassphrase({ kind: 'cancelled' });
+    expect(harness.store.passphraseWorking()).toBe(true);
+
+    await answer(harness, { kind: 'cancelled' });
+    expect(await done).toBe(false);
+    expect(harness.store.passphraseRequest()).toBeNull();
   });
 
   describe('copy as Markdown', () => {

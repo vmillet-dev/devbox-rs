@@ -6,6 +6,7 @@ import { AttachmentsRepository } from '@core/data/attachments.repository';
 import { NotesRepository } from '@core/data/notes.repository';
 import { SpacesRepository } from '@core/data/spaces.repository';
 import { TransferRepository } from '@core/data/transfer.repository';
+import { VaultRepository } from '@core/data/vault.repository';
 import { AppInfoService } from '@core/services/app-info/app-info.service';
 import { Note } from '@core/model/note.model';
 import { Space } from '@core/model/space.model';
@@ -18,6 +19,7 @@ import { FakeFileDialog } from './fake-file-dialog';
 import { FakeNotesRepository } from './fake-notes-repository';
 import { FakeSpacesRepository } from './fake-spaces-repository';
 import { FakeTransferRepository } from './fake-transfer-repository';
+import { FakeVaultRepository } from './fake-vault-repository';
 import { FakeUpdater } from './fake-updater';
 import { provideTranslocoTesting } from './provide-transloco-testing';
 
@@ -29,6 +31,7 @@ interface DataDoubles {
   readonly spacesRepository?: FakeSpacesRepository;
   readonly attachmentsRepository?: FakeAttachmentsRepository;
   readonly transferRepository?: FakeTransferRepository;
+  readonly vaultRepository?: FakeVaultRepository;
   readonly updater?: FakeUpdater;
   readonly appInfo?: FakeAppInfo;
   readonly clipboard?: FakeClipboard;
@@ -50,6 +53,10 @@ export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
     {
       provide: AttachmentsRepository,
       useValue: doubles.attachmentsRepository ?? new FakeAttachmentsRepository(),
+    },
+    {
+      provide: VaultRepository,
+      useValue: doubles.vaultRepository ?? new FakeVaultRepository(),
     },
     {
       provide: TransferRepository,

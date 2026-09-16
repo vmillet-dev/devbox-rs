@@ -54,21 +54,51 @@ export const commands = {
 	/**
 	 *  ⚠️ The call starts from Rust: opening a path from the front end would mean allowing
 	 *  `opener:allow-open-path` over a whole directory.
+	 * 
+	 *  ⚠️ **This is the one place a decrypted copy reaches the disk.** Handing a file to the
+	 *  application the desktop chose for it means handing over a path, and that file has to
+	 *  be readable. The copy goes under a directory of ours in the OS temporary folder and is
+	 *  swept at the next launch — it cannot be deleted on close, because the application that
+	 *  opened it still holds it. The README says so; replacing this with "save as" was the
+	 *  alternative and was turned down, one click being the point.
 	 */
 	openAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("open_attachment", { id })),
 	/**  The path comes from a native picker; the write stays here. */
 	saveAttachment: (id: string, path: string) => typedError<null, AppError>(__TAURI_INVOKE("save_attachment", { id, path })),
 	deleteAttachment: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_attachment", { id })),
 	/**  The spaces travel with the notes, or an import holds an id with nowhere to file it. */
-	exportNotes: (path: string, spaceId: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_notes", { path, spaceId })),
-	exportSelection: (path: string, ids: string[]) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_selection", { path, ids })),
+	exportNotes: (path: string, spaceId: string | null, passphrase: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_notes", { path, spaceId, passphrase })),
+	exportSelection: (path: string, ids: string[], passphrase: string | null) => typedError<ExportReport, AppError>(__TAURI_INVOKE("export_selection", { path, ids, passphrase })),
 	/**
 	 *  ⚠️ The file is read before the lock is taken: parsing a large export while holding the
 	 *  connection would block every other command for the length of it.
 	 */
-	importNotes: (path: string) => typedError<ImportReport, AppError>(__TAURI_INVOKE("import_notes", { path })),
+	importNotes: (path: string, passphrase: string | null) => typedError<ImportReport, AppError>(__TAURI_INVOKE("import_notes", { path, passphrase })),
 	/**  Nothing is sent anywhere: "share" stops at the clipboard. */
 	shareNotes: (ids: string[]) => typedError<string, AppError>(__TAURI_INVOKE("share_notes", { ids })),
+	/**  Whether an import will want a phrase, so the interface can ask before it starts. */
+	exportIsProtected: (path: string) => typedError<boolean, AppError>(__TAURI_INVOKE("export_is_protected", { path })),
+	vaultState: () => typedError<VaultState, AppError>(__TAURI_INVOKE("vault_state")),
+	/**
+	 *  The first launch. ⚠️ Refuses a library that already has a key file rather than
+	 *  replacing it: that file is the only way into the notes beside it.
+	 */
+	createVault: (passphrase: string) => typedError<null, AppError>(__TAURI_INVOKE("create_vault", { passphrase })),
+	/**
+	 *  ⚠️ Deliberately slow: deriving the key is the whole defence against someone trying
+	 *  passphrases against a copied file. It is `(async)` for the same reason — a second on the
+	 *  main thread would freeze the window over every attempt.
+	 */
+	unlockVault: (passphrase: string) => typedError<null, AppError>(__TAURI_INVOKE("unlock_vault", { passphrase })),
+	/**
+	 *  A new phrase over the same library, from the preferences panel.
+	 * 
+	 *  ⚠️ Not a re-encryption: the key the notes are sealed with is the one being rewrapped,
+	 *  so nothing in the database moves and the library stays open on the key it already had.
+	 *  The consequence is worth knowing — this answers a phrase somebody else learned, never
+	 *  a key somebody else got hold of.
+	 */
+	changePassphrase: (current: string, next: string) => typedError<null, AppError>(__TAURI_INVOKE("change_passphrase", { current, next })),
 	appChangelog: () => __TAURI_INVOKE<ChangelogRelease[]>("app_changelog"),
 	/**
 	 *  Replaces only the menu when the tray already exists, so a language change does not
@@ -157,11 +187,31 @@ export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" 
 /**  The `field` parameter names the offending field. */
 "invalidInput" | 
 /**  Poisoned mutex: a command panicked while holding the connection. */
-"storageUnavailable" | "storage";
+"storageUnavailable" | 
+/**
+ *  The one the unlock screen acts on: it clears the field rather than banishing the
+ *  user to a banner.
+ */
+"wrongPassphrase" | 
+/**  A command ran before the library was unlocked. */
+"locked" | 
+/**  The import needs the phrase the export was protected with. */
+"passphraseRequired" | "storage";
 
 export type ExportReport = {
 	notes: number,
 	spaces: number,
+	/**
+	 *  What actually went into the archive. A record whose file has gone missing is left
+	 *  out rather than failing the export.
+	 */
+	attachments: number,
+	/**
+	 *  ⚠️ `false` means the file is readable by anyone who has it — every note, every
+	 *  screenshot. The interface says which of the two it wrote, because the file is the
+	 *  one thing here most likely to leave the machine.
+	 */
+	protected: boolean,
 };
 
 /**
@@ -184,6 +234,12 @@ export type ImportReport = {
 	 *  default. Counted so the loss is said rather than discovered.
 	 */
 	notesDegraded: number,
+	attachmentsImported: number,
+	/**
+	 *  Records the archive named but did not carry. Counted rather than swallowed: the
+	 *  note arrives with a thumbnail that will never load, and only this says why.
+	 */
+	attachmentsMissing: number,
 };
 
 /**
@@ -381,6 +437,22 @@ export type TrayLabels = {
 	palette: string,
 	quit: string,
 };
+
+/**  What the front end renders before it renders anything else. */
+export type VaultState = 
+/**
+ *  A library that has never been encrypted: the first launch asks for a passphrase
+ *  twice and creates one.
+ */
+"absent" | 
+/**  A key file is there and the passphrase has not been given yet. */
+"locked" | 
+/**
+ *  ⚠️ Held in Rust, never in the front end: a page reload must not ask again for a
+ *  library this process already has open — which is also what keeps `reopenSession`
+ *  working in the end-to-end suite.
+ */
+"unlocked";
 
 /**
  *  Pushed from the preferences panel like the tray labels: reading `preferences.json`

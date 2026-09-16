@@ -22,6 +22,9 @@ const IPC_ERROR_CODES: Record<IpcErrorCode, true> = {
   importFormat: true,
   invalidInput: true,
   storageUnavailable: true,
+  wrongPassphrase: true,
+  locked: true,
+  passphraseRequired: true,
   storage: true,
 };
 
@@ -60,6 +63,14 @@ export class IpcError extends Error {
     this.code = structured?.code ?? null;
     this.params = structured?.params ?? {};
   }
+}
+
+/**
+ * The one code a caller acts on rather than reports: a refused passphrase is the ordinary
+ * answer to a typo and belongs beside the field, not in the error banner.
+ */
+export function hasErrorCode(error: unknown, code: IpcErrorCode): boolean {
+  return error instanceof IpcError && error.code === code;
 }
 
 /** Throws rather than propagating the `status`, which every caller would have to branch on. */

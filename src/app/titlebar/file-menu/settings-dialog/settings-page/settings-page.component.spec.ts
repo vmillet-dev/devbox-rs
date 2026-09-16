@@ -38,12 +38,27 @@ describe('SettingsPageComponent', () => {
     await fixture.whenStable();
   });
 
-  it('shows the four groups the panel is made of', () => {
+  it('shows the five groups the panel is made of', () => {
     const titles = [...fixture.nativeElement.querySelectorAll('.setting-group-title')].map(
       (title: HTMLElement) => title.textContent?.trim(),
     );
 
-    expect(titles).toEqual(['Apparence', 'Comportement', 'Collage rapide', 'Notifications']);
+    expect(titles).toEqual(['Apparence', 'Comportement', 'Collage rapide', 'Sécurité', 'Notifications']);
+  });
+
+  /** The dialog is opened from here and nowhere else; what it does is its own spec. */
+  it('opens the passphrase dialog from the security group, and only on demand', async () => {
+    const opener = (): HTMLButtonElement =>
+      fixture.nativeElement.querySelector('[data-testid="setting-change-passphrase"]');
+    const dialog = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector('[data-testid="change-passphrase"]');
+
+    expect(dialog()).toBeNull();
+
+    opener().click();
+    await fixture.whenStable();
+
+    expect(dialog()).not.toBeNull();
   });
 
   it('offers the language alongside the titlebar buttons, system included', () => {

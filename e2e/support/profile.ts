@@ -39,6 +39,11 @@ export function preferencesPath(): string {
   return join(e2eDataDir(), 'preferences.json');
 }
 
+/** The key file, beside the database — what a passphrase change rewrites. */
+export function vaultPath(): string {
+  return join(e2eDataDir(), 'vault.json');
+}
+
 /**
  * Where `homeSpaceId()` records the seeded space. Outside the profile on purpose: it is
  * the harness's own note, not the application's state.

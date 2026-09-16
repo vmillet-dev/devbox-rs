@@ -15,7 +15,39 @@ const SETTLE_INTERVAL = 200;
  * The canvas is behind a lazy route, a `resource` and a debounce; every scenario waits
  * for it rather than for the window, which exists long before anything is queryable.
  */
+/**
+ * ⚠️ The library is encrypted, so a run creates this on its first launch and carries it
+ * for the rest. There is nothing to remember between runs: `resetProfile` deletes the key
+ * file with everything else, so every run starts from a library that has none.
+ */
+export const PASSPHRASE = 'an end-to-end passphrase';
+
+/**
+ * Passes the unlock screen when it is there, and says nothing when it is not.
+ *
+ * ⚠️ Only `01-first-launch` ever meets it. The unlocked state lives in Rust and the
+ * process outlives every page reload — `before()` and `reopenSession` both rebuild the
+ * front end over a library that is already open — so a later file finds no gate at all.
+ */
+export async function passTheGate(): Promise<void> {
+  const field = $(testid('vault-passphrase'));
+  if (!(await field.isExisting())) return;
+
+  await setField(testid('vault-passphrase'), PASSPHRASE);
+
+  // Two entries on a library that has never been encrypted, one on a locked one.
+  if (await $(testid('vault-confirmation')).isExisting()) {
+    await setField(testid('vault-confirmation'), PASSPHRASE);
+  }
+
+  await $(testid('vault-submit')).click();
+  // ⚠️ Generous: deriving the key is deliberately slow, and a first launch seals whatever
+  // was already there on top of it.
+  await field.waitForExist({ reverse: true, timeout: 60_000 });
+}
+
 export async function waitForCanvas(): Promise<void> {
+  await passTheGate();
   await $(testid('canvas')).waitForExist({ timeout: 30_000 });
 
   // ⚠️ `aria-busy` answers "has anything at all arrived yet", once, and then says nothing

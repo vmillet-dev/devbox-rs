@@ -50,12 +50,11 @@ pub(crate) mod fixtures {
 use std::collections::BTreeMap;
 
 use chrono::Utc;
-use diesel::SqliteConnection;
 use tauri::{AppHandle, State};
 
 use crate::attachments;
 use crate::count::saturating_u32 as count;
-use crate::db::{Db, lock};
+use crate::db::{Db, Library, lock};
 use crate::error::{AppError, StorageError};
 use model::{DisplayNote, NoteDraft, NotePatch, TagUsage};
 use trash::TrashedNote;
@@ -294,10 +293,7 @@ pub fn set_global_placeholders(
 
 /// What only the database knows. Both are queries of their own, which is why neither
 /// lives in [`model::decorate`].
-fn display(
-    connection: &mut SqliteConnection,
-    note: model::Note,
-) -> Result<DisplayNote, StorageError> {
+fn display(connection: &mut Library, note: model::Note) -> Result<DisplayNote, StorageError> {
     let mut decorated = model::decorate_now(note);
     decorated.attachment_count = attachments::store::count_for(connection, &decorated.id)?;
     model::apply_global_defaults(

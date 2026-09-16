@@ -3,24 +3,54 @@ import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { FileDialogService } from '@core/services/dialogs/file-dialog.service';
 import { StatusNotifier } from '@core/services/notifications/status.service';
-import { ImportReport } from '@core/model/note.model';
+import { ExportReport, ImportReport } from '@core/model/note.model';
+import { hasErrorCode } from '@core/ipc/ipc.error';
 import { TransferRepository } from '../data/transfer.repository';
 import { NotesRevision } from './notes-revision';
 
 /** Dated, so two exports do not overlap. */
 function defaultFileName(now: Date): string {
-  return `devbox-${now.toISOString().slice(0, 10)}.json`;
+  return `devbox-${now.toISOString().slice(0, 10)}.devbox`;
 }
 
 /**
+ * What the prompt is for: sealing a file about to be written, or opening one about to be
+ * read. The two ask for different things — the first confirms the phrase and may be
+ * declined, the second cannot be.
+ */
+export interface PassphraseRequest {
+  readonly purpose: 'protect' | 'unlock';
+  readonly fileName: string;
+  /** The previous attempt was refused, which belongs beside the field and nowhere else. */
+  readonly refused: boolean;
+}
+
+export type PassphraseAnswer =
+  | { readonly kind: 'phrase'; readonly value: string }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'cancelled' };
+
+/**
  * Export then re-import at once adds nothing at all, and saying so explicitly stops it
- * looking like a breakdown. A note degraded from a newer version arrived all the same,
- * and the report is the only place that says so.
+ * looking like a breakdown. The rest is a ladder of what most deserves saying: an
+ * attachment the archive named and did not carry leaves a thumbnail that will never
+ * load, and only this says why.
  */
 function importedKey(report: ImportReport): string {
   if (report.notesImported === 0) return 'file.importedNothing';
+  if (report.attachmentsMissing > 0) return 'file.importedWithoutSomeAttachments';
+  if (report.notesDegraded > 0) return 'file.importedFromNewerVersion';
 
-  return report.notesDegraded > 0 ? 'file.importedFromNewerVersion' : 'file.imported';
+  return report.attachmentsImported > 0 ? 'file.importedWithAttachments' : 'file.imported';
+}
+
+/** Which of the two files was written is part of the report, not a detail. */
+function exportedKey(report: ExportReport): string {
+  if (report.protected) {
+    return report.attachments > 0 ? 'file.exportedProtectedWithAttachments' : 'file.exportedProtected';
+  }
+
+  return report.attachments > 0 ? 'file.exportedWithAttachments' : 'file.exported';
 }
 
 function fileNameOf(path: string): string {
@@ -41,8 +71,19 @@ export class LibraryStore {
   private readonly revision = inject(NotesRevision);
 
   private readonly _isBusy = signal(false);
+  private readonly _passphraseRequest = signal<PassphraseRequest | null>(null);
+  private readonly _passphraseWorking = signal(false);
 
   readonly isBusy = this._isBusy.asReadonly();
+
+  /** What the prompt drawn over the page is asking for; `null` when it is not asking. */
+  readonly passphraseRequest = this._passphraseRequest.asReadonly();
+
+  /** A phrase has been given and is being derived from. The prompt waits rather than
+   *  leaving the screen, and cannot be answered twice. */
+  readonly passphraseWorking = this._passphraseWorking.asReadonly();
+
+  private pending: ((answer: PassphraseAnswer) => void) | null = null;
 
   /** `true` when notes came in, which is what bumps the canvas revision. */
   async import(): Promise<boolean> {
@@ -50,11 +91,15 @@ export class LibraryStore {
     if (path === null) return false;
 
     return this.run(async () => {
-      const report = await this.repository.import(path);
+      const report = await this.readWithPrompt(path);
+      if (report === null) return false;
+
       const params = {
         notes: String(report.notesImported),
         skipped: String(report.notesSkipped),
         degraded: String(report.notesDegraded),
+        attachments: String(report.attachmentsImported),
+        missing: String(report.attachmentsMissing),
         path: fileNameOf(path),
       };
 
@@ -69,13 +114,13 @@ export class LibraryStore {
 
   /** A `null` `spaceId` exports the whole corpus. */
   async export(spaceId: string | null, now: Date): Promise<void> {
-    await this.write((path) => this.repository.export(path, spaceId), now);
+    await this.write((path, passphrase) => this.repository.export(path, spaceId, passphrase), now);
   }
 
   async exportSelection(ids: readonly string[], now: Date): Promise<void> {
     if (!this.requireSelection(ids)) return;
 
-    await this.write((path) => this.repository.exportSelection(path, ids), now);
+    await this.write((path, passphrase) => this.repository.exportSelection(path, ids, passphrase), now);
   }
 
   /** Sharing stops at the clipboard: nothing is sent anywhere. */
@@ -94,6 +139,76 @@ export class LibraryStore {
     }, 'errors.shareFailed');
   }
 
+  /**
+   * The prompt's only way back in.
+   *
+   * ⚠️ A phrase leaves the prompt on screen, working: deriving the key takes about a
+   * second, and a dialog that vanished and came back on a typo would read as a fault.
+   * Anything else ends the asking there and then.
+   */
+  answerPassphrase(answer: PassphraseAnswer): void {
+    const resolve = this.pending;
+    if (resolve === null) return;
+
+    this.pending = null;
+    if (answer.kind === 'phrase') {
+      this._passphraseWorking.set(true);
+    } else {
+      this.closePrompt();
+    }
+
+    resolve(answer);
+  }
+
+  private ask(request: PassphraseRequest): Promise<PassphraseAnswer> {
+    return new Promise((resolve) => {
+      this.pending = resolve;
+      this._passphraseWorking.set(false);
+      this._passphraseRequest.set(request);
+    });
+  }
+
+  private closePrompt(): void {
+    this.pending = null;
+    this._passphraseWorking.set(false);
+    this._passphraseRequest.set(null);
+  }
+
+  /** The prompt never outlives the operation it was opened for, failure included. */
+  private async readWithPrompt(path: string): Promise<ImportReport | null> {
+    const isProtected = await this.repository.isProtected(path);
+    try {
+      return await this.read(path, isProtected);
+    } finally {
+      this.closePrompt();
+    }
+  }
+
+  /**
+   * ⚠️ A refused phrase asks again rather than failing the import: it is the ordinary
+   * answer to a typo, and a file nobody can reopen for one is a file lost. `null` when
+   * the user gave up at the prompt, which is not a failure either.
+   */
+  private async read(path: string, isProtected: boolean): Promise<ImportReport | null> {
+    let refused = false;
+
+    for (;;) {
+      let passphrase: string | null = null;
+      if (isProtected) {
+        const answer = await this.ask({ purpose: 'unlock', fileName: fileNameOf(path), refused });
+        if (answer.kind !== 'phrase') return null;
+        passphrase = answer.value;
+      }
+
+      try {
+        return await this.repository.import(path, passphrase);
+      } catch (error) {
+        if (!isProtected || !hasErrorCode(error, 'wrongPassphrase')) throw error;
+        refused = true;
+      }
+    }
+  }
+
   private requireSelection(ids: readonly string[]): boolean {
     if (ids.length > 0) return true;
 
@@ -101,26 +216,53 @@ export class LibraryStore {
     return false;
   }
 
-  private async write(action: (path: string) => Promise<{ notes: number }>, now: Date): Promise<void> {
+  /**
+   * ⚠️ The phrase is asked for once the destination is known, and never kept: it goes
+   * straight to the command, which derives a key of its own for that one file.
+   */
+  private async write(
+    action: (path: string, passphrase: string | null) => Promise<ExportReport>,
+    now: Date,
+  ): Promise<void> {
     const path = await this.dialog.chooseBundleDestination(defaultFileName(now));
     if (path === null) return;
 
+    const answer = await this.ask({ purpose: 'protect', fileName: fileNameOf(path), refused: false });
+    if (answer.kind === 'cancelled') return;
+
     await this.run(async () => {
-      const report = await action(path);
-
-      if (report.notes === 0) {
-        this.status.notify({ key: 'file.emptyLibrary' });
-        return false;
+      try {
+        return await this.writeWith(action, path, answer);
+      } finally {
+        this.closePrompt();
       }
-
-      // The file name is part of the report: an export whose landing place is unknown
-      // is no use.
-      this.status.notify({
-        key: 'file.exported',
-        params: { notes: String(report.notes), path: fileNameOf(path) },
-      });
-      return true;
     }, 'errors.exportFailed');
+  }
+
+  private async writeWith(
+    action: (path: string, passphrase: string | null) => Promise<ExportReport>,
+    path: string,
+    answer: PassphraseAnswer,
+  ): Promise<boolean> {
+    const report = await action(path, answer.kind === 'phrase' ? answer.value : null);
+
+    if (report.notes === 0) {
+      this.status.notify({ key: 'file.emptyLibrary' });
+      return false;
+    }
+
+    // The file name is part of the report: an export whose landing place is unknown
+    // is no use.
+    this.status.notify({
+      key: exportedKey(report),
+      params: {
+        notes: String(report.notes),
+        attachments: String(report.attachments),
+        path: fileNameOf(path),
+      },
+    });
+
+    return true;
   }
 
   private async run(action: () => Promise<boolean>, failureKey: string): Promise<boolean> {

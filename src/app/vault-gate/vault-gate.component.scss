@@ -1,0 +1,85 @@
+@use 'mixins' as *;
+
+.gate {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: var(--space-canvas);
+}
+
+.panel {
+  @include surface;
+
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(420px, 100%);
+  padding: 28px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.lead,
+.problem,
+.warning {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.85rem;
+}
+
+// ⚠️ Amber rather than red: it is a condition of the choice, not a failure of it.
+.warning {
+  color: var(--amber);
+}
+
+// Reserves its line whether or not it says anything, so the button never moves under
+// the pointer as the user types.
+.problem {
+  min-height: 1.2em;
+  color: var(--red);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  color: var(--text-2);
+  font-size: 0.8rem;
+}
+
+.input {
+  @include text-field;
+
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-1);
+  color: var(--text-0);
+
+  &[aria-invalid='true'] {
+    border-color: var(--red);
+  }
+}
+
+.submit {
+  @include unstyled-control;
+
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--amber);
+  color: var(--amber-ink);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}

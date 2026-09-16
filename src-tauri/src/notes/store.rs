@@ -12,10 +12,11 @@ use super::checklist;
 use super::model::{self, Note, NoteDraft, NoteLifecycle, NotePatch};
 use super::placeholder;
 use super::view::{Facets, NoteFilter, NotesQuery};
-use crate::db::iso8601;
 use crate::db::schema::{global_placeholders, note_tags, notes};
+use crate::db::{Library, iso8601};
 use crate::error::StorageError;
 use crate::spaces::store as spaces;
+use crate::vault::key::Vault;
 
 #[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = notes)]
@@ -35,13 +36,15 @@ pub(super) struct NoteRow {
     kind: String,
 }
 
+/// ⚠️ Not a `TryFrom`: opening a row needs the key, and a trait cannot take one. The
+/// same goes for [`NoteRow::seal`] in the other direction.
+///
 /// An unreadable date fails the read: these columns are only ever written by
 /// [`iso8601::format`]. Language and `kind` degrade instead — a newer version may have
-/// written a value this build does not know.
-impl TryFrom<NoteRow> for Note {
-    type Error = StorageError;
-
-    fn try_from(row: NoteRow) -> Result<Self, Self::Error> {
+/// written a value this build does not know. ⚠️ A value that will not open does **not**
+/// degrade: a wrong key must stop the read rather than hand back plausible emptiness.
+impl NoteRow {
+    fn open(row: Self, vault: &Vault) -> Result<Note, StorageError> {
         let instant = |field: &'static str, value: &str| {
             iso8601::parse(value).map_err(|_| StorageError::CorruptRow {
                 id: row.id.clone(),
@@ -57,16 +60,16 @@ impl TryFrom<NoteRow> for Note {
             _ => NoteLifecycle::Permanent,
         };
 
-        Ok(Self {
+        Ok(Note {
             created_at: instant("createdAt", &row.created_at)?,
             updated_at: instant("updatedAt", &row.updated_at)?,
             language: row.language.parse().unwrap_or_default(),
             kind: row.kind.parse().unwrap_or_default(),
+            title: vault.open(&row.title)?,
+            content: vault.open(&row.content)?,
+            source: vault.open(&row.source)?,
             id: row.id,
             space_id: row.space_id,
-            title: row.title,
-            content: row.content,
-            source: row.source,
             tags: Vec::new(),
             items: Vec::new(),
             placeholder_values: BTreeMap::new(),
@@ -74,30 +77,39 @@ impl TryFrom<NoteRow> for Note {
             lifecycle,
         })
     }
-}
 
-impl From<&Note> for NoteRow {
-    fn from(note: &Note) -> Self {
+    /// ⚠️ `space_id`, the instants, `pinned`, `language` and `kind` stay in the clear:
+    /// every one of them is filtered, ordered or grouped on in SQL, and sealing one would
+    /// move that work into Rust for no secret. What is sealed is what a reader would want.
+    fn seal(note: &Note, vault: &Vault) -> Result<Self, StorageError> {
         let (lifecycle_kind, lifecycle_expires_at) = match note.lifecycle {
             NoteLifecycle::Permanent => ("permanent", None),
             NoteLifecycle::Expires { at } => ("expires", Some(iso8601::format(at))),
         };
 
-        Self {
+        Ok(Self {
             id: note.id.clone(),
             space_id: note.space_id.clone(),
-            title: note.title.clone(),
+            title: vault.seal(&note.title)?,
             language: note.language.to_string(),
-            content: note.content.clone(),
-            source: note.source.clone(),
+            content: vault.seal(&note.content)?,
+            source: vault.seal(&note.source)?,
             pinned: note.pinned,
             created_at: iso8601::format(note.created_at),
             updated_at: iso8601::format(note.updated_at),
             lifecycle_kind: lifecycle_kind.to_string(),
             lifecycle_expires_at,
             kind: note.kind.to_string(),
-        }
+        })
     }
+}
+
+/// ⚠️ Every row or none: a value that will not open stops the read rather than handing
+/// back a note with an empty body. A wrong key is not a degraded note.
+fn open_all(rows: Vec<NoteRow>, vault: &Vault) -> Result<Vec<Note>, StorageError> {
+    rows.into_iter()
+        .map(|row| NoteRow::open(row, vault))
+        .collect()
 }
 
 pub(super) fn notes_of_space(
@@ -111,34 +123,39 @@ pub(super) fn notes_of_space(
         .filter(notes::space_id.eq(space_id.to_string()))
 }
 
+/// ⚠️ The value is sealed like a note's own, the name is not: the name is the key rows
+/// are found by, and a variable called `host` is worth a good deal less than what it holds.
 pub fn global_placeholder_values(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
 ) -> Result<BTreeMap<String, String>, StorageError> {
-    Ok(global_placeholders::table
+    let (db, vault) = connection.split();
+
+    global_placeholders::table
         .select((global_placeholders::name, global_placeholders::value))
         .order(global_placeholders::name.asc())
-        .load::<(String, String)>(connection)?
+        .load::<(String, String)>(db)?
         .into_iter()
-        .collect())
+        .map(|(name, value)| Ok((name, vault.open(&value)?)))
+        .collect::<Result<BTreeMap<_, _>, StorageError>>()
 }
 
 pub fn replace_global_placeholder_values(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     values: &BTreeMap<String, String>,
 ) -> Result<(), StorageError> {
-    connection.transaction(|connection| {
+    connection.transaction(|connection, vault| {
         diesel::delete(global_placeholders::table).execute(connection)?;
 
         if !values.is_empty() {
             let rows: Vec<_> = values
                 .iter()
                 .map(|(name, value)| {
-                    (
+                    Ok((
                         global_placeholders::name.eq(name),
-                        global_placeholders::value.eq(value),
-                    )
+                        global_placeholders::value.eq(vault.seal(value)?),
+                    ))
                 })
-                .collect();
+                .collect::<Result<Vec<_>, StorageError>>()?;
             diesel::insert_into(global_placeholders::table)
                 .values(rows)
                 .execute(connection)?;
@@ -149,10 +166,7 @@ pub fn replace_global_placeholder_values(
 }
 
 /// Scoped to the space and not to the current filter — see [`NotesView`].
-fn facets(
-    connection: &mut SqliteConnection,
-    space_id: Option<&str>,
-) -> Result<Facets, StorageError> {
+fn facets(connection: &mut Library, space_id: Option<&str>) -> Result<Facets, StorageError> {
     let mut tags = note_tags::table
         .inner_join(notes::table)
         .filter(notes::deleted_at.is_null())
@@ -173,10 +187,10 @@ fn facets(
     }
 
     Ok(Facets {
-        tags: tags.load::<String>(connection)?,
+        tags: tags.load::<String>(connection.db())?,
         // A stored language this build does not know has no facet to offer.
         languages: languages
-            .load::<String>(connection)?
+            .load::<String>(connection.db())?
             .iter()
             .filter_map(|language| language.parse().ok())
             .collect(),
@@ -185,7 +199,7 @@ fn facets(
 
 /// Coarse criteria only; `view::build` takes over for search and sections.
 pub fn fetch(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     request: &NotesQuery,
 ) -> Result<(Vec<Note>, Facets), StorageError> {
     let mut query = notes::table
@@ -222,19 +236,21 @@ pub fn fetch(
 
     // On `updated_at` although the sections group on `created_at`: the section says when
     // a note was born, the order within it which one moved last.
-    let mut notes = query
+    let rows = query
         .order((notes::updated_at.desc(), notes::id.asc()))
-        .load::<NoteRow>(connection)?
-        .into_iter()
-        .map(Note::try_from)
-        .collect::<Result<Vec<_>, _>>()?;
-
-    related::attach_related(connection, &mut notes, request.space_id.as_deref())?;
+        .load::<NoteRow>(connection.db())?;
+    let (db, vault) = connection.split();
+    let mut notes = open_all(rows, vault)?;
+    related::attach_related(db, vault, &mut notes, request.space_id.as_deref())?;
 
     Ok((notes, facets(connection, request.space_id.as_deref())?))
 }
 
-fn find(connection: &mut SqliteConnection, id: &str) -> Result<Option<Note>, StorageError> {
+fn find(
+    connection: &mut SqliteConnection,
+    vault: &Vault,
+    id: &str,
+) -> Result<Option<Note>, StorageError> {
     let Some(row) = notes::table
         .find(id)
         .filter(notes::deleted_at.is_null())
@@ -245,20 +261,24 @@ fn find(connection: &mut SqliteConnection, id: &str) -> Result<Option<Note>, Sto
         return Ok(None);
     };
 
+    let tags = related::tags_of(connection, id)?;
+    let items = related::items_of(connection, vault, id)?;
+    let placeholder_values = related::placeholder_values_of(connection, vault, id)?;
+
     Ok(Some(Note {
-        tags: related::tags_of(connection, id)?,
-        items: related::items_of(connection, id)?,
-        placeholder_values: related::placeholder_values_of(connection, id)?,
-        ..Note::try_from(row)?
+        tags,
+        items,
+        placeholder_values,
+        ..NoteRow::open(row, vault)?
     }))
 }
 
 pub fn create(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     draft: NoteDraft,
     now: DateTime<Utc>,
 ) -> Result<Note, StorageError> {
-    connection.transaction(|connection| {
+    connection.transaction(|connection, vault| {
         if !spaces::exists(connection, &draft.space_id)? {
             return Err(StorageError::SpaceNotFound(draft.space_id));
         }
@@ -266,24 +286,24 @@ pub fn create(
         let mut note = draft.into_note(Uuid::new_v4().to_string(), now);
 
         diesel::insert_into(notes::table)
-            .values(NoteRow::from(&note))
+            .values(NoteRow::seal(&note, vault)?)
             .execute(connection)?;
         let written = std::mem::take(&mut note.tags);
         note.tags = related::replace_tags(connection, &note.id, &written)?;
-        related::replace_items(connection, &note.id, &note.items)?;
+        related::replace_items(connection, vault, &note.id, &note.items)?;
 
         Ok(note)
     })
 }
 
 pub fn update(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     id: &str,
     patch: &NotePatch,
     now: DateTime<Utc>,
 ) -> Result<Note, StorageError> {
-    connection.transaction(|connection| {
-        let Some(mut note) = find(connection, id)? else {
+    connection.transaction(|connection, vault| {
+        let Some(mut note) = find(connection, vault, id)? else {
             return Err(StorageError::NoteNotFound(id.to_string()));
         };
 
@@ -297,7 +317,7 @@ pub fn update(
 
         // Columns listed rather than an `AsChangeset`, which would also rewrite
         // `created_at`.
-        let row = NoteRow::from(&note);
+        let row = NoteRow::seal(&note, vault)?;
         diesel::update(notes::table.find(&note.id))
             .set((
                 notes::space_id.eq(&row.space_id),
@@ -319,7 +339,7 @@ pub fn update(
         }
 
         if patch.items.is_some() {
-            related::replace_items(connection, &note.id, &note.items)?;
+            related::replace_items(connection, vault, &note.id, &note.items)?;
         }
 
         Ok(note)
@@ -329,16 +349,16 @@ pub fn update(
 /// ⚠️ `updated_at` is not touched: filling a field is not editing the note, and the
 /// canvas sorts on that column.
 pub fn set_placeholder_values(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     id: &str,
     values: &BTreeMap<String, String>,
 ) -> Result<Note, StorageError> {
-    connection.transaction(|connection| {
-        let Some(mut note) = find(connection, id)? else {
+    connection.transaction(|connection, vault| {
+        let Some(mut note) = find(connection, vault, id)? else {
             return Err(StorageError::NoteNotFound(id.to_string()));
         };
 
-        related::replace_placeholder_values(connection, id, values)?;
+        related::replace_placeholder_values(connection, vault, id, values)?;
         note.placeholder_values = values.clone();
 
         Ok(note)
@@ -346,7 +366,7 @@ pub fn set_placeholder_values(
 }
 
 pub fn move_many(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     ids: &[String],
     space_id: &str,
     now: DateTime<Utc>,
@@ -355,7 +375,7 @@ pub fn move_many(
         return Ok(0);
     }
 
-    connection.transaction(|connection| {
+    connection.transaction(|connection, _vault| {
         if !spaces::exists(connection, space_id)? {
             return Err(StorageError::SpaceNotFound(space_id.to_string()));
         }
@@ -375,7 +395,7 @@ pub fn move_many(
 }
 
 pub fn tag_many(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     ids: &[String],
     tags: &[String],
     now: DateTime<Utc>,
@@ -384,7 +404,7 @@ pub fn tag_many(
         return Ok(0);
     }
 
-    connection.transaction(|connection| {
+    connection.transaction(|connection, _vault| {
         let targets = notes::table
             .filter(notes::id.eq_any(ids))
             .filter(notes::deleted_at.is_null())
@@ -412,20 +432,20 @@ pub fn tag_many(
     })
 }
 
-pub fn tag_usage(connection: &mut SqliteConnection) -> Result<Vec<(String, i64)>, StorageError> {
+pub fn tag_usage(connection: &mut Library) -> Result<Vec<(String, i64)>, StorageError> {
     Ok(note_tags::table
         .inner_join(notes::table)
         .filter(notes::deleted_at.is_null())
         .group_by(note_tags::tag)
         .select((note_tags::tag, diesel::dsl::count_star()))
         .order(note_tags::tag.asc())
-        .load::<(String, i64)>(connection)?)
+        .load::<(String, i64)>(connection.db())?)
 }
 
 /// ⚠️ `updated_at` stays intact — the canvas sorts on it, and a corpus-wide rename would
 /// float up notes nobody reopened.
 pub fn retag(
-    connection: &mut SqliteConnection,
+    connection: &mut Library,
     sources: &[String],
     target: &str,
 ) -> Result<usize, StorageError> {
@@ -433,7 +453,7 @@ pub fn retag(
         return Ok(0);
     }
 
-    connection.transaction(|connection| {
+    connection.transaction(|connection, _vault| {
         let renamed = note_tags::table
             .filter(note_tags::tag.eq_any(sources))
             .select(note_tags::note_id)
@@ -469,22 +489,19 @@ pub fn retag(
     })
 }
 
-pub fn drop_tags(
-    connection: &mut SqliteConnection,
-    tags: &[String],
-) -> Result<usize, StorageError> {
+pub fn drop_tags(connection: &mut Library, tags: &[String]) -> Result<usize, StorageError> {
     if tags.is_empty() {
         return Ok(0);
     }
 
-    Ok(diesel::delete(note_tags::table.filter(note_tags::tag.eq_any(tags))).execute(connection)?)
+    Ok(
+        diesel::delete(note_tags::table.filter(note_tags::tag.eq_any(tags)))
+            .execute(connection.db())?,
+    )
 }
 
 /// Export only: no command hands this list to the front, which would re-filter it.
-pub fn all(
-    connection: &mut SqliteConnection,
-    space_id: Option<&str>,
-) -> Result<Vec<Note>, StorageError> {
+pub fn all(connection: &mut Library, space_id: Option<&str>) -> Result<Vec<Note>, StorageError> {
     let mut query = notes::table
         .filter(notes::deleted_at.is_null())
         .select(NoteRow::as_select())
@@ -494,46 +511,46 @@ pub fn all(
         query = query.filter(notes::space_id.eq(space_id.to_string()));
     }
 
-    let mut notes = query
+    let rows = query
         .order((notes::created_at.asc(), notes::id.asc()))
-        .load::<NoteRow>(connection)?
-        .into_iter()
-        .map(Note::try_from)
-        .collect::<Result<Vec<_>, _>>()?;
-
-    related::attach_related(connection, &mut notes, space_id)?;
+        .load::<NoteRow>(connection.db())?;
+    let (db, vault) = connection.split();
+    let mut notes = open_all(rows, vault)?;
+    related::attach_related(db, vault, &mut notes, space_id)?;
 
     Ok(notes)
 }
 
-pub fn by_ids(
-    connection: &mut SqliteConnection,
-    ids: &[String],
-) -> Result<Vec<Note>, StorageError> {
+pub fn by_ids(connection: &mut Library, ids: &[String]) -> Result<Vec<Note>, StorageError> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
 
-    let mut notes = notes::table
+    let rows = notes::table
         .filter(notes::id.eq_any(ids))
         .filter(notes::deleted_at.is_null())
         .select(NoteRow::as_select())
         .order((notes::created_at.asc(), notes::id.asc()))
-        .load::<NoteRow>(connection)?
-        .into_iter()
-        .map(Note::try_from)
-        .collect::<Result<Vec<_>, _>>()?;
-
-    related::attach_related(connection, &mut notes, None)?;
+        .load::<NoteRow>(connection.db())?;
+    let (db, vault) = connection.split();
+    let mut notes = open_all(rows, vault)?;
+    related::attach_related(db, vault, &mut notes, None)?;
 
     Ok(notes)
 }
 
-pub fn insert_imported(
+pub fn insert_imported(connection: &mut Library, note: &Note) -> Result<bool, StorageError> {
+    connection.transaction(|connection, vault| insert_imported_in(connection, vault, note))
+}
+
+/// For a caller already inside a transaction: an import is one transaction for the whole
+/// file, and every note it brings in runs inside it.
+pub(crate) fn insert_imported_in(
     connection: &mut SqliteConnection,
+    vault: &Vault,
     note: &Note,
 ) -> Result<bool, StorageError> {
-    connection.transaction(|connection| {
+    {
         let taken = notes::table
             .find(&note.id)
             .select(notes::id)
@@ -545,20 +562,22 @@ pub fn insert_imported(
         }
 
         diesel::insert_into(notes::table)
-            .values(NoteRow::from(note))
+            .values(NoteRow::seal(note, vault)?)
             .execute(connection)?;
         related::replace_tags(connection, &note.id, &model::normalize_tags(&note.tags))?;
         related::replace_items(
             connection,
+            vault,
             &note.id,
             &checklist::normalize_items(&note.items),
         )?;
         related::replace_placeholder_values(
             connection,
+            vault,
             &note.id,
             &placeholder::normalize_values(note.placeholder_values.clone()),
         )?;
 
         Ok(true)
-    })
+    }
 }

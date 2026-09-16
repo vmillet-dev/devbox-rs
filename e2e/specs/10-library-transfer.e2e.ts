@@ -15,11 +15,18 @@ import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
  * ⚠️ The OS file picker is not driven here (see `support/app.ts`): the commands take a
  * path, and the path is where the real work happens.
  */
+/** The message rather than the throw: a refusal is what these two assertions are about. */
+async function failureOf(running: Promise<unknown>): Promise<string> {
+  return running.then(
+    () => 'it was not refused',
+    (error: Error) => error.message,
+  );
+}
 describe('Import, export and share', () => {
   const directory = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
 
   /** ⚠️ Forward slashes: `\` is an escape on the wire and a separator on Windows. */
-  const bundlePath = join(directory, 'library.json').replaceAll('\\', '/');
+  const bundlePath = join(directory, 'library.devbox').replaceAll('\\', '/');
 
   /** Kept from `before`: the seeded space is named from a translation (see below). */
   let homeId = '';
@@ -39,8 +46,11 @@ describe('Import, export and share', () => {
     expect(written.spaces).toBe((await bridge.listSpaces()).length);
 
     expect(existsSync(bundlePath)).toBe(true);
-    const bundle = JSON.parse(readFileSync(bundlePath, 'utf8')) as { notes: { title: string }[] };
-    expect(bundle.notes.map((note) => note.title)).toContain('Worth exporting');
+
+    // ⚠️ An archive, not JSON: the attachments travel as entries beside the bundle. What
+    // the archive holds is asserted in `tests/transfer.rs`, which can open one — reading
+    // a deflated entry from here would mean a zip reader in the harness for one check.
+    expect(readFileSync(bundlePath).subarray(0, 4)).toEqual(Buffer.from('PK\x03\x04', 'binary'));
   });
 
   it('imports nothing when every note is already there', async () => {
@@ -96,17 +106,22 @@ describe('Import, export and share', () => {
    * arrives with that field brought down to the default rather than failing the file.
    */
   it('imports a bundle from a newer version instead of refusing it whole', async () => {
-    const source = JSON.parse(readFileSync(bundlePath, 'utf8')) as {
-      notes: Record<string, unknown>[];
-    };
+    // ⚠️ Written as a bare `.json`, which is also the shape DevBox exported before the
+    // archive: this doubles as the proof that an old export still imports.
+    const exported = await bridge.queryNotes(query({ search: 'Worth exporting' }));
+    const source = exported.sections[0]?.notes[0];
+    expect(source).toBeDefined();
+
     const newerPath = join(directory, 'newer.json').replaceAll('\\', '/');
     writeFileSync(
       newerPath,
       JSON.stringify({
-        ...source,
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        spaces: await bridge.listSpaces(),
         notes: [
           {
-            ...source.notes[0],
+            ...source,
             id: 'written-by-a-newer-devbox',
             title: 'Ahead of this build',
             language: 'from-the-future',
@@ -124,6 +139,29 @@ describe('Import, export and share', () => {
     expect(view.sections[0]?.notes[0]?.language).toBe('txt');
   });
 
+  /**
+   * ⚠️ The export is the one file the library key does not protect: it is meant to reach
+   * another machine, so it carries a key of its own. Read from Node, against the bytes on
+   * disk rather than against what the application says about them.
+   */
+  it('seals an export with a phrase, and will not open it without that phrase', async () => {
+    const sealedPath = join(directory, 'sealed.devbox').replaceAll('\\', '/');
+
+    const written = await bridge.exportNotes(sealedPath, null, 'an export passphrase');
+    expect(written.protected).toBe(true);
+    expect(await bridge.exportIsProtected(sealedPath)).toBe(true);
+    expect(await bridge.exportIsProtected(bundlePath)).toBe(false);
+    expect(readFileSync(sealedPath).includes(Buffer.from('Worth exporting'))).toBe(false);
+
+    const refused = await failureOf(bridge.importNotes(sealedPath));
+    expect(refused).toContain('passphraseRequired');
+
+    const wrong = await failureOf(bridge.importNotes(sealedPath, 'not the phrase'));
+    expect(wrong).toContain('wrongPassphrase');
+
+    const report = await bridge.importNotes(sealedPath, 'an export passphrase');
+    expect(report.notesSkipped).toBeGreaterThan(0);
+  });
   it('greys out the menu entries that have nothing to act on', async () => {
     await fileMenu.open();
     // The entry stays in the DOM and clickable — it carries `aria-disabled`, not `disabled`.

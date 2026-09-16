@@ -150,6 +150,9 @@
     "spaceGone": "This space no longer exists.",
     "invalidInput": "The engine rejected this value: {{field}}.",
     "storageUnavailable": "Storage is unavailable. Restart {{app}}.",
+    "wrongPassphrase": "Wrong passphrase.",
+    "locked": "The library is locked.",
+    "passphraseRequired": "This file is protected by a passphrase.",
     "updateFailed": "The update failed. {{app}} remains usable on its current version.",
     "updateCheckFailed": "The update check failed. Try again later.",
     "attachmentGone": "This attachment no longer exists.",
@@ -170,7 +173,10 @@
     "attachmentOpenFailed": "Could not open the attachment with an application.",
     "attachmentSaveFailed": "Could not save the attachment to that location.",
     "variablesLoadFailed": "Could not load the variables.",
-    "variablesSaveFailed": "Could not save the variables."
+    "variablesSaveFailed": "Could not save the variables.",
+    "passphraseChangeFailed": "Could not change the passphrase. The old one still opens the library.",
+    "unlockFailed": "Unlocking failed.",
+    "vaultStateFailed": "Could not tell whether the library is encrypted."
   },
   "tray": {
     "open": "Open {{app}}",
@@ -321,7 +327,22 @@
     "imported": "{{notes}} note(s) imported from {{path}}, {{skipped}} skipped.",
     "importedNothing": "Nothing to import: those {{skipped}} note(s) are already in your library.",
     "importedFromNewerVersion": "{{notes}} note(s) imported from {{path}}, {{skipped}} skipped. {{degraded}} came from a newer version: their language or kind was brought down to what this version can read.",
+    "importedWithAttachments": "{{notes}} note(s) imported from {{path}}, {{skipped}} skipped, {{attachments}} attachment(s) restored.",
+    "importedWithoutSomeAttachments": "{{notes}} note(s) imported from {{path}}. ⚠️ {{missing}} attachment(s) the file named but did not carry: their preview will stay empty.",
     "exported": "{{notes}} note(s) exported to {{path}}.",
+    "exportedWithAttachments": "{{notes}} note(s) and {{attachments}} attachment(s) exported to {{path}}.",
+    "exportedProtected": "{{notes}} note(s) exported to {{path}}, sealed with the passphrase you gave it.",
+    "exportedProtectedWithAttachments": "{{notes}} note(s) and {{attachments}} attachment(s) exported to {{path}}, sealed with the passphrase you gave it.",
+    "protectTitle": "Protect this export?",
+    "protectLead": "{{path}} is about to leave your library. A passphrase seals it with a key of its own, which travels with the file rather than with this machine.",
+    "protectWarning": "⚠️ Without one, the file carries every note and every attachment in the clear: anyone holding it can read them.",
+    "protectAction": "Export protected",
+    "protectPlain": "Export in the clear",
+    "unlockTitle": "This file is protected",
+    "unlockLead": "Enter the passphrase {{path}} was exported with.",
+    "unlockAction": "Import",
+    "cancel": "Cancel",
+    "working": "Working…",
     "copied": "{{notes}} note(s) copied as Markdown to the clipboard.",
     "needsSelection": "Select at least one note.",
     "emptyLibrary": "Nothing to export: this library has no notes.",
@@ -409,6 +430,19 @@
       "shortcutReset": "Reset",
       "showPinnedFirst": "Show pinned first"
     },
+    "security": {
+      "title": "Security",
+      "passphrase": "Passphrase",
+      "change": "Change…",
+      "changing": "Changing…",
+      "note": "It opens the library at every launch. Changing it re-encrypts nothing: your notes stay sealed with the same key, which is why it takes a second rather than a rewrite.",
+      "dialogTitle": "Change the passphrase",
+      "dialogLead": "The new one applies at the next launch. This session carries on as it is.",
+      "current": "Current passphrase",
+      "next": "New passphrase",
+      "cancel": "Cancel",
+      "changed": "Passphrase changed."
+    },
     "notifications": {
       "title": "Notifications",
       "copyConfirmation": "Confirm every copy",
@@ -481,5 +515,20 @@
     "empty": "No release described yet.",
     "installed": "installed",
     "close": "Close"
+  },
+  "vault": {
+    "createTitle": "Protect this library",
+    "createLead": "Choose a passphrase. {{app}} will ask for it once at every launch.",
+    "noRecovery": "⚠️ This passphrase cannot be recovered. Lose it and the library goes with it — a plaintext export is the only copy that does not depend on it.",
+    "unlockTitle": "Unlock the library",
+    "unlockLead": "Enter your passphrase to open your notes.",
+    "passphrase": "Passphrase",
+    "confirmation": "Confirmation",
+    "tooShort": "At least {{length}} characters.",
+    "mismatched": "The two entries differ.",
+    "createAction": "Protect and continue",
+    "unlockAction": "Unlock",
+    "working": "Unlocking…",
+    "creating": "Protecting the library…"
   }
 }

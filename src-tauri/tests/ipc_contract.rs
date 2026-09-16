@@ -426,6 +426,8 @@ fn an_import_report_names_what_it_skipped() {
         notes_imported: 2,
         notes_skipped: 3,
         notes_degraded: 4,
+        attachments_imported: 1,
+        attachments_missing: 0,
     })
     .unwrap();
 
@@ -448,6 +450,7 @@ fn an_export_bundle_reads_back_the_notes_it_wrote() {
             pinned: false,
         }],
         notes: vec![sample()],
+        attachments: Vec::new(),
     };
     let json = serde_json::to_string(&bundle).unwrap();
 

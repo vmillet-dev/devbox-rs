@@ -136,6 +136,24 @@
   </section>
 
   <section class="setting-group">
+    <h4 class="setting-group-title">{{ 'settings.security.title' | transloco }}</h4>
+
+    <div class="setting-row">
+      <span class="setting-label">{{ 'settings.security.passphrase' | transloco }}</span>
+      <button
+        type="button"
+        class="setting-inline-btn"
+        data-testid="setting-change-passphrase"
+        (click)="openPassphraseChange()"
+      >
+        {{ 'settings.security.change' | transloco }}
+      </button>
+    </div>
+
+    <p class="setting-note">{{ 'settings.security.note' | transloco }}</p>
+  </section>
+
+  <section class="setting-group">
     <h4 class="setting-group-title">{{ 'settings.notifications.title' | transloco }}</h4>
 
     <div class="setting-row">
@@ -177,3 +195,7 @@
     }
   </section>
 </div>
+
+@if (isChangingPassphrase()) {
+  <app-change-passphrase-dialog (closed)="closePassphraseChange()" />
+}

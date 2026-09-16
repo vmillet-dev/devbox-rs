@@ -20,6 +20,7 @@ import { SettingsStore } from '@core/services/settings/settings.store';
 import { GlobalShortcutsService } from '@core/services/shortcuts/global-shortcuts.service';
 import { TrayService } from '@core/services/tray/tray.service';
 import { UpdateStore } from '@core/services/updates/update.store';
+import { VaultStore } from '@core/state/vault.store';
 import { WindowBehaviorService } from '@core/services/window/window-behavior.service';
 
 export const appConfig: ApplicationConfig = {
@@ -54,6 +55,7 @@ export const appConfig: ApplicationConfig = {
       const shortcuts = inject(GlobalShortcutsService);
       const windowBehavior = inject(WindowBehaviorService);
       const autostart = inject(AutostartService);
+      const vault = inject(VaultStore);
 
       await preferences.hydrate();
       // ⚠️ Before the first render, and before `locale.restore()`, which reads the
@@ -63,6 +65,10 @@ export const appConfig: ApplicationConfig = {
       // ⚠️ After `restore()`: the front creates the tray by giving it its labels, and
       // earlier would push the default language and a setting the user had changed.
       tray.start();
+
+      // ⚠️ Before the first render: the shell renders nothing at all until this answers,
+      // rather than flashing a canvas it is about to replace with an unlock screen.
+      await vault.load();
 
       shortcuts.start();
       windowBehavior.start();

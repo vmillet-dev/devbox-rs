@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use diesel::SqliteConnection;
+use devbox_lib::db::Library;
 use diesel::prelude::*;
 
 use chrono::{DateTime, Utc};
@@ -22,7 +22,7 @@ use devbox_lib::spaces::store as spaces;
 
 /// No such shortcut exists in production code: it would invite re-filtering on the
 /// front end.
-fn list(connection: &mut SqliteConnection) -> Result<Vec<Note>, StorageError> {
+fn list(connection: &mut Library) -> Result<Vec<Note>, StorageError> {
     fetch(
         connection,
         &NotesQuery {
@@ -51,15 +51,12 @@ fn t1() -> DateTime<Utc> {
     at("2026-07-25T10:00:00.000Z")
 }
 
-fn query(
-    connection: &mut SqliteConnection,
-    request: &NotesQuery,
-) -> Result<NotesView, StorageError> {
+fn query(connection: &mut Library, request: &NotesQuery) -> Result<NotesView, StorageError> {
     let (notes, facets) = fetch(connection, request)?;
     Ok(view::build(notes, facets, request))
 }
 
-fn space(connection: &mut SqliteConnection, name: &str) -> String {
+fn space(connection: &mut Library, name: &str) -> String {
     spaces::create(connection, name).unwrap().id
 }
 
@@ -352,7 +349,7 @@ fn emptying_the_list_leaves_no_row_behind() {
     assert_eq!(
         note_items::table
             .count()
-            .get_result::<i64>(&mut connection)
+            .get_result::<i64>(connection.db())
             .unwrap(),
         0
     );
@@ -400,7 +397,7 @@ fn purging_removes_the_note_and_its_items_for_good() {
     assert_eq!(
         note_items::table
             .count()
-            .get_result::<i64>(&mut connection)
+            .get_result::<i64>(connection.db())
             .unwrap(),
         0
     );
@@ -508,7 +505,7 @@ fn deleting_takes_the_note_off_the_canvas_without_destroying_it() {
     assert!(list(&mut connection).unwrap().is_empty());
     let kept_tags = note_tags::table
         .count()
-        .get_result::<i64>(&mut connection)
+        .get_result::<i64>(connection.db())
         .unwrap();
     assert_eq!(kept_tags, 2);
 
@@ -563,7 +560,7 @@ fn purging_removes_the_note_and_its_tags_for_good() {
     assert!(list_trashed(&mut connection).unwrap().is_empty());
     let orphan_tags = note_tags::table
         .count()
-        .get_result::<i64>(&mut connection)
+        .get_result::<i64>(connection.db())
         .unwrap();
     assert_eq!(orphan_tags, 0);
 }
@@ -727,7 +724,7 @@ fn purging_removes_the_note_and_its_values_for_good() {
     assert_eq!(
         note_placeholders::table
             .count()
-            .get_result::<i64>(&mut connection)
+            .get_result::<i64>(connection.db())
             .unwrap(),
         0
     );
@@ -1669,7 +1666,7 @@ fn deleting_a_space_takes_its_notes_with_it() {
     create(&mut connection, draft(&space_id), t0()).unwrap();
 
     diesel::delete(spaces_table::table.find(&space_id))
-        .execute(&mut connection)
+        .execute(connection.db())
         .unwrap();
 
     assert!(list(&mut connection).unwrap().is_empty());
@@ -1683,7 +1680,7 @@ fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
 
     diesel::update(devbox_lib::db::schema::notes::table.find(&created.id))
         .set(devbox_lib::db::schema::notes::created_at.eq("pas une date"))
-        .execute(&mut connection)
+        .execute(connection.db())
         .unwrap();
 
     let error = list(&mut connection).unwrap_err();
@@ -1708,8 +1705,73 @@ fn a_stored_date_always_carries_its_milliseconds() {
     let stored: String = devbox_lib::db::schema::notes::table
         .find(&created.id)
         .select(devbox_lib::db::schema::notes::updated_at)
-        .first(&mut connection)
+        .first(connection.db())
         .unwrap();
 
     assert_eq!(stored, "2026-07-25T09:00:00.000Z");
+}
+
+/// ⚠️ The point of the whole thing, and the only test that reads the file rather than the
+/// API: a note written through the store must not be findable by grepping the database.
+#[test]
+fn a_note_is_not_readable_in_the_file_it_was_written_to() {
+    use devbox_lib::db;
+
+    let directory = std::env::temp_dir().join(format!(
+        "devbox-sealed-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("sealed.sqlite3");
+
+    let secret = "psql -h prod.internal -U admin -W hunter2";
+    {
+        let mut library = db::open(&path, db::test_vault().unwrap()).unwrap();
+        let space = spaces::create(&mut library, "Secrets").unwrap().id;
+        let mut seeded = draft(&space);
+        seeded.title = "AWS prod credentials".to_string();
+        seeded.content = secret.to_string();
+        seeded.tags = vec!["prod".to_string()];
+        create(&mut library, seeded, t0()).unwrap();
+
+        // A variable for the whole corpus is where a host name or a token ends up, so it
+        // is sealed like anything else a reader would want.
+        let mut globals = std::collections::BTreeMap::new();
+        globals.insert("host".to_string(), "prod.internal".to_string());
+        devbox_lib::notes::store::replace_global_placeholder_values(&mut library, &globals)
+            .unwrap();
+    }
+
+    let raw = std::fs::read(&path).unwrap();
+    let haystack = String::from_utf8_lossy(&raw);
+
+    assert!(!haystack.contains(secret), "the body is in the clear");
+    assert!(
+        !haystack.contains("AWS prod credentials"),
+        "the title is in the clear"
+    );
+    assert!(
+        !haystack.contains("Secrets"),
+        "the space name is in the clear"
+    );
+    assert!(
+        !haystack.contains("prod.internal"),
+        "a global variable's value is in the clear"
+    );
+    // ⚠️ Tags and the names of variables are deliberately not sealed: the facet, the
+    // filter and the lookup all touch them in SQL. This asserts the decision rather than
+    // an accident.
+    assert!(
+        haystack.contains("prod"),
+        "a tag is expected to stay readable"
+    );
+    assert!(
+        haystack.contains("host"),
+        "a variable's name is expected to stay readable"
+    );
+
+    std::fs::remove_dir_all(&directory).ok();
 }

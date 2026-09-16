@@ -150,6 +150,9 @@
     "spaceGone": "Cet espace n'existe plus.",
     "invalidInput": "Valeur refusée par le moteur : {{field}}.",
     "storageUnavailable": "Le stockage est indisponible. Redémarrez {{app}}.",
+    "wrongPassphrase": "Phrase de passe incorrecte.",
+    "locked": "La bibliothèque est verrouillée.",
+    "passphraseRequired": "Ce fichier est protégé par une phrase de passe.",
     "updateFailed": "La mise à jour a échoué. {{app}} reste utilisable dans sa version actuelle.",
     "updateCheckFailed": "La recherche de mise à jour a échoué. Réessayez plus tard.",
     "attachmentGone": "Cette pièce jointe n'existe plus.",
@@ -170,7 +173,10 @@
     "attachmentOpenFailed": "Impossible d'ouvrir la pièce jointe avec une application.",
     "attachmentSaveFailed": "Impossible d'enregistrer la pièce jointe à cet emplacement.",
     "variablesLoadFailed": "Impossible de charger les variables.",
-    "variablesSaveFailed": "Impossible d'enregistrer les variables."
+    "variablesSaveFailed": "Impossible d'enregistrer les variables.",
+    "passphraseChangeFailed": "Impossible de changer la phrase de passe. L'ancienne ouvre toujours la bibliothèque.",
+    "unlockFailed": "Le déverrouillage a échoué.",
+    "vaultStateFailed": "Impossible de savoir si la bibliothèque est chiffrée."
   },
   "tray": {
     "open": "Ouvrir {{app}}",
@@ -321,7 +327,22 @@
     "imported": "{{notes}} note(s) importée(s) depuis {{path}}, {{skipped}} ignorée(s).",
     "importedNothing": "Rien à importer : ces {{skipped}} note(s) sont déjà dans votre bibliothèque.",
     "importedFromNewerVersion": "{{notes}} note(s) importée(s) depuis {{path}}, {{skipped}} ignorée(s). {{degraded}} vien(nen)t d’une version plus récente : leur langage ou leur type a été ramené à ce que cette version sait lire.",
+    "importedWithAttachments": "{{notes}} note(s) importée(s) depuis {{path}}, {{skipped}} ignorée(s), {{attachments}} pièce(s) jointe(s) restaurée(s).",
+    "importedWithoutSomeAttachments": "{{notes}} note(s) importée(s) depuis {{path}}. ⚠️ {{missing}} pièce(s) jointe(s) annoncée(s) par le fichier mais absente(s) : leur aperçu restera vide.",
     "exported": "{{notes}} note(s) exportée(s) vers {{path}}.",
+    "exportedWithAttachments": "{{notes}} note(s) et {{attachments}} pièce(s) jointe(s) exportée(s) vers {{path}}.",
+    "exportedProtected": "{{notes}} note(s) exportée(s) vers {{path}}, scellées avec la phrase de passe que vous lui avez donnée.",
+    "exportedProtectedWithAttachments": "{{notes}} note(s) et {{attachments}} pièce(s) jointe(s) exportée(s) vers {{path}}, scellées avec la phrase de passe que vous lui avez donnée.",
+    "protectTitle": "Protéger cet export ?",
+    "protectLead": "{{path}} va quitter votre bibliothèque. Une phrase de passe le scelle avec une clé qui lui est propre, et qui voyage avec le fichier plutôt qu’avec cette machine.",
+    "protectWarning": "⚠️ Sans elle, le fichier emporte toutes les notes et toutes les pièces jointes en clair : quiconque le détient peut les lire.",
+    "protectAction": "Exporter protégé",
+    "protectPlain": "Exporter en clair",
+    "unlockTitle": "Ce fichier est protégé",
+    "unlockLead": "Saisissez la phrase de passe avec laquelle {{path}} a été exporté.",
+    "unlockAction": "Importer",
+    "cancel": "Annuler",
+    "working": "En cours…",
     "copied": "{{notes}} note(s) copiée(s) en Markdown dans le presse-papier.",
     "needsSelection": "Sélectionnez au moins une note.",
     "emptyLibrary": "Rien à exporter : cette bibliothèque n'a aucune note.",
@@ -409,6 +430,19 @@
       "shortcutReset": "Rétablir",
       "showPinnedFirst": "Épinglées en premier"
     },
+    "security": {
+      "title": "Sécurité",
+      "passphrase": "Phrase de passe",
+      "change": "Changer…",
+      "changing": "Changement…",
+      "note": "Elle ouvre la bibliothèque à chaque lancement. La changer ne rechiffre rien : les notes restent scellées avec la même clé, d'où une seconde plutôt qu'une réécriture.",
+      "dialogTitle": "Changer la phrase de passe",
+      "dialogLead": "La nouvelle s'applique au prochain lancement. Cette session continue telle quelle.",
+      "current": "Phrase actuelle",
+      "next": "Nouvelle phrase",
+      "cancel": "Annuler",
+      "changed": "Phrase de passe changée."
+    },
     "notifications": {
       "title": "Notifications",
       "copyConfirmation": "Accuser chaque copie",
@@ -481,5 +515,20 @@
     "empty": "Aucune version décrite pour l'instant.",
     "installed": "installée",
     "close": "Fermer"
+  },
+  "vault": {
+    "createTitle": "Protéger cette bibliothèque",
+    "createLead": "Choisissez une phrase de passe. Elle sera demandée à chaque lancement de {{app}}, une seule fois.",
+    "noRecovery": "⚠️ Cette phrase ne peut pas être récupérée. Perdue, la bibliothèque l’est aussi — un export en clair est la seule copie qui n’en dépend pas.",
+    "unlockTitle": "Déverrouiller la bibliothèque",
+    "unlockLead": "Entrez votre phrase de passe pour ouvrir vos notes.",
+    "passphrase": "Phrase de passe",
+    "confirmation": "Confirmation",
+    "tooShort": "Au moins {{length}} caractères.",
+    "mismatched": "Les deux saisies diffèrent.",
+    "createAction": "Protéger et continuer",
+    "unlockAction": "Déverrouiller",
+    "working": "Déverrouillage…",
+    "creating": "Protection de la bibliothèque…"
   }
 }

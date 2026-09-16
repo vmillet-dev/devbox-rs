@@ -47,9 +47,24 @@ pub enum StorageError {
     SchemaTooRecent(String),
     #[error("Migration failed: {0}")]
     Migration(String),
+    /// Deriving a key, sealing a value, or opening one that will not open.
+    #[error("Vault error: {0}")]
+    Vault(String),
+    /// ⚠️ Says only that: which of the passphrase and the file is wrong is not something
+    /// to help a caller narrow down.
+    #[error("Wrong passphrase")]
+    WrongPassphrase,
+    /// A protected export was offered without the phrase that opens it. Not a failure —
+    /// the interface has to ask, and nothing could know before looking inside.
+    #[error("This file is protected by a passphrase")]
+    PassphraseRequired,
     /// A command panicked while holding the connection.
     #[error("Storage unavailable: a previous operation failed")]
     Unavailable,
+    /// ⚠️ A command reached the library before the passphrase did. The front gates on the
+    /// unlock screen, so this is a caller that jumped the queue rather than a state.
+    #[error("The library is locked")]
+    Locked,
     /// `#[from]`: required by `Connection::transaction`.
     #[error("Storage error: {0}")]
     Sqlite(#[from] diesel::result::Error),
@@ -57,7 +72,7 @@ pub enum StorageError {
 
 /// ⚠️ Adding a variant breaks the front-end build until `CODE_KEYS`
 /// (`core/services/errors/error-notifier.service.ts`) and both locales have their key.
-#[derive(Debug, Clone, Copy, Serialize, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ErrorCode {
     NoteNotFound,
@@ -70,6 +85,13 @@ pub enum ErrorCode {
     InvalidInput,
     /// Poisoned mutex: a command panicked while holding the connection.
     StorageUnavailable,
+    /// The one the unlock screen acts on: it clears the field rather than banishing the
+    /// user to a banner.
+    WrongPassphrase,
+    /// A command ran before the library was unlocked.
+    Locked,
+    /// The import needs the phrase the export was protected with.
+    PassphraseRequired,
     Storage,
 }
 
@@ -134,11 +156,15 @@ impl From<StorageError> for AppError {
                 Self::with(ErrorCode::AttachmentNotFound, detail, "id", &id)
             }
             StorageError::Unavailable => Self::new(ErrorCode::StorageUnavailable, detail),
+            StorageError::WrongPassphrase => Self::new(ErrorCode::WrongPassphrase, detail),
+            StorageError::PassphraseRequired => Self::new(ErrorCode::PassphraseRequired, detail),
+            StorageError::Locked => Self::new(ErrorCode::Locked, detail),
             StorageError::File(_) => Self::new(ErrorCode::FileAccess, detail),
             StorageError::ImportFormat(_) => Self::new(ErrorCode::ImportFormat, detail),
             // Nothing here gives the front anything to do beyond reporting the failure.
             StorageError::SchemaTooRecent(_)
             | StorageError::Migration(_)
+            | StorageError::Vault(_)
             | StorageError::CorruptRow { .. }
             | StorageError::Sqlite(_) => Self::new(ErrorCode::Storage, detail),
         }
