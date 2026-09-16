@@ -757,12 +757,25 @@ consequences:
 `purgeAt` is **derived**, never stored: the retention can change between versions and a
 deadline frozen in the database would not follow.
 
-On the front, every deletion records the ids it took away and shows `UndoBarComponent` for
+On the front, a reversible action records what it changed and shows `UndoBarComponent` for
 `UNDO_WINDOW_MS` (8 s).
 
+`Reversible` is a three-branch union — a deletion, a move, a tagging — and `NotesStore.reverse`
+switches over it exhaustively, so a fourth kind of undoable action stops the front compiling
+until it says how to put itself back. ⚠️ Each branch carries **what the back end answered**,
+never what the front end guessed: `move_notes` returns the placements it actually changed and
+`tag_notes` the `(note, tag)` pairs it actually added. Recomputing either from the selection
+would mean holding a second copy of rules that live in Rust — and it goes wrong in a way that
+destroys data, since undoing a tag a note already carried takes away something the batch never
+gave. One key per kind on the bar, too: "3 notes deleted" and "3 notes moved" are not the same
+sentence.
+
+A batch that changed nothing opens no window at all. A bar offering to undo zero notes is
+noise, not a safety net.
+
 ⚠️ The banner and the record are **two different things**: `undoBanner()` is what the timer
-clears, `lastDeletion()` is what `Ctrl+Z` reads, and it survives. Hiding a suggestion is not
-withdrawing it — the deletion stays undoable until another one replaces it or the user
+clears, `lastAction()` is what `Ctrl+Z` reads, and it survives. Hiding a suggestion is not
+withdrawing it — the action stays undoable until another one replaces it or the user
 dismisses the banner by hand, which _is_ an explicit refusal.
 
 `Ctrl+Z` is handled by the page's keydown, ahead of the modifier guard that stops every other
@@ -808,9 +821,21 @@ several notes are selected. `SelectionBarComponent` appears only when something 
 offers: move to a space, add a tag, share, move to trash.
 
 Each action is **one command for the whole batch** (`move_notes`, `tag_notes`,
-`delete_notes`), not a loop of single writes: the count comes back so a stale id in the
-selection produces a partial result rather than failing the lot. Tagging **adds** without
-replacing — a bulk action enriches the labelling, it does not overwrite it.
+`delete_notes`), not a loop of single writes: a stale id in the selection produces a partial
+result rather than failing the lot. Tagging **adds** without replacing — a bulk action
+enriches the labelling, it does not overwrite it.
+
+⚠️ `move_notes` and `tag_notes` answer **what they changed**, not how many notes they looked
+at — the placements the notes left, the `(note, tag)` pairs actually inserted. That is what
+`move_notes_back` and `untag_notes` undo, exactly and nothing wider. It also fixed a count
+that had always overstated itself: `tag_many` used to report every live note in the selection,
+including the ones already carrying the tag, which `INSERT OR IGNORE` had quietly skipped.
+Those notes no longer have `updated_at` refreshed either, for the same reason — nothing about
+them changed.
+
+⚠️ Which notes "already carry the tag" is decided in SQL, before the insert, by the same
+comparison the insert will make: `note_tags.tag` is `COLLATE NOCASE`, and SQLite's `NOCASE`
+folds **ASCII only** — which is exactly what `eq_ignore_ascii_case` does in `tag_many`.
 
 ### `{{fields}}` in a snippet
 
@@ -922,6 +947,24 @@ Two subtleties in `notes::store::retag`:
   the primary key is `NOCASE`, so both spellings are the same row.
 - `updated_at` is left alone. A global retag would otherwise float the whole corpus to the top
   of a canvas that sorts on it, for notes nobody reopened.
+
+**Nothing corpus-wide runs before it has said what it would touch.** These are the most
+dangerous operations in the application and they act on the whole library rather than on a
+selection, so a mis-click reaches them easily. `TagsStore` turns every one of them into a
+`PendingTagChange` first — the kind, the tags, the target, and the number of notes — and only
+`confirm()` writes.
+
+⚠️ That number is counted by the back end (`count_notes_tagged`, a `COUNT(DISTINCT note_id)`
+over live notes), not summed from the per-tag counts already on screen: a note carrying two of
+the selected tags is one note, and a confirmation that overstates its blast radius teaches
+people to dismiss it. If the count cannot be read, nothing is proposed and nothing runs —
+a blast radius that cannot be shown is not a reason to go ahead blind.
+
+⚠️ The confirmation replaces the actions rather than sitting beside them: the click that asked
+for it is the one that would confirm it, and a second click landing on the same spot is the
+accident a confirmation exists to stop. A **merge** says out loud that it cannot be undone,
+because it is the only one that genuinely cannot — once `auth` and `Auth` are one row, nothing
+knows which note carried which.
 
 ### Attachments
 

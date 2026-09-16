@@ -5,8 +5,10 @@ import {
   Note,
   NoteDraft,
   NotePatch,
+  NotePlacement,
   NotesQuery,
   NotesView,
+  NoteTag,
   TagUsage,
   TrashedNote,
 } from '../model/note.model';
@@ -70,12 +72,27 @@ export class NotesRepository {
     return unwrap('empty_trash', await commands.emptyTrash());
   }
 
-  async moveMany(ids: readonly string[], spaceId: string): Promise<number> {
+  /** Answers where each note came from, which is the only thing that can put it back. */
+  async moveMany(ids: readonly string[], spaceId: string): Promise<readonly NotePlacement[]> {
     return unwrap('move_notes', await commands.moveNotes([...ids], spaceId));
   }
 
-  async tagMany(ids: readonly string[], tags: readonly string[]): Promise<number> {
+  async moveBack(placements: readonly NotePlacement[]): Promise<number> {
+    return unwrap('move_notes_back', await commands.moveNotesBack([...placements]));
+  }
+
+  /** Answers the pairs it added, never the notes it merely looked at. */
+  async tagMany(ids: readonly string[], tags: readonly string[]): Promise<readonly NoteTag[]> {
     return unwrap('tag_notes', await commands.tagNotes([...ids], [...tags]));
+  }
+
+  async untagMany(pairs: readonly NoteTag[]): Promise<number> {
+    return unwrap('untag_notes', await commands.untagNotes([...pairs]));
+  }
+
+  /** What a corpus-wide tag action would touch, asked before it runs. */
+  async countNotesTagged(tags: readonly string[]): Promise<number> {
+    return unwrap('count_notes_tagged', await commands.countNotesTagged([...tags]));
   }
 
   async loadTags(): Promise<readonly TagUsage[]> {

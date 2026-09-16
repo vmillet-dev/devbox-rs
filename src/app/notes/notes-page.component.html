@@ -141,13 +141,16 @@
     [tags]="tags.tags()"
     [selected]="tags.selected()"
     [isLoading]="tags.isLoading()"
+    [pending]="tags.pending()"
     (closed)="tags.close()"
     (toggled)="tags.toggle($event)"
     (renameRequested)="onRenameTag($event)"
     (deleteRequested)="onDeleteTags()"
+    (confirmed)="tags.confirm()"
+    (cancelled)="tags.cancel()"
   />
 }
 
-@if (store.undoBanner(); as deletion) {
-  <app-undo-bar [count]="deletion.count" (undone)="store.undoDeletion()" (dismissed)="store.dismissUndo()" />
+@if (store.undoBanner(); as action) {
+  <app-undo-bar [action]="action" (undone)="store.undoLastAction()" (dismissed)="store.dismissUndo()" />
 }

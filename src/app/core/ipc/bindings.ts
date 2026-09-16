@@ -30,9 +30,15 @@ export const commands = {
 	listTrash: () => typedError<TrashedNote[], AppError>(__TAURI_INVOKE("list_trash")),
 	purgeNotes: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("purge_notes", { ids })),
 	emptyTrash: () => typedError<number, AppError>(__TAURI_INVOKE("empty_trash")),
-	moveNotes: (ids: string[], spaceId: string) => typedError<number, AppError>(__TAURI_INVOKE("move_notes", { ids, spaceId })),
+	moveNotes: (ids: string[], spaceId: string) => typedError<NotePlacement[], AppError>(__TAURI_INVOKE("move_notes", { ids, spaceId })),
+	/**  The undo of [`move_notes`]: each note goes back to the space it left. */
+	moveNotesBack: (placements: NotePlacement[]) => typedError<number, AppError>(__TAURI_INVOKE("move_notes_back", { placements })),
 	/**  Normalized here as everywhere else, or a typed `#urgent` would not join `urgent`. */
-	tagNotes: (ids: string[], tags: string[]) => typedError<number, AppError>(__TAURI_INVOKE("tag_notes", { ids, tags })),
+	tagNotes: (ids: string[], tags: string[]) => typedError<NoteTag[], AppError>(__TAURI_INVOKE("tag_notes", { ids, tags })),
+	/**  The undo of [`tag_notes`]: exactly the pairs it added, and nothing wider. */
+	untagNotes: (pairs: NoteTag[]) => typedError<number, AppError>(__TAURI_INVOKE("untag_notes", { pairs })),
+	/**  What a corpus-wide tag action is about to touch, asked before it runs. */
+	countNotesTagged: (tags: string[]) => typedError<number, AppError>(__TAURI_INVOKE("count_notes_tagged", { tags })),
 	listTags: () => typedError<TagUsage[], AppError>(__TAURI_INVOKE("list_tags")),
 	/**  Renaming onto an existing tag is a merge: a note cannot carry one twice. */
 	renameTag: (tag: string, into: string) => typedError<number, AppError>(__TAURI_INVOKE("rename_tag", { tag, into })),
@@ -355,6 +361,12 @@ export type NotePatch = {
 	items?: ChecklistItem[] | null,
 };
 
+/**  Where a note sat before a batch moved it — the only thing that can put it back. */
+export type NotePlacement = {
+	noteId: string,
+	spaceId: string,
+};
+
 export type NoteSection = {
 	key: NoteSectionKey,
 	hasExpiringNotes: boolean,
@@ -364,6 +376,15 @@ export type NoteSection = {
 
 /**  A translation key on the front-end side: no readable label crosses the bridge. */
 export type NoteSectionKey = "pinned" | "today" | "week" | "older" | "results";
+
+/**
+ *  One tag on one note. A batch tagging answers pair by pair rather than with a count,
+ *  so undoing it cannot strip a tag the note already carried.
+ */
+export type NoteTag = {
+	noteId: string,
+	tag: string,
+};
 
 export type NotesQuery = {
 	/**  `None` = every space: a choice, not an absence of one. */

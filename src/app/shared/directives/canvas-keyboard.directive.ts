@@ -98,7 +98,7 @@ const CANVAS_KEYS: readonly CanvasKey[] = [
     on: ['z', 'Z'],
     ctrl: true,
     // Even after the banner is gone: it is the gesture one makes without looking.
-    run: ({ notes }) => when(notes.lastDeletion() !== null, () => void notes.undoDeletion()),
+    run: ({ notes }) => when(notes.lastAction() !== null, () => void notes.undoLastAction()),
   },
   {
     keys: ['Escape'],

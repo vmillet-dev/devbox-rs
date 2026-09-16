@@ -274,6 +274,23 @@ fn expires_soon(note: &Note, now: DateTime<Utc>) -> bool {
     at.signed_duration_since(now) <= EXPIRING_SOON
 }
 
+/// Where a note sat before a batch moved it — the only thing that can put it back.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct NotePlacement {
+    pub note_id: String,
+    pub space_id: String,
+}
+
+/// One tag on one note. A batch tagging answers pair by pair rather than with a count,
+/// so undoing it cannot strip a tag the note already carried.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteTag {
+    pub note_id: String,
+    pub tag: String,
+}
+
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TagUsage {

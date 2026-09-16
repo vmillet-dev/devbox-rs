@@ -81,6 +81,26 @@ app-dialog {
   opacity: 0.75;
 }
 
+.tags-confirm {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--amber);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+}
+
+.tags-confirm-text {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.tags-confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .tags-actions {
   display: flex;
   gap: 8px;
@@ -111,8 +131,7 @@ app-dialog {
   @include accent-state(var(--text-0), var(--amber-dim));
 }
 
-.tags-action.danger:hover,
-.tags-action.danger.confirming {
+.tags-action.danger:hover {
   border-color: var(--red);
   color: var(--red);
 }

@@ -186,30 +186,76 @@ pub fn empty_trash(app: AppHandle, db: State<'_, Db>) -> Result<u32, AppError> {
 
 #[tauri::command(async)]
 #[specta::specta]
-pub fn move_notes(ids: Vec<String>, space_id: String, db: State<'_, Db>) -> Result<u32, AppError> {
+pub fn move_notes(
+    ids: Vec<String>,
+    space_id: String,
+    db: State<'_, Db>,
+) -> Result<Vec<model::NotePlacement>, AppError> {
     let mut connection = lock(&db)?;
 
-    Ok(count(store::move_many(
+    Ok(store::move_many(
         &mut connection,
         &ids,
         &space_id,
         Utc::now(),
+    )?)
+}
+
+/// The undo of [`move_notes`]: each note goes back to the space it left.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn move_notes_back(
+    placements: Vec<model::NotePlacement>,
+    db: State<'_, Db>,
+) -> Result<u32, AppError> {
+    let mut connection = lock(&db)?;
+
+    Ok(count(store::restore_placements(
+        &mut connection,
+        &placements,
     )?))
 }
 
 /// Normalized here as everywhere else, or a typed `#urgent` would not join `urgent`.
 #[tauri::command(async)]
 #[specta::specta]
-pub fn tag_notes(ids: Vec<String>, tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
+pub fn tag_notes(
+    ids: Vec<String>,
+    tags: Vec<String>,
+    db: State<'_, Db>,
+) -> Result<Vec<model::NoteTag>, AppError> {
     let normalized = model::normalize_tags(&tags);
 
     let mut connection = lock(&db)?;
 
-    Ok(count(store::tag_many(
+    Ok(store::tag_many(
         &mut connection,
         &ids,
         &normalized,
         Utc::now(),
+    )?)
+}
+
+/// The undo of [`tag_notes`]: exactly the pairs it added, and nothing wider.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn untag_notes(pairs: Vec<model::NoteTag>, db: State<'_, Db>) -> Result<u32, AppError> {
+    let mut connection = lock(&db)?;
+
+    Ok(count(store::untag_many(&mut connection, &pairs)?))
+}
+
+/// What a corpus-wide tag action is about to touch, asked before it runs.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn count_notes_tagged(tags: Vec<String>, db: State<'_, Db>) -> Result<u32, AppError> {
+    let normalized = model::normalize_tags(&tags);
+
+    let mut connection = lock(&db)?;
+
+    Ok(count(store::count_notes_tagged(
+        &mut connection,
+        &normalized,
     )?))
 }
 

@@ -1,14 +1,15 @@
 import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
-import { selectionBar } from '../pageobjects/overlays.page.js';
+import { selectionBar, undoBar } from '../pageobjects/overlays.page.js';
 import { banners } from '../pageobjects/titlebar.page.js';
 import { clipboardText, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
- * The batch commands answer with a count, not a `Result` per note: a selection can hold
- * an id that went stale between the click and the call.
+ * A batch never fails whole for one stale id — a selection can hold an id that went stale
+ * between the click and the call. `move_notes` and `tag_notes` answer **what they
+ * changed**, which is what the undo hands back.
  */
 describe('Selecting several notes at once', () => {
   const first = 'Batch one';
@@ -57,6 +58,23 @@ describe('Selecting several notes at once', () => {
     expect((await reread(untouched))?.tags).toEqual([]);
   });
 
+  /**
+   * ⚠️ The pairs come back from Rust, not from the selection: `first` already carries
+   * `batch`, so undoing a second tagging must not strip it.
+   */
+  it('offers to take a bulk tagging back, without stripping what was already there', async () => {
+    await selectionBar.tag('reversible');
+    await browser.pause(800);
+    expect((await reread(first))?.tags).toContain('reversible');
+
+    await undoBar.bar().waitForDisplayed({ timeout: 10_000 });
+    await undoBar.restore();
+    await browser.pause(800);
+
+    expect((await reread(first))?.tags).toEqual(['batch']);
+    expect((await reread(second))?.tags).toEqual(['batch']);
+  });
+
   it('copies the selection as Markdown', async function () {
     await selectionBar.copy();
     await browser.pause(800);
@@ -82,6 +100,28 @@ describe('Selecting several notes at once', () => {
 
     expect((await reread(first))?.spaceId).toBe(refugeId);
     expect((await reread(second))?.spaceId).toBe(refugeId);
+    expect((await reread(untouched))?.spaceId).toBe(spaceId);
+  });
+
+  /**
+   * Putting thirty notes back by hand means remembering which thirty, and from where.
+   * ⚠️ States its own precondition: the move above took its notes out of this space, and
+   * with them the selection.
+   */
+  it('offers to take a bulk move back, to the space each note left', async () => {
+    await reloadCanvas();
+    await canvas.waitForCard(untouched);
+    await canvas.check(untouched);
+    await selectionBar.bar().waitForExist({ timeout: 10_000 });
+
+    await selectionBar.moveTo(refugeId);
+    await browser.pause(800);
+    expect((await reread(untouched))?.spaceId).toBe(refugeId);
+
+    await undoBar.bar().waitForDisplayed({ timeout: 10_000 });
+    await undoBar.restore();
+    await browser.pause(800);
+
     expect((await reread(untouched))?.spaceId).toBe(spaceId);
   });
 

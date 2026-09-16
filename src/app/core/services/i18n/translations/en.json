@@ -178,7 +178,8 @@
     "variablesSaveFailed": "Could not save the variables.",
     "passphraseChangeFailed": "Could not change the passphrase. The old one still opens the library.",
     "unlockFailed": "Unlocking failed.",
-    "vaultStateFailed": "Could not tell whether the library is encrypted."
+    "vaultStateFailed": "Could not tell whether the library is encrypted.",
+    "undoFailed": "The undo failed. Nothing was put back."
   },
   "tray": {
     "open": "Open {{app}}",
@@ -254,9 +255,13 @@
     "rename": "Rename",
     "merge": "Merge",
     "delete": "Delete",
-    "deleteConfirm": "Confirm?",
     "hint": "Renaming onto an existing tag merges the two.",
-    "selectionHint": "Select the tags to merge, then type their common name."
+    "selectionHint": "Select the tags to merge, then type their common name.",
+    "confirmRename": "Rename #{{tag}} to #{{into}} on {{count}} note(s)?",
+    "confirmMerge": "⚠️ Merge {{tags}} tags into #{{into}} across {{count}} note(s)? A merge cannot be undone: once they are one, nothing knows which note carried which.",
+    "confirmDelete": "Strip {{tags}} tag(s) from {{count}} note(s)? The notes themselves stay.",
+    "confirmAction": "Confirm",
+    "confirmCancel": "Cancel"
   },
   "selection": {
     "label": "Selection actions",
@@ -315,7 +320,9 @@
   "undo": {
     "deleted": "{{count}} note(s) moved to trash",
     "restore": "Undo",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "moved": "{{count}} note(s) moved",
+    "tagged": "{{count}} note(s) tagged"
   },
   "file": {
     "menuLabel": "File",

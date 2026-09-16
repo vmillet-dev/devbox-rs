@@ -53,12 +53,33 @@ describe('TagsStore', () => {
     expect(harness.store.selectedCount()).toBe(0);
   });
 
-  it('renames a single selected tag', async () => {
+  /**
+   * ⚠️ Proposing must write nothing. This is the whole protection: the tag manager acts
+   * on the corpus rather than on a selection, so a mis-click reaches it easily.
+   */
+  it('asks before it writes, and says how many notes it would touch', async () => {
     await harness.store.open();
     harness.store.toggle('auth');
 
-    expect(await harness.store.renameSelected('identity')).toBe(true);
+    await harness.store.proposeRename('identity');
+
+    expect(harness.store.pending()).toEqual({
+      kind: 'rename',
+      tags: ['auth'],
+      into: 'identity',
+      notes: 2,
+    });
+    expect(harness.repository.retagged).toBeNull();
+  });
+
+  it('renames a single selected tag once it is confirmed', async () => {
+    await harness.store.open();
+    harness.store.toggle('auth');
+    await harness.store.proposeRename('identity');
+
+    expect(await harness.store.confirm()).toBe(true);
     expect(harness.repository.retagged).toEqual({ tags: ['auth'], into: 'identity' });
+    expect(harness.store.pending()).toBeNull();
   });
 
   it('merges when several tags are selected', async () => {
@@ -68,33 +89,75 @@ describe('TagsStore', () => {
     harness.store.toggle('auth');
     harness.store.toggle('api');
 
-    await harness.store.renameSelected('backend');
+    await harness.store.proposeRename('backend');
+
+    expect(harness.store.pending()?.kind).toBe('merge');
+
+    await harness.store.confirm();
 
     expect(harness.repository.retagged?.tags).toEqual(['auth', 'api']);
     expect(harness.repository.retagged?.into).toBe('backend');
+  });
+
+  /** A note carrying both tags is one note, not two. */
+  it('counts the notes it would touch, rather than summing the per-tag counts', async () => {
+    await harness.store.open();
+    harness.store.toggle('auth');
+    harness.store.toggle('api');
+
+    await harness.store.proposeRename('backend');
+
+    expect(harness.store.pending()?.notes).toBe(2);
+  });
+
+  it('withdraws the proposal when the selection changes under it', async () => {
+    await harness.store.open();
+    harness.store.toggle('auth');
+    await harness.store.proposeRename('identity');
+
+    harness.store.toggle('api');
+
+    expect(harness.store.pending()).toBeNull();
+  });
+
+  it('cancelling changes nothing, which is the point of asking', async () => {
+    await harness.store.open();
+    harness.store.toggle('auth');
+    await harness.store.proposeRename('identity');
+
+    harness.store.cancel();
+
+    expect(harness.store.pending()).toBeNull();
+    expect(await harness.store.confirm()).toBe(false);
+    expect(harness.repository.retagged).toBeNull();
   });
 
   it('refuses to rename towards nothing', async () => {
     await harness.store.open();
     harness.store.toggle('auth');
 
-    expect(await harness.store.renameSelected('   ')).toBe(false);
-    expect(harness.repository.retagged).toBeNull();
+    await harness.store.proposeRename('   ');
+
+    expect(harness.store.pending()).toBeNull();
   });
 
   it('does nothing without a selection', async () => {
     await harness.store.open();
 
-    expect(await harness.store.renameSelected('identity')).toBe(false);
-    expect(await harness.store.deleteSelected()).toBe(false);
+    await harness.store.proposeRename('identity');
+    await harness.store.proposeDelete();
+
+    expect(harness.store.pending()).toBeNull();
   });
 
   it('drops every selected tag and clears the selection', async () => {
     await harness.store.open();
     harness.store.toggle('auth');
     harness.store.toggle('api');
+    await harness.store.proposeDelete();
 
-    expect(await harness.store.deleteSelected()).toBe(true);
+    expect(harness.store.pending()?.kind).toBe('delete');
+    expect(await harness.store.confirm()).toBe(true);
     expect(harness.repository.deletedTags).toEqual(['auth', 'api']);
     expect(harness.store.selectedCount()).toBe(0);
     expect(harness.store.isEmpty()).toBe(true);
@@ -108,12 +171,25 @@ describe('TagsStore', () => {
     expect(harness.notifier.notice()?.ref.key).toBe('errors.tagsLoadFailed');
   });
 
-  it('keeps the selection when an action fails', async () => {
+  /** ⚠️ A blast radius that cannot be read is not a reason to go ahead blind. */
+  it('proposes nothing when it cannot say what would be touched', async () => {
     await harness.store.open();
     harness.store.toggle('auth');
     harness.repository.failNext = new Error('boom');
 
-    expect(await harness.store.renameSelected('identity')).toBe(false);
+    await harness.store.proposeRename('identity');
+
+    expect(harness.store.pending()).toBeNull();
+    expect(harness.notifier.notice()?.ref.key).toBe('errors.tagActionFailed');
+  });
+
+  it('keeps the selection when a confirmed action fails', async () => {
+    await harness.store.open();
+    harness.store.toggle('auth');
+    await harness.store.proposeRename('identity');
+    harness.repository.failNext = new Error('boom');
+
+    expect(await harness.store.confirm()).toBe(false);
     expect(harness.store.selectedCount()).toBe(1);
     expect(harness.notifier.notice()?.ref.key).toBe('errors.tagActionFailed');
   });

@@ -4,6 +4,19 @@ import { NotesRepository } from '../data/notes.repository';
 import { TagUsage } from '../model/note.model';
 import { NotesRevision } from './notes-revision';
 
+/**
+ * A corpus-wide change, waiting to be confirmed. ⚠️ `notes` is counted distinctly by the
+ * back end, never summed from the per-tag counts on screen: a note carrying two of the
+ * selected tags is one note.
+ */
+export interface PendingTagChange {
+  readonly kind: 'rename' | 'merge' | 'delete';
+  readonly tags: readonly string[];
+  /** Empty for a deletion. */
+  readonly into: string;
+  readonly notes: number;
+}
+
 /** Scoped to the whole corpus: a tag that drifts drifts everywhere. */
 @Injectable({ providedIn: 'root' })
 export class TagsStore {
@@ -15,11 +28,14 @@ export class TagsStore {
   private readonly _isLoading = signal(false);
   private readonly _isOpen = signal(false);
   private readonly _selected = signal<ReadonlySet<string>>(new Set());
+  private readonly _pending = signal<PendingTagChange | null>(null);
 
   readonly tags = this._tags.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
   readonly isOpen = this._isOpen.asReadonly();
   readonly selected = this._selected.asReadonly();
+
+  readonly pending = this._pending.asReadonly();
   readonly isEmpty = computed(() => !this._isLoading() && this._tags().length === 0);
 
   /** A merge needs at least two tags; a rename exactly one. */
@@ -33,6 +49,7 @@ export class TagsStore {
 
   close(): void {
     this._isOpen.set(false);
+    this._pending.set(null);
   }
 
   async load(): Promise<void> {
@@ -48,6 +65,8 @@ export class TagsStore {
   }
 
   toggle(tag: string): void {
+    // Changing the selection withdraws a proposal made about the old one.
+    this._pending.set(null);
     this._selected.update((selection) => {
       const next = new Set(selection);
       if (!next.delete(tag)) {
@@ -58,24 +77,56 @@ export class TagsStore {
   }
 
   /** Renaming onto an existing tag is a merge: a note cannot carry one twice. */
-  async renameSelected(into: string): Promise<boolean> {
+  async proposeRename(into: string): Promise<void> {
     const selection = [...this._selected()];
-    if (selection.length === 0 || !into.trim()) return false;
+    if (selection.length === 0 || !into.trim()) return;
 
-    const [only] = selection;
-
-    return this.run(() =>
-      only !== undefined && selection.length === 1
-        ? this.repository.renameTag(only, into)
-        : this.repository.mergeTags(selection, into),
-    );
+    await this.propose(selection.length === 1 ? 'rename' : 'merge', selection, into.trim());
   }
 
-  async deleteSelected(): Promise<boolean> {
+  async proposeDelete(): Promise<void> {
     const selection = [...this._selected()];
-    if (selection.length === 0) return false;
+    if (selection.length === 0) return;
 
-    return this.run(() => this.repository.deleteTags(selection));
+    await this.propose('delete', selection, '');
+  }
+
+  cancel(): void {
+    this._pending.set(null);
+  }
+
+  async confirm(): Promise<boolean> {
+    const change = this._pending();
+    if (!change) return false;
+
+    this._pending.set(null);
+    const [only] = change.tags;
+
+    return this.run(() => {
+      switch (change.kind) {
+        case 'rename':
+          // `only` is defined: a rename is a selection of exactly one.
+          return this.repository.renameTag(only ?? '', change.into);
+        case 'merge':
+          return this.repository.mergeTags(change.tags, change.into);
+        case 'delete':
+          return this.repository.deleteTags(change.tags);
+      }
+    });
+  }
+
+  /** ⚠️ A blast radius that cannot be read leaves nothing pending, so nothing runs. */
+  private async propose(
+    kind: PendingTagChange['kind'],
+    tags: readonly string[],
+    into: string,
+  ): Promise<void> {
+    const notes = await this.notifier.attempt('errors.tagActionFailed', () =>
+      this.repository.countNotesTagged(tags),
+    );
+    if (notes === null) return;
+
+    this._pending.set({ kind, tags, into, notes });
   }
 
   private async run(action: () => Promise<number>): Promise<boolean> {
@@ -84,6 +135,7 @@ export class TagsStore {
     // Retagging rewrites the corpus: the rail and the cards are both stale.
     this.revision.bump();
     this._selected.set(new Set());
+    this._pending.set(null);
     await this.load();
     return true;
   }

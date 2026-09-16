@@ -28,10 +28,10 @@ use attachments::{
 use changelog::app_changelog;
 use desktop::{set_global_shortcuts, set_window_behavior, sync_tray};
 use notes::{
-    create_note, delete_note, delete_notes, delete_tags, empty_trash, fill_placeholders,
-    list_global_placeholders, list_tags, list_trash, merge_tags, move_notes, purge_notes,
-    query_notes, rename_tag, restore_notes, seed_samples, set_global_placeholders,
-    set_placeholder_values, tag_notes, update_note,
+    count_notes_tagged, create_note, delete_note, delete_notes, delete_tags, empty_trash,
+    fill_placeholders, list_global_placeholders, list_tags, list_trash, merge_tags, move_notes,
+    move_notes_back, purge_notes, query_notes, rename_tag, restore_notes, seed_samples,
+    set_global_placeholders, set_placeholder_values, tag_notes, untag_notes, update_note,
 };
 use recovery::set_aside_damaged_library;
 use spaces::{create_space, delete_space, list_spaces, pin_space, rename_space};
@@ -68,7 +68,10 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             purge_notes,
             empty_trash,
             move_notes,
+            move_notes_back,
             tag_notes,
+            untag_notes,
+            count_notes_tagged,
             list_tags,
             rename_tag,
             merge_tags,

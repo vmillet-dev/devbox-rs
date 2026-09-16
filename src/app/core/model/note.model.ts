@@ -6,6 +6,9 @@ export { type ChecklistItem, type NoteKind } from './checklist.model';
 
 export type { SearchField, SearchHit } from '@core/ipc/bindings';
 
+/** Both cross as themselves: a batch answers what it changed, and the undo hands it back. */
+export type { NotePlacement, NoteTag } from '@core/ipc/bindings';
+
 export type NoteLifecycle = { readonly kind: 'permanent' } | { readonly kind: 'expires'; readonly at: Date };
 
 /** Two variants carry a date and not a label, so the text ages without a round trip. */

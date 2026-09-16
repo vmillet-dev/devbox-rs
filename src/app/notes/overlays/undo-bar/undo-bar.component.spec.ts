@@ -13,13 +13,23 @@ describe('UndoBarComponent', () => {
       providers: [provideTranslocoTesting()],
     });
     fixture = TestBed.createComponent(UndoBarComponent);
-    fixture.componentRef.setInput('count', 3);
+    fixture.componentRef.setInput('action', { kind: 'deletion', ids: ['a', 'b', 'c'], count: 3 });
     fixture.autoDetectChanges();
     await fixture.whenStable();
   });
 
   it('says how many notes went to the trash', () => {
     expect(fixture.nativeElement.querySelector('.undo-text').textContent).toContain('3');
+  });
+
+  /** ⚠️ "3 notes deleted" and "3 notes moved" are not the same sentence. */
+  it('says which action it is offering to put back', async () => {
+    expect(fixture.nativeElement.querySelector('.undo-text').textContent).toContain('corbeille');
+
+    fixture.componentRef.setInput('action', { kind: 'move', previous: [], count: 3 });
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('.undo-text').textContent).toContain('déplacée');
   });
 
   it('announces itself as a status, not an alert', () => {

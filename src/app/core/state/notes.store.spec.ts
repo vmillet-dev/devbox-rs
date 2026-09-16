@@ -635,7 +635,7 @@ describe('NotesStore', () => {
 
       expect(remove).not.toHaveBeenCalled();
       expect(store.selectedNote()).toBeNull();
-      expect(store.lastDeletion()).toBeNull();
+      expect(store.lastAction()).toBeNull();
     });
 
     it('materialises the draft on demand, for what needs a real note', async () => {
@@ -705,17 +705,17 @@ describe('NotesStore', () => {
 
       await store.deleteNote('a');
 
-      expect(store.lastDeletion()).toEqual({ ids: ['a'], count: 1 });
+      expect(store.lastAction()).toEqual({ kind: 'deletion', ids: ['a'], count: 1 });
     });
 
     it('brings a deleted note back', async () => {
       const { store, canvas } = await createNotesHarness([createNote({ id: 'a' }), createNote({ id: 'b' })]);
       await store.deleteNote('a');
 
-      await store.undoDeletion();
+      await store.undoLastAction();
       await vi.waitFor(() => expect(visibleIds(canvas)).toContain('a'));
 
-      expect(store.lastDeletion()).toBeNull();
+      expect(store.lastAction()).toBeNull();
     });
 
     it('clears the selection once it is in the trash', async () => {
@@ -729,7 +729,7 @@ describe('NotesStore', () => {
       await store.deleteSelection();
 
       expect(selection.hasSelection()).toBe(false);
-      expect(store.lastDeletion()?.count).toBe(2);
+      expect(store.lastAction()?.count).toBe(2);
     });
 
     it('hides the banner after its window but stays undoable', async () => {
@@ -744,7 +744,7 @@ describe('NotesStore', () => {
         await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
 
         expect(store.undoBanner()).toBeNull();
-        expect(store.lastDeletion()).toEqual({ ids: ['a'], count: 1 });
+        expect(store.lastAction()).toEqual({ kind: 'deletion', ids: ['a'], count: 1 });
       } finally {
         vi.useRealTimers();
       }
@@ -757,7 +757,7 @@ describe('NotesStore', () => {
       store.dismissUndo();
 
       expect(store.undoBanner()).toBeNull();
-      expect(store.lastDeletion()).toBeNull();
+      expect(store.lastAction()).toBeNull();
     });
   });
 

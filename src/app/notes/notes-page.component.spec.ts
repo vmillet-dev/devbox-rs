@@ -515,19 +515,19 @@ describe('NotesPageComponent', () => {
 
       press('Delete');
 
-      await vi.waitFor(() => expect(store.lastDeletion()).toEqual({ ids: ['n1'], count: 1 }));
+      await vi.waitFor(() => expect(store.lastAction()).toEqual({ kind: 'deletion', ids: ['n1'], count: 1 }));
       expect(canvas.visibleNotes().map((note) => note.id)).not.toContain('n1');
     });
 
     it('takes back the last deletion on Ctrl+Z', async () => {
       selection.focusNote('n1');
       press('Backspace');
-      await vi.waitFor(() => expect(store.lastDeletion()).not.toBeNull());
+      await vi.waitFor(() => expect(store.lastAction()).not.toBeNull());
 
       press('z', { ctrlKey: true });
 
       await vi.waitFor(() => expect(canvas.visibleNotes().map((note) => note.id)).toContain('n1'));
-      expect(store.lastDeletion()).toBeNull();
+      expect(store.lastAction()).toBeNull();
     });
 
     it('leaves Ctrl+Z alone when nothing was deleted', () => {
@@ -922,6 +922,10 @@ describe('NotesPageComponent', () => {
       await fixture.whenStable();
 
       child(TagManagerComponent).renameRequested.emit('authentication');
+      // ⚠️ Nothing is written until the blast radius has been shown and accepted.
+      await vi.waitFor(() => expect(TestBed.inject(TagsStore).pending()).not.toBeNull());
+      expect(repository.retagged).toBeNull();
+      child(TagManagerComponent).confirmed.emit();
 
       await vi.waitFor(() => expect(repository.retagged).toEqual({ tags: ['auth'], into: 'authentication' }));
       await vi.waitFor(() => expect(canvas.allTags()).toEqual(['authentication']));
@@ -934,6 +938,8 @@ describe('NotesPageComponent', () => {
       await fixture.whenStable();
 
       child(TagManagerComponent).deleteRequested.emit();
+      await vi.waitFor(() => expect(TestBed.inject(TagsStore).pending()).not.toBeNull());
+      child(TagManagerComponent).confirmed.emit();
 
       await vi.waitFor(() => expect(repository.deletedTags).toEqual(['auth']));
       await vi.waitFor(() => expect(canvas.allTags()).toEqual([]));
