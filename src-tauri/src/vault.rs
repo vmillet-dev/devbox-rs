@@ -76,7 +76,10 @@ fn create_with(passphrase: &str, app: &AppHandle, db: &State<'_, Db>) -> Result<
     validate(passphrase)?;
 
     let directory = app.path().app_data_dir().map_err(storage)?;
-    std::fs::create_dir_all(&directory).map_err(|error| storage_msg(&error.to_string()))?;
+    // ⚠️ The directory, not just the cause: this is the first thing a full disk or a
+    // permissions problem reaches, and the user has never opened that folder.
+    std::fs::create_dir_all(&directory)
+        .map_err(|error| storage_msg(&format!("{}: {error}", directory.display())))?;
 
     let vault = file::create(&directory, passphrase, Cost::default())?;
 

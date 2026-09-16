@@ -188,9 +188,27 @@ fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // The tray waits for its translated labels to arrive from the front end.
     desktop::init(app.handle())?;
 
-    // The only writable location guaranteed once the app is installed.
-    let directory = app.path().app_data_dir()?;
-    std::fs::create_dir_all(&directory)?;
+    // ⚠️ Logged and carried on, never propagated: an error out of `setup` reaches
+    // `run(…).expect(…)` and panics before the window has anything in it — a full disk
+    // used to kill the application with nothing on screen but a line in the log
+    // directory. The failure comes back where it can be read instead: `vault_state`,
+    // `create_vault` and `unlock_vault` all reach for this directory, and their error
+    // names it in the banner over the unlock screen.
+    //
+    // Carrying on is only safe because the library is already opened behind the
+    // passphrase: a command that runs before it answers `StorageError::Locked` rather
+    // than reading a database nobody opened.
+    match app.path().app_data_dir() {
+        Ok(directory) => {
+            if let Err(error) = std::fs::create_dir_all(&directory) {
+                log::error!(
+                    "The data directory {} could not be prepared: {error}",
+                    directory.display()
+                );
+            }
+        }
+        Err(error) => log::error!("No data directory to store the library in: {error}"),
+    }
 
     // ⚠️ Nothing is opened here any more: the key comes from a passphrase the front end
     // has not asked for yet. `vault::unlock` is what fills this and runs the sweeps.

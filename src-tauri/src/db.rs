@@ -102,11 +102,18 @@ impl DerefMut for LibraryGuard<'_> {
     }
 }
 
+/// ⚠️ Every failure here names the file. This is the one error a user meets before any
+/// window has anything in it, and "migration failed" without a path leaves them nowhere
+/// to look — the database is in a directory they have never opened.
 pub fn open(path: &Path, vault: Vault) -> Result<Library, StorageError> {
-    let mut connection = SqliteConnection::establish(&path.to_string_lossy())
-        .map_err(|error| StorageError::Migration(error.to_string()))?;
-    configure(&mut connection)?;
-    migration::run(&mut connection)?;
+    let named = |error: &dyn std::fmt::Display| {
+        StorageError::Migration(format!("{}: {error}", path.display()))
+    };
+
+    let mut connection =
+        SqliteConnection::establish(&path.to_string_lossy()).map_err(|error| named(&error))?;
+    configure(&mut connection).map_err(|error| named(&error))?;
+    migration::run(&mut connection).map_err(|error| named(&error))?;
 
     Ok(Library { connection, vault })
 }
@@ -243,6 +250,30 @@ mod tests {
             .foreign_keys;
 
         assert_eq!(enabled, 1);
+    }
+
+    /// ⚠️ The one storage error a user can meet with an empty window: a message without
+    /// the path leaves them nowhere to look, since the database sits in a directory they
+    /// have never opened.
+    #[test]
+    fn a_database_that_will_not_open_says_which_file() {
+        let directory =
+            std::env::temp_dir().join(format!("devbox-unopenable-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+
+        // A directory is not a database file, so establishing it fails the way a corrupt
+        // file or a bad permission would. ⚠️ Destructured rather than `unwrap_err`, which
+        // would want `Library: Debug` — and a library carries the key.
+        let Err(error) = open(&directory, test_vault().unwrap()) else {
+            panic!("a directory opened as a database");
+        };
+
+        assert!(
+            format!("{error}").contains(&directory.display().to_string()),
+            "the failure does not name the file: {error}"
+        );
+
+        std::fs::remove_dir_all(&directory).ok();
     }
 
     /// ⚠️ Zero is SQLite's own default, and it turns a database another process holds for
