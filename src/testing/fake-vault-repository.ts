@@ -13,7 +13,13 @@ export class FakeVaultRepository implements Pick<VaultRepository, keyof VaultRep
   passphrases: string[] = [];
   changes: { current: string; next: string }[] = [];
 
+  /** ⚠️ Through the guard like the rest: reading the state is a command too, and it is
+   *  the one that fails when there is no bridge at all. */
   async state(): Promise<VaultState> {
+    const failure = this.failNext;
+    this.failNext = null;
+    if (failure !== null) throw failure;
+
     return this.answer;
   }
 
