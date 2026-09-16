@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::sync::Mutex;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::closed_enum::closed_enum;
@@ -43,7 +43,7 @@ fn reveal_and_emit(app: &AppHandle, action: GlobalAction) {
 
 /// Three fields rather than a map, which would leave the compiler silent about a
 /// missing shortcut.
-#[derive(Debug, Clone, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ShortcutBindings {
     pub capture: String,
@@ -52,13 +52,15 @@ pub struct ShortcutBindings {
 }
 
 impl ShortcutBindings {
-    /// ⚠️ Mirror of `DEFAULT_SHORTCUTS` (`core/services/shortcuts/shortcut.model.ts`),
-    /// and deliberately so: these are taken before the front end has started, and
-    /// without them `Ctrl+Alt+P` is dead for the length of the first render.
+    /// ⚠️ Taken before the front end has started: without them `Ctrl+Alt+P` is dead for
+    /// the length of the first render — exactly the second it is used from another
+    /// application. That is why the native side has defaults of its own at all.
+    ///
+    /// The front end keeps no copy: these cross as the `DEFAULT_SHORTCUTS` constant.
     ///
     /// ⚠️ Not `Ctrl+Alt+Space` for the palette: widely installed applications hold it
     /// already, and a global shortcut is first come, first served.
-    fn defaults() -> Self {
+    pub(crate) fn defaults() -> Self {
         Self {
             capture: "Ctrl+Alt+V".to_string(),
             new_note: "Ctrl+Alt+N".to_string(),

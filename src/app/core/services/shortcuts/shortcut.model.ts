@@ -1,6 +1,15 @@
+import { DEFAULT_SHORTCUTS } from '@core/ipc/bindings';
 import type { ShortcutBindings } from '@core/ipc/bindings';
 
 export type { ShortcutBindings };
+
+/**
+ * The three accelerators the native side registers before the front end exists — read
+ * from it rather than retyped. ⚠️ It still has defaults of its own, and must: without
+ * them `Ctrl+Alt+P` is dead for the length of the first render, which is exactly the
+ * second it gets used from another application.
+ */
+export { DEFAULT_SHORTCUTS };
 
 /** `keys` is split because each one is rendered as its own `<kbd>`. */
 export interface ShortcutEntry {
@@ -13,17 +22,6 @@ export interface ShortcutGroup {
   readonly labelKey: string;
   readonly shortcuts: readonly ShortcutEntry[];
 }
-
-/**
- * ⚠️ Mirror of `ShortcutBindings::defaults()` (`src-tauri/src/desktop.rs`), and
- * deliberately so: the native side takes these before the front has started, and
- * without them `Ctrl+Alt+P` is dead for the length of the first render.
- */
-export const DEFAULT_SHORTCUTS: ShortcutBindings = {
-  capture: 'Ctrl+Alt+V',
-  newNote: 'Ctrl+Alt+N',
-  palette: 'Ctrl+Alt+P',
-};
 
 /** A modifier alone is not a finished combination. */
 const MODIFIER_CODES = new Set([

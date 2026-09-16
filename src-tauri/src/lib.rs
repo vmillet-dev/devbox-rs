@@ -106,6 +106,11 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         .constant("GLOBAL_ACTION_EVENT", desktop::ACTION_EVENT)
         // From `Cargo.toml`, so the front keeps no second copy of the name.
         .constant("APP_METADATA", app_info::METADATA)
+        // ⚠️ The native side still registers these before the front end exists — that is
+        // what a default is for here — but the front reads them rather than retyping them.
+        .constant("DEFAULT_SHORTCUTS", desktop::ShortcutBindings::defaults())
+        // The `{{field}}` rule, so the form refuses in the same terms the back end does.
+        .constant("FIELD_NAME_PATTERN", notes::placeholder::FIELD_NAME_PATTERN)
 }
 
 /// ⚠️ Not the plugin's default `all()`, which carries `VISIBLE`: quitting from the tray

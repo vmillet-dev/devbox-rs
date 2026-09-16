@@ -1,3 +1,5 @@
+import { FIELD_NAME_PATTERN } from '@core/ipc/bindings';
+
 /** A pair and not a `Record` entry: a half-filled row has to exist long enough to be corrected. */
 export interface Variable {
   readonly name: string;
@@ -5,12 +7,15 @@ export interface Variable {
 }
 
 /**
- * ⚠️ Mirror of `notes::placeholder::is_field_name`, where the rule lives. The back end
- * already refuses what does not match; this copy only says so before a badly named row
- * vanishes on save without a word.
+ * The rule lives in `notes::placeholder`, and travels as `FIELD_NAME_PATTERN`: this
+ * refuses a name in the same terms rather than keeping a copy of them. It exists only to
+ * say so before a badly named row vanishes on save without a word — the back end refuses
+ * it either way.
  */
+const FIELD_NAME = new RegExp(FIELD_NAME_PATTERN);
+
 export function isVariableName(name: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(name);
+  return FIELD_NAME.test(name);
 }
 
 /** Last one wins on a duplicate, as the JSON object crossing the bridge would. */

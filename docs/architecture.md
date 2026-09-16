@@ -1030,10 +1030,16 @@ attach to. For the same reason the initializer injects **everything before its f
 an `inject()` after one is outside the injection context, and the whole bootstrap fails with
 NG0203 and a black window.
 
-⚠️ `ShortcutBindings::defaults()` (Rust) and `DEFAULT_SHORTCUTS` (front) are a **deliberate
-mirror**, commented on both sides. The native side takes the shortcuts before the front has
-started: without them `Ctrl+Alt+P` would be dead for the length of the first render, which is
-exactly the second one uses it from another application.
+⚠️ The native side has shortcut defaults of its own, and must: it takes the shortcuts before
+the front has started, and without them `Ctrl+Alt+P` would be dead for the length of the first
+render — exactly the second one uses it from another application. They are declared once,
+though: `ShortcutBindings::defaults()` crosses as the `DEFAULT_SHORTCUTS` constant, next to
+`GLOBAL_ACTION_EVENT` and `APP_METADATA`, and the front re-exports it rather than retyping it.
+
+The same treatment closes the other mirror: `notes::placeholder` exports `FIELD_NAME_PATTERN`,
+and `isVariableName` builds its `RegExp` from it. ⚠️ Rust checks characters rather than
+matching a regex, so the pattern and `is_field_name` are held together by one test —
+`the_pattern_and_the_rule_agree` — and by nothing else.
 
 `AutostartService` reads the system **first** and aligns the preference on what it finds:
 turning the entry off from the task manager has to uncheck the box, not see DevBox put it back.
