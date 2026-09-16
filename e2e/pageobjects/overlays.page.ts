@@ -154,6 +154,13 @@ export const board = {
 
   zoneNames: (): Promise<string[]> => readEach(testid('board-zone-open'), 'text'),
 
+  /** Clicking a zone title is the descent. */
+  async openZone(name: string): Promise<void> {
+    await $(
+      `${testid('board-zone')}[data-folder-id="${await board.folderId(name)}"] ${testid('board-zone-open')}`,
+    ).click();
+  },
+
   /**
    * ⚠️ Read in one call, like `canvas.titles()`: a round trip per card leaves a window in
    * which the board re-renders, and the list that comes back mixes two states.
@@ -391,6 +398,41 @@ export const board = {
       testid('note-card-title'),
       title,
     );
+  },
+};
+
+/** The breadcrumb, which replaces the switchers while a folder is open. */
+export const crumb = {
+  isShowing: () => $(testid('folder-breadcrumb')).isExisting(),
+
+  name: () => $(testid('folder-breadcrumb-name')).getText(),
+
+  back: () => $(testid('folder-breadcrumb-back')).click(),
+
+  swatchClass: () =>
+    browser.execute(
+      (selector: string) => document.querySelector(selector)?.className ?? '',
+      `${testid('folder-breadcrumb')} ~ * .crumb-swatch, ${testid('folder-breadcrumb')} .crumb-swatch`,
+    ),
+
+  /** ⚠️ Opens behind the ⋯, which is the only way to the folder's own actions from here. */
+  async openMenu(): Promise<void> {
+    if (!(await $(testid('folder-breadcrumb-panel')).isExisting())) {
+      await $(testid('folder-breadcrumb-menu')).click();
+      await $(testid('folder-breadcrumb-panel')).waitForExist({ timeout: 5_000 });
+    }
+  },
+
+  async rename(into: string): Promise<void> {
+    await crumb.openMenu();
+    await setField(testid('folder-rename-input'), into);
+    await $(testid('folder-rename-submit')).click();
+  },
+
+  /** ⚠️ No refuge to choose, unlike a space: the notes come out loose. */
+  async remove(): Promise<void> {
+    await crumb.openMenu();
+    await confirmTwice($(testid('folder-delete')));
   },
 };
 

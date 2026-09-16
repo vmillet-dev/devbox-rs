@@ -158,9 +158,15 @@ pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> Note
         });
     }
 
-    // A quick filter restricts a view that stays chronological; a search or a facet
-    // switches to a flat list.
+    // A quick filter restricts a view that stays chronological; a search, a facet or an
+    // opened folder switches to a flat list.
+    //
+    // ⚠️ The folder belongs here and `build_sections` still knows nothing about it: the
+    // inside of a folder is already sorted by the fact of being there, so dating it again
+    // would be classifying twice. The date view's own sections are untouched — nothing
+    // sends a `folder_id` unless a folder has actually been opened.
     let is_filtering = !needle.is_empty()
+        || request.folder_id.is_some()
         || request
             .tags
             .iter()
@@ -486,6 +492,38 @@ mod tests {
 
         assert!(view.is_filtering);
         assert_eq!(keys(&view), [NoteSectionKey::Results]);
+    }
+
+    /// ⚠️ The inside of a folder is already sorted by the fact of being there, so dating
+    /// it again would be classifying twice. `build_sections` still knows nothing about a
+    /// folder — this is the only place the two meet.
+    #[test]
+    fn an_opened_folder_is_a_flat_grid_rather_than_dated_sections() {
+        let view = build(
+            vec![note("a", "Un"), note("b", "Deux")],
+            Facets::default(),
+            &NotesQuery {
+                folder_id: Some("f-1".to_string()),
+                ..request()
+            },
+        );
+
+        assert!(view.is_filtering);
+        assert_eq!(keys(&view), [NoteSectionKey::Results]);
+        assert_eq!(view.matched, 2);
+    }
+
+    /// The date view is untouched: nothing sends a folder unless one has been opened.
+    #[test]
+    fn no_folder_leaves_the_sections_exactly_as_they_were() {
+        let view = build(
+            vec![note("a", "Un")],
+            Facets::default(),
+            &NotesQuery { ..request() },
+        );
+
+        assert!(!view.is_filtering);
+        assert_ne!(keys(&view), [NoteSectionKey::Results]);
     }
 
     #[test]

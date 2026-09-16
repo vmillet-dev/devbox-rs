@@ -10,22 +10,14 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Folder, FolderColour } from '@core/model/folder.model';
+import { Folder } from '@core/model/folder.model';
+import {
+  FolderEditorComponent,
+  FolderRecolouring,
+  FolderRenaming,
+} from '@notes/header/folder-editor/folder-editor.component';
 import { MenuPanelDirective } from '@shared/directives/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/directives/menu-trigger.directive';
-
-export interface FolderRenaming {
-  readonly id: string;
-  readonly name: string;
-}
-
-export interface FolderRecolouring {
-  readonly id: string;
-  readonly colour: FolderColour;
-}
-
-/** The palette the back end assigns from; the order is `FolderColour::ALL`. */
-const COLOURS: readonly FolderColour[] = ['blue', 'amber', 'purple', 'green', 'red'];
 
 /**
  * Narrows the canvas to one folder, and is where a folder is made and managed until the
@@ -36,7 +28,7 @@ const COLOURS: readonly FolderColour[] = ['blue', 'amber', 'purple', 'green', 'r
  */
 @Component({
   selector: 'app-folder-switcher',
-  imports: [TranslocoPipe, MenuPanelDirective],
+  imports: [TranslocoPipe, MenuPanelDirective, FolderEditorComponent],
   hostDirectives: [MenuTriggerDirective],
   templateUrl: './folder-switcher.component.html',
   styleUrl: './folder-switcher.component.scss',
@@ -56,18 +48,14 @@ export class FolderSwitcherComponent {
   readonly folderDeleted = output<string>();
 
   protected readonly menu = inject(MenuTriggerDirective);
-  protected readonly colours = COLOURS;
 
   protected readonly creating = signal(false);
 
   /** ⚠️ The panel replaces the menu: input fields inside a `role="menu"` are not valid ARIA. */
   protected readonly editing = signal<Folder | null>(null);
 
-  /** Two steps: the WebView blocks on a native `confirm()`. */
-  protected readonly confirmingDelete = signal(false);
-
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
-  private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
+  private readonly editor = viewChild(FolderEditorComponent);
 
   constructor() {
     this.menu.escaped.subscribe(() => this.onEscape());
@@ -76,7 +64,7 @@ export class FolderSwitcherComponent {
     effect(() => {
       if (!this.menu.open()) return;
       if (this.editing()) {
-        this.renameInput()?.nativeElement.focus();
+        this.editor()?.focusName();
       } else if (this.creating()) {
         this.nameInput()?.nativeElement.focus();
       }
@@ -99,7 +87,6 @@ export class FolderSwitcherComponent {
 
   protected startEditing(folder: Folder): void {
     this.editing.set(folder);
-    this.confirmingDelete.set(false);
   }
 
   /** `submit` and not `click`: the form then also answers Enter. */
@@ -111,32 +98,13 @@ export class FolderSwitcherComponent {
     this.menu.close();
   }
 
-  protected submitRename(event: Event, name: string): void {
-    event.preventDefault();
-    const edited = this.editing();
-    if (!edited || !name.trim()) return;
-
-    this.folderRenamed.emit({ id: edited.id, name });
+  protected onRenamed(renaming: FolderRenaming): void {
+    this.folderRenamed.emit(renaming);
     this.menu.close();
   }
 
-  protected pickColour(colour: FolderColour): void {
-    const edited = this.editing();
-    if (!edited || edited.colour === colour) return;
-
-    this.folderRecoloured.emit({ id: edited.id, colour });
-  }
-
-  /** ⚠️ No refuge to choose, unlike a space: the notes come out loose. */
-  protected onDeleteClick(): void {
-    const edited = this.editing();
-    if (!edited) return;
-
-    if (!this.confirmingDelete()) {
-      this.confirmingDelete.set(true);
-      return;
-    }
-    this.folderDeleted.emit(edited.id);
+  protected onDeleted(id: string): void {
+    this.folderDeleted.emit(id);
     this.menu.close();
   }
 
@@ -152,6 +120,5 @@ export class FolderSwitcherComponent {
   private resetPanels(): void {
     this.creating.set(false);
     this.editing.set(null);
-    this.confirmingDelete.set(false);
   }
 }

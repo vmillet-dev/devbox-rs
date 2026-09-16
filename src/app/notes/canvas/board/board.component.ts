@@ -11,6 +11,7 @@ import {
 import { TranslocoPipe } from '@jsverse/transloco';
 import { BoardFrame, BoardNote, BoardPoint, BoardZone } from '@core/model/board.model';
 import { NoteActivation, NoteCardComponent } from '@notes/canvas/note-card/note-card.component';
+import { FolderRecolouring, FolderRenaming } from '@notes/header/folder-editor/folder-editor.component';
 import { BoardZoneComponent } from './board-zone/board-zone.component';
 import {
   Gesture,
@@ -76,6 +77,9 @@ export class BoardComponent {
   readonly cardDropped = output<CardDrop>();
   readonly zoneMoved = output<ZoneMove>();
   readonly zoneDrawn = output<BoardFrame>();
+  readonly folderRenamed = output<FolderRenaming>();
+  readonly folderRecoloured = output<FolderRecolouring>();
+  readonly folderDeleted = output<string>();
 
   protected readonly gesture = signal<Gesture | null>(null);
 

@@ -18,6 +18,7 @@ import { NoteFiling } from '../model/folder.model';
 import { ClockService } from '@core/services/time/clock.service';
 import { debounced } from '@core/services/time/debounce';
 import { NoteSelectionStore } from './note-selection.store';
+import { FoldersStore } from './folders.store';
 import { NotesQueryStore } from './notes-query.store';
 import { SpacesStore } from './spaces.store';
 
@@ -52,10 +53,10 @@ function isWorthSaving(note: Note): boolean {
 }
 
 /** Empty title: the UI renders a translated placeholder, and storing one would freeze a language into the data. */
-function emptyDraft(spaceId: string, kind: NoteKind): NoteDraft {
+function emptyDraft(spaceId: string, kind: NoteKind, folderId: string | null = null): NoteDraft {
   return {
     spaceId,
-    folderId: null,
+    folderId,
     title: '',
     language: FALLBACK_LANGUAGE,
     content: '',
@@ -68,9 +69,9 @@ function emptyDraft(spaceId: string, kind: NoteKind): NoteDraft {
   };
 }
 
-function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
+function emptyNote(spaceId: string, now: Date, kind: NoteKind, folderId: string | null = null): Note {
   return {
-    ...emptyDraft(spaceId, kind),
+    ...emptyDraft(spaceId, kind, folderId),
     id: DRAFT_ID,
     createdAt: now,
     updatedAt: now,
@@ -154,6 +155,7 @@ function changedFields(note: Note, patch: NotePatch): NotePatch {
 export class NotesStore {
   private readonly repository = inject(NotesRepository);
   private readonly folders = inject(FoldersRepository);
+  private readonly openFolder = inject(FoldersStore);
   private readonly clipboard = inject(ClipboardService);
   private readonly clock = inject(ClockService);
   private readonly notifier = inject(ErrorNotifier);
@@ -240,6 +242,12 @@ export class NotesStore {
   }
 
   /** Opens the editor on a local draft; a note with no space at all is refused. */
+  /**
+   * ⚠️ A note made while a folder is open arrives already filed. That and a drop on the
+   * board are the only two places that file a new one: the quick-paste palette
+   * deliberately does not, because it is used mid-task from another application and a
+   * decision there would sit in the fastest path in the product.
+   */
   createNote(kind: NoteKind = 'snippet'): void {
     const spaceId = this.spaceForNewNote();
     if (!spaceId) return;
@@ -248,7 +256,7 @@ export class NotesStore {
     this._selectedNote.set(null);
     this.draftMaterialisation = null;
     this._editorSession.update((session) => session + 1);
-    this._draftNote.set(emptyNote(spaceId, this.clock.now(), kind));
+    this._draftNote.set(emptyNote(spaceId, this.clock.now(), kind, this.openFolder.activeFolderId()));
   }
 
   async captureFromClipboard(): Promise<void> {

@@ -164,6 +164,15 @@ export class NotesQueryStore {
   readonly hasNoResults = computed(() => this.matched() === 0);
 
   /**
+   * What `clearFilters` would give back. ⚠️ Not `isFiltering`, which is the view's own
+   * answer and is true inside an opened folder — Escape would then clear a search that is
+   * not there and never fall through to leaving the folder.
+   */
+  readonly hasUserFilters = computed(
+    () => this._searchQuery() !== '' || this._selectedTags().size > 0 || this._selectedLanguages().size > 0,
+  );
+
+  /**
    * ⚠️ `view()` is read before the resource state: an `&&` the other way round would
    * short-circuit past the read, dropping the freshly loaded view.
    */
@@ -214,7 +223,6 @@ export class NotesQueryStore {
     this._debouncedSearch.set('');
     this._selectedTags.set(new Set());
     this._selectedLanguages.set(new Set());
-    this.folders.selectFolder(null);
   }
 
   findVisible(id: string): Note | null {
