@@ -73,11 +73,16 @@ pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, Ap
 
     let globals = store::global_placeholder_values(&mut connection)?;
 
-    let folders = folders::store::by_id(&mut connection, query.space_id.as_deref())?;
-
     let mut view = view::build(notes, facets, &query);
     view::apply_attachment_counts(&mut view, &counts);
-    view::apply_folders(&mut view, &folders);
+
+    // ⚠️ Not inside an opened folder: a chip naming the folder every card is already in is
+    // noise, and the breadcrumb above says it once. Same reason the board resolves none.
+    if query.folder_id.is_none() {
+        let folders = folders::store::by_id(&mut connection, query.space_id.as_deref())?;
+        view::apply_folders(&mut view, &folders);
+    }
+
     view::apply_global_defaults(&mut view, &globals);
 
     Ok(view)
