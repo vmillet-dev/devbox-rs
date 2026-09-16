@@ -571,8 +571,11 @@ mod board {
     fn a_board_draws_every_folder_as_a_zone_holding_its_notes() {
         let mut connection = open_in_memory().unwrap();
         let sql = space(&mut connection, "SQL");
+        // ⚠️ Distinct instants: `list` orders by `(created_at, id)`, so two folders made
+        // in the same millisecond fall back to their UUIDs — stable across launches, which
+        // is what the board needs, but not something a test can name.
         let migrations = create(&mut connection, &sql, "Migrations", t0()).unwrap();
-        create(&mut connection, &sql, "Perf", t0()).unwrap();
+        create(&mut connection, &sql, "Perf", t1()).unwrap();
         let filed = note_in(&mut connection, &sql);
         note_in(&mut connection, &sql);
         file_many(
