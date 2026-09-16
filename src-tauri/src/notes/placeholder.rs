@@ -19,8 +19,16 @@ pub struct Placeholder {
     pub value: String,
 }
 
-/// ⚠️ Mirrored by `isVariableName` (`core/model/variable.model.ts`), which only says so
-/// before a badly named row vanishes on save. This is where the rule lives.
+/// The same rule as [`is_field_name`], written as a pattern so the front end can refuse
+/// a name in the same terms rather than keeping a copy of the rule.
+///
+/// ⚠️ Crosses as a constant and is the front's only source. The two are held together by
+/// `the_pattern_and_the_rule_agree` below — Rust checks characters rather than matching a
+/// regex, so nothing but that test stops the two drifting.
+pub(crate) const FIELD_NAME_PATTERN: &str = "^[A-Za-z0-9_-]+$";
+
+/// ⚠️ Where the rule lives. The name is restricted on purpose: without it a note holding
+/// Angular template code (`{{ user.name }}`) would demand a form on every copy.
 fn is_field_name(name: &str) -> bool {
     !name.is_empty()
         && name
@@ -160,6 +168,58 @@ pub fn fill(content: &str, values: &BTreeMap<String, String>) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// ⚠️ The pattern is what the front end refuses names with, and the character check
+    /// is what this crate refuses them with. Nothing else stops the two drifting, so
+    /// every case that distinguishes them is listed here.
+    #[test]
+    fn the_pattern_and_the_rule_agree() {
+        let names = [
+            "host",
+            "HOST",
+            "port_2",
+            "a-b",
+            "_",
+            "-",
+            "0",
+            "",
+            " host",
+            "host ",
+            "user.name",
+            "user name",
+            "café",
+            "хост",
+            "２",
+            "host\n",
+            "{{host}}",
+        ];
+
+        // A hand-rolled reader of the pattern: the crate carries no regex engine, and
+        // adding one to check a character class would be the larger duplication.
+        let matches = |name: &str| {
+            let class = super::FIELD_NAME_PATTERN
+                .strip_prefix("^[")
+                .and_then(|rest| rest.strip_suffix("]+$"))
+                .expect("a character class pattern");
+
+            !name.is_empty()
+                && name.chars().all(|c| {
+                    (class.contains("A-Z") && c.is_ascii_uppercase())
+                        || (class.contains("a-z") && c.is_ascii_lowercase())
+                        || (class.contains("0-9") && c.is_ascii_digit())
+                        || (class.contains('_') && c == '_')
+                        || (class.ends_with('-') && c == '-')
+                })
+        };
+
+        for name in names {
+            assert_eq!(
+                super::is_field_name(name),
+                matches(name),
+                "{name:?} is read differently by the rule and by the pattern"
+            );
+        }
+    }
+
     use super::*;
 
     fn values(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
