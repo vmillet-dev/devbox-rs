@@ -185,20 +185,10 @@ fn archive(
 /// one: nothing can tell a protected archive from an ordinary one until it has looked
 /// inside, so looking is this function's job rather than the interface's.
 pub fn read(path: &str, passphrase: Option<&str>) -> Result<(IncomingBundle, Payload), AppError> {
-    let mut file = File::open(path).map_err(|error| file_error(path, &error))?;
-
-    let mut magic = [0u8; 4];
-    let zipped = file.read_exact(&mut magic).is_ok() && magic == ZIP_MAGIC;
-    file.seek(SeekFrom::Start(0))
-        .map_err(|error| file_error(path, &error))?;
-
-    if !zipped {
+    let Some(mut archive) = open_archive(path)? else {
         let json = std::fs::read_to_string(path).map_err(|error| file_error(path, &error))?;
         return Ok((super::model::read_bundle(&json)?, Payload::Empty));
-    }
-
-    let mut archive =
-        ZipArchive::new(file).map_err(|error| StorageError::ImportFormat(error.to_string()))?;
+    };
 
     let Some(recipe) = read_recipe(&mut archive)? else {
         let raw = entry(&mut archive, BUNDLE_ENTRY)?;
@@ -239,12 +229,35 @@ pub fn read(path: &str, passphrase: Option<&str>) -> Result<(IncomingBundle, Pay
 }
 
 /// Whether a file will want a phrase, asked without one so an interface can prompt.
+///
+/// ⚠️ The recipe and nothing else. Answering this through [`read`] would parse the whole
+/// bundle — a hundred megabytes on a large library — and then throw it away, for the import
+/// to parse it again a moment later.
 pub fn is_protected(path: &str) -> Result<bool, AppError> {
-    match read(path, None) {
-        Ok(_) => Ok(false),
-        Err(error) if error.code == crate::error::ErrorCode::PassphraseRequired => Ok(true),
-        Err(error) => Err(error),
+    let Some(mut archive) = open_archive(path)? else {
+        return Ok(false);
+    };
+
+    Ok(read_recipe(&mut archive)?.is_some())
+}
+
+/// `None` for a file that is not a zip: a `.json` export written before the archive, which
+/// carries no attachments and cannot be protected.
+fn open_archive(path: &str) -> Result<Option<ZipArchive<File>>, AppError> {
+    let mut file = File::open(path).map_err(|error| file_error(path, &error))?;
+
+    let mut magic = [0u8; 4];
+    let zipped = file.read_exact(&mut magic).is_ok() && magic == ZIP_MAGIC;
+    file.seek(SeekFrom::Start(0))
+        .map_err(|error| file_error(path, &error))?;
+
+    if !zipped {
+        return Ok(None);
     }
+
+    Ok(Some(ZipArchive::new(file).map_err(|error| {
+        StorageError::ImportFormat(error.to_string())
+    })?))
 }
 
 fn read_recipe(archive: &mut ZipArchive<File>) -> Result<Option<Recipe>, StorageError> {
@@ -665,6 +678,34 @@ mod tests {
         let error = read(&target.to_string_lossy(), Some("the wrong one")).unwrap_err();
 
         assert_eq!(error.code, crate::error::ErrorCode::WrongPassphrase);
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// ⚠️ Asked before an import starts, so it must not pay for the bundle: a file whose
+    /// payload could not be parsed at all still answers the question.
+    #[test]
+    fn whether_a_file_is_protected_is_answered_without_reading_the_bundle() {
+        let directory = scratch();
+        let target = directory.join("library.devbox");
+        write(
+            &target.to_string_lossy(),
+            &bundle(),
+            &directory,
+            &library(),
+            None,
+        )
+        .unwrap();
+
+        // The entry is there and is nonsense; only the recipe decides the answer.
+        let mut rewritten = ZipWriter::new(std::fs::File::create(&target).unwrap());
+        rewritten.start_file(BUNDLE_ENTRY, deflated()).unwrap();
+        rewritten.write_all(b"not json at all").unwrap();
+        rewritten.finish().unwrap();
+
+        assert!(!is_protected(&target.to_string_lossy()).unwrap());
+        // And the import that follows is what says the file is unreadable.
+        assert!(read(&target.to_string_lossy(), None).is_err());
+
         std::fs::remove_dir_all(&directory).ok();
     }
 
