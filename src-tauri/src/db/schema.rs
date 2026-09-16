@@ -14,6 +14,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    folders (id) {
+        id -> Text,
+        space_id -> Text,
+        name -> Text,
+        colour -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
     notes (id) {
         id -> Text,
         space_id -> Text,
@@ -28,6 +38,7 @@ diesel::table! {
         lifecycle_expires_at -> Nullable<Text>,
         deleted_at -> Nullable<Text>,
         kind -> Text,
+        folder_id -> Nullable<Text>,
     }
 }
 
@@ -77,6 +88,7 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(folders -> spaces (space_id));
 diesel::joinable!(notes -> spaces (space_id));
 diesel::joinable!(note_tags -> notes (note_id));
 diesel::joinable!(note_items -> notes (note_id));
@@ -85,6 +97,7 @@ diesel::joinable!(attachments -> notes (note_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     spaces,
+    folders,
     notes,
     note_tags,
     note_items,

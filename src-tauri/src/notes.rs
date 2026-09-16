@@ -31,6 +31,7 @@ pub(crate) mod fixtures {
         Note {
             id: "n-1".to_string(),
             space_id: "s-1".to_string(),
+            folder_id: None,
             title: "Title".to_string(),
             language: Language::Txt,
             content: "Content".to_string(),
@@ -56,6 +57,7 @@ use crate::attachments;
 use crate::count::saturating_u32 as count;
 use crate::db::{Db, Library, lock};
 use crate::error::{AppError, StorageError};
+use crate::folders;
 use crate::spaces::model::SpaceDraft;
 use model::{DisplayNote, NoteDraft, NotePatch, TagUsage};
 use trash::TrashedNote;
@@ -71,8 +73,11 @@ pub fn query_notes(query: NotesQuery, db: State<'_, Db>) -> Result<NotesView, Ap
 
     let globals = store::global_placeholder_values(&mut connection)?;
 
+    let folders = folders::store::by_id(&mut connection, query.space_id.as_deref())?;
+
     let mut view = view::build(notes, facets, &query);
     view::apply_attachment_counts(&mut view, &counts);
+    view::apply_folders(&mut view, &folders);
     view::apply_global_defaults(&mut view, &globals);
 
     Ok(view)

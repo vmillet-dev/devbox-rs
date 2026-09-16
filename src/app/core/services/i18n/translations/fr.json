@@ -83,6 +83,29 @@
     "pinned": "Épinglées",
     "untriaged": "À trier"
   },
+  "folders": {
+    "switcherLabel": "Filtrer par dossier",
+    "allFolders": "Tous les dossiers",
+    "newFolder": "Nouveau dossier",
+    "newFolderLabel": "Nom du nouveau dossier",
+    "newFolderPlaceholder": "Nom du dossier",
+    "newFolderSubmit": "Créer",
+    "needsASpace": "Choisissez un espace pour y créer un dossier.",
+    "optionsLabel": "Options du dossier {{name}}",
+    "renameLabel": "Renommer le dossier",
+    "renameSubmit": "Renommer",
+    "colourLabel": "Couleur du dossier",
+    "colour": {
+      "blue": "Bleu",
+      "amber": "Ambre",
+      "purple": "Violet",
+      "green": "Vert",
+      "red": "Rouge"
+    },
+    "delete": "Supprimer le dossier",
+    "deleteConfirm": "Confirmer ?",
+    "deleteKeepsNotes": "Les notes restent, simplement sans dossier."
+  },
   "sections": {
     "pinned": "Épinglées",
     "today": "Aujourd'hui",
@@ -179,7 +202,14 @@
     "passphraseChangeFailed": "Impossible de changer la phrase de passe. L'ancienne ouvre toujours la bibliothèque.",
     "unlockFailed": "Le déverrouillage a échoué.",
     "vaultStateFailed": "Impossible de savoir si la bibliothèque est chiffrée.",
-    "undoFailed": "L'annulation a échoué. Rien n'a été remis en place."
+    "undoFailed": "L'annulation a échoué. Rien n'a été remis en place.",
+    "foldersLoadFailed": "Les dossiers n’ont pas pu être chargés.",
+    "folderCreateFailed": "Le dossier « {{name}} » n’a pas pu être créé.",
+    "folderRenameFailed": "Le dossier n’a pas pu être renommé.",
+    "folderRecolourFailed": "La couleur du dossier n’a pas pu être changée.",
+    "folderDeleteFailed": "Le dossier n’a pas pu être supprimé.",
+    "folderGone": "Ce dossier n’existe plus.",
+    "folderNameTaken": "Un dossier « {{name}} » existe déjà dans cet espace."
   },
   "tray": {
     "open": "Ouvrir {{app}}",
@@ -271,7 +301,9 @@
     "addTagLabel": "Ajouter un tag à la sélection",
     "addTagPlaceholder": "+ tag",
     "delete": "Mettre à la corbeille",
-    "deleteConfirm": "Confirmer ?"
+    "deleteConfirm": "Confirmer ?",
+    "fileInto": "Ranger dans",
+    "unfile": "Sortir du dossier"
   },
   "palette": {
     "title": "Collage rapide",
@@ -322,7 +354,8 @@
     "restore": "Annuler",
     "dismiss": "Masquer",
     "moved": "{{count}} note(s) déplacée(s)",
-    "tagged": "{{count}} note(s) étiquetée(s)"
+    "tagged": "{{count}} note(s) étiquetée(s)",
+    "filed": "{{count}} note(s) rangée(s)"
   },
   "file": {
     "menuLabel": "Fichier",

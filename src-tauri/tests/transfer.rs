@@ -21,6 +21,7 @@ fn t0() -> DateTime<Utc> {
 fn draft(space_id: &str, title: &str) -> NoteDraft {
     NoteDraft {
         space_id: space_id.to_string(),
+        folder_id: None,
         title: title.to_string(),
         language: Language::Sql,
         content: "select 1".to_string(),

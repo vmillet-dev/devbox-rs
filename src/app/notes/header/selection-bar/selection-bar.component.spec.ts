@@ -9,6 +9,11 @@ const SPACES = [
   { id: 'space-2', name: 'Boulot' },
 ];
 
+const FOLDERS = [
+  { id: 'perf', spaceId: 'space-1', name: 'Perf', colour: 'amber' as const, createdAt: new Date(0) },
+  { id: 'migr', spaceId: 'space-1', name: 'Migrations', colour: 'blue' as const, createdAt: new Date(0) },
+];
+
 describe('SelectionBarComponent', () => {
   let fixture: ComponentFixture<SelectionBarComponent>;
 
@@ -64,6 +69,61 @@ describe('SelectionBarComponent', () => {
     await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelector('.selection-move')).toBeNull();
+  });
+
+  describe('filing into a folder', () => {
+    function filePicker(): HTMLSelectElement {
+      return fixture.nativeElement.querySelector('[data-testid="selection-file"]');
+    }
+
+    beforeEach(async () => {
+      fixture.componentRef.setInput('folders', FOLDERS);
+      await fixture.whenStable();
+    });
+
+    /** ⚠️ Both directions are one control: unfiling is as much a filing as any other. */
+    it('offers every folder and a way back out of one', () => {
+      const options = [...filePicker().querySelectorAll('option')];
+
+      expect(options.map((option) => option.textContent?.trim())).toEqual([
+        'Ranger dans',
+        'Perf',
+        'Migrations',
+        'Sortir du dossier',
+      ]);
+    });
+
+    it('emits the chosen folder and resets the picker', async () => {
+      let emitted: string | null | undefined;
+      fixture.componentInstance.fileRequested.subscribe((id) => (emitted = id));
+      const select = filePicker();
+
+      select.value = 'migr';
+      select.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+
+      expect(emitted).toBe('migr');
+      expect(select.value).toBe('');
+    });
+
+    it('emits null to take the selection out of its folder', async () => {
+      let emitted: string | null | undefined = 'untouched';
+      fixture.componentInstance.fileRequested.subscribe((id) => (emitted = id));
+      const select = filePicker();
+
+      select.value = '__unfile__';
+      select.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+
+      expect(emitted).toBeNull();
+    });
+
+    it('hides the picker when the space holds no folder', async () => {
+      fixture.componentRef.setInput('folders', []);
+      await fixture.whenStable();
+
+      expect(filePicker()).toBeNull();
+    });
   });
 
   it('emits the typed tag and clears the field', async () => {

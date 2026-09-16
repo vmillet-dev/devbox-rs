@@ -1,0 +1,252 @@
+@use 'mixins' as *;
+
+.folder-switch-wrapper {
+  position: relative;
+}
+
+.folder-switch {
+  @include unstyled-control;
+  @include surface(var(--bg-2), 20px, var(--line));
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.folder-switch.narrowed {
+  @include accent-state;
+}
+
+.chev {
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.folder-icon {
+  color: var(--text-2);
+}
+
+// The square is the whole point: a round, tinted pill is what a tag is.
+.folder-swatch {
+  @include folder-hues;
+
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--folder-hue);
+}
+
+.folder-dropdown {
+  @include surface;
+
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  padding: 4px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--shadow-dropdown);
+}
+
+.folder-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.folder-option {
+  @include unstyled-control;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.folder-option:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+.folder-option.active {
+  color: var(--amber);
+}
+
+.folder-switch:focus-visible,
+.folder-option:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+// The option takes all the remaining width: the ⋯ must not eat into the click area.
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.folder-row .folder-option {
+  flex: 1;
+  min-width: 0;
+}
+
+.folder-edit-trigger {
+  @include unstyled-control;
+
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-2);
+  cursor: pointer;
+  // Quiet at rest but never hidden: `visibility: hidden` would take it out of the tab order.
+  opacity: 0.45;
+}
+
+.folder-row:hover .folder-edit-trigger,
+.folder-edit-trigger:hover,
+.folder-edit-trigger:focus-visible {
+  opacity: 1;
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+.folder-edit-trigger:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.folder-create-trigger {
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0 0 6px 6px;
+  margin-top: 2px;
+  color: var(--text-2);
+}
+
+.folder-create-blocked {
+  margin: 2px 0 0;
+  padding: 7px 10px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.folder-create-form {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+}
+
+.folder-create-input {
+  @include text-field;
+  @include surface(var(--bg-1), 6px);
+
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--text-0);
+  font-family: var(--font-sans);
+}
+
+.folder-create-submit {
+  @include unstyled-control;
+  @include surface($radius: 6px);
+
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.folder-create-submit:hover {
+  @include accent-state;
+}
+
+.folder-create-input:focus-visible,
+.folder-create-submit:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.folder-edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+  min-width: 240px;
+}
+
+.folder-edit-title {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.folder-colours {
+  display: flex;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.folder-colour {
+  @include unstyled-control;
+  @include folder-hues;
+
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--folder-hue);
+  opacity: 0.45;
+}
+
+.folder-colour.on,
+.folder-colour:hover {
+  opacity: 1;
+}
+
+.folder-colour.on {
+  box-shadow:
+    0 0 0 2px var(--bg-2),
+    0 0 0 3px var(--folder-hue);
+}
+
+.folder-colour:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.folder-delete-submit {
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+.folder-delete-submit:hover,
+.folder-delete-submit:focus-visible,
+.folder-delete-submit.confirming {
+  @include accent-state(var(--red), var(--red));
+}
+
+.folder-delete-note {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--text-2);
+}

@@ -200,6 +200,7 @@ mod tests {
             &mut connection,
             crate::notes::model::NoteDraft {
                 space_id: space,
+                folder_id: None,
                 title: "À sauvegarder".to_string(),
                 language: crate::notes::language::Language::Txt,
                 content: "psql -h prod".to_string(),

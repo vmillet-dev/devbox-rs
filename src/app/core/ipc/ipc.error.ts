@@ -17,6 +17,8 @@ const IPC_ERROR_CODES: Record<IpcErrorCode, true> = {
   noteNotFound: true,
   spaceNotFound: true,
   duplicateSpaceName: true,
+  folderNotFound: true,
+  duplicateFolderName: true,
   attachmentNotFound: true,
   fileAccess: true,
   importFormat: true,

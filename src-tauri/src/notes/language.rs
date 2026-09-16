@@ -378,6 +378,7 @@ mod tests {
     fn draft(language: Language, content: &str) -> NoteDraft {
         NoteDraft {
             space_id: "s-1".to_string(),
+            folder_id: None,
             title: String::new(),
             language,
             content: content.to_string(),

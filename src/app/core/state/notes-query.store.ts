@@ -5,6 +5,7 @@ import { ClockService } from '@core/services/time/clock.service';
 import { SEARCH_DEBOUNCE_MS, debounced } from '@core/services/time/debounce';
 import { NotesRepository } from '../data/notes.repository';
 import { Note, NoteFilter, NoteSection, NotesQuery, NotesView } from '../model/note.model';
+import { FoldersStore } from './folders.store';
 import { NotesRevision } from './notes-revision';
 import { SpacesStore } from './spaces.store';
 
@@ -19,6 +20,7 @@ function localDayKey(now: Date): string {
 
 interface QueryParams {
   readonly spaceId: string | null;
+  readonly folderId: string | null;
   readonly search: string;
   readonly filter: NoteFilter;
   readonly tags: readonly string[];
@@ -45,6 +47,7 @@ const SAME: {
   readonly [K in keyof QueryParams]: (a: QueryParams[K], b: QueryParams[K]) => boolean;
 } = {
   spaceId: Object.is,
+  folderId: Object.is,
   search: Object.is,
   filter: Object.is,
   day: Object.is,
@@ -81,6 +84,7 @@ export class NotesQueryStore {
   private readonly repository = inject(NotesRepository);
   private readonly clock = inject(ClockService);
   private readonly spaces = inject(SpacesStore);
+  private readonly folders = inject(FoldersStore);
   private readonly revision = inject(NotesRevision);
 
   private readonly _searchQuery = signal('');
@@ -103,6 +107,7 @@ export class NotesQueryStore {
   private readonly queryParams = computed<QueryParams>(
     () => ({
       spaceId: this.spaces.activeSpaceId(),
+      folderId: this.folders.activeFolderId(),
       search: this._debouncedSearch().trim(),
       filter: this._activeFilter(),
       tags: [...this._selectedTags()].sort(),
@@ -120,6 +125,7 @@ export class NotesQueryStore {
       const now = untracked(() => this.clock.now());
       const query: NotesQuery = {
         spaceId: params.spaceId,
+        folderId: params.folderId,
         search: params.search,
         filter: params.filter,
         tags: params.tags,
@@ -206,6 +212,7 @@ export class NotesQueryStore {
     this._debouncedSearch.set('');
     this._selectedTags.set(new Set());
     this._selectedLanguages.set(new Set());
+    this.folders.selectFolder(null);
   }
 
   findVisible(id: string): Note | null {

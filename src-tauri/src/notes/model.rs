@@ -11,12 +11,18 @@ use super::checklist::{self, ChecklistItem, NoteKind};
 use super::language::{self, Language};
 use super::placeholder::{self, Placeholder};
 use super::view::SearchHit;
+use crate::folders::model::NoteFolder;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
     pub id: String,
     pub space_id: String,
+    /// ⚠️ The folder travels with an export; where its zone sits on the board does not,
+    /// and must never join this model — `transfer::Bundle` deserializes `Note` itself.
+    #[serde(default)]
+    #[specta(optional)]
+    pub folder_id: Option<String>,
     pub title: String,
     pub language: Language,
     pub content: String,
@@ -51,6 +57,10 @@ pub enum NoteLifecycle {
 #[serde(rename_all = "camelCase")]
 pub struct NoteDraft {
     pub space_id: String,
+    /// Set by the two places that file a new note: the board and the inside of a folder.
+    #[serde(default)]
+    #[specta(optional)]
+    pub folder_id: Option<String>,
     pub title: String,
     pub language: Language,
     pub content: String,
@@ -107,6 +117,7 @@ impl NoteDraft {
         Note {
             id,
             space_id: self.space_id,
+            folder_id: self.folder_id,
             title: self.title,
             language,
             content: self.content,
@@ -136,6 +147,11 @@ impl NotePatch {
         };
 
         if let Some(space_id) = &self.space_id {
+            // ⚠️ A folder belongs to one space, so leaving the note in it would show a
+            // chip the space switcher can never reach.
+            if *space_id != note.space_id {
+                note.folder_id = None;
+            }
             note.space_id.clone_from(space_id);
         }
         if let Some(title) = &self.title {
@@ -197,6 +213,9 @@ pub struct DisplayNote {
     pub placeholders: Vec<Placeholder>,
     /// Filled in afterwards by whoever holds a connection: `decorate` reads no database.
     pub attachment_count: u32,
+    /// Resolved in a pass of its own, like [`Self::attachment_count`]: the front end
+    /// never joins a `folder_id` against a list it happens to hold.
+    pub folder: Option<NoteFolder>,
     /// ⚠️ What copying yields when that is not the content. Decided here so
     /// `checklist::to_markdown` stays the only place the `- [x] ` syntax exists.
     pub copy_text: Option<String>,
@@ -219,6 +238,7 @@ pub fn decorate(note: Note, now: DateTime<Utc>) -> DisplayNote {
         expiring_soon: expires_soon(&note, now),
         placeholders: placeholder::parse(&note.content, &note.placeholder_values),
         attachment_count: 0,
+        folder: None,
         search_hit: None,
         copy_text: match note.kind {
             NoteKind::Checklist => Some(checklist::to_markdown(&note.items)),
@@ -393,6 +413,7 @@ mod tests {
     fn draft(language: Language, content: &str) -> NoteDraft {
         NoteDraft {
             space_id: "s-1".to_string(),
+            folder_id: None,
             title: "Title".to_string(),
             language,
             content: content.to_string(),

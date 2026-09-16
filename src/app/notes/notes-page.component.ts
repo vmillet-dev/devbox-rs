@@ -5,6 +5,7 @@ import { DialogStack } from '@shared/layout/dialog/dialog-stack';
 import { AttachmentsStore } from '@core/state/attachments.store';
 import { LibraryStore } from '@core/state/library.store';
 import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { FoldersStore } from '@core/state/folders.store';
 import { NotesQueryStore } from '@core/state/notes-query.store';
 import { NotesRevision } from '@core/state/notes-revision';
 import { NotesStore } from '@core/state/notes.store';
@@ -16,6 +17,11 @@ import { TagsStore } from '@core/state/tags.store';
 import { TrashStore } from '@core/state/trash.store';
 import { CanvasKeyboardDirective } from '@shared/directives/canvas-keyboard.directive';
 import { FilterChipsComponent } from './header/filter-chips/filter-chips.component';
+import {
+  FolderRecolouring,
+  FolderRenaming,
+  FolderSwitcherComponent,
+} from './header/folder-switcher/folder-switcher.component';
 import { LanguageRailComponent } from './header/language-rail/language-rail.component';
 import { NewNoteButtonComponent } from './header/new-note-button/new-note-button.component';
 import { NoteActivation } from './canvas/note-section/note-card/note-card.component';
@@ -42,6 +48,7 @@ import { UndoBarComponent } from './overlays/undo-bar/undo-bar.component';
     SpaceSwitcherComponent,
     SearchBoxComponent,
     FilterChipsComponent,
+    FolderSwitcherComponent,
     NewNoteButtonComponent,
     SelectionBarComponent,
     TagRailComponent,
@@ -66,6 +73,7 @@ export class NotesPageComponent {
   protected readonly selection = inject(NoteSelectionStore);
   protected readonly store = inject(NotesStore);
   protected readonly spaces = inject(SpacesStore);
+  protected readonly folders = inject(FoldersStore);
   protected readonly palette = inject(PaletteStore);
   protected readonly trash = inject(TrashStore);
   protected readonly tags = inject(TagsStore);
@@ -124,6 +132,14 @@ export class NotesPageComponent {
 
   protected onSpaceDeleted({ id, targetSpaceId }: SpaceDeletion): void {
     void this.spaces.deleteSpace(id, targetSpaceId);
+  }
+
+  protected onFolderRenamed({ id, name }: FolderRenaming): void {
+    void this.folders.renameFolder(id, name);
+  }
+
+  protected onFolderRecoloured({ id, colour }: FolderRecolouring): void {
+    void this.folders.recolourFolder(id, colour);
   }
 
   protected onNoteActivated({ noteId, toggleChecked, extendRange }: NoteActivation): void {

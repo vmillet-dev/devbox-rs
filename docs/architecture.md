@@ -63,9 +63,9 @@ src-tauri/          Rust back-end
 
 ### Feature-first, not layer-first
 
-The back-end is filed by **subject**. `notes.rs`, `spaces.rs`, `attachments.rs` and
-`transfer.rs` are the features, and each owns everything about itself: its model, its SQL, and
-the Tauri commands that expose it. Deleting `src/notes/` deletes the feature.
+The back-end is filed by **subject**. `notes.rs`, `spaces.rs`, `folders.rs`, `attachments.rs`
+and `transfer.rs` are the features, and each owns everything about itself: its model, its SQL,
+and the Tauri commands that expose it. Deleting `src/notes/` deletes the feature.
 
 `changelog.rs` is the smallest of them, and the odd one out: it owns no table and reads no
 database — the repository's `CHANGELOG.md` is baked into the binary by `include_str!` and
@@ -126,9 +126,9 @@ so their tests run without opening a database — section placement, timezone bo
 normalisation, search folding, footer choice and expiry thresholds, in a few milliseconds
 with no fixture setup.
 
-The two features are not fully independent, and that is visible rather than hidden:
-`notes/store.rs` calls `spaces::store::exists` before filing a note, and `spaces/store.rs`
-moves notes out before dropping a space. The Diesel schema therefore stays shared in
+The features are not fully independent, and that is visible rather than hidden:
+`notes/store.rs` calls `spaces::store::exists` before filing a note, `spaces/store.rs`
+moves notes out before dropping a space, and `folders/store.rs` writes `notes.folder_id`. The Diesel schema therefore stays shared in
 `db/schema.rs` — splitting it per feature would break `allow_tables_to_appear_in_same_query!`.
 
 Serde attributes sit on the model types rather than on a separate DTO family. At this size a
@@ -684,6 +684,65 @@ The delete control only appears when another space exists to receive the notes; 
 space the panel explains why rather than offering a button that could only fail. Each space
 row is a `role="none"` wrapper holding the select button and the `⋯` trigger, so the menu
 keeps its direct menuitem children. Arrow-key navigation stays on the select buttons only.
+
+### Folders inside a space
+
+A space is one flat pile ordered by when things were typed, which is the right default for
+"what was I doing yesterday" and useless for "where do I keep the SQL I wrote about indexing".
+A **folder** cuts a space into named, coloured regions, and a note belongs to exactly one or to
+none.
+
+`folders.rs` is a feature like any other, with its own model, store and commands. What it
+holds is deliberately small:
+
+| Piece                      | Where it lives                                              |
+| -------------------------- | ----------------------------------------------------------- |
+| name, colour, owning space | the `folders` table — domain, and it travels with an export |
+| which folder a note is in  | `notes.folder_id`, nullable, `ON DELETE SET NULL`           |
+
+⚠️ **`ON DELETE SET NULL`, never `CASCADE`.** Deleting a folder must not delete a note. It is
+also why `delete_folder` takes no refuge argument where `delete_space(id, targetSpaceId)`
+must: "no folder" is a legitimate state, so the notes simply come out loose. `spaces/`
+cascades into `folders/`, and that cascade then fires the `SET NULL` — a space's notes reach
+their refuge unfiled, which is correct, since a folder of the deleted space no longer exists.
+
+⚠️ **A folder belongs to one space, so a note cannot be filed across one.** `file_many`
+narrows to the folder's own space, and `NotePatch::apply` clears `folder_id` whenever
+`space_id` moves — otherwise a card would show a chip the space switcher can never reach.
+That rule lives in `notes/model.rs`, where a test reaches it without a database.
+
+**The colour is assigned, not chosen.** `FolderColour` is a `closed_enum!` of the five theme
+accents, and `create` rotates through them by the number of folders the space already holds,
+so two made back to back differ. It is changed afterwards from the switcher's edit panel.
+Counted rather than random: a deterministic colour is one a test can assert and a user can
+predict. Every consumer reads it through the `folder-hues` mixin as `--folder-hue`, so the
+five-colour map exists once.
+
+**Filing is a batch with a command of its own**, not a `NotePatch` field. `file_notes` answers
+the `NoteFiling`s it actually changed — which folder each note _left_, `null` for a loose one
+— and `file_notes_back` undoes exactly those. That is the shape `move_notes` already has, and
+for the same reason: rebuilding the set from the selection would unfile a note the batch never
+touched. A note already in the target folder is not reported, so a batch that changed nothing
+opens no undo window.
+
+**The card says where a note lives, and the back end is what resolved it.**
+`view::apply_folders` decorates `DisplayNote.folder` in a pass of its own, exactly as
+`apply_attachment_counts` and `apply_global_defaults` do. The front end never joins a
+`folderId` against a list it happens to hold. ⚠️ The chip is a **square swatch on a neutral
+pill** — never a coloured pill, which is what a tag is. A note with no folder gets no chip at
+all: the absence reads on its own, and an "unfiled" chip would soil every loose card.
+
+Filing happens from the selection bar, beside "move to another space"; the same control both
+ways, since taking a note out is a filing with no folder. The switcher in the header narrows
+the canvas to one folder and is where folders are created, renamed, recoloured and deleted —
+the same three-panel shape as the space switcher (see above). It offers no "unfiled" filter
+entry, for the reason the chip does not exist: that would be a second way to say the same
+thing.
+
+⚠️ **The board geometry is not in any of this.** Where a folder's zone sits, and where a loose
+note sits beside it, are local state that must never enter the `Note` or `Folder` models —
+`transfer::Bundle` deserialises them itself, so a coordinate stored there would travel in
+every export and land on top of the receiving machine's own arrangement.
 
 ### Editing a note
 
@@ -1838,6 +1897,15 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   re-runs `CREATE TABLE spaces` nor keeps a second, drifting source of truth. A pre-Diesel
   binary reopening such a database now fails loudly at startup instead of writing into a schema
   it believes it understands.
+- **A folder is a row, and membership is a column.** `folders` holds `(id, space_id, name,
+colour, created_at)` and `notes.folder_id` points into it. ⚠️ The column was added with no
+  `DEFAULT`, because SQLite only accepts an added `REFERENCES` column whose default is `NULL`
+  — which is what every existing note needs anyway. `folders.name` is sealed like
+  `spaces.name`, so uniqueness leaves SQL exactly as it did there: two seals of the same name
+  differ, and a unique index on ciphertext catches nothing. The order does not move —
+  `created_at` stays in the clear, and reading order is the order a board lays its zones out
+  in. `colour` carries no `CHECK`, following `language`: the list lives in the domain, and a
+  value a build cannot name degrades to the default rather than failing the read.
 - **A checklist's items are a child table, not a serialised column.** `note_items` is keyed
   `(note_id, position)` and written by wiping the note's rows and re-inserting them in order —
   the same shape as `note_tags`, for the same reason. It is _not_ read back after writing, and

@@ -83,6 +83,69 @@ describe('NoteSelectionStore', () => {
       expect(repository.taggedWith).toEqual({ ids: ['a'], tags: ['#Urgent'] });
     });
 
+    it('files the whole selection in one call', async () => {
+      const { store, selection, folders } = await withThreeNotes();
+      selection.toggleChecked('a');
+      selection.toggleChecked('c');
+
+      await store.fileSelection('perf');
+
+      expect([...folders.filings]).toEqual([
+        ['a', 'perf'],
+        ['c', 'perf'],
+      ]);
+    });
+
+    /** Both directions are one action: taking a note out is a filing with no folder. */
+    it('takes the selection out of its folder with the same call', async () => {
+      const { store, selection, folders } = await withThreeNotes();
+      selection.toggleChecked('a');
+      await store.fileSelection('perf');
+
+      await store.fileSelection(null);
+
+      expect(folders.filings.get('a')).toBeNull();
+    });
+
+    /**
+     * ⚠️ The record carries what the back end answered, never what the front guessed:
+     * rebuilding it from the selection would unfile a note the batch never touched.
+     */
+    it('offers to put a filing back, folder by folder', async () => {
+      const { store, selection, folders } = await withThreeNotes();
+      selection.toggleChecked('a');
+      await store.fileSelection('migrations');
+      selection.toggleChecked('c');
+
+      await store.fileSelection('perf');
+
+      expect(store.undoBanner()).toEqual({
+        kind: 'file',
+        previous: [
+          { noteId: 'a', folderId: 'migrations' },
+          { noteId: 'c', folderId: null },
+        ],
+        count: 2,
+      });
+
+      await store.undoLastAction();
+
+      expect(folders.filings.get('a')).toBe('migrations');
+      expect(folders.filings.get('c')).toBeNull();
+    });
+
+    /** A bar offering to undo zero notes is noise. */
+    it('opens no undo window when the selection was already in that folder', async () => {
+      const { store, selection } = await withThreeNotes();
+      selection.toggleChecked('a');
+      await store.fileSelection('perf');
+      store.dismissUndo();
+
+      await store.fileSelection('perf');
+
+      expect(store.undoBanner()).toBeNull();
+    });
+
     it('ignores a blank tag rather than sending it', async () => {
       const { store, selection, repository } = await withThreeNotes();
       selection.toggleChecked('a');

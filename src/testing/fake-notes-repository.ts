@@ -97,6 +97,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
         updatedAt: now,
         footer: { kind: 'age', at: now },
         expiringSoon: false,
+        folder: null,
         placeholders: [],
         attachmentCount: 0,
         copyText: draft.kind === 'checklist' ? checklistMarkdown(draft.items) : null,
@@ -158,6 +159,9 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
           expiringSoon: false,
           placeholders: [],
           attachmentCount: 0,
+          // The trash shape carries no folder: a restored note comes back loose.
+          folderId: null,
+          folder: null,
           copyText: null,
           searchHit: null,
           // The trash shape drops the items; a spec needing them restored uses `setView`.

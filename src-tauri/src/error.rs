@@ -35,6 +35,10 @@ pub enum StorageError {
     SpaceNotFound(String),
     #[error("A space named \"{0}\" already exists")]
     DuplicateSpaceName(String),
+    #[error("Folder not found: {0}")]
+    FolderNotFound(String),
+    #[error("A folder named \"{0}\" already exists in this space")]
+    DuplicateFolderName(String),
     #[error("Attachment not found: {0}")]
     AttachmentNotFound(String),
     #[error("File error: {0}")]
@@ -82,6 +86,8 @@ pub enum ErrorCode {
     NoteNotFound,
     SpaceNotFound,
     DuplicateSpaceName,
+    FolderNotFound,
+    DuplicateFolderName,
     AttachmentNotFound,
     FileAccess,
     ImportFormat,
@@ -158,6 +164,12 @@ impl From<StorageError> for AppError {
             }
             StorageError::DuplicateSpaceName(name) => {
                 Self::with(ErrorCode::DuplicateSpaceName, detail, "name", &name)
+            }
+            StorageError::FolderNotFound(id) => {
+                Self::with(ErrorCode::FolderNotFound, detail, "id", &id)
+            }
+            StorageError::DuplicateFolderName(name) => {
+                Self::with(ErrorCode::DuplicateFolderName, detail, "name", &name)
             }
             StorageError::AttachmentNotFound(id) => {
                 Self::with(ErrorCode::AttachmentNotFound, detail, "id", &id)

@@ -191,6 +191,7 @@ mod tests {
         let space = space_store::create(&mut library, "Secrets").unwrap().id;
         let draft = crate::notes::model::NoteDraft {
             space_id: space.clone(),
+            folder_id: None,
             title: "AWS prod".to_string(),
             language: crate::notes::language::Language::Txt,
             content: "hunter2".to_string(),

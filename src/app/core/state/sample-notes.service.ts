@@ -99,6 +99,7 @@ export class SampleNotesService {
     const drafts: NoteDraft[] = [
       {
         spaceId: UNFILED,
+        folderId: null,
         title: text.welcomeTitle,
         language: 'md',
         content: text.welcomeContent,
@@ -111,6 +112,7 @@ export class SampleNotesService {
       },
       {
         spaceId: UNFILED,
+        folderId: null,
         title: text.snippetTitle,
         language: 'sh',
         content: PSQL_SNIPPET,
@@ -123,6 +125,7 @@ export class SampleNotesService {
       },
       {
         spaceId: UNFILED,
+        folderId: null,
         title: text.checklistTitle,
         language: 'txt',
         content: '',
@@ -141,6 +144,7 @@ export class SampleNotesService {
       },
       {
         spaceId: UNFILED,
+        folderId: null,
         title: text.codeTitle,
         language: 'ts',
         content: SIGNAL_SNIPPET,

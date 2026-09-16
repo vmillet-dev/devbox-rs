@@ -76,6 +76,7 @@ fn list(connection: &mut Library) -> Result<Vec<Note>, StorageError> {
         connection,
         &NotesQuery {
             space_id: None,
+            folder_id: None,
             search: String::new(),
             filter: NoteFilter::All,
             tags: Vec::new(),
@@ -112,6 +113,7 @@ fn space(connection: &mut Library, name: &str) -> String {
 fn draft(space_id: &str) -> NoteDraft {
     NoteDraft {
         space_id: space_id.to_string(),
+        folder_id: None,
         title: "Titre".to_string(),
         language: Language::Txt,
         content: "Contenu".to_string(),
@@ -1309,6 +1311,7 @@ fn sharing_a_selection_reads_the_notes_it_names() {
 fn all_notes() -> NotesQuery {
     NotesQuery {
         space_id: None,
+        folder_id: None,
         search: String::new(),
         filter: NoteFilter::All,
         tags: Vec::new(),

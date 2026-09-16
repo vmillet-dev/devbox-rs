@@ -16,6 +16,16 @@
     (queryChange)="canvas.setSearchQuery($event)"
   />
   <app-filter-chips [active]="canvas.activeFilter()" (filterChanged)="canvas.setFilter($event)" />
+  <app-folder-switcher
+    [folders]="folders.folders()"
+    [activeFolder]="folders.activeFolder()"
+    [canCreate]="spaces.activeSpaceId() !== null"
+    (folderChanged)="folders.selectFolder($event)"
+    (folderCreated)="folders.createFolder($event)"
+    (folderRenamed)="onFolderRenamed($event)"
+    (folderRecoloured)="onFolderRecoloured($event)"
+    (folderDeleted)="folders.deleteFolder($event)"
+  />
   <button type="button" class="trash-btn" data-testid="trash-open" (click)="trash.open()">
     <span aria-hidden="true">🗑</span>
     {{ 'notes.trash' | transloco }}
@@ -40,7 +50,9 @@
   <app-selection-bar
     [count]="selection.checkedCount()"
     [spaces]="spaces.spaces()"
+    [folders]="folders.folders()"
     (moveRequested)="store.moveSelection($event)"
+    (fileRequested)="store.fileSelection($event)"
     (tagRequested)="store.tagSelection($event)"
     (copyRequested)="onCopySelection()"
     (deleteRequested)="store.deleteSelection()"
