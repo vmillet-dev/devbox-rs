@@ -28,6 +28,7 @@ const SIZES: [usize; 3] = [1_000, 5_000, 20_000];
 fn query(search: &str) -> NotesQuery {
     NotesQuery {
         space_id: None,
+        folder_id: None,
         search: search.to_string(),
         filter: NoteFilter::All,
         tags: Vec::new(),

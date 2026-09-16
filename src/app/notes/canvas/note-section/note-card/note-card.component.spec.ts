@@ -253,6 +253,41 @@ describe('NoteCardComponent', () => {
     expect(tags.map((tag) => tag.nativeElement.textContent)).toEqual(['#a', '#b']);
   });
 
+  describe('the folder chip', () => {
+    it('names the folder and carries its colour as a swatch', async () => {
+      fixture.componentRef.setInput(
+        'note',
+        createNote({ folderId: 'perf', folder: { id: 'perf', name: 'Perf', colour: 'amber' } }),
+      );
+      await fixture.whenStable();
+
+      expect(text('[data-testid="note-card-folder"]')).toBe('Perf');
+      expect(fixture.debugElement.query(By.css('.folder-swatch')).nativeElement.className).toContain(
+        'is-amber',
+      );
+    });
+
+    /** ⚠️ The absence reads on its own; an "unfiled" chip would soil every loose card. */
+    it('shows nothing at all when the note has no folder', async () => {
+      fixture.componentRef.setInput('note', createNote({ folderId: null, folder: null }));
+      await fixture.whenStable();
+
+      expect(fixture.debugElement.query(By.css('[data-testid="note-card-folder"]'))).toBeNull();
+    });
+
+    /** A tinted pill is what a tag is, and the two must not be read as the same thing. */
+    it('is a neutral pill, never a tinted one like a tag', async () => {
+      fixture.componentRef.setInput(
+        'note',
+        createNote({ folder: { id: 'perf', name: 'Perf', colour: 'amber' }, tags: ['urgent'] }),
+      );
+      await fixture.whenStable();
+
+      const chip = fixture.debugElement.query(By.css('[data-testid="note-card-folder"]'));
+      expect(chip.nativeElement.className).not.toContain('is-amber');
+    });
+  });
+
   describe('footer', () => {
     it('renders an expiry footer as a countdown', async () => {
       fixture.componentRef.setInput(

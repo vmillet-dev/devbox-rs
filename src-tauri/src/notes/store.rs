@@ -35,6 +35,7 @@ pub(super) struct NoteRow {
     lifecycle_kind: String,
     lifecycle_expires_at: Option<String>,
     kind: String,
+    folder_id: Option<String>,
 }
 
 /// ⚠️ Not a `TryFrom`: opening a row needs the key, and a trait cannot take one. The
@@ -71,6 +72,7 @@ impl NoteRow {
             source: vault.open(&row.source)?,
             id: row.id,
             space_id: row.space_id,
+            folder_id: row.folder_id,
             tags: Vec::new(),
             items: Vec::new(),
             placeholder_values: BTreeMap::new(),
@@ -101,6 +103,7 @@ impl NoteRow {
             lifecycle_kind: lifecycle_kind.to_string(),
             lifecycle_expires_at,
             kind: note.kind.to_string(),
+            folder_id: note.folder_id.clone(),
         })
     }
 }
@@ -130,6 +133,10 @@ struct NoteChanges {
     #[allow(clippy::option_option)]
     lifecycle_expires_at: Option<Option<String>>,
     kind: Option<String>,
+    /// Twice optional for the same reason, and only ever written by a move between
+    /// spaces: filing has a command of its own.
+    #[allow(clippy::option_option)]
+    folder_id: Option<Option<String>>,
 }
 
 /// ⚠️ Every row or none: a value that will not open stops the read rather than handing
@@ -237,6 +244,10 @@ pub fn fetch(
 
     if let Some(space_id) = &request.space_id {
         query = query.filter(notes::space_id.eq(space_id.clone()));
+    }
+
+    if let Some(folder_id) = &request.folder_id {
+        query = query.filter(notes::folder_id.eq(folder_id.clone()));
     }
 
     match request.filter {
@@ -408,6 +419,7 @@ pub fn update(
                 lifecycle_kind: moved(lifecycle_moved, &row.lifecycle_kind),
                 lifecycle_expires_at: lifecycle_moved.then(|| row.lifecycle_expires_at.clone()),
                 kind: moved(note.kind != before.kind, &row.kind),
+                folder_id: (note.folder_id != before.folder_id).then(|| row.folder_id.clone()),
             })
             .execute(connection)?;
 
@@ -475,6 +487,8 @@ pub fn move_many(
         diesel::update(notes::table.filter(notes::id.eq_any(touched)))
             .set((
                 notes::space_id.eq(space_id),
+                // The folder stays behind with its space, as it does through a patch.
+                notes::folder_id.eq(None::<String>),
                 notes::updated_at.eq(iso8601::format(now)),
             ))
             .execute(connection)?;

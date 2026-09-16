@@ -26,6 +26,7 @@ const BASE_DTO: WireNote = {
   expiringSoon: false,
   placeholders: [],
   attachmentCount: 0,
+  folder: null,
   copyText: null,
   searchHit: null,
 };
@@ -109,6 +110,7 @@ describe('toWireNoteDraft', () => {
   it('serialises dates and omits the fields the backend owns', () => {
     const draft: NoteDraft = {
       spaceId: 'space-1',
+      folderId: null,
       title: 'New',
       language: 'txt',
       content: '',
@@ -124,6 +126,7 @@ describe('toWireNoteDraft', () => {
 
     expect(dto).toEqual({
       spaceId: 'space-1',
+      folderId: null,
       title: 'New',
       language: 'txt',
       content: '',

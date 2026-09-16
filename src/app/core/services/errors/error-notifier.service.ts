@@ -20,6 +20,8 @@ const CODE_KEYS: Record<IpcErrorCode, string | null> = {
   noteNotFound: 'errors.noteGone',
   spaceNotFound: 'errors.spaceGone',
   duplicateSpaceName: 'errors.spaceNameTaken',
+  folderNotFound: 'errors.folderGone',
+  duplicateFolderName: 'errors.folderNameTaken',
   attachmentNotFound: 'errors.attachmentGone',
   fileAccess: 'errors.fileAccess',
   importFormat: 'errors.importFormat',

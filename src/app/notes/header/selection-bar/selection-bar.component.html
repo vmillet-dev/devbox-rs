@@ -23,6 +23,22 @@
     </select>
   }
 
+  @if (folders().length > 0) {
+    <select
+      #fileSelect
+      class="selection-move"
+      data-testid="selection-file"
+      [attr.aria-label]="'selection.fileInto' | transloco"
+      (change)="onFile(fileSelect.value); fileSelect.value = ''"
+    >
+      <option value="">{{ 'selection.fileInto' | transloco }}</option>
+      @for (folder of folders(); track folder.id) {
+        <option [value]="folder.id">{{ folder.name }}</option>
+      }
+      <option value="__unfile__">{{ 'selection.unfile' | transloco }}</option>
+    </select>
+  }
+
   <form class="selection-tag-form" (submit)="submitTag($event)">
     <input
       #tagInput

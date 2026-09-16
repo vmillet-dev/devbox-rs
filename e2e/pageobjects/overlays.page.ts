@@ -65,6 +65,59 @@ export const spaces = {
   deleteBlocked: () => $(testid('space-delete-blocked')),
 };
 
+/** The folder switcher: a menu, a create form and an edit panel in one, like `spaces`. */
+export const folders = {
+  async open(): Promise<void> {
+    if (!(await $(testid('folder-dropdown')).isExisting())) {
+      await $(testid('folder-switcher')).click();
+      await $(testid('folder-dropdown')).waitForExist({ timeout: 5_000 });
+    }
+  },
+
+  async close(): Promise<void> {
+    if (await $(testid('folder-dropdown')).isExisting()) {
+      await $(testid('folder-switcher')).click();
+      await $(testid('folder-dropdown')).waitForExist({ reverse: true, timeout: 5_000 });
+    }
+  },
+
+  label: () => $(testid('folder-switcher')).getText(),
+  option: (id: string) => $(`${testid('folder-option')}[data-folder-id="${id}"]`),
+
+  /** `null` is "every folder", filed or not — a choice rather than a loading state. */
+  allOption: () => $(testid('folder-option-all')),
+
+  names: (): Promise<string[]> => readEach(testid('folder-option'), 'text'),
+
+  async create(name: string): Promise<void> {
+    await $(testid('folder-create-open')).click();
+    // The form is revealed by that click: the field does not exist until it lands.
+    await setField(testid('folder-create-input'), name);
+    await $(testid('folder-create-submit')).click();
+  },
+
+  async rename(id: string, into: string): Promise<void> {
+    await $(`${testid('folder-edit')}[data-folder-id="${id}"]`).click();
+    await setField(testid('folder-rename-input'), into);
+    await $(testid('folder-rename-submit')).click();
+  },
+
+  /** ⚠️ Closes behind itself: the edit panel replaces the menu rather than sitting over it. */
+  async recolour(id: string, colour: string): Promise<void> {
+    await $(`${testid('folder-edit')}[data-folder-id="${id}"]`).click();
+    await $(`${testid('folder-colour')}[data-colour="${colour}"]`).click();
+    await folders.close();
+  },
+
+  /** ⚠️ No refuge to choose, unlike a space: the notes simply come out loose. */
+  async remove(id: string): Promise<void> {
+    await $(`${testid('folder-edit')}[data-folder-id="${id}"]`).click();
+    await confirmTwice($(testid('folder-delete')));
+  },
+
+  createBlocked: () => $(testid('folder-create-blocked')),
+};
+
 export const trash = {
   async open(): Promise<void> {
     await $(testid('trash-open')).click();
@@ -206,6 +259,9 @@ export const selectionBar = {
   copy: () => $(testid('selection-copy')).click(),
 
   moveTo: (spaceId: string) => setNativeValue(testid('selection-move'), spaceId),
+
+  /** The same control both ways: `null` picks the "take out of folder" entry. */
+  fileInto: (folderId: string | null) => setNativeValue(testid('selection-file'), folderId ?? '__unfile__'),
 
   async tag(tag: string): Promise<void> {
     const field = $(testid('selection-tag'));

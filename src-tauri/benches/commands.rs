@@ -26,6 +26,7 @@ use corpus::{NOTES, build, now, run_query};
 fn query(search: &str) -> NotesQuery {
     NotesQuery {
         space_id: None,
+        folder_id: None,
         search: search.to_string(),
         filter: NoteFilter::All,
         tags: Vec::new(),

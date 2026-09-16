@@ -32,6 +32,7 @@ fn sample() -> Note {
     Note {
         id: "n-1".to_string(),
         space_id: "s-1".to_string(),
+        folder_id: None,
         title: "Title".to_string(),
         language: Language::Txt,
         content: "Contenu".to_string(),

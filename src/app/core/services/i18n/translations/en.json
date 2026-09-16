@@ -83,6 +83,29 @@
     "pinned": "Pinned",
     "untriaged": "Untriaged"
   },
+  "folders": {
+    "switcherLabel": "Filter by folder",
+    "allFolders": "All folders",
+    "newFolder": "New folder",
+    "newFolderLabel": "New folder name",
+    "newFolderPlaceholder": "Folder name",
+    "newFolderSubmit": "Create",
+    "needsASpace": "Pick a space to create a folder in it.",
+    "optionsLabel": "Options for folder {{name}}",
+    "renameLabel": "Rename folder",
+    "renameSubmit": "Rename",
+    "colourLabel": "Folder colour",
+    "colour": {
+      "blue": "Blue",
+      "amber": "Amber",
+      "purple": "Purple",
+      "green": "Green",
+      "red": "Red"
+    },
+    "delete": "Delete folder",
+    "deleteConfirm": "Confirm?",
+    "deleteKeepsNotes": "The notes stay, simply without a folder."
+  },
   "sections": {
     "pinned": "Pinned",
     "today": "Today",
@@ -179,7 +202,14 @@
     "passphraseChangeFailed": "Could not change the passphrase. The old one still opens the library.",
     "unlockFailed": "Unlocking failed.",
     "vaultStateFailed": "Could not tell whether the library is encrypted.",
-    "undoFailed": "The undo failed. Nothing was put back."
+    "undoFailed": "The undo failed. Nothing was put back.",
+    "foldersLoadFailed": "Folders could not be loaded.",
+    "folderCreateFailed": "Folder “{{name}}” could not be created.",
+    "folderRenameFailed": "The folder could not be renamed.",
+    "folderRecolourFailed": "The folder colour could not be changed.",
+    "folderDeleteFailed": "The folder could not be deleted.",
+    "folderGone": "That folder no longer exists.",
+    "folderNameTaken": "A folder named “{{name}}” already exists in this space."
   },
   "tray": {
     "open": "Open {{app}}",
@@ -271,7 +301,9 @@
     "addTagLabel": "Add a tag to the selection",
     "addTagPlaceholder": "+ tag",
     "delete": "Move to trash",
-    "deleteConfirm": "Confirm?"
+    "deleteConfirm": "Confirm?",
+    "fileInto": "File into",
+    "unfile": "Take out of folder"
   },
   "palette": {
     "title": "Quick paste",
@@ -322,7 +354,8 @@
     "restore": "Undo",
     "dismiss": "Dismiss",
     "moved": "{{count}} note(s) moved",
-    "tagged": "{{count}} note(s) tagged"
+    "tagged": "{{count}} note(s) tagged",
+    "filed": "{{count}} note(s) filed"
   },
   "file": {
     "menuLabel": "File",

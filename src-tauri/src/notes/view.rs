@@ -8,12 +8,19 @@ use unicode_normalization::char::{decompose_canonical, is_combining_mark};
 use super::language::Language;
 use super::model::{self, DisplayNote, Note};
 use crate::count::saturating_u32;
+use crate::folders::model::NoteFolder;
 
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotesQuery {
     /// `None` = every space: a choice, not an absence of one.
     pub space_id: Option<String>,
+    /// `None` = every folder, filed or not. Narrowing to "unfiled" is not offered: the
+    /// absence of a chip already reads, and a filter for it would be a fourth way to say
+    /// the same thing.
+    #[serde(default)]
+    #[specta(optional)]
+    pub folder_id: Option<String>,
     pub search: String,
     pub filter: NoteFilter,
     /// A note passes if it carries at least one of these tags.
@@ -103,6 +110,22 @@ pub fn apply_attachment_counts<S: std::hash::BuildHasher>(
     for section in &mut view.sections {
         for note in &mut section.notes {
             note.attachment_count = counts.get(&note.id).copied().unwrap_or(0);
+        }
+    }
+}
+
+/// Separate from [`build`] for the same reason as [`apply_attachment_counts`].
+pub fn apply_folders<S: std::hash::BuildHasher>(
+    view: &mut NotesView,
+    folders: &HashMap<String, NoteFolder, S>,
+) {
+    for section in &mut view.sections {
+        for note in &mut section.notes {
+            note.folder = note
+                .folder_id
+                .as_ref()
+                .and_then(|id| folders.get(id))
+                .cloned();
         }
     }
 }
@@ -389,6 +412,7 @@ mod tests {
     fn request() -> NotesQuery {
         NotesQuery {
             space_id: None,
+            folder_id: None,
             search: String::new(),
             filter: NoteFilter::All,
             tags: Vec::new(),

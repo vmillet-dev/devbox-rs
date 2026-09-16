@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotesView } from '../model/note.model';
 import { ClockService } from '@core/services/time/clock.service';
 import { FakeClipboard } from '@testing/fake-clipboard';
+import { FakeFoldersRepository } from '@testing/fake-folders-repository';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { createNote } from '@testing/note.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
@@ -132,9 +133,15 @@ describe('NotesQueryStore', () => {
     async function createStoreWithClock(now: WritableSignal<Date>): Promise<NotesHarness> {
       const repository = new FakeNotesRepository([createNote()]);
       const clipboard = new FakeClipboard();
+      const folders = new FakeFoldersRepository();
       TestBed.configureTestingModule({
         providers: [
-          provideAppTesting({ notesRepository: repository, spaces: HARNESS_SPACES, clipboard }),
+          provideAppTesting({
+            notesRepository: repository,
+            spaces: HARNESS_SPACES,
+            clipboard,
+            foldersRepository: folders,
+          }),
           { provide: ClockService, useValue: { now: now.asReadonly() } },
         ],
       });
@@ -147,6 +154,7 @@ describe('NotesQueryStore', () => {
         canvas,
         selection: TestBed.inject(NoteSelectionStore),
         repository,
+        folders,
         spaces: TestBed.inject(SpacesStore),
         clipboard,
       };

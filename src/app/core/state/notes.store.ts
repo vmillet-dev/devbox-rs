@@ -1,4 +1,5 @@
 import { Injectable, Signal, computed, inject, signal } from '@angular/core';
+import { FoldersRepository } from '../data/folders.repository';
 import { NotesRepository } from '../data/notes.repository';
 import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
@@ -13,6 +14,7 @@ import {
   NotePlacement,
   NoteTag,
 } from '../model/note.model';
+import { NoteFiling } from '../model/folder.model';
 import { ClockService } from '@core/services/time/clock.service';
 import { debounced } from '@core/services/time/debounce';
 import { NoteSelectionStore } from './note-selection.store';
@@ -31,7 +33,8 @@ export const UNDO_WINDOW_MS = 8000;
 export type Reversible =
   | { readonly kind: 'deletion'; readonly ids: readonly string[]; readonly count: number }
   | { readonly kind: 'move'; readonly previous: readonly NotePlacement[]; readonly count: number }
-  | { readonly kind: 'tag'; readonly added: readonly NoteTag[]; readonly count: number };
+  | { readonly kind: 'tag'; readonly added: readonly NoteTag[]; readonly count: number }
+  | { readonly kind: 'file'; readonly previous: readonly NoteFiling[]; readonly count: number };
 
 /** The note being created, not written until it is worth keeping. */
 export const DRAFT_ID = '__draft__';
@@ -52,6 +55,7 @@ function isWorthSaving(note: Note): boolean {
 function emptyDraft(spaceId: string, kind: NoteKind): NoteDraft {
   return {
     spaceId,
+    folderId: null,
     title: '',
     language: FALLBACK_LANGUAGE,
     content: '',
@@ -74,6 +78,7 @@ function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
     expiringSoon: false,
     placeholders: [],
     attachmentCount: 0,
+    folder: null,
     copyText: null,
     searchHit: null,
   };
@@ -82,6 +87,7 @@ function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
 function toDraftPayload(note: Note): NoteDraft {
   return {
     spaceId: note.spaceId,
+    folderId: note.folderId,
     title: note.title,
     language: note.language,
     content: note.content,
@@ -147,6 +153,7 @@ function changedFields(note: Note, patch: NotePatch): NotePatch {
 @Injectable({ providedIn: 'root' })
 export class NotesStore {
   private readonly repository = inject(NotesRepository);
+  private readonly folders = inject(FoldersRepository);
   private readonly clipboard = inject(ClipboardService);
   private readonly clock = inject(ClockService);
   private readonly notifier = inject(ErrorNotifier);
@@ -298,6 +305,14 @@ export class NotesStore {
     this.openUndoWindow({ kind: 'move', previous, count: previous.length });
   }
 
+  /** `folderId` of `null` takes the selection out of whatever folder it was in. */
+  async fileSelection(folderId: string | null): Promise<void> {
+    const previous = await this.runOnSelection((ids) => this.folders.fileMany(ids, folderId));
+    if (previous === null) return;
+
+    this.openUndoWindow({ kind: 'file', previous, count: previous.length });
+  }
+
   async tagSelection(tag: string): Promise<void> {
     if (!tag.trim()) return;
 
@@ -347,6 +362,8 @@ export class NotesStore {
         return this.repository.moveBack(action.previous);
       case 'tag':
         return this.repository.untagMany(action.added);
+      case 'file':
+        return this.folders.fileBack(action.previous);
     }
   }
 
