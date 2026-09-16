@@ -125,11 +125,19 @@ export class NotesPageComponent {
     }
   }
 
-  /** The spaces reload afterwards — they had already read an empty database. */
+  /**
+   * The spaces reload afterwards — they had already read an empty database.
+   *
+   * ⚠️ And the seeded space is selected: with exactly one, "all spaces" is a distinction
+   * without a difference, and it is the state in which the board cannot be shown at all —
+   * a first launch would hide the feature behind a disabled button.
+   */
   private async seedSamples(): Promise<void> {
-    if (!(await this.samples.seedIfFirstRun())) return;
+    const seeded = await this.samples.seedIfFirstRun();
+    if (!seeded) return;
 
     this.spaces.reload();
+    this.spaces.selectSpace(seeded.id);
     this.revision.bump();
   }
 

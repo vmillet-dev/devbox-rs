@@ -6,15 +6,18 @@ use std::collections::BTreeMap;
 use diesel::prelude::*;
 use uuid::Uuid;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 
 use super::checklist;
-use super::model::{self, Note, NoteDraft, NoteLifecycle, NotePatch, NotePlacement, NoteTag};
+use super::model::{
+    self, Note, NoteDraft, NoteLifecycle, NotePatch, NotePlacement, NoteTag, SampleNote,
+};
 use super::placeholder;
 use super::view::{Facets, NoteFilter, NotesQuery};
 use crate::db::schema::{global_placeholders, note_tags, notes};
 use crate::db::{Library, iso8601};
 use crate::error::StorageError;
+use crate::folders::store as folders;
 use crate::spaces::model::Space;
 use crate::spaces::store as spaces;
 use crate::vault::key::Vault;
@@ -356,23 +359,45 @@ pub(crate) fn create_in(
 pub fn seed(
     connection: &mut Library,
     space_name: &str,
-    drafts: Vec<NoteDraft>,
+    folder_names: &[String],
+    notes: Vec<SampleNote>,
     now: DateTime<Utc>,
 ) -> Result<Space, StorageError> {
     connection.transaction(|connection, vault| {
         let space = spaces::create_in(connection, vault, space_name)?;
 
-        for draft in drafts {
-            // Sequential, and `now` is shared: `created_at` is what orders the canvas,
-            // so the samples keep the order they were written in.
+        // ⚠️ Inside the same transaction as the space and the notes. A seeding that wrote
+        // the space but not the folders would be permanent: a space exists, so both of the
+        // front end's guards read "already seeded" and it never runs again.
+        //
+        // ⚠️ A millisecond apart, and *forward*: `folders::list` orders `created_at` ascending
+        // and breaks a tie on the id, which is a random UUID — sharing one instant would
+        // leave the board's zones in an order that differs from one install to the next.
+        let mut folder_ids: Vec<String> = Vec::with_capacity(folder_names.len());
+        for (index, name) in folder_names.iter().enumerate() {
+            let at = now + TimeDelta::milliseconds(i64::try_from(index).unwrap_or(0));
+            folder_ids.push(folders::create_in(connection, vault, &space.id, name, at)?.id);
+        }
+
+        // ⚠️ And *backward* for the notes, for the same reason read the other way: the
+        // canvas orders `updated_at` descending, so the first one declared needs the latest
+        // instant to come out first.
+        for (index, note) in notes.into_iter().enumerate() {
+            let at = now - TimeDelta::milliseconds(i64::try_from(index).unwrap_or(0));
+            let folder_id = note
+                .folder
+                .and_then(|index| folder_ids.get(usize::try_from(index).unwrap_or(usize::MAX)))
+                .cloned();
+
             create_in(
                 connection,
                 vault,
                 NoteDraft {
                     space_id: space.id.clone(),
-                    ..draft
+                    folder_id,
+                    ..note.draft
                 },
-                now,
+                at,
             )?;
         }
 

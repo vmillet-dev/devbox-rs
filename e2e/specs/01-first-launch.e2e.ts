@@ -1,6 +1,7 @@
 import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
+import { board } from '../pageobjects/overlays.page.js';
 import { banners, fileMenu, titlebar } from '../pageobjects/titlebar.page.js';
 import { passTheGate } from '../support/app.js';
 import { bridge, homeSpaceId, query } from '../support/bridge.js';
@@ -50,6 +51,46 @@ describe('First launch', () => {
 
     // Resolved while the guarantee above still holds; every later file reads it back.
     expect(await homeSpaceId()).toBe(spaces[0]?.id);
+  });
+
+  /**
+   * ⚠️ Written in the same transaction as the space and the notes: a seeding that left the
+   * folders out would be permanent, because a space exists and both of the front end's
+   * guards then read "already seeded".
+   */
+  it('seeds its folders too, in the order the board reads them', async () => {
+    const folders = await bridge.listFolders(await homeSpaceId());
+
+    expect(folders.map((folder) => folder.name)).toEqual(['Snippets', 'Prise en main']);
+    // Assigned by rotation, so the two zones are told apart on the board at a glance.
+    expect(folders[0]?.colour).not.toBe(folders[1]?.colour);
+  });
+
+  /** The chip is the affordance that says a note lives somewhere; three of four wear one. */
+  it('arrives arranged, with one note left loose on purpose', async () => {
+    const filed = await browser.execute(
+      (cardSelector: string, chipSelector: string) =>
+        [...document.querySelectorAll(cardSelector)].filter((card) => card.querySelector(chipSelector))
+          .length,
+      '[data-testid="note-card"]',
+      '[data-testid="note-card-folder"]',
+    );
+
+    expect(filed).toBe(3);
+  });
+
+  /**
+   * The one screen that explains what a folder is for used to open empty on a fresh
+   * install: the feature was finished and undiscoverable.
+   */
+  it('opens a board that already has something on it', async () => {
+    await canvas.open();
+    await board.show('board');
+
+    expect(await board.zoneNames()).toEqual(['Snippets', 'Prise en main']);
+    expect(await board.looseTitles()).toHaveLength(1);
+
+    await board.show('date');
   });
 
   it('gives every card a click surface of its own', async () => {

@@ -48,13 +48,35 @@ describe('SampleNotesService', () => {
   });
 
   it('files a space and its samples into a database that has never been written to', async () => {
-    expect(await service.seedIfFirstRun()).toBe(true);
+    expect(await service.seedIfFirstRun()).not.toBeNull();
 
     expect(notes.seededSamples?.spaceName).toBe('Découverte');
     expect(drafts()).toHaveLength(4);
     // ⚠️ The drafts carry no space: it does not exist when they are composed, and the
     // command that creates it is the one that files them into it.
-    expect(notes.seededSamples?.drafts.every((draft) => draft.spaceId === '')).toBe(true);
+    expect(notes.seededSamples?.notes.every(({ draft }) => draft.spaceId === '')).toBe(true);
+  });
+
+  /**
+   * A fresh install opens on a board with something on it: the switch would otherwise show
+   * an empty canvas, and the feature would be finished and undiscoverable.
+   */
+  it('arrives already arranged, with one note left loose on purpose', async () => {
+    await service.seedIfFirstRun();
+
+    expect(notes.seededSamples?.folders).toEqual(['Snippets', 'Prise en main']);
+    // ⚠️ Indexes, not ids: the folders do not exist when these are composed.
+    expect(notes.seededSamples?.notes.map((note) => note.folder)).toEqual([1, 0, undefined, 0]);
+  });
+
+  /** ⚠️ "No folder" is a legitimate state, and the first launch shows it rather than
+   *  describing it. */
+  it('leaves the checklist unfiled, so the loose area is not empty either', async () => {
+    await service.seedIfFirstRun();
+
+    const loose = notes.seededSamples?.notes.filter((note) => note.folder === undefined) ?? [];
+    expect(loose).toHaveLength(1);
+    expect(loose[0]?.draft.kind).toBe('checklist');
   });
 
   it('carries one feature per sample', async () => {
@@ -65,7 +87,7 @@ describe('SampleNotesService', () => {
     expect(snippet.content).toContain('{{host}}');
     expect(snippet.content).toContain('{{port=5432}}');
     expect(checklist.kind).toBe('checklist');
-    expect(checklist.items).toHaveLength(5);
+    expect(checklist.items).toHaveLength(6);
     expect(checklist.items.every((item) => !item.done)).toBe(true);
     expect(code.lifecycle.kind).toBe('expires');
   });
@@ -91,14 +113,14 @@ describe('SampleNotesService', () => {
   it('never offers the samples twice', async () => {
     await service.seedIfFirstRun();
 
-    expect(await service.seedIfFirstRun()).toBe(false);
+    expect(await service.seedIfFirstRun()).toBeNull();
     expect(drafts()).toHaveLength(4);
   });
 
   it('leaves an existing installation alone, and stops looking', async () => {
     setUp([{ id: 'space-1', name: 'Perso', pinned: false }]);
 
-    expect(await service.seedIfFirstRun()).toBe(false);
+    expect(await service.seedIfFirstRun()).toBeNull();
     expect(drafts()).toHaveLength(0);
     // Marked, so the check does not run on every launch from now on.
     expect(preferences.read('devbox.notes.samplesSeeded')).not.toBeNull();
@@ -108,7 +130,7 @@ describe('SampleNotesService', () => {
     // jsdom has no bridge; the canvas reports its own failure.
     spaces.failNext = new Error('no bridge');
 
-    await expect(service.seedIfFirstRun()).resolves.toBe(false);
+    await expect(service.seedIfFirstRun()).resolves.toBeNull();
     expect(drafts()).toHaveLength(0);
   });
 
@@ -120,10 +142,10 @@ describe('SampleNotesService', () => {
   it('seeds again after a failure, instead of closing the door on an empty canvas', async () => {
     notes.failNext = new Error('disk full');
 
-    expect(await service.seedIfFirstRun()).toBe(false);
+    expect(await service.seedIfFirstRun()).toBeNull();
     expect(preferences.read('devbox.notes.samplesSeeded')).toBeNull();
 
-    expect(await service.seedIfFirstRun()).toBe(true);
-    expect(notes.seededSamples?.drafts).toHaveLength(4);
+    expect(await service.seedIfFirstRun()).not.toBeNull();
+    expect(notes.seededSamples?.notes).toHaveLength(4);
   });
 });

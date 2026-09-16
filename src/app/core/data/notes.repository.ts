@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { commands } from '@core/ipc/bindings';
 import { unwrap } from '@core/ipc/ipc.error';
+import { Space } from '../model/space.model';
 import {
   Note,
   NoteDraft,
@@ -9,6 +10,7 @@ import {
   NotesQuery,
   NotesView,
   NoteTag,
+  SampleNote,
   TagUsage,
   TrashedNote,
 } from '../model/note.model';
@@ -36,11 +38,22 @@ export class NotesRepository {
   }
 
   /**
-   * The first launch, as one write. The space does not exist yet, so each draft carries
-   * no space of its own — the back end files them into the one it creates.
+   * The first launch, as one write. Neither the space nor the folders exist yet, so a note
+   * carries no space of its own and names its folder by **index** — the back end creates
+   * all three in one transaction.
    */
-  async seedSamples(spaceName: string, drafts: readonly NoteDraft[]): Promise<void> {
-    unwrap('seed_samples', await commands.seedSamples(spaceName, drafts.map(toWireNoteDraft)));
+  async seedSamples(
+    spaceName: string,
+    folders: readonly string[],
+    notes: readonly SampleNote[],
+  ): Promise<Space> {
+    const wire = notes.map((note) => ({
+      folder: note.folder ?? null,
+      draft: toWireNoteDraft(note.draft),
+    }));
+
+    const space = unwrap('seed_samples', await commands.seedSamples(spaceName, [...folders], wire));
+    return { ...space, pinned: space.pinned ?? false };
   }
 
   async update(id: string, patch: NotePatch): Promise<Note> {

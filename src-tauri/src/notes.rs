@@ -59,7 +59,7 @@ use crate::db::{Db, Library, lock};
 use crate::error::{AppError, StorageError};
 use crate::folders;
 use crate::spaces::model::SpaceDraft;
-use model::{DisplayNote, NoteDraft, NotePatch, TagUsage};
+use model::{DisplayNote, NoteDraft, NotePatch, SampleNote, TagUsage};
 use trash::TrashedNote;
 use view::{NotesQuery, NotesView};
 
@@ -105,19 +105,29 @@ pub fn create_note(draft: NoteDraft, db: State<'_, Db>) -> Result<DisplayNote, A
 /// the front end, where the translations are — only the atomicity comes from here.
 #[tauri::command(async)]
 #[specta::specta]
-/// Answers nothing: the caller needs to know the library was seeded, not what was made,
-/// and it reloads the spaces either way.
+/// Answers the space it made: with exactly one, "all spaces" is a distinction without a
+/// difference, and the front end opens on it rather than on a board it cannot show.
 pub fn seed_samples(
     space_name: String,
-    drafts: Vec<NoteDraft>,
+    folders: Vec<String>,
+    notes: Vec<SampleNote>,
     db: State<'_, Db>,
-) -> Result<(), AppError> {
+) -> Result<crate::spaces::model::Space, AppError> {
     let name = SpaceDraft { name: space_name }.validated_name()?;
+    let folder_names = folders
+        .iter()
+        .map(|folder| crate::folders::model::validated_name(folder))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut connection = lock(&db)?;
-    store::seed(&mut connection, &name, drafts, Utc::now())?;
 
-    Ok(())
+    Ok(store::seed(
+        &mut connection,
+        &name,
+        &folder_names,
+        notes,
+        Utc::now(),
+    )?)
 }
 
 #[tauri::command(async)]

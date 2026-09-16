@@ -51,7 +51,7 @@
       "welcome": {
         "title": "Bienvenue dans {{app}}",
         "source": "{{app}} / Prise en main",
-        "content": "{{app}} garde vos notes, vos snippets et vos listes à portée de raccourci.\n\n- Les cartes se rangent seules : épinglées, aujourd'hui, cette semaine, plus ancien.\n- Cliquez une carte pour l'ouvrir, ou copiez-la sans l'ouvrir.\n- Tout est local : la base vit dans votre dossier utilisateur, rien ne part sur le réseau.\n\nCes quatre notes sont des exemples. Modifiez-les, ou mettez-les à la corbeille : le menu « À propos → Prise en main » raconte la même chose et ne s'efface pas."
+        "content": "{{app}} garde vos notes, vos snippets et vos listes à portée de raccourci.\n\n- Les cartes se rangent seules : épinglées, aujourd'hui, cette semaine, plus ancien.\n- La pastille carrée sur une carte dit dans quel dossier elle vit. Essayez la vue « Tableau » en haut : les dossiers y sont des régions où l'on dépose les notes à la souris.\n- Tout est local : la base vit dans votre dossier utilisateur, rien ne part sur le réseau.\n\nCes quatre notes sont des exemples. Modifiez-les, ou mettez-les à la corbeille : le menu « À propos → Prise en main » raconte la même chose et ne s'efface pas."
       },
       "snippet": {
         "title": "Connexion psql",
@@ -63,7 +63,8 @@
         "copy": "Copier une note sans l'ouvrir, depuis le bouton de la carte",
         "fields": "Copier « Connexion psql » et remplir ses champs",
         "palette": "Ouvrir la palette de collage rapide avec Ctrl+Alt+P",
-        "space": "Créer un espace à soi et y déplacer une note"
+        "space": "Créer un espace à soi et y déplacer une note",
+        "board": "Passer en vue Tableau et glisser une note dans une zone"
       },
       "code": {
         "title": "Signaux Angular",
@@ -74,6 +75,10 @@
         "example": "exemple",
         "database": "sql",
         "angular": "angular"
+      },
+      "folders": {
+        "snippets": "Snippets",
+        "startHere": "Prise en main"
       }
     }
   },
@@ -439,7 +444,7 @@
       "extendWithClick": "Étendre la sélection au clic",
       "trash": "Mettre à la corbeille",
       "undo": "Annuler la dernière suppression",
-      "clearSelection": "Annuler la sélection, puis les filtres"
+      "clearSelection": "Annuler la sélection, puis les filtres, puis sortir du dossier"
     },
     "editor": {
       "close": "Fermer l'éditeur en enregistrant",
@@ -541,6 +546,10 @@
       "spaces": {
         "title": "Des espaces pour ranger",
         "body": "Chaque note vit dans un espace — « Perso », « Boulot », ce que vous voulez. Le sélecteur en haut à gauche filtre le canevas, et « Tous les espaces » les montre ensemble. Supprimer un espace demande toujours où ses notes doivent aller : elles ne disparaissent jamais avec lui."
+      },
+      "folders": {
+        "title": "Des dossiers, et un tableau",
+        "body": "Un espace reste un tas rangé par date, ce qui répond très bien à « qu'est-ce que j'écrivais hier » et pas du tout à « où est mon SQL sur les index ». Un dossier découpe un espace en régions nommées et colorées : la pastille carrée sur une carte dit où elle vit, et une carte sans pastille n'est rangée nulle part — ce qui est un état parfaitement valable.\n\nLe commutateur « Date / Tableau » ouvre la seconde vue du même espace. Une zone se déplace par sa poignée, se redimensionne par son coin, et se trace à la souris sur le fond vide. Glisser une note dans une zone la range ; la lâcher sur le fond l'en sort. Déplacer une zone emmène ses notes, la redimensionner n'en attrape aucune. Sans souris : {{check}} pour cocher des cartes, puis « Ranger dans » dans la barre de sélection.\n\nCliquer le titre d'une zone descend dedans : une grille ordinaire, une recherche qui ne sort pas du dossier, et une note créée là arrive déjà rangée. Supprimer un dossier ne supprime jamais ses notes — elles redeviennent simplement libres."
       },
       "organise": {
         "title": "Retrouver : recherche, tags, filtres",

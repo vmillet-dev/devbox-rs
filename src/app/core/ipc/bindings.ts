@@ -14,10 +14,10 @@ export const commands = {
 	 *  a space with nothing in it reads as "already seeded" to both of the front end's
 	 *  guards, and the canvas stays empty for the life of that install. The strings stay on
 	 *  the front end, where the translations are — only the atomicity comes from here.
-	 *  Answers nothing: the caller needs to know the library was seeded, not what was made,
-	 *  and it reloads the spaces either way.
+	 *  Answers the space it made: with exactly one, "all spaces" is a distinction without a
+	 *  difference, and the front end opens on it rather than on a board it cannot show.
 	 */
-	seedSamples: (spaceName: string, drafts: NoteDraft[]) => typedError<null, AppError>(__TAURI_INVOKE("seed_samples", { spaceName, drafts })),
+	seedSamples: (spaceName: string, folders: string[], notes: SampleNote[]) => typedError<Space, AppError>(__TAURI_INVOKE("seed_samples", { spaceName, folders, notes })),
 	updateNote: (id: string, patch: NotePatch) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("update_note", { id, patch })),
 	/**
 	 *  Moves to the trash: the note comes back through [`restore_notes`] for
@@ -600,6 +600,18 @@ export type Placeholder = {
 	 *  being erased.
 	 */
 	value: string,
+};
+
+/**
+ *  One seeded note, and which of the seeded folders it lands in.
+ * 
+ *  ⚠️ An **index** into the folders the same command creates, not an id: they do not exist
+ *  until the transaction that writes them is under way. `None` stays loose, which the
+ *  first launch shows on purpose — "no folder" is a legitimate state.
+ */
+export type SampleNote = {
+	folder?: number | null,
+	draft: NoteDraft,
 };
 
 /**

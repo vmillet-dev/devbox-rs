@@ -31,6 +31,9 @@ interface CanvasKey {
   readonly run?: (context: CanvasContext, key: string) => boolean;
 }
 
+/** ⚠️ Spelled once: the table below binds it and the written guide names it. */
+export const CHECK_KEY = 'X';
+
 const DIRECTIONS: Record<string, FocusDirection> = {
   ArrowLeft: 'prev',
   ArrowRight: 'next',
@@ -81,7 +84,7 @@ const CANVAS_KEYS: readonly CanvasKey[] = [
     run: ({ focused, notes }) => given(focused, (note) => void notes.togglePinned(note.id)),
   },
   {
-    keys: ['X'],
+    keys: [CHECK_KEY],
     labelKey: 'shortcuts.canvas.check',
     on: ['x', 'X'],
     run: ({ focused, selection }) => given(focused, (note) => selection.toggleChecked(note.id)),
