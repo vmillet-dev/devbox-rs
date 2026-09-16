@@ -40,6 +40,8 @@ function importedKey(report: ImportReport): string {
   if (report.notesImported === 0) return 'file.importedNothing';
   if (report.attachmentsMissing > 0) return 'file.importedWithoutSomeAttachments';
   if (report.notesDegraded > 0) return 'file.importedFromNewerVersion';
+  // A library received arranged is worth saying so: the folders are half of what came in.
+  if (report.foldersCreated > 0) return 'file.importedIntoFolders';
 
   return report.attachmentsImported > 0 ? 'file.importedWithAttachments' : 'file.imported';
 }
@@ -100,12 +102,13 @@ export class LibraryStore {
         degraded: String(report.notesDegraded),
         attachments: String(report.attachmentsImported),
         missing: String(report.attachmentsMissing),
+        folders: String(report.foldersCreated),
         path: fileNameOf(path),
       };
 
       this.status.notify({ key: importedKey(report), params });
 
-      const changed = report.notesImported > 0 || report.spacesCreated > 0;
+      const changed = report.notesImported > 0 || report.spacesCreated > 0 || report.foldersCreated > 0;
       if (changed) this.revision.bump();
 
       return changed;

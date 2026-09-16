@@ -12,18 +12,31 @@ use crate::attachments::model::Attachment;
 use crate::attachments::store as attachments;
 use crate::db::Library;
 use crate::error::StorageError;
+use crate::folders::model::Folder;
+use crate::folders::store as folders;
 use crate::notes::model::Note;
 use crate::notes::store as notes;
 use crate::spaces::model::Space;
 use crate::spaces::store as spaces;
 use crate::vault::key::Vault;
 
-/// Only the spaces actually cited travel with the notes: exporting one space must not
-/// recreate the whole tree for whoever imports it.
+/// Only the spaces and folders actually cited travel with the notes: exporting one space
+/// must not recreate the whole tree for whoever imports it.
 pub fn collect(connection: &mut Library, exported: Vec<Note>) -> Result<Bundle, StorageError> {
     let spaces: Vec<Space> = spaces::list(connection)?
         .into_iter()
         .filter(|space| exported.iter().any(|note| note.space_id == space.id))
+        .collect();
+
+    // ⚠️ `Folder` carries no geometry, so nothing has to be stripped by hand here: where a
+    // zone sits is columns only the board query reads.
+    let folders: Vec<Folder> = folders::list(connection, None)?
+        .into_iter()
+        .filter(|folder| {
+            exported
+                .iter()
+                .any(|note| note.folder_id.as_deref() == Some(folder.id.as_str()))
+        })
         .collect();
 
     let note_ids: Vec<String> = exported.iter().map(|note| note.id.clone()).collect();
@@ -32,6 +45,7 @@ pub fn collect(connection: &mut Library, exported: Vec<Note>) -> Result<Bundle, 
         version: model::FORMAT_VERSION,
         exported_at: Utc::now(),
         spaces,
+        folders,
         attachments: attachments::for_notes(connection, &note_ids)?,
         notes: exported,
     })
@@ -71,6 +85,9 @@ pub fn merge(
             mapping.insert(space.id.clone(), local_id);
         }
 
+        let folder_mapping =
+            merge_folders(connection, vault, &bundle.folders, &mapping, &mut report)?;
+
         for mut note in bundle.notes {
             let Some(space_id) = mapping.get(&note.space_id) else {
                 // A file truncated by hand: inventing a space would file the note where
@@ -79,6 +96,14 @@ pub fn merge(
                 continue;
             };
             note.space_id.clone_from(space_id);
+            // ⚠️ Remapped, and dropped when the file did not carry the folder: the id is
+            // the *sending* library's, and a dangling one would be refused by the foreign
+            // key — losing the whole import over a note that is merely unfiled.
+            note.folder_id = note
+                .folder_id
+                .as_ref()
+                .and_then(|id| folder_mapping.get(id))
+                .cloned();
 
             if notes::insert_imported_in(connection, vault, &note)? {
                 report.notes_imported += 1;
@@ -105,6 +130,42 @@ pub fn merge(
 
         Ok(report)
     })
+}
+
+/// Matched by name inside the destination space, and created when absent — the rule spaces
+/// already follow, case-insensitively.
+///
+/// ⚠️ A folder whose space did not make it is dropped rather than invented: its notes were
+/// skipped for the same reason, and a folder in no space is unreachable.
+fn merge_folders(
+    connection: &mut SqliteConnection,
+    vault: &Vault,
+    incoming: &[Folder],
+    spaces: &BTreeMap<String, String>,
+    report: &mut ImportReport,
+) -> Result<BTreeMap<String, String>, StorageError> {
+    let mut mapping: BTreeMap<String, String> = BTreeMap::new();
+
+    for folder in incoming {
+        let Some(space_id) = spaces.get(&folder.space_id) else {
+            continue;
+        };
+
+        let existing = folders::list_in(connection, vault, Some(space_id))?;
+        let matched = existing
+            .iter()
+            .find(|candidate| candidate.name.to_lowercase() == folder.name.to_lowercase());
+
+        let local_id = if let Some(candidate) = matched {
+            candidate.id.clone()
+        } else {
+            report.folders_created += 1;
+            folders::create_in(connection, vault, space_id, &folder.name, folder.created_at)?.id
+        };
+        mapping.insert(folder.id.clone(), local_id);
+    }
+
+    Ok(mapping)
 }
 
 /// ⚠️ The file is written **before** the record, the rule `attachments.rs` already holds:

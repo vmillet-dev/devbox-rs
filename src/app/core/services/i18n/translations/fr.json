@@ -408,7 +408,8 @@
     "copied": "{{notes}} note(s) copiée(s) en Markdown dans le presse-papier.",
     "needsSelection": "Sélectionnez au moins une note.",
     "emptyLibrary": "Rien à exporter : cette bibliothèque n'a aucune note.",
-    "preferences": "Préférences…"
+    "preferences": "Préférences…",
+    "importedIntoFolders": "{{notes}} note(s) importée(s) depuis {{path}} dans {{folders}} nouveau(x) dossier(s), {{skipped}} ignorée(s)."
   },
   "shortcuts": {
     "unavailable": "Raccourci(s) global(aux) indisponible(s) : {{list}}. Une autre application les utilise déjà.",

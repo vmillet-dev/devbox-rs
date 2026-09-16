@@ -102,6 +102,7 @@ pub fn write(
     Ok(ExportReport {
         notes: saturating_u32(bundle.notes.len()),
         spaces: saturating_u32(bundle.spaces.len()),
+        folders: saturating_u32(bundle.folders.len()),
         attachments: stored,
         protected: passphrase.is_some(),
     })
@@ -376,6 +377,7 @@ mod tests {
                 name: "Personal".to_string(),
                 pinned: false,
             }],
+            folders: Vec::new(),
             notes: vec![sample()],
             attachments: Vec::new(),
         }
