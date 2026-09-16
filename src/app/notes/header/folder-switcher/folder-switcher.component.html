@@ -22,53 +22,12 @@
     <div class="folder-dropdown" data-testid="folder-dropdown">
       @if (editing(); as edited) {
         <!-- The edit panel replaces the menu, like the create form. -->
-        <div class="folder-edit-panel">
-          <p class="folder-edit-title">{{ edited.name }}</p>
-
-          <div class="folder-colours" role="radiogroup" [attr.aria-label]="'folders.colourLabel' | transloco">
-            @for (colour of colours; track colour) {
-              <button
-                type="button"
-                role="radio"
-                class="folder-colour"
-                data-testid="folder-colour"
-                [attr.data-colour]="colour"
-                [class]="'folder-colour is-' + colour"
-                [class.on]="edited.colour === colour"
-                [attr.aria-checked]="edited.colour === colour"
-                [attr.aria-label]="'folders.colour.' + colour | transloco"
-                (click)="pickColour(colour)"
-              ></button>
-            }
-          </div>
-
-          <form class="folder-create-form" (submit)="submitRename($event, renameInput.value)">
-            <input
-              #renameInput
-              type="text"
-              class="folder-create-input"
-              data-testid="folder-rename-input"
-              [attr.aria-label]="'folders.renameLabel' | transloco"
-              [value]="edited.name"
-            />
-            <button type="submit" class="folder-create-submit" data-testid="folder-rename-submit">
-              {{ 'folders.renameSubmit' | transloco }}
-            </button>
-          </form>
-
-          <!-- ⚠️ No refuge to choose, unlike a space: `ON DELETE SET NULL` leaves the
-               notes where they are, merely unfiled. -->
-          <button
-            type="button"
-            class="folder-create-submit folder-delete-submit"
-            data-testid="folder-delete"
-            [class.confirming]="confirmingDelete()"
-            (click)="onDeleteClick()"
-          >
-            {{ (confirmingDelete() ? 'folders.deleteConfirm' : 'folders.delete') | transloco }}
-          </button>
-          <p class="folder-delete-note">{{ 'folders.deleteKeepsNotes' | transloco }}</p>
-        </div>
+        <app-folder-editor
+          [folder]="edited"
+          (renamed)="onRenamed($event)"
+          (recoloured)="folderRecoloured.emit($event)"
+          (deleted)="onDeleted($event)"
+        />
       } @else if (creating()) {
         <!-- The form replaces the menu rather than adding to it: an input inside a
              role="menu" is neither valid ARIA nor navigable the way options are. -->

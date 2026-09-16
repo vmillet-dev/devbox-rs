@@ -843,6 +843,43 @@ means "this note is loose", and writing one back would undo what `file_many` jus
 with `X`, then "Ranger dans" in the selection bar — the same batch command the drop uses,
 so the two cannot drift. The gesture adds to it; it does not replace it.
 
+### Descending into a folder
+
+A space shows its folders; a folder shows its notes. **Choosing a folder is opening it** —
+there is one piece of state, `FoldersStore.activeFolderId`, whether it was chosen from the
+switcher or by clicking a zone title on the board.
+
+While one is open, the space switcher, the view switch and the folder switcher all give way
+to a `SQL / ● Perf` breadcrumb: from inside a folder there is one place to go, and it is
+back. Leaving restores whichever view you came from, because the board's own mode is never
+touched.
+
+⚠️ **The inside of a folder is not spatial.** No zones, no coordinates, nothing to draw —
+it is already sorted by the fact of being there, and a second board inside the first would
+be a second set of positions to maintain for nothing.
+
+**It is a flat grid, and that is decided in Rust.** `notes::view::build` counts an opened
+folder as filtering, so the view comes back as a single `results` section. ⚠️
+`build_sections` still knows nothing about a folder — this is the only place the two meet,
+and the date view's own sections are untouched, because nothing sends a `folder_id` unless
+a folder has actually been opened.
+
+**A note created here arrives already filed.** That and a drop on the board are the only two
+places that file a new note. ⚠️ The quick-paste palette deliberately does not: it is used
+mid-task from another application, and a decision there would sit in the fastest path in the
+product.
+
+**Escape falls through**, in this order: the selection, then the search and the facets, then
+out of the folder. Leaving is the biggest of the three, so it goes last. ⚠️ The middle rung
+asks `hasUserFilters` and not `isFiltering` — the latter is the _view's_ answer and is true
+inside an opened folder, so Escape would clear a search that is not there and never fall
+through.
+
+**The folder's three actions live in one component.** `folder-editor/` holds the rename, the
+palette and the delete; the switcher, the breadcrumb and the zone menu on the board all
+project it, so they cannot drift apart. Deleting from the breadcrumb goes back, with the
+notes now loose.
+
 ### Editing a note
 
 The editor overlay is where every note mutation starts (title, body, language, tags, pin,

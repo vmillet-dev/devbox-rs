@@ -104,7 +104,8 @@
     },
     "delete": "Delete folder",
     "deleteConfirm": "Confirm?",
-    "deleteKeepsNotes": "The notes stay, simply without a folder."
+    "deleteKeepsNotes": "The notes stay, simply without a folder.",
+    "breadcrumbLabel": "Folder breadcrumb"
   },
   "board": {
     "viewSwitchLabel": "Choose the view",

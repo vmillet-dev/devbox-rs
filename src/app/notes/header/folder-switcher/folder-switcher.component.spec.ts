@@ -167,7 +167,7 @@ describe('FolderSwitcherComponent', () => {
 
     await open();
     await click('[data-testid="folder-edit"]');
-    expect(root().querySelector('.folder-delete-note')?.textContent).toContain('Les notes restent');
+    expect(root().querySelector('.editor-note')?.textContent).toContain('Les notes restent');
 
     await click('[data-testid="folder-delete"]');
     expect(seen).toEqual([]);

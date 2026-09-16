@@ -1,7 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { BoardFrame, BoardNote, BoardZone } from '@core/model/board.model';
 import { NoteActivation, NoteCardComponent } from '@notes/canvas/note-card/note-card.component';
+import {
+  FolderEditorComponent,
+  FolderRecolouring,
+  FolderRenaming,
+} from '@notes/header/folder-editor/folder-editor.component';
 
 /** A card grabbed inside a zone, with where it sits so the drag keeps its offset. */
 export interface CardGrab {
@@ -22,7 +27,7 @@ export interface CardGrab {
  */
 @Component({
   selector: 'app-board-zone',
-  imports: [NoteCardComponent, TranslocoPipe],
+  imports: [NoteCardComponent, TranslocoPipe, FolderEditorComponent],
   templateUrl: './board-zone.component.html',
   styleUrl: './board-zone.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -42,8 +47,24 @@ export class BoardZoneComponent {
   readonly headGrabbed = output<PointerEvent>();
   readonly resizeGrabbed = output<PointerEvent>();
   readonly cardGrabbed = output<CardGrab>();
+  readonly renamed = output<FolderRenaming>();
+  readonly recoloured = output<FolderRecolouring>();
+  readonly deleted = output<string>();
+
+  /** The same three actions the breadcrumb and the switcher offer, in the same panel. */
+  protected readonly menuOpen = signal(false);
 
   protected readonly headingId = computed(() => `board-zone-${this.zone().folder.id}`);
+
+  protected onRenamed(renaming: FolderRenaming): void {
+    this.menuOpen.set(false);
+    this.renamed.emit(renaming);
+  }
+
+  protected onDeleted(id: string): void {
+    this.menuOpen.set(false);
+    this.deleted.emit(id);
+  }
 
   /** A card flows here, so its drag starts from where the zone is rather than from itself. */
   protected grabCard(event: PointerEvent, entry: BoardNote): void {

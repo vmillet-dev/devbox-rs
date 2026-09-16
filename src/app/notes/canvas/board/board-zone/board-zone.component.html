@@ -43,7 +43,31 @@
     @if (isDropTarget()) {
       <span class="zone-drop" data-testid="board-zone-drop">{{ 'board.dropHere' | transloco }}</span>
     }
+    @if (editable() && !isDropTarget()) {
+      <button
+        type="button"
+        class="zone-menu"
+        data-testid="board-zone-menu"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="menuOpen()"
+        [attr.aria-label]="'folders.optionsLabel' | transloco: { name: folder.name }"
+        (click)="menuOpen.set(!menuOpen())"
+      >
+        <span aria-hidden="true">⋯</span>
+      </button>
+    }
   </header>
+
+  @if (menuOpen()) {
+    <div class="zone-dropdown" data-testid="board-zone-panel">
+      <app-folder-editor
+        [folder]="folder"
+        (renamed)="onRenamed($event)"
+        (recoloured)="recoloured.emit($event)"
+        (deleted)="onDeleted($event)"
+      />
+    </div>
+  }
 
   <div class="zone-body">
     @for (entry of zone().notes; track entry.note.id) {

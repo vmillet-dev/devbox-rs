@@ -104,7 +104,8 @@
     },
     "delete": "Supprimer le dossier",
     "deleteConfirm": "Confirmer ?",
-    "deleteKeepsNotes": "Les notes restent, simplement sans dossier."
+    "deleteKeepsNotes": "Les notes restent, simplement sans dossier.",
+    "breadcrumbLabel": "Fil d’Ariane du dossier"
   },
   "board": {
     "viewSwitchLabel": "Choisir la vue",

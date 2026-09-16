@@ -21,11 +21,9 @@ import { BoardFrame } from '@core/model/board.model';
 import { BoardComponent, CardDrop } from './canvas/board/board.component';
 import { FolderNamePromptComponent } from './overlays/folder-name-prompt/folder-name-prompt.component';
 import { FilterChipsComponent } from './header/filter-chips/filter-chips.component';
-import {
-  FolderRecolouring,
-  FolderRenaming,
-  FolderSwitcherComponent,
-} from './header/folder-switcher/folder-switcher.component';
+import { FolderRecolouring, FolderRenaming } from './header/folder-editor/folder-editor.component';
+import { FolderBreadcrumbComponent } from './header/folder-breadcrumb/folder-breadcrumb.component';
+import { FolderSwitcherComponent } from './header/folder-switcher/folder-switcher.component';
 import { LanguageRailComponent } from './header/language-rail/language-rail.component';
 import { NewNoteButtonComponent } from './header/new-note-button/new-note-button.component';
 import { NoteActivation } from './canvas/note-card/note-card.component';
@@ -54,6 +52,7 @@ import { UndoBarComponent } from './overlays/undo-bar/undo-bar.component';
     SearchBoxComponent,
     FilterChipsComponent,
     FolderSwitcherComponent,
+    FolderBreadcrumbComponent,
     ViewSwitchComponent,
     BoardComponent,
     FolderNamePromptComponent,
@@ -156,6 +155,11 @@ export class NotesPageComponent {
 
   protected onCardDropped({ noteId, folderId, position }: CardDrop): void {
     void this.board.dropCard(noteId, folderId, position);
+  }
+
+  /** Deleting from here goes back to the board, with the notes now loose on it. */
+  protected onFolderDeleted(id: string): void {
+    void this.folders.deleteFolder(id);
   }
 
   protected onZoneDrawn(frame: BoardFrame): void {

@@ -1,7 +1,7 @@
 import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
-import { folders, selectionBar, spaces } from '../pageobjects/overlays.page.js';
+import { crumb, folders, selectionBar, spaces } from '../pageobjects/overlays.page.js';
 import { reloadCanvas, testid, waitForCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
@@ -111,17 +111,21 @@ describe('Folders', () => {
       expect(await card.$(testid('note-card-folder')).isExisting()).toBe(false);
     });
 
+    /**
+     * Choosing a folder *is* opening it: the canvas narrows and the breadcrumb takes the
+     * switcher's place, because from inside a folder there is one place to go.
+     */
     it('narrows the canvas to one folder, and back out again', async () => {
       await folders.open();
       await folders.option(perfId).click();
       await canvas.waitForNoCard('Hors dossier');
 
       expect((await canvas.titles()).sort()).toEqual(['Cache hit ratio', 'Locks sur jobs']);
-      expect(await folders.label()).toContain('Perf');
+      expect(await crumb.name()).toBe('Perf');
 
-      await folders.open();
-      await folders.allOption().click();
+      await crumb.back();
       await canvas.waitForCard('Hors dossier');
+      expect(await crumb.isShowing()).toBe(false);
     });
 
     /** The same control both ways: taking a note out is a filing with no folder. */

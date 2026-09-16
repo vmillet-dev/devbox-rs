@@ -118,6 +118,8 @@ export const canvas = {
     await waitForCanvas();
   },
 
+  searchQuery: (): Promise<string> => $(testid('search-input')).getValue(),
+
   async clearSearch(): Promise<void> {
     // ⚠️ `setValue('')` rather than select-all-then-Backspace: it goes through the element
     // endpoint, which the embedded driver implements, where key actions are dropped.
