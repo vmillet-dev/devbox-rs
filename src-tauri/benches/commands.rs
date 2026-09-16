@@ -16,13 +16,12 @@ use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use devbox_lib::attachments::store as attachments;
 use devbox_lib::notes::model::NotePatch;
 use devbox_lib::notes::store;
-use devbox_lib::notes::view::{self, NoteFilter, NotesQuery};
+use devbox_lib::notes::view::{NoteFilter, NotesQuery};
 use devbox_lib::transfer::{bundle, file};
 
-use corpus::{Corpus, NOTES, build, now};
+use corpus::{NOTES, build, now, run_query};
 
 fn query(search: &str) -> NotesQuery {
     NotesQuery {
@@ -35,19 +34,6 @@ fn query(search: &str) -> NotesQuery {
         tz_offset_minutes: -120,
         pinned_first: true,
     }
-}
-
-/// Everything `query_notes` does, in its order, serialisation included.
-fn run_query(corpus: &mut Corpus, request: &NotesQuery) -> String {
-    let (notes, facets) = store::fetch(&mut corpus.connection, request).expect("a view");
-    let counts = attachments::counts(&mut corpus.connection).expect("the counters");
-    let globals = store::global_placeholder_values(&mut corpus.connection).expect("the globals");
-
-    let mut built = view::build(notes, facets, request);
-    view::apply_attachment_counts(&mut built, &counts);
-    view::apply_global_defaults(&mut built, &globals);
-
-    serde_json::to_string(&built).expect("a serialisable view")
 }
 
 /// The one that matters most: it runs on every keystroke, behind the 150 ms debounce.

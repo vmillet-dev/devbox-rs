@@ -80,6 +80,11 @@ criterion = { version = "0.8", default-features = false, features = ["cargo_benc
 name = "commands"
 harness = false
 
+# ⚠️ Its own target so `cargo bench` stays usable: it seeds 26 000 notes.
+[[bench]]
+name = "corpus_size"
+harness = false
+
 [profile.release]
 lto = true
 codegen-units = 1

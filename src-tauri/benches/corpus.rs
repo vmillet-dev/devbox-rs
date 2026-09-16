@@ -6,16 +6,22 @@
 //! ⚠️ **File-backed, never `open_in_memory`.** An in-memory database has no pager behind a
 //! file, no page cache and no I/O, so it measures something the application never does.
 
+// ⚠️ Two bench targets compile their own copy of this module and each uses a part of it:
+// `commands` never calls `build_of`, `corpus_size` never reads `note_ids`.
+#![allow(dead_code)]
+
 use std::path::PathBuf;
 
 use chrono::{DateTime, TimeDelta, Utc};
 use devbox_lib::db::Library;
 
+use devbox_lib::attachments::store as attachments;
 use devbox_lib::db;
 use devbox_lib::notes::checklist::{ChecklistItem, NoteKind};
 use devbox_lib::notes::language::Language;
 use devbox_lib::notes::model::{NoteDraft, NoteLifecycle};
 use devbox_lib::notes::store;
+use devbox_lib::notes::view::{self, NotesQuery};
 use devbox_lib::spaces::store as spaces;
 
 pub(crate) const NOTES: usize = 8000;
@@ -104,8 +110,28 @@ fn draft(seed: usize, space_id: &str) -> NoteDraft {
     }
 }
 
+/// Everything `query_notes` does, in its order, serialisation included — the string it
+/// returns is what would cross the bridge.
+pub(crate) fn run_query(corpus: &mut Corpus, request: &NotesQuery) -> String {
+    let (notes, facets) = store::fetch(&mut corpus.connection, request).expect("a view");
+    let counts = attachments::counts(&mut corpus.connection).expect("the counters");
+    let globals = store::global_placeholder_values(&mut corpus.connection).expect("the globals");
+
+    let mut built = view::build(notes, facets, request);
+    view::apply_attachment_counts(&mut built, &counts);
+    view::apply_global_defaults(&mut built, &globals);
+
+    serde_json::to_string(&built).expect("a serialisable view")
+}
+
 /// Seeded once per benchmark group, never inside a `b.iter`.
 pub(crate) fn build() -> Corpus {
+    build_of(NOTES)
+}
+
+/// ⚠️ The size is a parameter only because #21 asks what a query costs as a corpus grows.
+/// Every other group takes [`NOTES`], so its numbers stay comparable across runs.
+pub(crate) fn build_of(notes: usize) -> Corpus {
     let directory = std::env::temp_dir().join(format!("devbox-bench-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&directory).expect("a writable temporary directory");
 
@@ -126,7 +152,7 @@ pub(crate) fn build() -> Corpus {
         .collect();
 
     let at = now();
-    let note_ids: Vec<String> = (0..NOTES)
+    let note_ids: Vec<String> = (0..notes)
         .map(|seed| {
             let space_id = &space_ids[seed % SPACES];
             store::create(&mut connection, draft(seed, space_id), at)
