@@ -60,6 +60,18 @@ export const commands = {
 	setGlobalPlaceholders: (values: { [key in string]: string }) => typedError<{ [key in string]: string }, AppError>(__TAURI_INVOKE("set_global_placeholders", { values })),
 	/**  `None` = every space, like [`crate::notes::view::NotesQuery::space_id`]. */
 	listFolders: (spaceId: string | null) => typedError<Folder[], AppError>(__TAURI_INVOKE("list_folders", { spaceId })),
+	/**
+	 *  The second way to look at a space: folders as zones, their notes inside them, the
+	 *  loose ones beside them.
+	 * 
+	 *  ⚠️ It reads the whole space and marks what matches rather than narrowing — the quick
+	 *  filter, the rails and the search all **dim** on the board. Reflowing the survivors into
+	 *  a list would throw away the spatial memory the board exists for.
+	 * 
+	 *  ⚠️ `apply_folders` deliberately does not run: a chip naming the zone a card already
+	 *  sits in is noise, and a loose card has no folder to name.
+	 */
+	boardView: (query: BoardQuery) => typedError<BoardView, AppError>(__TAURI_INVOKE("board_view", { query })),
 	createFolder: (draft: FolderDraft) => typedError<Folder, AppError>(__TAURI_INVOKE("create_folder", { draft })),
 	renameFolder: (id: string, name: string) => typedError<Folder, AppError>(__TAURI_INVOKE("rename_folder", { id, name })),
 	recolourFolder: (id: string, colour: FolderColour) => typedError<Folder, AppError>(__TAURI_INVOKE("recolour_folder", { id, colour })),
@@ -181,6 +193,64 @@ export type Attachment = {
 	/**  `u32` and not `u64`: Specta refuses what JSON cannot carry without loss. */
 	byteSize: number,
 	createdAt: string,
+};
+
+export type BoardFrame = {
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+};
+
+/**  `flatten`: the front end draws this with the same card component the canvas uses. */
+export type BoardNote = {
+	/**
+	 *  ⚠️ Dimmed in place rather than reflowed into a list: spatial memory is the only
+	 *  thing the board has that the date view does not, and a reflow throws it away.
+	 */
+	matches: boolean,
+	/**  `None` inside a zone, where a card flows; `Some` only on the free background. */
+	position: BoardPoint | null,
+} & DisplayNote;
+
+export type BoardPoint = {
+	x: number,
+	y: number,
+};
+
+export type BoardQuery = {
+	/**
+	 *  Required, unlike [`crate::notes::view::NotesQuery::space_id`]: a folder belongs to
+	 *  a space, so a board across all of them would have no zones to draw.
+	 */
+	spaceId: string,
+	search: string,
+	filter: NoteFilter,
+	tags: string[],
+	languages: Language[],
+	now: string,
+};
+
+export type BoardView = {
+	zones: BoardZone[],
+	loose: BoardNote[],
+	/**
+	 *  Attached to the space, like [`crate::notes::view::NotesView`]'s: facets drawn from
+	 *  already filtered notes would empty the rails on the first selection.
+	 */
+	availableTags: string[],
+	availableLanguages: Language[],
+	isFiltering: boolean,
+	matched: number,
+	/**  The surface to pan over, so the front end sizes it from what is actually on it. */
+	width: number,
+	height: number,
+};
+
+export type BoardZone = {
+	folder: Folder,
+	frame: BoardFrame,
+	notes: BoardNote[],
 };
 
 export type ChangelogRelease = {

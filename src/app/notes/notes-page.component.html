@@ -8,10 +8,15 @@
     (pinRequested)="spaces.togglePinned($event)"
     (spaceDeleted)="onSpaceDeleted($event)"
   />
+  <app-view-switch
+    [mode]="board.mode()"
+    [boardAvailable]="board.canShowBoard()"
+    (modeChanged)="board.setMode($event)"
+  />
   <app-search-box
     [query]="canvas.searchQuery()"
     [shortcutEnabled]="searchShortcutEnabled()"
-    [matched]="canvas.matched()"
+    [matched]="board.isBoard() ? board.matched() : canvas.matched()"
     (cleared)="canvas.clearFilters()"
     (queryChange)="canvas.setSearchQuery($event)"
   />
@@ -60,28 +65,61 @@
   />
 }
 
-@let error = canvas.loadError();
+<!-- ⚠️ The region keeps the `canvas` hook whichever view fills it: it is the address on
+     screen, and the two views are alternatives inside it, not replacements for it. -->
+<div
+  class="canvas-region"
+  data-testid="canvas"
+  [attr.aria-busy]="board.isBoard() ? board.isLoading() : canvas.isLoading()"
+>
+  @if (board.isBoard()) {
+    @let boardError = board.loadError();
 
-<div class="canvas" data-testid="canvas" [attr.aria-busy]="canvas.isLoading()">
-  @if (error) {
-    <!-- Loading is the one operation whose failure empties the whole screen: it
-         deserves its own retry. -->
-    <div class="canvas-state" role="alert">
-      <p class="canvas-state-text">{{ 'errors.notesLoadFailed' | transloco }}</p>
-      <p class="canvas-state-detail">{{ error.message }}</p>
-      <button type="button" class="canvas-retry" (click)="canvas.reload()">
-        {{ 'errors.retry' | transloco }}
-      </button>
-    </div>
-  } @else if (canvas.isLoading()) {
-    <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
-  } @else if (canvas.hasNoResults()) {
-    <p class="canvas-state-text" data-testid="canvas-no-results">{{ 'notes.noResults' | transloco }}</p>
-  } @else {
-    @for (section of canvas.sections(); track section.key) {
-      <app-note-section [section]="section" (noteActivated)="onNoteActivated($event)" />
+    @if (boardError) {
+      <div class="canvas-state" role="alert">
+        <p class="canvas-state-text">{{ 'errors.boardLoadFailed' | transloco }}</p>
+        <p class="canvas-state-detail">{{ boardError.message }}</p>
+        <button type="button" class="canvas-retry" (click)="board.reload()">
+          {{ 'errors.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (board.isLoading()) {
+      <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
+    } @else {
+      <app-board
+        [zones]="board.zones()"
+        [loose]="board.loose()"
+        [width]="board.width()"
+        [height]="board.height()"
+        (noteActivated)="onNoteActivated($event)"
+        (folderOpened)="folders.selectFolder($event)"
+      />
     }
-    <p class="canvas-keyboard-hint">{{ 'notes.keyboardHint' | transloco }}</p>
+  } @else {
+    @let error = canvas.loadError();
+
+    <div class="canvas">
+      @if (error) {
+        <!-- Loading is the one operation whose failure empties the whole screen: it
+             deserves its own retry. -->
+        <div class="canvas-state" role="alert">
+          <p class="canvas-state-text">{{ 'errors.notesLoadFailed' | transloco }}</p>
+          <p class="canvas-state-detail">{{ error.message }}</p>
+          <button type="button" class="canvas-retry" (click)="canvas.reload()">
+            {{ 'errors.retry' | transloco }}
+          </button>
+        </div>
+      } @else if (canvas.isLoading()) {
+        <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
+      } @else if (canvas.hasNoResults()) {
+        <p class="canvas-state-text" data-testid="canvas-no-results">{{ 'notes.noResults' | transloco }}</p>
+      } @else {
+        @for (section of canvas.sections(); track section.key) {
+          <app-note-section [section]="section" (noteActivated)="onNoteActivated($event)" />
+        }
+        <p class="canvas-keyboard-hint">{{ 'notes.keyboardHint' | transloco }}</p>
+      }
+    </div>
   }
 </div>
 

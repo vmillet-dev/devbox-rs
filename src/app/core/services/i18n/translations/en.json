@@ -106,6 +106,15 @@
     "deleteConfirm": "Confirm?",
     "deleteKeepsNotes": "The notes stay, simply without a folder."
   },
+  "board": {
+    "viewSwitchLabel": "Choose the view",
+    "dateView": "Date",
+    "boardView": "Board",
+    "needsASpace": "Pick a space to see its board.",
+    "loose": "No folder · {{count}}",
+    "emptyZone": "No note here.",
+    "empty": "Nothing to arrange yet."
+  },
   "sections": {
     "pinned": "Pinned",
     "today": "Today",
@@ -209,7 +218,8 @@
     "folderRecolourFailed": "The folder colour could not be changed.",
     "folderDeleteFailed": "The folder could not be deleted.",
     "folderGone": "That folder no longer exists.",
-    "folderNameTaken": "A folder named “{{name}}” already exists in this space."
+    "folderNameTaken": "A folder named “{{name}}” already exists in this space.",
+    "boardLoadFailed": "The board could not be loaded."
   },
   "tray": {
     "open": "Open {{app}}",

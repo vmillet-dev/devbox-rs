@@ -17,6 +17,14 @@
   flex-shrink: 0;
 }
 
+// The address on screen, whichever of the two views is filling it.
+.canvas-region {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .canvas {
   flex: 1;
   overflow-y: auto;

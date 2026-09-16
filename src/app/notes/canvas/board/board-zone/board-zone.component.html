@@ -1,0 +1,44 @@
+@let folder = zone().folder;
+@let frame = zone().frame;
+
+<section
+  class="zone"
+  data-testid="board-zone"
+  [attr.data-folder-id]="folder.id"
+  [class]="'zone is-' + folder.colour"
+  [style.left.px]="frame.x"
+  [style.top.px]="frame.y"
+  [style.width.px]="frame.width"
+  [style.height.px]="frame.height"
+  [attr.aria-labelledby]="headingId()"
+>
+  <header class="zone-head">
+    <i class="zone-swatch" aria-hidden="true"></i>
+    <!-- A button, not a heading alone: clicking the title is what descends into it. -->
+    <button
+      type="button"
+      class="zone-name"
+      data-testid="board-zone-open"
+      [id]="headingId()"
+      (click)="opened.emit(folder.id)"
+    >
+      {{ folder.name }}
+    </button>
+    <span class="zone-count">{{ zone().notes.length }}</span>
+  </header>
+
+  <div class="zone-body">
+    @for (entry of zone().notes; track entry.note.id) {
+      <!-- ⚠️ Dimmed, never dropped: reflowing the survivors throws away the spatial
+           memory the board exists for. -->
+      <app-note-card
+        [note]="entry.note"
+        [class.dimmed]="!entry.matches"
+        (opened)="noteActivated.emit($event)"
+      />
+    }
+    @if (zone().notes.length === 0) {
+      <p class="zone-empty">{{ 'board.emptyZone' | transloco }}</p>
+    }
+  </div>
+</section>
