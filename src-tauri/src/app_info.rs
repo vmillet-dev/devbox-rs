@@ -31,3 +31,40 @@ pub(crate) const METADATA: AppMetadata = AppMetadata {
     author_handle: env!("DEVBOX_AUTHOR_HANDLE"),
     rust_version: env!("DEVBOX_RUST_VERSION"),
 };
+
+#[cfg(test)]
+mod tests {
+    use super::METADATA;
+
+    /// ⚠️ The comment on `repository` is a promise nothing checked. Tauri refuses an
+    /// `openUrl` outside the scope at runtime, with nothing on screen to explain it, so
+    /// moving the repository without widening the scope would only show up in someone's
+    /// hands. Read from the shipped capability, next to the constant it constrains.
+    #[test]
+    fn the_repository_stays_inside_the_scope_the_capability_allows() {
+        const CAPABILITY: &str = include_str!("../capabilities/default.json");
+
+        let declared: serde_json::Value = serde_json::from_str(CAPABILITY).expect("valid JSON");
+        let scopes = declared["permissions"]
+            .as_array()
+            .expect("a permissions array")
+            .iter()
+            .filter(|permission| permission["identifier"] == "opener:allow-open-url")
+            .flat_map(|permission| permission["allow"].as_array().expect("an allow list"))
+            .filter_map(|entry| entry["url"].as_str())
+            .collect::<Vec<_>>();
+
+        assert!(
+            !scopes.is_empty(),
+            "no opener:allow-open-url scope to check"
+        );
+        assert!(
+            scopes.iter().any(|scope| match scope.strip_suffix('*') {
+                Some(prefix) => METADATA.repository.starts_with(prefix),
+                None => *scope == METADATA.repository,
+            }),
+            "{} is outside {scopes:?}",
+            METADATA.repository
+        );
+    }
+}

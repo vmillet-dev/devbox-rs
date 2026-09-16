@@ -64,7 +64,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
     return guard(this, () => {
       this.lastQuery = query;
       this.queryCount += 1;
-      return this.forcedView ?? this.trivialView();
+      return this.forcedView ?? this.trivialView(query);
     });
   }
 
@@ -295,8 +295,12 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
     return removed.length;
   }
 
-  /** Every note in one section — the shape, not the grouping rules. */
-  private trivialView(): NotesView {
+  /**
+   * Every note in one section — the shape, not the grouping rules. ⚠️ `isFiltering` is
+   * answered the way the back end answers it, because the canvas reads it to decide
+   * whether there is anything to clear.
+   */
+  private trivialView(query?: NotesQuery): NotesView {
     return {
       sections: [
         {
@@ -308,7 +312,10 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
       ],
       availableTags: [...new Set(this.notes.flatMap((note) => note.tags))].sort(),
       availableLanguages: [...new Set(this.notes.map((note) => note.language))].sort(),
-      isFiltering: false,
+      isFiltering:
+        (query?.search.trim().length ?? 0) > 0 ||
+        (query?.tags.length ?? 0) > 0 ||
+        (query?.languages.length ?? 0) > 0,
       matched: this.notes.length,
     };
   }
