@@ -15,10 +15,57 @@ use devbox_lib::notes::model::{Note, NoteDraft, NoteLifecycle, NotePatch, decora
 use devbox_lib::notes::store::trash::{expired_ids, list_trashed, purge, restore_many, trash};
 use devbox_lib::notes::store::{
     all, by_ids, create, drop_tags, fetch, global_placeholder_values, insert_imported, move_many,
-    replace_global_placeholder_values, retag, set_placeholder_values, tag_many, tag_usage, update,
+    replace_global_placeholder_values, retag, seed, set_placeholder_values, tag_many, tag_usage,
+    update,
 };
 use devbox_lib::notes::view::{self, NoteFilter, NotesQuery, NotesView};
 use devbox_lib::spaces::store as spaces;
+
+/// ⚠️ The first launch used to be six round trips — one space, one marker, four notes —
+/// and a process killed between any two left a space standing with nothing in it, which
+/// both of the front end’s guards then read as "already seeded".
+#[test]
+fn the_first_launch_writes_the_space_and_its_notes_as_one() {
+    let mut library = open_in_memory().unwrap();
+
+    let space = seed(
+        &mut library,
+        "Personnel",
+        vec![
+            NoteDraft {
+                title: "Bienvenue".to_string(),
+                ..draft("ignored")
+            },
+            NoteDraft {
+                title: "Un snippet".to_string(),
+                ..draft("ignored")
+            },
+        ],
+        t0(),
+    )
+    .unwrap();
+
+    assert_eq!(space.name, "Personnel");
+    let written = list(&mut library).unwrap();
+    assert_eq!(written.len(), 2);
+    // ⚠️ The drafts carry a space that does not exist when the front end composes them.
+    assert!(written.iter().all(|note| note.space_id == space.id));
+}
+
+/// A refused seeding leaves nothing behind — not even the space it had started with.
+#[test]
+fn a_seeding_that_fails_leaves_no_half_library() {
+    let mut library = open_in_memory().unwrap();
+    spaces::create(&mut library, "Personnel").unwrap();
+    let before = spaces::list(&mut library).unwrap().len();
+
+    // The name is taken, so the space this seeding opens with is refused.
+    let refused = seed(&mut library, "personnel", vec![draft("ignored")], t0());
+
+    assert!(matches!(refused, Err(StorageError::DuplicateSpaceName(_))));
+    assert_eq!(spaces::list(&mut library).unwrap().len(), before);
+    assert!(list(&mut library).unwrap().is_empty());
+}
 
 /// No such shortcut exists in production code: it would invite re-filtering on the
 /// front end.

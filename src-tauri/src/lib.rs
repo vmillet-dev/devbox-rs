@@ -28,8 +28,8 @@ use desktop::{set_global_shortcuts, set_window_behavior, sync_tray};
 use notes::{
     create_note, delete_note, delete_notes, delete_tags, empty_trash, fill_placeholders,
     list_global_placeholders, list_tags, list_trash, merge_tags, move_notes, purge_notes,
-    query_notes, rename_tag, restore_notes, set_global_placeholders, set_placeholder_values,
-    tag_notes, update_note,
+    query_notes, rename_tag, restore_notes, seed_samples, set_global_placeholders,
+    set_placeholder_values, tag_notes, update_note,
 };
 use spaces::{create_space, delete_space, list_spaces, pin_space, rename_space};
 use transfer::{export_is_protected, export_notes, export_selection, import_notes, share_notes};
@@ -56,6 +56,7 @@ fn ipc_builder() -> Builder<tauri::Wry> {
         .commands(collect_commands![
             query_notes,
             create_note,
+            seed_samples,
             update_note,
             delete_note,
             delete_notes,

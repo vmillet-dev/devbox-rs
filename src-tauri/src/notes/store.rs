@@ -15,6 +15,7 @@ use super::view::{Facets, NoteFilter, NotesQuery};
 use crate::db::schema::{global_placeholders, note_tags, notes};
 use crate::db::{Library, iso8601};
 use crate::error::StorageError;
+use crate::spaces::model::Space;
 use crate::spaces::store as spaces;
 use crate::vault::key::Vault;
 
@@ -278,21 +279,66 @@ pub fn create(
     draft: NoteDraft,
     now: DateTime<Utc>,
 ) -> Result<Note, StorageError> {
+    connection.transaction(|connection, vault| create_in(connection, vault, draft, now))
+}
+
+/// For a caller already inside a transaction — the first launch writes a space and four
+/// notes as one.
+pub(crate) fn create_in(
+    connection: &mut SqliteConnection,
+    vault: &Vault,
+    draft: NoteDraft,
+    now: DateTime<Utc>,
+) -> Result<Note, StorageError> {
+    if !spaces::exists(connection, &draft.space_id)? {
+        return Err(StorageError::SpaceNotFound(draft.space_id));
+    }
+
+    let mut note = draft.into_note(Uuid::new_v4().to_string(), now);
+
+    diesel::insert_into(notes::table)
+        .values(NoteRow::seal(&note, vault)?)
+        .execute(connection)?;
+    let written = std::mem::take(&mut note.tags);
+    note.tags = related::replace_tags(connection, &note.id, &written)?;
+    related::replace_items(connection, vault, &note.id, &note.items)?;
+
+    Ok(note)
+}
+
+/// The first launch, as one write.
+///
+/// ⚠️ The space and its notes commit together or not at all. Six round trips used to
+/// seed them — one space, one marker, four notes — and a process that died between any
+/// two left a space standing with nothing in it, which both of `seedIfFirstRun`'s guards
+/// then read as "already seeded". The canvas stayed empty for the life of that install.
+///
+/// ⚠️ Each draft's own `space_id` is ignored and replaced: the front end composes the
+/// drafts before the space it files them into exists.
+pub fn seed(
+    connection: &mut Library,
+    space_name: &str,
+    drafts: Vec<NoteDraft>,
+    now: DateTime<Utc>,
+) -> Result<Space, StorageError> {
     connection.transaction(|connection, vault| {
-        if !spaces::exists(connection, &draft.space_id)? {
-            return Err(StorageError::SpaceNotFound(draft.space_id));
+        let space = spaces::create_in(connection, vault, space_name)?;
+
+        for draft in drafts {
+            // Sequential, and `now` is shared: `created_at` is what orders the canvas,
+            // so the samples keep the order they were written in.
+            create_in(
+                connection,
+                vault,
+                NoteDraft {
+                    space_id: space.id.clone(),
+                    ..draft
+                },
+                now,
+            )?;
         }
 
-        let mut note = draft.into_note(Uuid::new_v4().to_string(), now);
-
-        diesel::insert_into(notes::table)
-            .values(NoteRow::seal(&note, vault)?)
-            .execute(connection)?;
-        let written = std::mem::take(&mut note.tags);
-        note.tags = related::replace_tags(connection, &note.id, &written)?;
-        related::replace_items(connection, vault, &note.id, &note.items)?;
-
-        Ok(note)
+        Ok(space)
     })
 }
 

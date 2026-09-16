@@ -50,9 +50,11 @@ describe('SampleNotesService', () => {
   it('files a space and its samples into a database that has never been written to', async () => {
     expect(await service.seedIfFirstRun()).toBe(true);
 
-    expect((await spaces.loadAll()).map((space) => space.name)).toEqual(['Découverte']);
+    expect(notes.seededSamples?.spaceName).toBe('Découverte');
     expect(drafts()).toHaveLength(4);
-    expect(drafts().every((draft) => draft.spaceId === 'fake-space-1')).toBe(true);
+    // ⚠️ The drafts carry no space: it does not exist when they are composed, and the
+    // command that creates it is the one that files them into it.
+    expect(notes.seededSamples?.drafts.every((draft) => draft.spaceId === '')).toBe(true);
   });
 
   it('carries one feature per sample', async () => {
@@ -110,12 +112,18 @@ describe('SampleNotesService', () => {
     expect(drafts()).toHaveLength(0);
   });
 
-  it('does not start over when a write failed halfway through', async () => {
+  /**
+   * ⚠️ The opposite of what this asserted before, and the point of the ticket: the space
+   * and its notes are one write now, so a failure leaves neither — and "it is seeded" is
+   * written only once it is true, which lets the next launch try again.
+   */
+  it('seeds again after a failure, instead of closing the door on an empty canvas', async () => {
     notes.failNext = new Error('disk full');
 
     expect(await service.seedIfFirstRun()).toBe(false);
-    // An incomplete set beats a second full set on the next launch.
-    expect(await service.seedIfFirstRun()).toBe(false);
-    expect((await spaces.loadAll()).length).toBe(1);
+    expect(preferences.read('devbox.notes.samplesSeeded')).toBeNull();
+
+    expect(await service.seedIfFirstRun()).toBe(true);
+    expect(notes.seededSamples?.drafts).toHaveLength(4);
   });
 });

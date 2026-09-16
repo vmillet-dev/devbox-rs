@@ -9,6 +9,9 @@ import { NoteDraft } from '../model/note.model';
 
 const SEEDED_KEY = 'devbox.notes.samplesSeeded';
 
+/** The space these drafts belong to does not exist yet; `seed_samples` fills it in. */
+const UNFILED = '';
+
 const DEADLINE_DAYS = 7;
 
 /**
@@ -90,14 +93,11 @@ export class SampleNotesService {
   private async seed(): Promise<boolean> {
     const text = await this.texts();
 
-    const space = await this.spaces.create({ name: text.spaceName });
-    // ⚠️ Written before the notes: a failure halfway through leaves an incomplete set
-    // rather than a second full one on the next launch.
-    this.preferences.write(SEEDED_KEY, 'true');
-
+    // ⚠️ No space of their own: one command writes the space and these four notes in a
+    // single transaction, and it is the one that decides where they land.
     const drafts: NoteDraft[] = [
       {
-        spaceId: space.id,
+        spaceId: UNFILED,
         title: text.welcomeTitle,
         language: 'md',
         content: text.welcomeContent,
@@ -109,7 +109,7 @@ export class SampleNotesService {
         items: [],
       },
       {
-        spaceId: space.id,
+        spaceId: UNFILED,
         title: text.snippetTitle,
         language: 'sh',
         content: PSQL_SNIPPET,
@@ -121,7 +121,7 @@ export class SampleNotesService {
         items: [],
       },
       {
-        spaceId: space.id,
+        spaceId: UNFILED,
         title: text.checklistTitle,
         language: 'txt',
         content: '',
@@ -139,7 +139,7 @@ export class SampleNotesService {
         ].map((label) => ({ text: label, done: false })),
       },
       {
-        spaceId: space.id,
+        spaceId: UNFILED,
         title: text.codeTitle,
         language: 'ts',
         content: SIGNAL_SNIPPET,
@@ -152,10 +152,12 @@ export class SampleNotesService {
       },
     ];
 
-    // ⚠️ Sequential on purpose: `created_at` orders the canvas.
-    for (const draft of drafts) {
-      await this.notes.create(draft);
-    }
+    await this.notes.seedSamples(text.spaceName, drafts);
+
+    // ⚠️ Written after, and only after: it says "this library has been seeded", which is
+    // now something observed rather than hoped for. An interrupted seeding rolls back
+    // whole, so the next launch finds no marker and no space, and seeds again.
+    this.preferences.write(SEEDED_KEY, 'true');
 
     return true;
   }

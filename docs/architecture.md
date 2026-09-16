@@ -1131,10 +1131,12 @@ would replace a snippet's fields with empty strings on the way out.
 ⚠️ **Two guards decide a first launch, not one.** A preference marker
 (`devbox.notes.samplesSeeded`) alone would re-seed anyone whose preferences file went missing;
 "no space at all" alone would re-seed the day the last space disappears. Together they only ever
-match a database that has never been written to. The marker is written **before** the notes, so
-a write that fails halfway leaves an incomplete set rather than a second full set on the next
-launch, and an installation that predates the samples is marked as skipped so the check stops
-running on every launch. A failure is silent: the canvas reports its own, and a second banner
+match a database that has never been written to. The marker is written **after** the seeding,
+because the seeding is one write: `seed_samples` creates the space and the four notes in a
+single transaction, so there is no halfway. ⚠️ It used to be six round trips, and a process
+killed between any two left a space standing with nothing in it — which both guards then read
+as "already seeded", leaving that install with an empty canvas for good. An installation that
+predates the samples is marked as skipped so the check stops running on every launch. A failure is silent: the canvas reports its own, and a second banner
 about samples nobody asked for would only add noise.
 
 ### Import, export and copying out
