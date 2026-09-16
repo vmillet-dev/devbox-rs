@@ -151,10 +151,16 @@ fn configure(connection: &mut SqliteConnection) -> Result<(), StorageError> {
     // `ON DELETE CASCADE` clauses are inert. `busy_timeout` covers the window where a
     // second process still holds the file, where the default of zero surfaces
     // `SQLITE_BUSY` as a storage error on the very first write.
+    //
+    // ⚠️ `synchronous = NORMAL` is WAL's own default, written down because it is a
+    // durability choice and not a detail: a power cut can cost the last committed
+    // transaction, and cannot corrupt the file. `FULL` would fsync every commit for a
+    // note the user can retype, on an application whose whole corpus is local.
     connection.batch_execute(
         "PRAGMA foreign_keys = ON;
          PRAGMA journal_mode = WAL;
-         PRAGMA busy_timeout = 5000;",
+         PRAGMA busy_timeout = 5000;
+         PRAGMA synchronous = NORMAL;",
     )?;
 
     Ok(())
@@ -237,6 +243,47 @@ mod tests {
             .foreign_keys;
 
         assert_eq!(enabled, 1);
+    }
+
+    /// ⚠️ Zero is SQLite's own default, and it turns a database another process holds for
+    /// twenty milliseconds — a checkpoint, an antivirus, a second instance — into a
+    /// storage error on the first write.
+    #[test]
+    fn a_locked_database_is_waited_on_rather_than_reported() {
+        #[derive(QueryableByName)]
+        struct BusyTimeout {
+            #[diesel(sql_type = Integer)]
+            timeout: i32,
+        }
+
+        let mut connection = open_in_memory().unwrap();
+
+        let timeout = diesel::sql_query("PRAGMA busy_timeout")
+            .get_result::<BusyTimeout>(connection.db())
+            .unwrap()
+            .timeout;
+
+        assert_eq!(timeout, 5000);
+    }
+
+    /// The durability trade-off is chosen, not inherited: `NORMAL` can lose the last
+    /// commit to a power cut and cannot corrupt the file.
+    #[test]
+    fn commits_are_not_fsynced_one_by_one() {
+        #[derive(QueryableByName)]
+        struct Synchronous {
+            #[diesel(sql_type = Integer)]
+            synchronous: i32,
+        }
+
+        let mut connection = open_in_memory().unwrap();
+
+        let level = diesel::sql_query("PRAGMA synchronous")
+            .get_result::<Synchronous>(connection.db())
+            .unwrap()
+            .synchronous;
+
+        assert_eq!(level, 1);
     }
 
     #[test]
