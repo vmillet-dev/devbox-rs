@@ -148,11 +148,11 @@ export class NotesPageComponent {
   }
 
   protected onRenameTag(into: string): void {
-    void this.tags.renameSelected(into);
+    void this.tags.proposeRename(into);
   }
 
   protected onDeleteTags(): void {
-    void this.tags.deleteSelected();
+    void this.tags.proposeDelete();
   }
 
   protected onPaletteOpen(noteId: string): void {

@@ -9,7 +9,7 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
 use super::checklist;
-use super::model::{self, Note, NoteDraft, NoteLifecycle, NotePatch};
+use super::model::{self, Note, NoteDraft, NoteLifecycle, NotePatch, NotePlacement, NoteTag};
 use super::placeholder;
 use super::view::{Facets, NoteFilter, NotesQuery};
 use crate::db::schema::{global_placeholders, note_tags, notes};
@@ -443,14 +443,15 @@ pub fn set_placeholder_values(
     })
 }
 
+/// Answers where each note came from, which is what putting the move back needs.
 pub fn move_many(
     connection: &mut Library,
     ids: &[String],
     space_id: &str,
     now: DateTime<Utc>,
-) -> Result<usize, StorageError> {
+) -> Result<Vec<NotePlacement>, StorageError> {
     if ids.is_empty() {
-        return Ok(0);
+        return Ok(Vec::new());
     }
 
     connection.transaction(|connection, _vault| {
@@ -458,28 +459,80 @@ pub fn move_many(
             return Err(StorageError::SpaceNotFound(space_id.to_string()));
         }
 
-        Ok(diesel::update(
-            notes::table
-                .filter(notes::id.eq_any(ids))
-                .filter(notes::deleted_at.is_null())
-                .filter(notes::space_id.ne(space_id)),
-        )
-        .set((
-            notes::space_id.eq(space_id),
-            notes::updated_at.eq(iso8601::format(now)),
-        ))
-        .execute(connection)?)
+        // ⚠️ Read before the update: afterwards they all say `space_id`, and where each
+        // one came from is gone.
+        let moved: Vec<NotePlacement> = notes::table
+            .filter(notes::id.eq_any(ids))
+            .filter(notes::deleted_at.is_null())
+            .filter(notes::space_id.ne(space_id))
+            .select((notes::id, notes::space_id))
+            .load::<(String, String)>(connection)?
+            .into_iter()
+            .map(|(note_id, space_id)| NotePlacement { note_id, space_id })
+            .collect();
+
+        let touched: Vec<&String> = moved.iter().map(|placement| &placement.note_id).collect();
+        diesel::update(notes::table.filter(notes::id.eq_any(touched)))
+            .set((
+                notes::space_id.eq(space_id),
+                notes::updated_at.eq(iso8601::format(now)),
+            ))
+            .execute(connection)?;
+
+        Ok(moved)
     })
 }
 
+/// Puts moved notes back where they were.
+///
+/// ⚠️ `updated_at` is left alone, like restoring from the trash: undoing is not editing,
+/// and the canvas sorts on that column.
+pub fn restore_placements(
+    connection: &mut Library,
+    placements: &[NotePlacement],
+) -> Result<usize, StorageError> {
+    if placements.is_empty() {
+        return Ok(0);
+    }
+
+    connection.transaction(|connection, _vault| {
+        let mut by_space: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        for placement in placements {
+            by_space
+                .entry(placement.space_id.as_str())
+                .or_default()
+                .push(placement.note_id.as_str());
+        }
+
+        let mut restored = 0;
+        for (space_id, ids) in by_space {
+            // A space dropped since the move is not an error: the rest still goes back.
+            if !spaces::exists(connection, space_id)? {
+                continue;
+            }
+
+            restored += diesel::update(
+                notes::table
+                    .filter(notes::id.eq_any(&ids))
+                    .filter(notes::deleted_at.is_null()),
+            )
+            .set(notes::space_id.eq(space_id))
+            .execute(connection)?;
+        }
+
+        Ok(restored)
+    })
+}
+
+/// Answers the pairs it actually added, not how many notes it looked at.
 pub fn tag_many(
     connection: &mut Library,
     ids: &[String],
     tags: &[String],
     now: DateTime<Utc>,
-) -> Result<usize, StorageError> {
+) -> Result<Vec<NoteTag>, StorageError> {
     if ids.is_empty() || tags.is_empty() {
-        return Ok(0);
+        return Ok(Vec::new());
     }
 
     connection.transaction(|connection, _vault| {
@@ -489,25 +542,104 @@ pub fn tag_many(
             .select(notes::id)
             .load::<String>(connection)?;
 
-        let rows: Vec<_> = targets
+        // ⚠️ What the batch is about to find already there, read before it inserts. This
+        // is what the undo hangs on: re-adding a tag a note carries is a no-op, so
+        // stripping it afterwards would take away something the batch never gave.
+        // `note_tags.tag` is `NOCASE`, which SQLite folds over ASCII only — exactly what
+        // `eq_ignore_ascii_case` compares below.
+        let carried = note_tags::table
+            .filter(note_tags::note_id.eq_any(&targets))
+            .filter(note_tags::tag.eq_any(tags))
+            .select((note_tags::note_id, note_tags::tag))
+            .load::<(String, String)>(connection)?;
+
+        let mut added = Vec::new();
+        for note_id in &targets {
+            for tag in tags {
+                let held = carried
+                    .iter()
+                    .any(|(id, name)| id == note_id && name.eq_ignore_ascii_case(tag));
+                if !held {
+                    added.push(NoteTag {
+                        note_id: note_id.clone(),
+                        tag: tag.clone(),
+                    });
+                }
+            }
+        }
+
+        if added.is_empty() {
+            return Ok(added);
+        }
+
+        let rows: Vec<_> = added
             .iter()
-            .flat_map(|note_id| {
-                tags.iter()
-                    .map(move |tag| (note_tags::note_id.eq(note_id), note_tags::tag.eq(tag)))
+            .map(|pair| {
+                (
+                    note_tags::note_id.eq(&pair.note_id),
+                    note_tags::tag.eq(&pair.tag),
+                )
             })
             .collect();
 
-        // `(note_id, tag)` is `NOCASE`: re-adding a tag already there is a no-op.
         diesel::insert_or_ignore_into(note_tags::table)
             .values(rows)
             .execute(connection)?;
 
-        diesel::update(notes::table.filter(notes::id.eq_any(&targets)))
+        // Only what gained something: a note that already carried the tag did not change,
+        // and the canvas sorts on this column.
+        let touched: Vec<&String> = added.iter().map(|pair| &pair.note_id).collect();
+        diesel::update(notes::table.filter(notes::id.eq_any(touched)))
             .set(notes::updated_at.eq(iso8601::format(now)))
             .execute(connection)?;
 
-        Ok(targets.len())
+        Ok(added)
     })
+}
+
+/// Removes exactly these pairs — the undo of [`tag_many`], and nothing wider.
+///
+/// ⚠️ `updated_at` is left alone, for the reason [`restore_placements`] gives.
+pub fn untag_many(connection: &mut Library, pairs: &[NoteTag]) -> Result<usize, StorageError> {
+    if pairs.is_empty() {
+        return Ok(0);
+    }
+
+    connection.transaction(|connection, _vault| {
+        let mut removed = 0;
+        for pair in pairs {
+            removed += diesel::delete(
+                note_tags::table
+                    .filter(note_tags::note_id.eq(&pair.note_id))
+                    .filter(note_tags::tag.eq(&pair.tag)),
+            )
+            .execute(connection)?;
+        }
+
+        Ok(removed)
+    })
+}
+
+/// How many live notes carry at least one of these tags.
+///
+/// ⚠️ Counted distinctly, not summed per tag: a note carrying two of them is one note,
+/// and a confirmation that overstates its blast radius teaches people to dismiss it.
+pub fn count_notes_tagged(
+    connection: &mut Library,
+    tags: &[String],
+) -> Result<usize, StorageError> {
+    if tags.is_empty() {
+        return Ok(0);
+    }
+
+    let counted: i64 = note_tags::table
+        .inner_join(notes::table)
+        .filter(note_tags::tag.eq_any(tags))
+        .filter(notes::deleted_at.is_null())
+        .select(diesel::dsl::count(note_tags::note_id).aggregate_distinct())
+        .first(connection.db())?;
+
+    Ok(usize::try_from(counted).unwrap_or(0))
 }
 
 pub fn tag_usage(connection: &mut Library) -> Result<Vec<(String, i64)>, StorageError> {

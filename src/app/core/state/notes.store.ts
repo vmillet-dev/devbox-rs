@@ -3,7 +3,16 @@ import { NotesRepository } from '../data/notes.repository';
 import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { FALLBACK_LANGUAGE } from '@core/model/language.model';
-import { ChecklistItem, Note, NoteDraft, NoteKind, NoteLifecycle, NotePatch } from '../model/note.model';
+import {
+  ChecklistItem,
+  Note,
+  NoteDraft,
+  NoteKind,
+  NoteLifecycle,
+  NotePatch,
+  NotePlacement,
+  NoteTag,
+} from '../model/note.model';
 import { ClockService } from '@core/services/time/clock.service';
 import { debounced } from '@core/services/time/debounce';
 import { NoteSelectionStore } from './note-selection.store';
@@ -15,10 +24,14 @@ export type { NoteFilter, NoteKind } from '../model/note.model';
 /** The note is not lost after that: it stays in the trash for 30 days. */
 export const UNDO_WINDOW_MS = 8000;
 
-export interface Deletion {
-  readonly ids: readonly string[];
-  readonly count: number;
-}
+/**
+ * ⚠️ Each variant carries what the back end answered, never what the front end guessed.
+ * Rebuilding the pairs from the selection would undo a tag the note already carried.
+ */
+export type Reversible =
+  | { readonly kind: 'deletion'; readonly ids: readonly string[]; readonly count: number }
+  | { readonly kind: 'move'; readonly previous: readonly NotePlacement[]; readonly count: number }
+  | { readonly kind: 'tag'; readonly added: readonly NoteTag[]; readonly count: number };
 
 /** The note being created, not written until it is worth keeping. */
 export const DRAFT_ID = '__draft__';
@@ -150,7 +163,7 @@ export class NotesStore {
    * changes the id of the *same* note, and stale drafts would be replayed over it.
    */
   private readonly _editorSession = signal(0);
-  private readonly _lastDeletion = signal<Deletion | null>(null);
+  private readonly _lastAction = signal<Reversible | null>(null);
   private readonly _undoVisible = signal(false);
 
   /** The draft wins: while it exists, it is what the editor shows. */
@@ -161,9 +174,9 @@ export class NotesStore {
 
   /** The id actually in the database, or `null` while the open note is only a draft. */
   readonly persistedNoteId = computed<string | null>(() => this._selectedNote()?.id ?? null);
-  readonly lastDeletion = this._lastDeletion.asReadonly();
+  readonly lastAction = this._lastAction.asReadonly();
 
-  readonly undoBanner = computed<Deletion | null>(() => (this._undoVisible() ? this._lastDeletion() : null));
+  readonly undoBanner = computed<Reversible | null>(() => (this._undoVisible() ? this._lastAction() : null));
 
   private readonly hideUndoBanner = debounced(() => this._undoVisible.set(false), UNDO_WINDOW_MS);
 
@@ -274,18 +287,25 @@ export class NotesStore {
     if (this.selectedNoteId() === resolved) {
       this.closeOverlay();
     }
-    this.openUndoWindow({ ids: [resolved], count: 1 });
+    this.openUndoWindow({ kind: 'deletion', ids: [resolved], count: 1 });
     this.notes.reload();
   }
 
   async moveSelection(spaceId: string): Promise<void> {
-    await this.runOnSelection((ids) => this.repository.moveMany(ids, spaceId));
+    const previous = await this.runOnSelection((ids) => this.repository.moveMany(ids, spaceId));
+    if (previous === null) return;
+
+    this.openUndoWindow({ kind: 'move', previous, count: previous.length });
   }
 
   async tagSelection(tag: string): Promise<void> {
     if (!tag.trim()) return;
+
     // No normalisation here: `notes::model::normalize_tags` is its only keeper.
-    await this.runOnSelection((ids) => this.repository.tagMany(ids, [tag]));
+    const added = await this.runOnSelection((ids) => this.repository.tagMany(ids, [tag]));
+    if (added === null) return;
+
+    this.openUndoWindow({ kind: 'tag', added, count: added.length });
   }
 
   async deleteSelection(): Promise<void> {
@@ -298,26 +318,36 @@ export class NotesStore {
     if (count === null) return;
 
     this.selection.clearSelection();
-    this.openUndoWindow({ ids, count });
+    this.openUndoWindow({ kind: 'deletion', ids, count });
     this.notes.reload();
   }
 
-  async undoDeletion(): Promise<void> {
-    const deletion = this._lastDeletion();
-    if (!deletion) return;
+  async undoLastAction(): Promise<void> {
+    const action = this._lastAction();
+    if (!action) return;
 
     this.dismissUndo();
-    const restored = await this.notifier.attempt('errors.trashActionFailed', () =>
-      this.repository.restore(deletion.ids),
-    );
-    if (restored !== null) this.notes.reload();
+    const undone = await this.notifier.attempt('errors.undoFailed', () => this.reverse(action));
+    if (undone !== null) this.notes.reload();
   }
 
   /** Hiding the banner gives up the undo, unlike the timer running out. */
   dismissUndo(): void {
     this.hideUndoBanner.cancel();
     this._undoVisible.set(false);
-    this._lastDeletion.set(null);
+    this._lastAction.set(null);
+  }
+
+  /** Exhaustive by construction: a new kind of undo stops this compiling. */
+  private reverse(action: Reversible): Promise<number> {
+    switch (action.kind) {
+      case 'deletion':
+        return this.repository.restore(action.ids);
+      case 'move':
+        return this.repository.moveBack(action.previous);
+      case 'tag':
+        return this.repository.untagMany(action.added);
+    }
   }
 
   /** Outside `edit()`: filling a field is not editing the note, so `updatedAt` stays put. */
@@ -399,17 +429,23 @@ export class NotesStore {
     this.draftMaterialisation = null;
   }
 
-  private async runOnSelection(action: (ids: readonly string[]) => Promise<number>): Promise<void> {
+  /** `null` when there was nothing to act on, or when the batch failed. */
+  private async runOnSelection<T>(action: (ids: readonly string[]) => Promise<T>): Promise<T | null> {
     const ids = this.selection.checkedNoteIds();
-    if (ids.length === 0) return;
+    if (ids.length === 0) return null;
 
     const done = await this.notifier.attempt('errors.bulkActionFailed', () => action(ids));
     if (done !== null) this.notes.reload();
+
+    return done;
   }
 
-  /** ⚠️ The banner fades, the deletion stays undoable: `Ctrl+Z` still works once it is gone. */
-  private openUndoWindow(deletion: Deletion): void {
-    this._lastDeletion.set(deletion);
+  /** ⚠️ The banner fades, the action stays undoable: `Ctrl+Z` still works once it is gone. */
+  private openUndoWindow(action: Reversible): void {
+    // Nothing moved is nothing to offer: a bar saying "0 notes" is noise, not an undo.
+    if (action.count === 0) return;
+
+    this._lastAction.set(action);
     this._undoVisible.set(true);
     this.hideUndoBanner(undefined);
   }

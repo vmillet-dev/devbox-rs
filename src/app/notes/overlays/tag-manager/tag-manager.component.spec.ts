@@ -29,6 +29,16 @@ describe('TagManagerComponent', () => {
     await fixture.whenStable();
   }
 
+  async function propose(change: {
+    kind: 'rename' | 'merge' | 'delete';
+    tags: readonly string[];
+    into: string;
+    notes: number;
+  }): Promise<void> {
+    fixture.componentRef.setInput('pending', change);
+    await fixture.whenStable();
+  }
+
   async function type(value: string): Promise<void> {
     const input: HTMLInputElement = fixture.nativeElement.querySelector('.tags-target');
     input.value = value;
@@ -75,7 +85,9 @@ describe('TagManagerComponent', () => {
     expect(deleteButton().getAttribute('aria-disabled')).toBe('true');
   });
 
-  it('emits the target name and clears the field', async () => {
+  /** ⚠️ The field keeps what was typed: the change has only been proposed, and
+   *  cancelling must not cost the user their typing. */
+  it('emits the target name and keeps the field until the change is confirmed', async () => {
     let emitted: string | undefined;
     fixture.componentInstance.renameRequested.subscribe((into) => (emitted = into));
     await select('auth');
@@ -85,7 +97,7 @@ describe('TagManagerComponent', () => {
     await fixture.whenStable();
 
     expect(emitted).toBe('identity');
-    expect(fixture.nativeElement.querySelector('.tags-target').value).toBe('');
+    expect(fixture.nativeElement.querySelector('.tags-target').value).toBe('  identity ');
   });
 
   it('does not rename towards nothing', async () => {
@@ -100,19 +112,55 @@ describe('TagManagerComponent', () => {
     expect(emitted).toBe(0);
   });
 
-  it('asks for a confirmation before dropping tags from the corpus', async () => {
+  it('asks rather than acting, when a tag action is clicked', async () => {
     let emitted = 0;
     fixture.componentInstance.deleteRequested.subscribe(() => (emitted += 1));
     await select('auth');
 
     deleteButton().click();
     await fixture.whenStable();
-    expect(emitted).toBe(0);
-    expect(deleteButton().textContent).toContain('Confirmer');
 
-    deleteButton().click();
-    await fixture.whenStable();
     expect(emitted).toBe(1);
+  });
+
+  /**
+   * ⚠️ In place of the actions, not beside them: the click that asked for this is the one
+   * that would confirm it, and a second click landing on the same spot is the accident a
+   * confirmation exists to stop.
+   */
+  it('replaces the actions with what the change would touch', async () => {
+    await select('auth');
+    await propose({ kind: 'delete', tags: ['auth'], into: '', notes: 4 });
+
+    const confirmation = fixture.nativeElement.querySelector('[data-testid="tag-confirm"]');
+
+    expect(confirmation.textContent).toContain('4');
+    expect(fixture.nativeElement.querySelector('.tags-actions')).toBeNull();
+  });
+
+  it('says a merge cannot be undone, because it is the one that cannot', async () => {
+    await select('auth', 'api');
+    await propose({ kind: 'merge', tags: ['auth', 'api'], into: 'backend', notes: 5 });
+
+    const confirmation = fixture.nativeElement.querySelector('[data-testid="tag-confirm"]');
+
+    expect(confirmation.textContent).toContain('ne s’annule pas');
+  });
+
+  it('emits the confirmation, and the cancellation', async () => {
+    let confirmed = 0;
+    let cancelled = 0;
+    fixture.componentInstance.confirmed.subscribe(() => (confirmed += 1));
+    fixture.componentInstance.cancelled.subscribe(() => (cancelled += 1));
+    await select('auth');
+    await propose({ kind: 'rename', tags: ['auth'], into: 'identity', notes: 4 });
+
+    fixture.nativeElement.querySelector('[data-testid="tag-confirm-apply"]').click();
+    fixture.nativeElement.querySelector('[data-testid="tag-confirm-cancel"]').click();
+    await fixture.whenStable();
+
+    expect(confirmed).toBe(1);
+    expect(cancelled).toBe(1);
   });
 
   it('shows an empty state rather than empty controls', async () => {

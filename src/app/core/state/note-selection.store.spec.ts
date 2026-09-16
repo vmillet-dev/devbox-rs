@@ -104,6 +104,85 @@ describe('NoteSelectionStore', () => {
       expect(visibleIds(canvas)).toEqual(['a', 'b', 'c']);
     });
 
+    /**
+     * ⚠️ The asymmetry this closes: deleting a note had three safety nets, and moving
+     * thirty of them had none — where putting a move back by hand means remembering
+     * which thirty, and which space each one came from.
+     */
+    it('offers to put a move back, space by space', async () => {
+      const { store, selection, repository } = await createNotesHarness([
+        createNote({ id: 'a', spaceId: 'space-1' }),
+        createNote({ id: 'b', spaceId: 'space-2' }),
+      ]);
+      selection.toggleChecked('a');
+      selection.toggleChecked('b');
+
+      await store.moveSelection('space-3');
+
+      expect(store.undoBanner()).toEqual({
+        kind: 'move',
+        previous: [
+          { noteId: 'a', spaceId: 'space-1' },
+          { noteId: 'b', spaceId: 'space-2' },
+        ],
+        count: 2,
+      });
+
+      const queries = repository.queryCount;
+      await store.undoLastAction();
+      await awaitQuery(repository, queries);
+
+      expect(repository.spaceOf('a')).toBe('space-1');
+      expect(repository.spaceOf('b')).toBe('space-2');
+    });
+
+    it('offers to put a tagging back', async () => {
+      const { store, selection, repository } = await createNotesHarness([createNote({ id: 'a', tags: [] })]);
+      selection.toggleChecked('a');
+
+      await store.tagSelection('urgent');
+
+      expect(store.undoBanner()?.kind).toBe('tag');
+
+      const queries = repository.queryCount;
+      await store.undoLastAction();
+      await awaitQuery(repository, queries);
+
+      expect(repository.tagsOf('a')).toEqual([]);
+    });
+
+    /**
+     * ⚠️ The reason the back end answers pairs rather than a count: the note that already
+     * carried the tag gained nothing, so the undo must not take it away.
+     */
+    it('undoing a tagging leaves the tag on the note that already carried it', async () => {
+      const { store, selection, repository } = await createNotesHarness([
+        createNote({ id: 'a', tags: ['Urgent'] }),
+        createNote({ id: 'b', tags: [] }),
+      ]);
+      selection.toggleChecked('a');
+      selection.toggleChecked('b');
+
+      await store.tagSelection('urgent');
+      const queries = repository.queryCount;
+      await store.undoLastAction();
+      await awaitQuery(repository, queries);
+
+      expect(repository.tagsOf('a')).toEqual(['Urgent']);
+      expect(repository.tagsOf('b')).toEqual([]);
+    });
+
+    /** A bar offering to undo nothing is noise, not a safety net. */
+    it('offers no undo when the batch changed nothing', async () => {
+      const { store, selection } = await createNotesHarness([createNote({ id: 'a', spaceId: 'space-1' })]);
+      selection.toggleChecked('a');
+
+      await store.moveSelection('space-1');
+
+      expect(store.undoBanner()).toBeNull();
+      expect(store.lastAction()).toBeNull();
+    });
+
     it('reports a failed bulk action without clearing the selection', async () => {
       const { store, selection, repository } = await withThreeNotes();
       const notifier = TestBed.inject(ErrorNotifier);

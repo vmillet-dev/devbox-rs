@@ -1,11 +1,30 @@
 import { guard } from './fail-next';
 import { NotesRepository } from '@core/data/notes.repository';
-import { Note, NoteDraft, NotePatch, TagUsage, TrashedNote } from '@core/model/note.model';
+import {
+  Note,
+  NoteDraft,
+  NotePatch,
+  NotePlacement,
+  NoteTag,
+  TagUsage,
+  TrashedNote,
+} from '@core/model/note.model';
 import { NotesQuery, NotesView } from '@core/model/note.model';
 import { checklistMarkdown } from './note.fixture';
 
 /** Mirrors `notes::trash::RETENTION`, so the double's `purgeAt` is plausible. */
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * ⚠️ Mirrors `note_tags.tag COLLATE NOCASE`, which SQLite folds over **ASCII only** —
+ * `toLowerCase()` would fold more than the real column does, and the double would then
+ * skip a tag the back end goes on to add.
+ */
+function sameTag(one: string, other: string): boolean {
+  const fold = (value: string): string => value.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+
+  return fold(one) === fold(other);
+}
 
 /**
  * ⚠️ It deliberately does not reimplement filtering, grouping, tag normalisation or
@@ -170,22 +189,85 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
     });
   }
 
-  moveMany(ids: readonly string[], spaceId: string): Promise<number> {
+  /** What the double actually holds, so a spec can assert an undo really put it back. */
+  spaceOf(id: string): string | undefined {
+    return this.notes.find((note) => note.id === id)?.spaceId;
+  }
+
+  tagsOf(id: string): readonly string[] | undefined {
+    return this.notes.find((note) => note.id === id)?.tags;
+  }
+
+  moveMany(ids: readonly string[], spaceId: string): Promise<readonly NotePlacement[]> {
     return guard(this, () => {
       this.movedTo = { ids, spaceId };
+      // Only the ones that actually change space, like `notes::store::move_many`.
+      const previous = this.notes
+        .filter((note) => ids.includes(note.id) && note.spaceId !== spaceId)
+        .map((note) => ({ noteId: note.id, spaceId: note.spaceId }));
+
       this.notes = this.notes.map((note) => (ids.includes(note.id) ? { ...note, spaceId } : note));
-      return ids.length;
+
+      return previous;
     });
   }
 
-  tagMany(ids: readonly string[], tags: readonly string[]): Promise<number> {
+  moveBack(placements: readonly NotePlacement[]): Promise<number> {
+    return guard(this, () => {
+      const home = new Map(placements.map((placement) => [placement.noteId, placement.spaceId]));
+      this.notes = this.notes.map((note) => {
+        const spaceId = home.get(note.id);
+
+        return spaceId === undefined ? note : { ...note, spaceId };
+      });
+
+      return placements.length;
+    });
+  }
+
+  tagMany(ids: readonly string[], tags: readonly string[]): Promise<readonly NoteTag[]> {
     return guard(this, () => {
       this.taggedWith = { ids, tags };
-      this.notes = this.notes.map((note) =>
-        ids.includes(note.id) ? { ...note, tags: [...note.tags, ...tags] } : note,
-      );
-      return ids.length;
+      const added: NoteTag[] = [];
+
+      this.notes = this.notes.map((note) => {
+        if (!ids.includes(note.id)) return note;
+
+        const missing = tags.filter((tag) => !note.tags.some((held) => sameTag(held, tag)));
+        for (const tag of missing) {
+          added.push({ noteId: note.id, tag });
+        }
+
+        return missing.length === 0 ? note : { ...note, tags: [...note.tags, ...missing] };
+      });
+
+      return added;
     });
+  }
+
+  untagMany(pairs: readonly NoteTag[]): Promise<number> {
+    return guard(this, () => {
+      let removed = 0;
+      this.notes = this.notes.map((note) => {
+        const strip = pairs.filter((pair) => pair.noteId === note.id);
+        if (strip.length === 0) return note;
+
+        const kept = note.tags.filter((tag) => !strip.some((pair) => sameTag(pair.tag, tag)));
+        removed += note.tags.length - kept.length;
+
+        return { ...note, tags: kept };
+      });
+
+      return removed;
+    });
+  }
+
+  countNotesTagged(tags: readonly string[]): Promise<number> {
+    return guard(
+      this,
+      () =>
+        this.notes.filter((note) => note.tags.some((held) => tags.some((tag) => sameTag(held, tag)))).length,
+    );
   }
 
   loadTags(): Promise<readonly TagUsage[]> {

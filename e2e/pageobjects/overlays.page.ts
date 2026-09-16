@@ -170,14 +170,29 @@ export const tagManager = {
   },
 
   /** Submits the form rather than clicking, so the `type="submit"` path is the one taken. */
-  apply: () => submitFormOf(testid('tag-target')),
+  propose: () => submitFormOf(testid('tag-target')),
+
+  proposeDelete: () => $(testid('tag-delete')).click(),
+
+  confirmation: () => $(testid('tag-confirm')),
+
+  confirm: () => $(testid('tag-confirm-apply')).click(),
+
+  cancel: () => $(testid('tag-confirm-cancel')).click(),
 
   isApplyDisabled: async () => (await $(testid('tag-apply')).getAttribute('aria-disabled')) === 'true',
 
+  /** Nothing corpus-wide writes without passing through the confirmation. */
+  async apply(): Promise<void> {
+    await submitFormOf(testid('tag-target'));
+    await $(testid('tag-confirm-apply')).waitForDisplayed({ timeout: 10_000 });
+    await $(testid('tag-confirm-apply')).click();
+  },
+
   async delete(): Promise<void> {
-    const button = $(testid('tag-delete'));
-    await button.click();
-    await button.click();
+    await $(testid('tag-delete')).click();
+    await $(testid('tag-confirm-apply')).waitForDisplayed({ timeout: 10_000 });
+    await $(testid('tag-confirm-apply')).click();
   },
 
   close: () => $(testid('tag-manager-close')).click(),

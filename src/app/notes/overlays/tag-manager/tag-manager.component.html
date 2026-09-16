@@ -41,32 +41,58 @@
       }
     </ul>
 
-    <p class="tags-hint">{{ 'tagManager.selectionHint' | transloco }}</p>
+    @if (confirmation(); as ask) {
+      <!-- ⚠️ In place of the actions, not beside them: the click that asked for this is
+           the one that would confirm it, and a second click landing on the same spot is
+           the accident a confirmation exists to stop. -->
+      <div class="tags-confirm" data-testid="tag-confirm" role="note">
+        <p class="tags-confirm-text">{{ ask.key | transloco: ask.params }}</p>
+        <div class="tags-confirm-actions">
+          <button
+            type="button"
+            class="tags-action danger"
+            data-testid="tag-confirm-apply"
+            (click)="onConfirm()"
+          >
+            {{ 'tagManager.confirmAction' | transloco }}
+          </button>
+          <button
+            type="button"
+            class="tags-action"
+            data-testid="tag-confirm-cancel"
+            (click)="cancelled.emit()"
+          >
+            {{ 'tagManager.confirmCancel' | transloco }}
+          </button>
+        </div>
+      </div>
+    } @else {
+      <p class="tags-hint">{{ 'tagManager.selectionHint' | transloco }}</p>
 
-    <form class="tags-actions" (submit)="submit($event)">
-      <input
-        #targetInput
-        type="text"
-        class="tags-target"
-        data-testid="tag-target"
-        [attr.aria-label]="'tagManager.targetLabel' | transloco"
-        [placeholder]="'tagManager.targetPlaceholder' | transloco"
-        [value]="target()"
-        (input)="target.set(targetInput.value)"
-      />
-      <button type="submit" class="tags-action" data-testid="tag-apply" [attr.aria-disabled]="!canApply()">
-        {{ applyKey() | transloco }}
-      </button>
-      <button
-        type="button"
-        class="tags-action danger"
-        data-testid="tag-delete"
-        [class.confirming]="confirmingDelete()"
-        [attr.aria-disabled]="!canApply()"
-        (click)="onDeleteClick()"
-      >
-        {{ (confirmingDelete() ? 'tagManager.deleteConfirm' : 'tagManager.delete') | transloco }}
-      </button>
-    </form>
+      <form class="tags-actions" (submit)="submit($event)">
+        <input
+          #targetInput
+          type="text"
+          class="tags-target"
+          data-testid="tag-target"
+          [attr.aria-label]="'tagManager.targetLabel' | transloco"
+          [placeholder]="'tagManager.targetPlaceholder' | transloco"
+          [value]="target()"
+          (input)="target.set(targetInput.value)"
+        />
+        <button type="submit" class="tags-action" data-testid="tag-apply" [attr.aria-disabled]="!canApply()">
+          {{ applyKey() | transloco }}
+        </button>
+        <button
+          type="button"
+          class="tags-action danger"
+          data-testid="tag-delete"
+          [attr.aria-disabled]="!canApply()"
+          (click)="onDeleteClick()"
+        >
+          {{ 'tagManager.delete' | transloco }}
+        </button>
+      </form>
+    }
   }
 </app-dialog>

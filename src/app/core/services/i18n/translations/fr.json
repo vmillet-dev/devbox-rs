@@ -178,7 +178,8 @@
     "variablesSaveFailed": "Impossible d'enregistrer les variables.",
     "passphraseChangeFailed": "Impossible de changer la phrase de passe. L'ancienne ouvre toujours la bibliothèque.",
     "unlockFailed": "Le déverrouillage a échoué.",
-    "vaultStateFailed": "Impossible de savoir si la bibliothèque est chiffrée."
+    "vaultStateFailed": "Impossible de savoir si la bibliothèque est chiffrée.",
+    "undoFailed": "L'annulation a échoué. Rien n'a été remis en place."
   },
   "tray": {
     "open": "Ouvrir {{app}}",
@@ -254,9 +255,13 @@
     "rename": "Renommer",
     "merge": "Fusionner",
     "delete": "Supprimer",
-    "deleteConfirm": "Confirmer ?",
     "hint": "Renommer vers un tag existant fusionne les deux.",
-    "selectionHint": "Sélectionnez les tags à fusionner, puis saisissez leur nom commun."
+    "selectionHint": "Sélectionnez les tags à fusionner, puis saisissez leur nom commun.",
+    "confirmRename": "Renommer #{{tag}} en #{{into}} sur {{count}} note(s) ?",
+    "confirmMerge": "⚠️ Fusionner {{tags}} tags en #{{into}} sur {{count}} note(s) ? Une fusion ne s’annule pas : une fois réunis, plus rien ne sait quel tag portait quelle note.",
+    "confirmDelete": "Retirer {{tags}} tag(s) de {{count}} note(s) ? Les notes, elles, restent.",
+    "confirmAction": "Confirmer",
+    "confirmCancel": "Annuler"
   },
   "selection": {
     "label": "Actions sur la sélection",
@@ -315,7 +320,9 @@
   "undo": {
     "deleted": "{{count}} note(s) mise(s) à la corbeille",
     "restore": "Annuler",
-    "dismiss": "Masquer"
+    "dismiss": "Masquer",
+    "moved": "{{count}} note(s) déplacée(s)",
+    "tagged": "{{count}} note(s) étiquetée(s)"
   },
   "file": {
     "menuLabel": "Fichier",

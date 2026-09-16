@@ -42,8 +42,28 @@ describe('Managing the tags of the whole corpus', () => {
     expect(await tagManager.isApplyDisabled()).toBe(true);
   });
 
-  it('renames a tag everywhere it is used', async () => {
+  /**
+   * ⚠️ This acts on the whole library rather than on a selection, so a mis-click reaches
+   * it easily — the count is what makes the confirmation worth reading.
+   */
+  it('states what it would touch, and writes nothing until that is accepted', async () => {
     await tagManager.select('staging');
+    await tagManager.setTarget('recette');
+    await tagManager.propose();
+
+    await tagManager.confirmation().waitForDisplayed({ timeout: 10_000 });
+    // Two notes carry `staging`, and the sentence has to say so.
+    expect(await tagManager.confirmation().getText()).toContain('2');
+    expect((await bridge.listTags()).map((usage) => usage.tag)).toContain('staging');
+
+    await tagManager.cancel();
+    await browser.pause(400);
+
+    // Cancelling is the whole point of asking: nothing moved.
+    expect(await tagsOf('Tagged alpha')).toEqual(['staging']);
+  });
+
+  it('renames a tag everywhere it is used', async () => {
     expect(await tagManager.isSelected('staging')).toBe(true);
 
     await tagManager.setTarget('recette');
@@ -89,7 +109,7 @@ describe('Managing the tags of the whole corpus', () => {
     expect(await tagsOf('Tagged alpha')).toEqual(['Recette']);
   });
 
-  it('deletes a tag on the second click, leaving the notes alone', async () => {
+  it('deletes a tag once the change is confirmed, leaving the notes alone', async () => {
     await reloadCanvas();
     await canvas.openTagManager();
 
