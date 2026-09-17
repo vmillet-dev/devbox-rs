@@ -68,6 +68,22 @@ describe('The quick-paste palette', () => {
     await editor.close();
   });
 
+  /**
+   * ⚠️ A click opens: it used to copy and hide the window, which reads as the application
+   * crashing on the click — nothing on screen says anything was copied.
+   */
+  it('opens the note that was clicked, with the window still on screen', async () => {
+    await emitGlobalAction('palette');
+    await palette.input().waitForExist({ timeout: 10_000 });
+    await palette.type('reset');
+
+    await palette.openRow().click();
+
+    expect(await editor.isOpen()).toBe(true);
+    expect(await editor.title()).toBe('Reset the dev database');
+    await editor.close();
+  });
+
   it('closes on Escape', async () => {
     await emitGlobalAction('palette');
     await palette.input().waitForExist({ timeout: 10_000 });

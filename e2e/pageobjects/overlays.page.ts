@@ -542,6 +542,10 @@ export const palette = {
 
   titles: (): Promise<string[]> => readEach(testid('palette-option'), 'text'),
 
+  /** A click on the row opens the note; the ⧉ beside it is the paste path. */
+  openRow: (index = 0) => $$(testid('palette-open'))[index],
+  copyRow: (index = 0) => $$(testid('palette-copy'))[index],
+
   async type(text: string): Promise<void> {
     await $(testid('palette-input')).setValue(text);
     await browser.pause(400);

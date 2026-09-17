@@ -12,6 +12,12 @@ Keep the shape — a `## ` heading per release, `### ` headings for the categori
 bullet per entry — or the entry will not be rendered. It is deliberately untranslated, like
 the release notes the updater hands over.
 
+## [0.3.0] - 2026-09-17
+
+### ✨ Added
+
+- A workspace, not a pile (#153)
+
 ## [0.2.0] - 2026-09-16
 
 ### ✨ Added

@@ -1207,6 +1207,13 @@ A snippet with fields goes through the fill form first — copying `psql -h {{ho
 gives an unusable command. `Tab` opens the note instead of copying it, which is what makes the
 palette double as a "find that note" shortcut.
 
+⚠️ **A click on a row opens the note; it does not copy it.** Copying hides the window, and a
+window that disappears on a click with nothing on screen saying why reads as the application
+crashing. Nobody clicked their way here from another application — the window is already in
+front — so the mouse gets the gesture a click on a note means everywhere else in the product,
+and the paste path gets a control of its own beside the row (⧉, which copies and hides, like
+`Enter`). The keyboard is untouched: it is the fast path and the muscle memory is the feature.
+
 **It captures as much as it retrieves.** As soon as the query is non-empty, a "créer une note"
 row is appended **after** the results — retrieving a snippet is the more frequent gesture and
 keeps the first place, but a query that matches nothing highlights the create row by default,
