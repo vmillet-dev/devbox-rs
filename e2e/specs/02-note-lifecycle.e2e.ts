@@ -37,8 +37,7 @@ describe('Creating a note, and finding it again', () => {
   /**
    * ⚠️ Measured, not asserted on a class: the title used to run inline after the badge and
    * the marks, so it started in the middle of the card and what was left of it wrapped —
-   * and the band reserved for the floating buttons was a number typed once, 46px against
-   * 51px of controls.
+   * and every attempt at reserving a band for the buttons cost the title a line of its own.
    */
   it('gives the title the whole width, under the badge rather than beside it', async () => {
     const layout = await canvas.cardHeadLayout(title);
@@ -48,8 +47,9 @@ describe('Creating a note, and finding it again', () => {
     expect(layout!.offset).toBe(0);
     // …and it has as much room as the snippet, which nothing floats over.
     expect(layout!.titleWidth).toBe(layout!.snippetWidth);
-    // The band above it is what keeps clear of the copy and ⋯ buttons.
-    expect(layout!.gap).toBeGreaterThanOrEqual(0);
+    // …because the copy and ⋯ buttons hang over the card's top edge instead of taking a
+    // band above it, which on a todo list with no marks held nothing else at all.
+    expect(layout!.actionsAboveTop).toBe(true);
   });
 
   it('materialises the draft exactly once, not once per committed field', async () => {
