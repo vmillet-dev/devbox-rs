@@ -21,9 +21,10 @@
   ></button>
 
   <div class="card" [class.pinned]="note().pinned" [class.selected]="selected()">
-    <!-- One row: what the note *is* on the left, what can be done to it on the right. -->
-    <div class="card-head">
-      <span class="card-marks">
+    <!-- ⚠️ What the note *is*, and only that: the actions hang outside the card, so a todo
+         list with nothing to mark draws no band at all and its title starts at the top. -->
+    @if (!isChecklist() || hasMarks()) {
+      <div class="card-head">
         @if (note().pinned) {
           <span class="card-pin" data-testid="note-card-pin" aria-hidden="true">📌</span>
           <!-- Decorative: without this text twin, a screen reader gets nothing. -->
@@ -33,6 +34,14 @@
         @if (!isChecklist()) {
           <app-language-badge [language]="note().language" />
         }
+        <!-- ⚠️ A mark, not a button: the copy below asks for the values when it sees this,
+             and a second ⚡ beside it would be the same thing said twice. -->
+        @if (hasPlaceholders()) {
+          <span class="card-fields" data-testid="note-card-fields" aria-hidden="true">⚡</span>
+          <span class="visually-hidden">
+            {{ 'notes.placeholdersCount' | transloco: { count: note().placeholders.length } }}
+          </span>
+        }
         @if (note().attachmentCount > 0) {
           <span class="card-clip" data-testid="note-card-clip" aria-hidden="true"
             >📎 {{ note().attachmentCount }}</span
@@ -41,51 +50,8 @@
             {{ 'notes.attachmentsCount' | transloco: { count: note().attachmentCount } }}
           </span>
         }
-      </span>
-
-      <!-- ⚠️ Their width is reserved whether they are showing or not: quiet at rest, they
-           must not shift the row the moment the pointer arrives. -->
-      <span class="card-actions">
-        <!-- `aria-pressed` rather than an `<input type=checkbox>`, which would inherit the
-             card's own styles. -->
-        <button
-          type="button"
-          class="card-action card-check"
-          data-testid="note-card-check"
-          [class.checked]="checked()"
-          [attr.aria-pressed]="checked()"
-          [attr.aria-label]="'notes.selectNote' | transloco: { title: menuTitle }"
-          (click)="onCheck($event)"
-        >
-          <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
-        </button>
-
-        <!-- ⚠️ A snippet with fields does not copy as is, so the ⚡ takes the copy's place —
-             and it stays showing at rest, because it is also what says the note has fields.
-             There used to be a second ⚡ beside the badge saying exactly that. -->
-        @if (hasPlaceholders()) {
-          <button
-            type="button"
-            class="card-action card-fill"
-            data-testid="note-card-fill"
-            [attr.aria-label]="'placeholders.title' | transloco"
-            (click)="onFill($event)"
-          >
-            <span aria-hidden="true">⚡</span>
-          </button>
-        } @else {
-          <app-copy-button [value]="copyText()" />
-        }
-
-        <app-note-card-menu
-          [noteTitle]="menuTitle"
-          [spaces]="spaces.spaces()"
-          [currentSpaceId]="note().spaceId"
-          (moveRequested)="onMove($event)"
-          (deleteRequested)="onDelete()"
-        />
-      </span>
-    </div>
+      </div>
+    }
 
     <span class="card-title" data-testid="note-card-title">
       @if (note().title) {
@@ -167,5 +133,48 @@
         }
       </span>
     </span>
+  </div>
+
+  <!-- ⚠️ Outside the card and over its top edge, shown under the pointer: inside, they were
+       a band of their own above the title — 26px of mostly nothing on a todo list with no
+       marks. A pill, so three glyphs over the canvas read as one group of controls. -->
+  <div class="card-actions">
+    <!-- `aria-pressed` rather than an `<input type=checkbox>`, which would inherit the
+         card's own styles. -->
+    <button
+      type="button"
+      class="card-action card-check"
+      data-testid="note-card-check"
+      [class.checked]="checked()"
+      [attr.aria-pressed]="checked()"
+      [attr.aria-label]="'notes.selectNote' | transloco: { title: menuTitle }"
+      (click)="onCheck($event)"
+    >
+      <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
+    </button>
+
+    <!-- ⚠️ One copy, two behaviours: a snippet with fields cannot be copied as it is, so
+         this asks for the values first. The ⚡ among the marks is what says so. -->
+    @if (hasPlaceholders()) {
+      <button
+        type="button"
+        class="card-action card-fill"
+        data-testid="note-card-fill"
+        [attr.aria-label]="'placeholders.title' | transloco"
+        (click)="onFill($event)"
+      >
+        <span aria-hidden="true">⧉</span>
+      </button>
+    } @else {
+      <app-copy-button [value]="copyText()" />
+    }
+
+    <app-note-card-menu
+      [noteTitle]="menuTitle"
+      [spaces]="spaces.spaces()"
+      [currentSpaceId]="note().spaceId"
+      (moveRequested)="onMove($event)"
+      (deleteRequested)="onDelete()"
+    />
   </div>
 </div>

@@ -56,40 +56,51 @@
   background: rgba(var(--amber-rgb), 0.06);
 }
 
-// One row, one baseline: what the note is on the left, what can be done to it on the right.
+// The marks and nothing else: a badge, a pin, a ⚡, a 📎. The actions hang outside the card,
+// so this band simply is not drawn when there is nothing to put in it.
 .card-head {
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-bottom: 6px;
-  min-height: 20px;
-}
-
-.card-marks {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  margin-bottom: 5px;
   min-width: 0;
   overflow: hidden;
 }
 
 .card-pin,
-.card-clip {
+.card-clip,
+.card-fields {
   flex-shrink: 0;
   font-size: 10.5px;
   color: var(--text-2);
 }
 
+.card-fields {
+  color: var(--amber);
+}
+
+// ⚠️ Outside the card, over its top edge: inside, they were a band of their own above the
+// title, and on a card with no marks that band was 26px of nothing. A pill rather than
+// three loose glyphs — over the canvas they have to read as one group of controls.
 .card-actions {
+  position: absolute;
+  top: -9px;
+  right: 6px;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 1px;
-  margin-left: auto;
-  flex-shrink: 0;
+  padding: 1px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-dropdown);
+  // Quiet at rest, never absent: `display: none` takes it out of the tab order.
+  opacity: 0;
 }
 
-// ⚠️ `opacity` comes after the mixin and not before it: `all: unset` resets it, so a rule
-// setting it earlier is wiped and every card shows its controls at rest.
+// ⚠️ Anything setting `opacity` here would have to come after `unstyled-control`, whose
+// `all: unset` resets it — which is why the pill above carries that, not the buttons.
 .card-action {
   @include unstyled-control;
 
@@ -100,23 +111,17 @@
   line-height: 1.2;
   color: var(--text-2);
   cursor: pointer;
-  // ⚠️ Quiet at rest, never absent: `display: none` would take them out of the tab order,
-  // and a width that appeared on hover would shift the row under the pointer.
-  opacity: 0;
 }
 
 app-copy-button {
   pointer-events: auto;
-  opacity: 0;
 }
 
-.card-shell:hover .card-action,
-.card-shell:hover app-copy-button,
-.card-action:focus-visible,
-app-copy-button:focus-within,
-.card-check.checked,
-// It says the note has fields, so it is not a control that waits for a pointer.
-.card-fill {
+// ⚠️ And when the card is ticked: the pill is where the tick lives, so hiding it would
+// leave a selected card with nothing on it saying which control did that.
+.card-shell:hover .card-actions,
+.card-actions:focus-within,
+.card-shell.checked .card-actions {
   opacity: 1;
 }
 
@@ -126,10 +131,6 @@ app-copy-button:focus-within,
 }
 
 .card-check.checked {
-  color: var(--amber);
-}
-
-.card-fill {
   color: var(--amber);
 }
 

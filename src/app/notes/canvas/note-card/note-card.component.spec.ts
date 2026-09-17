@@ -72,14 +72,19 @@ describe('NoteCardComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
   });
 
-  /** A todo list has no format to show, so the row holds only what can be done to it. */
-  it('leaves the marks empty on a todo list with nothing to mark', async () => {
+  /**
+   * ⚠️ No band at all, and that is the point: the actions hang outside the card, so a todo
+   * list with nothing to mark starts on its title instead of on 26px of nothing.
+   */
+  it('draws no band on a todo list with nothing to mark', async () => {
     fixture.componentRef.setInput('note', createNote({ title: 'My list', kind: 'checklist' }));
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.querySelector('.card-marks')?.textContent?.trim()).toBe('');
+    expect(fixture.nativeElement.querySelector('.card-head')).toBeNull();
     expect(fixture.nativeElement.querySelector('app-language-badge')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
+    // The controls are still there, outside the card.
+    expect(fixture.nativeElement.querySelector('[data-testid="note-card-check"]')).not.toBeNull();
   });
 
   /** ⚠️ A mark among the marks: it says what the note *is*, like the badge beside it. */
@@ -89,11 +94,25 @@ describe('NoteCardComponent', () => {
 
     const pin = fixture.nativeElement.querySelector('[data-testid="note-card-pin"]');
     expect(pin).not.toBeNull();
-    expect(pin.closest('.card-marks')).not.toBeNull();
+    expect(pin.closest('.card-head')).not.toBeNull();
     // The glyph is decorative, so the state reaches a screen reader as text beside it.
-    expect(fixture.nativeElement.querySelector('.card-marks .visually-hidden').textContent).toBe(
+    expect(fixture.nativeElement.querySelector('.card-head .visually-hidden').textContent).toBe(
       'Note épinglée',
     );
+  });
+
+  /** ⚠️ One ⚡, not two: the mark says the copy will ask for the values before it copies. */
+  it('marks a snippet with fields once, and copies through the form', async () => {
+    fixture.componentRef.setInput(
+      'note',
+      createNote({ title: 'psql', placeholders: [{ name: 'host', defaultValue: '', value: '' }] }),
+    );
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="note-card-fields"]')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelector('[data-testid="note-card-fill"]')).not.toBeNull();
+    // And no plain copy beside it: the two never coexist.
+    expect(fixture.debugElement.query(By.directive(CopyButtonComponent))).toBeNull();
   });
 
   /**

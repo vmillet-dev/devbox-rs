@@ -612,9 +612,17 @@ top of a card read as scattered glyphs rather than a toolbar.
 So the card is **not** the button. `.card-open` is an empty `<button>` at `inset: 0`
 underneath, carrying the click surface, the keyboard focus the canvas moves around and the
 card's accessible name; `.card` is a `<div>` above it in `pointer-events: none`, and each
-control takes its own events back. The header is then an ordinary flex row — marks on the
-left, actions on the right, one baseline, no reserved widths — and the checklist's tickable
-items are simply in the flow instead of a floating layer of their own.
+control takes its own events back. The header is then the marks and nothing else — a badge, a pin, a ⚡, a 📎 — and the
+checklist's tickable items are simply in the flow instead of a floating layer of their own.
+
+⚠️ **The actions hang outside the card**, in a pill over its top-right corner, shown under
+the pointer. Inside, they were a band of their own above the title, and on a card with
+nothing to mark — a todo list — that band was 26px of nothing between the top of the card and
+its first word. Outside, the band is simply not drawn, and three glyphs floating over the
+canvas need a pill to read as one group of controls. The pill also shows while the card is
+ticked: it is where the tick lives, and a selected card with nothing on it saying so is worse
+than a visible control. ⚠️ `.zone-body` scrolls, so it clips — its top padding is what keeps
+the first row of cards from losing their pill on the board.
 
 It is the same trick the editor uses for its body, where the code viewer sits under the
 textarea; the card had it already, for its items alone.
