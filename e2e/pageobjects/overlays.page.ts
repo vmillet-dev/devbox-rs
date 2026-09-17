@@ -388,6 +388,30 @@ export const board = {
   },
 
   /** ⚠️ Dimmed, never dropped: the card is still there, it has only stopped shouting. */
+  /**
+   * Whether the grip and the selection tick of a board card overlap. ⚠️ Measured in the
+   * page: the two are positioned in CSS, and "the class is applied" says nothing about
+   * whether one covers the other.
+   */
+  cornersOverlap(title: string): Promise<boolean> {
+    return browser.execute(
+      (cardSelector: string, titleSelector: string, checkSelector: string, wanted: string) => {
+        const wrapper = [...document.querySelectorAll(cardSelector)].find(
+          (card) => (card.querySelector(titleSelector)?.textContent ?? '').trim() === wanted,
+        );
+        const grip = wrapper?.querySelector('.card-grip')?.getBoundingClientRect();
+        const tick = wrapper?.querySelector(checkSelector)?.getBoundingClientRect();
+        if (!grip || !tick) return true;
+
+        return grip.right > tick.left && tick.right > grip.left && grip.bottom > tick.top;
+      },
+      '.zone-card, .loose-card',
+      testid('note-card-title'),
+      testid('note-card-check'),
+      title,
+    );
+  },
+
   isDimmed(title: string): Promise<boolean> {
     return browser.execute(
       (cardSelector: string, titleSelector: string, wanted: string) =>

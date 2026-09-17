@@ -218,7 +218,13 @@
 // column. Without it the flow inside a zone is the content's width, the second card wraps
 // out of sight, and `folders::board::CARD_WIDTH` — which every frame is computed from —
 // corresponds to nothing on screen. Keep the two in step.
+// ⚠️ The two custom properties are the whole of it: a board card carries a drag grip in
+// the corner the selection tick sits in, so the tick moves along and the head's gutter
+// follows it. The date view has no grip and keeps its own, tighter, defaults.
 @mixin board-card {
+  --card-check-left: 26px;
+  --card-head-gutter: 32px;
+
   position: relative;
   width: 240px;
 }

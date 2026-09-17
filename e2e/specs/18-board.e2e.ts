@@ -149,6 +149,18 @@ describe('The board', () => {
     await board.show('board');
   });
 
+  /**
+   * ⚠️ Two controls, two targets. The grip used to be drawn on top of the tick, with an
+   * opaque background and a higher `z-index`, so ticking a card on the board meant aiming
+   * at the few pixels of checkbox that stuck out from under it.
+   */
+  it('keeps the drag grip and the selection tick apart', async () => {
+    await board.show('board');
+
+    expect(await board.cornersOverlap('Dump nocturne')).toBe(false);
+    expect(await board.cornersOverlap('EXPLAIN lent sur join')).toBe(false);
+  });
+
   /** Nothing is removed from the header: the board is a second view, not a replacement. */
   it('keeps the folder switcher and the rails working beside it', async () => {
     await folders.open();
