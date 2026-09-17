@@ -56,15 +56,29 @@ describe('NoteCardComponent', () => {
     expect(badge.language()).toBe('json');
   });
 
-  /** Structural, not visual: jsdom lays nothing out, so this asserts a shared parent. */
-  it('puts the badge, the marks and the title in one block', async () => {
+  /**
+   * Structural, not visual: jsdom lays nothing out. ⚠️ The title is **outside** the band —
+   * inline after the badge and the marks it began in the middle of the card, and what was
+   * left of it wrapped.
+   */
+  it('keeps the title out of the band the badge and the marks sit on', async () => {
     fixture.componentRef.setInput('note', createNote({ title: 'My note', attachmentCount: 2 }));
     await fixture.whenStable();
 
     const head = fixture.nativeElement.querySelector('.card-head');
     expect(head.querySelector('app-language-badge')).not.toBeNull();
     expect(head.querySelector('[data-testid="note-card-clip"]')).not.toBeNull();
-    expect(head.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
+    expect(head.querySelector('[data-testid="note-card-title"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
+  });
+
+  /** Nothing to draw, nothing drawn: the title starts at the top of the card. */
+  it('draws no band at all on a todo list with no marks', async () => {
+    fixture.componentRef.setInput('note', createNote({ title: 'My list', kind: 'checklist' }));
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('.card-head')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
   });
 
   /** ⚠️ Outside the head, and outside the card button with it. */

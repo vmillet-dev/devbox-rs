@@ -49,10 +49,26 @@ app-copy-button:focus-within {
   box-shadow: 0 0 0 1px var(--amber-dim);
 }
 
-// ⚠️ A text block, not a flex row, and that is the whole point of this rule: as a row the
-// title is a column between the badge and the marks and wraps inside a third of the card.
-// Inline, it flows past them — its second line runs from the left edge, full width.
+// The badge and the marks, on a band of their own above the title.
+//
+// ⚠️ This band is the only one the floating buttons overlap — they sit at `top: 8px` and
+// the title starts below them — so it is the only one that reserves anything: the ⋯ at
+// `right: 8px` and the copy (or ⚡) beside it come to 51px.
 .card-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+  min-height: 17px;
+  padding-right: 52px;
+  // ⚠️ Nothing on the left either, normally: the selection tick fits inside the card's own
+  // padding. On the board it stands beside a drag grip and the band moves along.
+  padding-left: var(--card-head-gutter, 0);
+}
+
+// ⚠️ Full width, both lines, starting at the card's own edge: inline after the badge and
+// the marks, the title began in the middle of the card and what was left of it wrapped.
+.card-title {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -60,34 +76,8 @@ app-copy-button:focus-within {
   margin-bottom: 8px;
   font-size: 13px;
   line-height: 1.3;
-  // ⚠️ Reserves what the two buttons floating over the top-right corner actually take —
-  // the ⋯ at `right: 8px` and the copy (or ⚡) beside it — and not a number typed once:
-  // it was 46px against 51px of controls, so the copy button covered the title's tail the
-  // moment the pointer arrived.
-  padding-right: 52px;
-  // ⚠️ Nothing on the left: the selection tick now fits inside the card's own padding, so
-  // the badge and the title line up with the snippet under them instead of starting 8px
-  // in. On the board the tick stands beside a drag grip and asks for a gutter again.
-  padding-left: var(--card-head-gutter, 0);
-}
-
-.card-title {
   font-weight: 600;
   color: var(--text-0);
-}
-
-// Inline so the title flows past them, and before it so no glyph ends up alone on a line.
-.card-marks {
-  white-space: nowrap;
-}
-
-app-language-badge,
-.card-marks {
-  margin-right: 5px;
-}
-
-.card-marks > * + * {
-  margin-left: 5px;
 }
 
 // `app-code-viewer` brings the colouring only; the typography stays decided here.

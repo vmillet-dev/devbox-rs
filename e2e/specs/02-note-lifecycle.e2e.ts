@@ -35,17 +35,21 @@ describe('Creating a note, and finding it again', () => {
   });
 
   /**
-   * ⚠️ Measured, not asserted on a class: the copy and ⋯ buttons float over the head, and
-   * the band it reserved for them was a number typed once — 46px against 51px of controls,
-   * so the copy button covered the title's tail the moment the pointer arrived.
+   * ⚠️ Measured, not asserted on a class: the title used to run inline after the badge and
+   * the marks, so it started in the middle of the card and what was left of it wrapped —
+   * and the band reserved for the floating buttons was a number typed once, 46px against
+   * 51px of controls.
    */
-  it('leaves the title clear of the buttons floating over it', async () => {
+  it('gives the title the whole width, under the badge rather than beside it', async () => {
     const layout = await canvas.cardHeadLayout(title);
 
     expect(layout).not.toBeNull();
-    expect(layout!.gap).toBeGreaterThanOrEqual(0);
-    // And the head lines up with the snippet under it rather than starting 8px in.
+    // It starts at the card's own edge, exactly like the snippet under it…
     expect(layout!.offset).toBe(0);
+    // …and it has as much room as the snippet, which nothing floats over.
+    expect(layout!.titleWidth).toBe(layout!.snippetWidth);
+    // The band above it is what keeps clear of the copy and ⋯ buttons.
+    expect(layout!.gap).toBeGreaterThanOrEqual(0);
   });
 
   it('materialises the draft exactly once, not once per committed field', async () => {

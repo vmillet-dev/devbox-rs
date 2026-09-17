@@ -60,7 +60,9 @@ export const canvas = {
    * at `opacity: 0` until the pointer arrives, and opacity changes nothing about layout —
    * so their boxes are readable without hovering, which is the only way this is not flaky.
    */
-  cardHeadLayout(title: string): Promise<{ gap: number; offset: number } | null> {
+  cardHeadLayout(
+    title: string,
+  ): Promise<{ gap: number; offset: number; titleWidth: number; snippetWidth: number } | null> {
     return browser.execute(
       (cardSelector: string, titleSelector: string, wanted: string) => {
         const card = [...document.querySelectorAll(cardSelector)].find(
@@ -68,22 +70,24 @@ export const canvas = {
         );
         const headElement = card?.querySelector('.card-head');
         const head = headElement?.getBoundingClientRect();
+        const titleBox = card?.querySelector('.card-title')?.getBoundingClientRect();
         const snippet = card?.querySelector('.card-snippet')?.getBoundingClientRect();
         const button = card
           ?.querySelector('.card-fill, .copy-btn, .card-menu-trigger')
           ?.getBoundingClientRect();
-        if (!headElement || !head || !snippet || !button) return null;
+        if (!headElement || !head || !titleBox || !snippet || !button) return null;
 
-        // ⚠️ The head's own box spans the card: what the text has is inside its padding.
-        const style = getComputedStyle(headElement);
-        const textRight = head.right - Number.parseFloat(style.paddingRight);
-        const textLeft = head.left + Number.parseFloat(style.paddingLeft);
+        // ⚠️ The band's own box spans the card: what it draws is inside its padding.
+        const bandRight = head.right - Number.parseFloat(getComputedStyle(headElement).paddingRight);
 
         return {
-          // Between where the title can reach and the nearest of the floating buttons.
-          gap: Math.round(button.left - textRight),
-          // Between the head's text and the snippet under it: they have to line up.
-          offset: Math.round(textLeft - snippet.left),
+          // Between the badge band and the nearest of the buttons floating over it.
+          gap: Math.round(button.left - bandRight),
+          // The title starts at the card's own edge, exactly like the snippet under it.
+          offset: Math.round(titleBox.left - snippet.left),
+          // And it has the whole width to lay itself out in, both lines.
+          titleWidth: Math.round(titleBox.width),
+          snippetWidth: Math.round(snippet.width),
         };
       },
       testid('note-card'),
