@@ -112,6 +112,14 @@
     "deleteKeepsNotes": "Les notes restent, simplement sans dossier.",
     "breadcrumbLabel": "Fil d’Ariane du dossier"
   },
+  "sidebar": {
+    "library": "Bibliothèque",
+    "toggle": "Afficher ou masquer la bibliothèque",
+    "expand": "Ouvrir l'espace {{name}}",
+    "collapse": "Replier l'espace {{name}}",
+    "noFolders": "Aucun dossier",
+    "resize": "Largeur de la bibliothèque"
+  },
   "board": {
     "viewSwitchLabel": "Choisir la vue",
     "dateView": "Date",
@@ -436,6 +444,7 @@
     },
     "canvas": {
       "search": "Aller au champ de recherche",
+      "library": "Afficher ou masquer la bibliothèque",
       "move": "Se déplacer de carte en carte",
       "open": "Ouvrir la carte sous le focus",
       "copy": "Copier son contenu",

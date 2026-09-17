@@ -1,145 +1,186 @@
-<div class="topbar">
-  @if (folders.activeFolder(); as openFolder) {
-    <app-folder-breadcrumb
-      [folder]="openFolder"
-      [spaceName]="spaces.activeSpace()?.name ?? null"
-      (closed)="folders.selectFolder(null)"
-      (renamed)="onFolderRenamed($event)"
-      (recoloured)="onFolderRecoloured($event)"
-      (deleted)="onFolderDeleted($event)"
-    />
-  } @else {
-    <app-space-switcher
+<div class="page">
+  @if (settings.showLibraryRail()) {
+    <app-library-tree
       [spaces]="spaces.spaces()"
-      [activeSpace]="spaces.activeSpace()"
-      (spaceChanged)="spaces.selectSpace($event)"
+      [folders]="folders.allFolders()"
+      [activeSpaceId]="spaces.activeSpaceId()"
+      [activeFolderId]="folders.activeFolderId()"
+      [width]="settings.libraryRailWidth()"
+      (widthChanged)="settings.libraryRailWidth.write($event)"
+      (spaceChanged)="onSpaceChosen($event)"
       (spaceCreated)="spaces.createSpace($event)"
       (spaceRenamed)="onSpaceRenamed($event)"
       (pinRequested)="spaces.togglePinned($event)"
       (spaceDeleted)="onSpaceDeleted($event)"
-    />
-    <app-view-switch
-      [mode]="board.mode()"
-      [boardAvailable]="board.canShowBoard()"
-      (modeChanged)="board.setMode($event)"
-    />
-  }
-  <app-search-box
-    [query]="canvas.searchQuery()"
-    [shortcutEnabled]="searchShortcutEnabled()"
-    [matched]="board.isBoard() ? board.matched() : canvas.matched()"
-    (cleared)="canvas.clearFilters()"
-    (queryChange)="canvas.setSearchQuery($event)"
-  />
-  <app-filter-chips [active]="canvas.activeFilter()" (filterChanged)="canvas.setFilter($event)" />
-  @if (folders.activeFolder() === null) {
-    <app-folder-switcher
-      [folders]="folders.folders()"
-      [activeFolder]="folders.activeFolder()"
-      [canCreate]="spaces.activeSpaceId() !== null"
-      (folderChanged)="folders.selectFolder($event)"
+      (folderOpened)="onFolderOpened($event)"
       (folderCreated)="folders.createFolder($event)"
       (folderRenamed)="onFolderRenamed($event)"
       (folderRecoloured)="onFolderRecoloured($event)"
-      (folderDeleted)="folders.deleteFolder($event)"
+      (folderDeleted)="onFolderDeleted($event)"
     />
   }
-  <button type="button" class="trash-btn" data-testid="trash-open" (click)="trash.open()">
-    <span aria-hidden="true">🗑</span>
-    {{ 'notes.trash' | transloco }}
-  </button>
-  <app-new-note-button (created)="store.createNote($event)" />
-</div>
 
-<app-tag-rail
-  [tags]="canvas.allTags()"
-  [activeTags]="canvas.selectedTags()"
-  (tagToggled)="canvas.toggleTag($event)"
-  (manageRequested)="tags.open()"
-/>
+  <div class="workspace">
+    <div class="topbar">
+      <button
+        type="button"
+        class="rail-toggle"
+        data-testid="library-rail-toggle"
+        [attr.aria-pressed]="settings.showLibraryRail()"
+        [attr.aria-label]="'sidebar.toggle' | transloco"
+        (click)="toggleLibraryRail()"
+      >
+        <span aria-hidden="true">▤</span>
+      </button>
+      @if (folders.activeFolder(); as openFolder) {
+        <app-folder-breadcrumb
+          [folder]="openFolder"
+          [spaceName]="spaces.activeSpace()?.name ?? null"
+          (closed)="folders.selectFolder(null)"
+          (renamed)="onFolderRenamed($event)"
+          (recoloured)="onFolderRecoloured($event)"
+          (deleted)="onFolderDeleted($event)"
+        />
+      } @else {
+        <!-- ⚠️ Not while the rail is showing: two places to change space is how a tree and a
+         dropdown drift apart. -->
+        @if (!settings.showLibraryRail()) {
+          <app-space-switcher
+            [spaces]="spaces.spaces()"
+            [activeSpace]="spaces.activeSpace()"
+            (spaceChanged)="spaces.selectSpace($event)"
+            (spaceCreated)="spaces.createSpace($event)"
+            (spaceRenamed)="onSpaceRenamed($event)"
+            (pinRequested)="spaces.togglePinned($event)"
+            (spaceDeleted)="onSpaceDeleted($event)"
+          />
+        }
+        <app-view-switch
+          [mode]="board.mode()"
+          [boardAvailable]="board.canShowBoard()"
+          (modeChanged)="board.setMode($event)"
+        />
+      }
+      <app-search-box
+        [query]="canvas.searchQuery()"
+        [shortcutEnabled]="searchShortcutEnabled()"
+        [matched]="board.isBoard() ? board.matched() : canvas.matched()"
+        (cleared)="canvas.clearFilters()"
+        (queryChange)="canvas.setSearchQuery($event)"
+      />
+      <app-filter-chips [active]="canvas.activeFilter()" (filterChanged)="canvas.setFilter($event)" />
+      @if (folders.activeFolder() === null && !settings.showLibraryRail()) {
+        <app-folder-switcher
+          [folders]="folders.folders()"
+          [activeFolder]="folders.activeFolder()"
+          [canCreate]="spaces.activeSpaceId() !== null"
+          (folderChanged)="folders.selectFolder($event)"
+          (folderCreated)="folders.createFolder($event)"
+          (folderRenamed)="onFolderRenamed($event)"
+          (folderRecoloured)="onFolderRecoloured($event)"
+          (folderDeleted)="folders.deleteFolder($event)"
+        />
+      }
+      <button type="button" class="trash-btn" data-testid="trash-open" (click)="trash.open()">
+        <span aria-hidden="true">🗑</span>
+        {{ 'notes.trash' | transloco }}
+      </button>
+      <app-new-note-button (created)="store.createNote($event)" />
+    </div>
 
-<app-language-rail
-  [languages]="canvas.allLanguages()"
-  [activeLanguages]="canvas.selectedLanguages()"
-  (languageToggled)="canvas.toggleLanguage($event)"
-/>
+    <app-tag-rail
+      [tags]="canvas.allTags()"
+      [activeTags]="canvas.selectedTags()"
+      (tagToggled)="canvas.toggleTag($event)"
+      (manageRequested)="tags.open()"
+    />
 
-@if (selection.hasSelection()) {
-  <app-selection-bar
-    [count]="selection.checkedCount()"
-    [spaces]="spaces.spaces()"
-    [folders]="folders.folders()"
-    (moveRequested)="store.moveSelection($event)"
-    (fileRequested)="store.fileSelection($event)"
-    (tagRequested)="store.tagSelection($event)"
-    (copyRequested)="onCopySelection()"
-    (deleteRequested)="store.deleteSelection()"
-    (cleared)="selection.clearSelection()"
-  />
-}
+    <app-language-rail
+      [languages]="canvas.allLanguages()"
+      [activeLanguages]="canvas.selectedLanguages()"
+      (languageToggled)="canvas.toggleLanguage($event)"
+    />
 
-<!-- ⚠️ The region keeps the `canvas` hook whichever view fills it: it is the address on
-     screen, and the two views are alternatives inside it, not replacements for it. -->
-<div
-  class="canvas-region"
-  data-testid="canvas"
-  [attr.aria-busy]="board.isBoard() ? board.isLoading() : canvas.isLoading()"
->
-  @if (board.isBoard() && folders.activeFolder() === null) {
-    @let boardError = board.loadError();
-
-    @if (boardError) {
-      <div class="canvas-state" role="alert">
-        <p class="canvas-state-text">{{ 'errors.boardLoadFailed' | transloco }}</p>
-        <p class="canvas-state-detail">{{ boardError.message }}</p>
-        <button type="button" class="canvas-retry" (click)="board.reload()">
-          {{ 'errors.retry' | transloco }}
-        </button>
-      </div>
-    } @else if (board.isLoading()) {
-      <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
-    } @else {
-      <app-board
-        [zones]="board.zones()"
-        [loose]="board.loose()"
-        [width]="board.width()"
-        [height]="board.height()"
-        (noteActivated)="onNoteActivated($event)"
-        (folderOpened)="folders.selectFolder($event)"
-        (cardDropped)="onCardDropped($event)"
-        (zoneMoved)="board.moveZone($event.folderId, $event.frame)"
-        (zoneDrawn)="onZoneDrawn($event)"
-        (folderRenamed)="onFolderRenamed($event)"
-        (folderRecoloured)="onFolderRecoloured($event)"
-        (folderDeleted)="onFolderDeleted($event)"
+    @if (selection.hasSelection()) {
+      <app-selection-bar
+        [count]="selection.checkedCount()"
+        [spaces]="spaces.spaces()"
+        [folders]="folders.folders()"
+        (moveRequested)="store.moveSelection($event)"
+        (fileRequested)="store.fileSelection($event)"
+        (tagRequested)="store.tagSelection($event)"
+        (copyRequested)="onCopySelection()"
+        (deleteRequested)="store.deleteSelection()"
+        (cleared)="selection.clearSelection()"
       />
     }
-  } @else {
-    @let error = canvas.loadError();
 
-    <div class="canvas">
-      @if (error) {
-        <!-- Loading is the one operation whose failure empties the whole screen: it
-             deserves its own retry. -->
-        <div class="canvas-state" role="alert">
-          <p class="canvas-state-text">{{ 'errors.notesLoadFailed' | transloco }}</p>
-          <p class="canvas-state-detail">{{ error.message }}</p>
-          <button type="button" class="canvas-retry" (click)="canvas.reload()">
-            {{ 'errors.retry' | transloco }}
-          </button>
-        </div>
-      } @else if (canvas.isLoading()) {
-        <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
-      } @else if (canvas.hasNoResults()) {
-        <p class="canvas-state-text" data-testid="canvas-no-results">{{ 'notes.noResults' | transloco }}</p>
-      } @else {
-        @for (section of canvas.sections(); track section.key) {
-          <app-note-section [section]="section" (noteActivated)="onNoteActivated($event)" />
+    <!-- ⚠️ The region keeps the `canvas` hook whichever view fills it: it is the address on
+     screen, and the two views are alternatives inside it, not replacements for it. -->
+    <div
+      class="canvas-region"
+      data-testid="canvas"
+      [attr.aria-busy]="board.isBoard() ? board.isLoading() : canvas.isLoading()"
+    >
+      @if (board.isBoard() && folders.activeFolder() === null) {
+        @let boardError = board.loadError();
+
+        @if (boardError) {
+          <div class="canvas-state" role="alert">
+            <p class="canvas-state-text">{{ 'errors.boardLoadFailed' | transloco }}</p>
+            <p class="canvas-state-detail">{{ boardError.message }}</p>
+            <button type="button" class="canvas-retry" (click)="board.reload()">
+              {{ 'errors.retry' | transloco }}
+            </button>
+          </div>
+        } @else if (board.isLoading()) {
+          <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
+        } @else {
+          <app-board
+            [zones]="board.zones()"
+            [loose]="board.loose()"
+            [width]="board.width()"
+            [height]="board.height()"
+            (noteActivated)="onNoteActivated($event)"
+            (folderOpened)="folders.selectFolder($event)"
+            (cardDropped)="onCardDropped($event)"
+            (zoneMoved)="board.moveZone($event.folderId, $event.frame)"
+            (zoneDrawn)="onZoneDrawn($event)"
+            (folderRenamed)="onFolderRenamed($event)"
+            (folderRecoloured)="onFolderRecoloured($event)"
+            (folderDeleted)="onFolderDeleted($event)"
+          />
         }
-        <p class="canvas-keyboard-hint">{{ 'notes.keyboardHint' | transloco }}</p>
+      } @else {
+        @let error = canvas.loadError();
+
+        <div class="canvas">
+          @if (error) {
+            <!-- Loading is the one operation whose failure empties the whole screen: it
+             deserves its own retry. -->
+            <div class="canvas-state" role="alert">
+              <p class="canvas-state-text">{{ 'errors.notesLoadFailed' | transloco }}</p>
+              <p class="canvas-state-detail">{{ error.message }}</p>
+              <button type="button" class="canvas-retry" (click)="canvas.reload()">
+                {{ 'errors.retry' | transloco }}
+              </button>
+            </div>
+          } @else if (canvas.isLoading()) {
+            <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
+          } @else if (canvas.hasNoResults()) {
+            <p class="canvas-state-text" data-testid="canvas-no-results">
+              {{ 'notes.noResults' | transloco }}
+            </p>
+          } @else {
+            @for (section of canvas.sections(); track section.key) {
+              <app-note-section [section]="section" (noteActivated)="onNoteActivated($event)" />
+            }
+            <p class="canvas-keyboard-hint">{{ 'notes.keyboardHint' | transloco }}</p>
+          }
+        </div>
       }
     </div>
-  }
+  </div>
 </div>
 
 <!-- The id comes from the store and never from an editor emission: it may be a draft

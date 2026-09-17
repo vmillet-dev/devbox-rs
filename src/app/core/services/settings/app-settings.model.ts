@@ -18,6 +18,13 @@ export type ResolvedTheme = Exclude<ThemeChoice, 'system'>;
 export const DENSITIES = ['comfortable', 'compact'] as const;
 export type Density = (typeof DENSITIES)[number];
 
+/**
+ * ⚠️ Narrow enough to leave the canvas usable on a small window, wide enough for the
+ * panels a row opens — they are 240px of form, and a rail narrower than that would cut
+ * the delete button off.
+ */
+export const RAIL_WIDTH = { min: 220, max: 520, default: 288 } as const;
+
 export interface AppSettings {
   readonly locale: LocaleChoice;
   readonly theme: ThemeChoice;
@@ -26,6 +33,10 @@ export interface AppSettings {
   readonly minimizeToTray: boolean;
   readonly closeToTray: boolean;
   readonly paletteShortcut: string;
+  /** The library rail, remembered like the window's own geometry rather than reset on launch. */
+  readonly showLibraryRail: boolean;
+  /** Its width, dragged from its edge and clamped on the way in and out. */
+  readonly libraryRailWidth: number;
   readonly showPinnedFirst: boolean;
   /** ⚠️ Read by Rust at launch, before the front end exists: `backup::wanted`. */
   readonly automaticBackups: boolean;
@@ -47,6 +58,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   minimizeToTray: false,
   closeToTray: true,
   paletteShortcut: DEFAULT_SHORTCUTS.palette,
+  showLibraryRail: true,
+  libraryRailWidth: RAIL_WIDTH.default,
   showPinnedFirst: true,
   automaticBackups: true,
   copyConfirmation: true,
