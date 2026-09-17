@@ -2120,8 +2120,37 @@ that took it on trust would lock the library behind a phrase nobody chose. The o
 session is untouched: the key in memory is the one that was already there.
 
 ⚠️ The command asks for the connection only to check that the library is open, then
-releases it: the two derivations cost about a second each, and holding the mutex across
-them would freeze every other command.
+releases it: holding the mutex across the derivations would freeze every other command.
+
+⚠️ **Rewriting the live key file alone revoked nothing**, which is the whole of #157. A
+change is the gesture somebody makes when they think the old phrase leaked — and every
+retained backup kept a key file of its own, still wrapped under it, inside the same profile
+directory the library is in. Whoever copied the profile copied every phrase the user had
+ever retired, and the envelope means **one master key for the life of the library**, so any
+key file ever written is a permanent escrow for it. A note written _after_ the change opened
+under a phrase abandoned before it.
+
+So `backup::rewrap` is the second half, and `vault::change_with` is the one place that holds
+both. Three things decide its shape:
+
+- It writes the key it is **given** rather than opening each copy with the phrase being
+  retired. A backup's file wraps that same master key whatever phrase was current when it
+  was taken, so this retires **every** abandoned phrase at once — including one from three
+  changes ago, which could never have been opened with the current phrase to be rewrapped
+  the obvious way.
+- **The live file first.** If it cannot be written the whole change fails having touched
+  nothing; it is the only one whose loss is fatal. Each copy then goes through the same
+  staged-then-renamed write, so a copy is atomic for itself even though the set is not.
+- A copy it cannot rewrite is **counted, not fatal**. Refusing to rotate the phrase because
+  one backup's file is locked would block the revocation at the moment it is asked for.
+  `PassphraseChange { backupsRewrapped, backupsLeft }` crosses the bridge and `VaultStore`
+  turns it into one of three sentences — the report comes from the store and not from the
+  dialog, which closes on the click.
+
+⚠️ `damaged/` is deliberately absent: `recovery::set_aside` leaves `vault.json` where it is,
+so a set-aside library has no wrapping of its own to retire and opens under the new phrase
+like the live one. And the dialog says the part the application cannot act on — a key file
+the user copied elsewhere still opens with the old phrase, and only the user knows about it.
 
 ### Attachments, and the one plaintext copy
 

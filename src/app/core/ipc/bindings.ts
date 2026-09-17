@@ -157,7 +157,7 @@ export const commands = {
 	 *  The consequence is worth knowing — this answers a phrase somebody else learned, never
 	 *  a key somebody else got hold of.
 	 */
-	changePassphrase: (current: string, next: string) => typedError<null, AppError>(__TAURI_INVOKE("change_passphrase", { current, next })),
+	changePassphrase: (current: string, next: string) => typedError<PassphraseChange, AppError>(__TAURI_INVOKE("change_passphrase", { current, next })),
 	/**
 	 *  Sets the damaged library aside so the next unlock starts on a fresh one.
 	 * 
@@ -590,6 +590,16 @@ export type NotesView = {
 	isFiltering: boolean,
 	/**  `u32` and not `usize`: Specta refuses a type JSON cannot render losslessly. */
 	matched: number,
+};
+
+/**
+ *  What a change reached, so the interface can say it. ⚠️ `backupsLeft` is the honest half:
+ *  the application can only speak for the copies it knows about, and a key file the user
+ *  put somewhere else still opens with the retired phrase.
+ */
+export type PassphraseChange = {
+	backupsRewrapped: number,
+	backupsLeft: number,
 };
 
 export type Placeholder = {

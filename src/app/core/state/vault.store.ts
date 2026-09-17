@@ -3,6 +3,8 @@ import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { PreferencesService } from '@core/services/preferences/preferences.service';
 import { StatusNotifier } from '@core/services/notifications/status.service';
 import { hasErrorCode } from '@core/ipc/ipc.error';
+import { PassphraseChange } from '@core/ipc/bindings';
+import { TranslationRef } from '@core/services/i18n/translation-ref.model';
 import { VaultRepository } from '../data/vault.repository';
 import { VaultState } from '@core/model/vault.model';
 import { SEEDED_KEY } from './sample-notes.service';
@@ -61,12 +63,16 @@ export class VaultStore {
    * A new phrase over the same library. ⚠️ Nothing is re-encrypted — the phrase only ever
    * wrapped the key the notes are sealed with — so this cannot leave a library half
    * readable, and the session carries on as it was.
+   *
+   * ⚠️ Reports from here rather than from the dialog, which closes on the click: what the
+   * change reached is the whole point of it, and a retained backup it could not rewrap
+   * still opens with the phrase the user just retired.
    */
   async changePassphrase(current: string, next: string): Promise<boolean> {
-    return this.attempt(
-      () => this.repository.changePassphrase(current, next),
-      'errors.passphraseChangeFailed',
-    );
+    return this.attempt(async () => {
+      const change = await this.repository.changePassphrase(current, next);
+      this.status.notify(revocation(change));
+    }, 'errors.passphraseChangeFailed');
   }
 
   /** Typing again is what withdraws the refusal — it should not outlive the correction. */
@@ -128,4 +134,18 @@ export class VaultStore {
       this._isWorking.set(false);
     }
   }
+}
+
+/**
+ * ⚠️ Three strings rather than one with a count: the copies it could not reach are the
+ * half that matters, and French keeps the singular where English does not.
+ */
+function revocation(change: PassphraseChange): TranslationRef {
+  if (change.backupsLeft === 0) {
+    return { key: 'settings.security.changed' };
+  }
+
+  return change.backupsLeft === 1
+    ? { key: 'settings.security.changedOneLeft' }
+    : { key: 'settings.security.changedSomeLeft', params: { count: change.backupsLeft } };
 }

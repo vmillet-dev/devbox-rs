@@ -1,5 +1,6 @@
 import { VaultRepository } from '@core/data/vault.repository';
 import { IpcError } from '@core/ipc/ipc.error';
+import { PassphraseChange } from '@core/ipc/bindings';
 import { VaultState } from '@core/model/vault.model';
 
 /** The real one reaches for the Tauri bridge, absent under jsdom. */
@@ -47,11 +48,16 @@ export class FakeVaultRepository implements Pick<VaultRepository, keyof VaultRep
     return target;
   }
 
-  async changePassphrase(current: string, next: string): Promise<void> {
+  /** What the next change answers, so a spec can drive the report it produces. */
+  rewrapped: PassphraseChange = { backupsRewrapped: 0, backupsLeft: 0 };
+
+  async changePassphrase(current: string, next: string): Promise<PassphraseChange> {
     this.changes.push({ current, next });
     const failure = this.failNext;
     this.failNext = null;
     if (failure !== null) throw failure;
+
+    return this.rewrapped;
   }
 
   private async attempt(passphrase: string): Promise<void> {

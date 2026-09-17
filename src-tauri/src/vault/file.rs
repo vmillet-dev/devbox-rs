@@ -73,20 +73,26 @@ pub fn create(directory: &Path, passphrase: &str, cost: Cost) -> Result<Vault, S
 /// A new phrase over the same library. ⚠️ Nothing is re-encrypted: the key the notes are
 /// sealed with does not change, only what wraps it — so this cannot half-succeed and
 /// leave some notes unreadable, and it costs one derivation rather than a full rewrite.
+///
+/// ⚠️ Answers the library's key because the caller is not finished: every retained backup
+/// holds a key file of its own, still wrapped under the phrase being retired, and a change
+/// that leaves those revokes nothing (#157). `backup::rewrap` is the other half, and
+/// `vault::change_with` is the one place that has both.
 pub fn change_passphrase(
     directory: &Path,
     current: &str,
     next: &str,
     cost: Cost,
-) -> Result<(), StorageError> {
+) -> Result<Vault, StorageError> {
     let vault = unlock(directory, current)?;
+    write_wrapped(&path_in(directory), &vault, next, cost)?;
 
-    write_wrapped(&path_in(directory), &vault, next, cost)
+    Ok(vault)
 }
 
 /// ⚠️ A fresh salt every time, change included: two phrases must not share a derivation,
 /// or knowing one would say something about the other.
-fn write_wrapped(
+pub(crate) fn write_wrapped(
     path: &Path,
     vault: &Vault,
     passphrase: &str,
