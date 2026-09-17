@@ -830,6 +830,8 @@ rule — a comment box owns whatever it overlaps — was considered and refused:
 refiles notes the day a frame is stretched. **Membership comes from the drop, in both
 directions, and from nothing else.**
 
+**Everything lands on the grid.** The surface draws a 20px dotted lattice and every gesture snaps to it (`GRID_PX`), so two zones dropped roughly side by side come out exactly aligned instead of three pixels off. The rounding lives in the three arithmetic functions and nowhere else: ⚠️ both corners of a drawn band are snapped rather than its size — rounding a width would leave the far edge between two dots whenever the near one moved — and a resize is snapped **before** it is clamped, because the minimum is `folders::board`'s and is not a multiple of the grid. ⚠️ Snapping cannot turn a click into a move: nothing is computed until the pointer has passed `DRAG_THRESHOLD_PX`, and a stored position is left alone until something is actually dragged.
+
 **One write per gesture.** `BoardStore` stages what moved and writes it behind a 400 ms
 debounce as a single `save_board_layout`, one transaction. ⚠️ The staged geometry is laid
 _over_ the view rather than written into it, and it is cleared only once the write

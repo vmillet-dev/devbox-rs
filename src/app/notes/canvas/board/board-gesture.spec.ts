@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BoardFrame } from '@core/model/board.model';
 import {
   DRAG_THRESHOLD_PX,
+  GRID_PX,
   Gesture,
   MIN_ZONE_HEIGHT,
   MIN_ZONE_WIDTH,
@@ -13,6 +14,7 @@ import {
   isWorthDrawing,
   movedTo,
   resizedTo,
+  snap,
   zoneAt,
 } from './board-gesture';
 
@@ -42,14 +44,46 @@ describe('board gesture geometry', () => {
     });
   });
 
+  /** Nothing ever lands between two dots: that is what makes a board look arranged. */
+  describe('snapping to the grid', () => {
+    it('rounds to the nearest dot, both ways', () => {
+      expect(snap(0)).toBe(0);
+      expect(snap(9)).toBe(0);
+      expect(snap(11)).toBe(GRID_PX);
+      expect(snap(-9)).toBe(-0);
+      expect(snap(207)).toBe(200);
+    });
+
+    /** Two cards dropped roughly side by side come out exactly aligned. */
+    it('brings two rough drops onto the same line', () => {
+      const first = movedTo(gesture({ from: { x: 0, y: 0, width: 240, height: 150 } }), { x: 303, y: 298 });
+      const second = movedTo(gesture({ from: { x: 0, y: 0, width: 240, height: 150 } }), { x: 297, y: 305 });
+
+      expect(first.x).toBe(second.x);
+      expect(first.y).toBe(second.y);
+    });
+
+    /** ⚠️ A gesture under the threshold never reaches this, so a click still moves nothing. */
+    it('leaves a frame already on the grid exactly where it is', () => {
+      const moved = movedTo(gesture({ from: { x: 100, y: 100, width: 240, height: 150 } }), {
+        x: 100,
+        y: 100,
+      });
+
+      expect(moved).toEqual({ x: 100, y: 100, width: 240, height: 150 });
+    });
+  });
+
   describe('moving', () => {
     /** ⚠️ The grab offset is the whole point: a frame follows the pointer, it does not
      *  jump so its corner sits under it. */
     it('keeps the offset the pointer was grabbed at', () => {
       const moved = movedTo(gesture(), { x: 300, y: 300 });
 
-      expect(moved.x).toBe(90 + 200);
-      expect(moved.y).toBe(80 + 200);
+      // ⚠️ Snapped onto the lattice the background draws: the offset is kept, then
+      // rounded — 290 lands on 300 and 280 was already on a dot.
+      expect(moved.x).toBe(300);
+      expect(moved.y).toBe(280);
     });
 
     it('carries the size along unchanged', () => {
@@ -75,7 +109,7 @@ describe('board gesture geometry', () => {
       expect(resized.x).toBe(90);
       expect(resized.y).toBe(80);
       expect(resized.width).toBe(400);
-      expect(resized.height).toBe(250);
+      expect(resized.height).toBe(260);
     });
 
     /** A zone nothing can be dropped into is not a zone. */
@@ -93,7 +127,7 @@ describe('board gesture geometry', () => {
       const backwards = drawnTo({ x: 110, y: 90 }, { x: 10, y: 10 });
 
       expect(forwards).toEqual(backwards);
-      expect(forwards).toEqual({ x: 10, y: 10, width: 100, height: 80 });
+      expect(forwards).toEqual({ x: 20, y: 20, width: 100, height: 80 });
     });
 
     /** A band barely dragged was a click on the background, and creates nothing. */
@@ -107,7 +141,7 @@ describe('board gesture geometry', () => {
 
       expect(zone.width).toBe(MIN_ZONE_WIDTH);
       expect(zone.height).toBe(MIN_ZONE_HEIGHT);
-      expect(zone.x).toBe(10);
+      expect(zone.x).toBe(20);
     });
 
     it('leaves a band already big enough alone', () => {
@@ -145,7 +179,7 @@ describe('board gesture geometry', () => {
     });
 
     it('drops a card where the grab offset puts it, not under the cursor', () => {
-      expect(cardPosition(gesture(), { x: 300, y: 300 })).toEqual({ x: 290, y: 280 });
+      expect(cardPosition(gesture(), { x: 300, y: 300 })).toEqual({ x: 300, y: 280 });
     });
   });
 });
