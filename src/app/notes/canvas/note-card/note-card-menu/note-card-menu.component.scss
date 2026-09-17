@@ -11,9 +11,11 @@
 .card-menu-trigger {
   @include unstyled-control;
   display: block;
-  padding: 2px 6px;
+  // ⚠️ Narrow: the card's head reserves the band this and the copy button take, and every
+  // pixel here is a pixel off a title that is already clamped to two lines.
+  padding: 2px 4px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.2;
   color: var(--text-2);
   cursor: pointer;

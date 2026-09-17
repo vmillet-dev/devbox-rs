@@ -28,7 +28,8 @@
 app-copy-button {
   position: absolute;
   top: 8px;
-  right: 34px;
+  // Beside the ⋯, and the head reserves exactly the band the two of them take.
+  right: 30px;
   z-index: 1;
   opacity: 0;
 }
@@ -59,13 +60,15 @@ app-copy-button:focus-within {
   margin-bottom: 8px;
   font-size: 13px;
   line-height: 1.3;
-  // Reserves room for the copy and ⋯ buttons floating over the top-right corner, measured
-  // rather than guessed.
-  padding-right: 46px;
-  // ⚠️ And for the selection tick on the left, which floats over the card's own padding —
-  // `checked` keeps it on with no pointer at all. A permanent gutter rather than one that
-  // appears with the tick, which would shift the title sideways under the pointer.
-  padding-left: 8px;
+  // ⚠️ Reserves what the two buttons floating over the top-right corner actually take —
+  // the ⋯ at `right: 8px` and the copy (or ⚡) beside it — and not a number typed once:
+  // it was 46px against 51px of controls, so the copy button covered the title's tail the
+  // moment the pointer arrived.
+  padding-right: 52px;
+  // ⚠️ Nothing on the left: the selection tick now fits inside the card's own padding, so
+  // the badge and the title line up with the snippet under them instead of starting 8px
+  // in. On the board the tick stands beside a drag grip and asks for a gutter again.
+  padding-left: var(--card-head-gutter, 0);
 }
 
 .card-title {
@@ -275,11 +278,13 @@ app-language-badge,
   @include unstyled-control;
   position: absolute;
   top: 8px;
-  // Tight into the corner, so the gutter the head reserves for it can be 8px.
-  left: 2px;
+  // ⚠️ Inside the card's own padding (`--space-card`), which is what lets the head reserve
+  // nothing on the left: a wider tick would sit over the first glyphs of the badge the
+  // moment it appeared.
+  left: var(--card-check-left, 0);
   z-index: 1;
-  padding: 2px 4px;
-  font-size: 12px;
+  padding: 2px 1px;
+  font-size: 11px;
   color: var(--text-2);
   cursor: pointer;
   opacity: 0;
@@ -305,9 +310,9 @@ app-language-badge,
   @include unstyled-control;
   position: absolute;
   top: 8px;
-  right: 34px;
+  right: 30px;
   z-index: 1;
-  padding: 3px 6px;
+  padding: 3px 4px;
   border-radius: 6px;
   font-size: 11px;
   color: var(--amber);

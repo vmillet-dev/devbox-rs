@@ -55,6 +55,43 @@ export const canvas = {
     return $(`${testid('note-card')}[data-note-id="${id}"]`);
   },
 
+  /**
+   * What a card's head has to work with, measured in the page. ⚠️ The buttons are drawn
+   * at `opacity: 0` until the pointer arrives, and opacity changes nothing about layout —
+   * so their boxes are readable without hovering, which is the only way this is not flaky.
+   */
+  cardHeadLayout(title: string): Promise<{ gap: number; offset: number } | null> {
+    return browser.execute(
+      (cardSelector: string, titleSelector: string, wanted: string) => {
+        const card = [...document.querySelectorAll(cardSelector)].find(
+          (each) => (each.querySelector(titleSelector)?.textContent ?? '').trim() === wanted,
+        );
+        const headElement = card?.querySelector('.card-head');
+        const head = headElement?.getBoundingClientRect();
+        const snippet = card?.querySelector('.card-snippet')?.getBoundingClientRect();
+        const button = card
+          ?.querySelector('.card-fill, .copy-btn, .card-menu-trigger')
+          ?.getBoundingClientRect();
+        if (!headElement || !head || !snippet || !button) return null;
+
+        // ⚠️ The head's own box spans the card: what the text has is inside its padding.
+        const style = getComputedStyle(headElement);
+        const textRight = head.right - Number.parseFloat(style.paddingRight);
+        const textLeft = head.left + Number.parseFloat(style.paddingLeft);
+
+        return {
+          // Between where the title can reach and the nearest of the floating buttons.
+          gap: Math.round(button.left - textRight),
+          // Between the head's text and the snippet under it: they have to line up.
+          offset: Math.round(textLeft - snippet.left),
+        };
+      },
+      testid('note-card'),
+      testid('note-card-title'),
+      title,
+    );
+  },
+
   async waitForCard(title: string): Promise<void> {
     await browser.waitUntil(async () => (await canvas.titles()).includes(title), {
       timeout: 15_000,

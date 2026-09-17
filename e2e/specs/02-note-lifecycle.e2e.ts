@@ -34,6 +34,20 @@ describe('Creating a note, and finding it again', () => {
     expect(view.matched).toBe(1);
   });
 
+  /**
+   * ⚠️ Measured, not asserted on a class: the copy and ⋯ buttons float over the head, and
+   * the band it reserved for them was a number typed once — 46px against 51px of controls,
+   * so the copy button covered the title's tail the moment the pointer arrived.
+   */
+  it('leaves the title clear of the buttons floating over it', async () => {
+    const layout = await canvas.cardHeadLayout(title);
+
+    expect(layout).not.toBeNull();
+    expect(layout!.gap).toBeGreaterThanOrEqual(0);
+    // And the head lines up with the snippet under it rather than starting 8px in.
+    expect(layout!.offset).toBe(0);
+  });
+
   it('materialises the draft exactly once, not once per committed field', async () => {
     // ⚠️ Closing commits the title then the content with no change detection between
     // them: the second call still carries `DRAFT_ID` while the row already exists.
