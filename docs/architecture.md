@@ -469,6 +469,15 @@ loop would be an injection cycle — so each writes through `NotesRevision` and 
 re-queries on its own. The last three do inject it, in that direction only: they orchestrate
 _around_ the open note rather than being read by it.
 
+⚠️ **`NotesStore` bumps that same revision**, rather than reloading the canvas it happens to
+hold. There are **two** views of the same notes: `NotesQueryStore.queryParams` and
+`BoardStore.queryParams` both read `NotesRevision`, and a write that reloaded only the first
+one is exactly what left a todo list ticked on the board still showing unticked until the view
+was switched. The same trap in the other direction: `NotesStore.find` resolves a note through
+`NotesQueryStore.findVisible` **and** `BoardStore.findVisible`, because the board _dims_ where
+the canvas _narrows_ — a card there can be ticked, moved or deleted while its note is nowhere
+in the canvas view, and an unresolved note is a gesture that writes nothing, silently.
+
 `TrashStore` and `TagsStore` load **on opening** rather than through a permanent `resource`:
 neither is displayed anywhere else, and a resource would re-query on every deletion.
 

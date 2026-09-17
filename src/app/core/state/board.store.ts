@@ -15,7 +15,7 @@ import {
   BoardZone,
   NotesViewMode,
 } from '../model/board.model';
-import { NoteFilter } from '../model/note.model';
+import { Note, NoteFilter } from '../model/note.model';
 import { NotesQueryStore } from './notes-query.store';
 import { NotesRevision } from './notes-revision';
 import { SpacesStore } from './spaces.store';
@@ -208,6 +208,21 @@ export class BoardStore {
 
   reload(): void {
     this.viewResource.reload();
+  }
+
+  /**
+   * The note a card on the board is showing, zone or background.
+   *
+   * ⚠️ The twin of `NotesQueryStore.findVisible`, and the board needs one of its own: it
+   * **dims** where the canvas **narrows**, so a card here can be ticked, moved or deleted
+   * while its note is nowhere in the canvas view.
+   */
+  findVisible(id: string): Note | null {
+    for (const zone of this.zones()) {
+      const found = zone.notes.find((entry) => entry.note.id === id);
+      if (found) return found.note;
+    }
+    return this.loose().find((entry) => entry.note.id === id)?.note ?? null;
   }
 
   /**

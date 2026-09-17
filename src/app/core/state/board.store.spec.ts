@@ -99,6 +99,24 @@ describe('BoardStore', () => {
     expect(repository.queryCount).toBe(0);
   });
 
+  /**
+   * ⚠️ Its own lookup, and not the canvas's: the board **dims** where the canvas
+   * **narrows**, so a card here can be acted on while its note is nowhere in that view.
+   */
+  it('finds a card wherever it sits, zone or background, dimmed or not', async () => {
+    const repository = new FakeBoardRepository({
+      zones: [fakeZone({ folder: PERF, notes: [fakeBoardNote(createNote({ id: 'a' }))] })],
+      loose: [fakeBoardNote(createNote({ id: 'b' }), { matches: false })],
+    });
+    const harness = await createStore(repository);
+    await onBoard(harness);
+    await vi.waitFor(() => expect(harness.store.zones()).toHaveLength(1));
+
+    expect(harness.store.findVisible('a')?.id).toBe('a');
+    expect(harness.store.findVisible('b')?.id).toBe('b');
+    expect(harness.store.findVisible('nowhere')).toBeNull();
+  });
+
   it('draws the zones and the loose cards the back end answered', async () => {
     const repository = new FakeBoardRepository({
       zones: [fakeZone({ folder: PERF, notes: [fakeBoardNote(createNote({ id: 'a' }))] })],
