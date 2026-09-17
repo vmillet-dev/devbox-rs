@@ -224,9 +224,10 @@ describe('BoardComponent', () => {
         expect(ghost()).not.toBeNull();
         expect(ghost()?.getAttribute('data-note-id')).toBe('filed-1');
         // ⚠️ By the grab offset, not under the pointer: the card was grabbed 40px into its
-        // seat, so it travels 460 rather than jumping its own corner onto the cursor.
+        // seat, so it travels 460 rather than jumping its own corner onto the cursor —
+        // then snapped to the grid, which puts 410 on 420.
         expect(ghost()?.style.left).toBe('460px');
-        expect(ghost()?.style.top).toBe('410px');
+        expect(ghost()?.style.top).toBe('420px');
       });
 
       /** Its seat stays behind, faded: the drop can still be cancelled. */
