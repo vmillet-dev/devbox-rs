@@ -12,3 +12,4 @@ src/app/core/ipc/bindings.ts
 package-lock.json
 # Maquette statique de référence : conservée telle quelle, hors périmètre du formatage.
 docs/scratch-mockup-v2.html
+docs/scratch-folders.html

@@ -6,6 +6,12 @@ import { homeSpaceMarker } from './profile.js';
 import type {
   Attachment,
   DisplayNote,
+  BoardQuery,
+  BoardView,
+  Folder,
+  FolderColour,
+  FolderDraft,
+  NoteFiling,
   ExportReport,
   ImportReport,
   NoteDraft,
@@ -50,6 +56,16 @@ export const bridge = {
   createSpace: (draft: SpaceDraft) => invoke<Space>('create_space', { draft }),
   renameSpace: (id: string, draft: SpaceDraft) => invoke<Space>('rename_space', { id, draft }),
   deleteSpace: (id: string, targetSpaceId: string) => invoke<null>('delete_space', { id, targetSpaceId }),
+
+  listFolders: (spaceId: string | null = null) => invoke<Folder[]>('list_folders', { spaceId }),
+  createFolder: (draft: FolderDraft) => invoke<Folder>('create_folder', { draft }),
+  renameFolder: (id: string, name: string) => invoke<Folder>('rename_folder', { id, name }),
+  recolourFolder: (id: string, colour: FolderColour) => invoke<Folder>('recolour_folder', { id, colour }),
+  deleteFolder: (id: string) => invoke<null>('delete_folder', { id }),
+  boardView: (query: BoardQuery) => invoke<BoardView>('board_view', { query }),
+  /** `folderId` of `null` unfiles; the answer is what each note left, never a count. */
+  fileNotes: (ids: string[], folderId: string | null) =>
+    invoke<NoteFiling[]>('file_notes', { ids, folderId }),
 
   queryNotes: (query: NotesQuery) => invoke<NotesView>('query_notes', { query }),
   createNote: (draft: NoteDraft) => invoke<DisplayNote>('create_note', { draft }),

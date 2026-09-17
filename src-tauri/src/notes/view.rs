@@ -8,12 +8,19 @@ use unicode_normalization::char::{decompose_canonical, is_combining_mark};
 use super::language::Language;
 use super::model::{self, DisplayNote, Note};
 use crate::count::saturating_u32;
+use crate::folders::model::NoteFolder;
 
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotesQuery {
     /// `None` = every space: a choice, not an absence of one.
     pub space_id: Option<String>,
+    /// `None` = every folder, filed or not. Narrowing to "unfiled" is not offered: the
+    /// absence of a chip already reads, and a filter for it would be a fourth way to say
+    /// the same thing.
+    #[serde(default)]
+    #[specta(optional)]
+    pub folder_id: Option<String>,
     pub search: String,
     pub filter: NoteFilter,
     /// A note passes if it carries at least one of these tags.
@@ -108,6 +115,22 @@ pub fn apply_attachment_counts<S: std::hash::BuildHasher>(
 }
 
 /// Separate from [`build`] for the same reason as [`apply_attachment_counts`].
+pub fn apply_folders<S: std::hash::BuildHasher>(
+    view: &mut NotesView,
+    folders: &HashMap<String, NoteFolder, S>,
+) {
+    for section in &mut view.sections {
+        for note in &mut section.notes {
+            note.folder = note
+                .folder_id
+                .as_ref()
+                .and_then(|id| folders.get(id))
+                .cloned();
+        }
+    }
+}
+
+/// Separate from [`build`] for the same reason as [`apply_attachment_counts`].
 pub fn apply_global_defaults(view: &mut NotesView, globals: &BTreeMap<String, String>) {
     if globals.is_empty() {
         return;
@@ -135,9 +158,15 @@ pub fn build(mut notes: Vec<Note>, facets: Facets, request: &NotesQuery) -> Note
         });
     }
 
-    // A quick filter restricts a view that stays chronological; a search or a facet
-    // switches to a flat list.
+    // A quick filter restricts a view that stays chronological; a search, a facet or an
+    // opened folder switches to a flat list.
+    //
+    // ⚠️ The folder belongs here and `build_sections` still knows nothing about it: the
+    // inside of a folder is already sorted by the fact of being there, so dating it again
+    // would be classifying twice. The date view's own sections are untouched — nothing
+    // sends a `folder_id` unless a folder has actually been opened.
     let is_filtering = !needle.is_empty()
+        || request.folder_id.is_some()
         || request
             .tags
             .iter()
@@ -185,6 +214,12 @@ fn apply_search_hits(view: &mut NotesView, hits: &mut HashMap<String, SearchHit>
 /// ⚠️ Folded in Rust and not in SQL: without ICU, SQLite's `LOWER()` only handles ASCII,
 /// so `Étape` would not match `étape`. The items count as much as the content — a todo
 /// list has no body to be found by.
+/// ⚠️ The one place a needle meets a note. The board reuses it rather than growing a
+/// second, subtly different match — it dims what does not match instead of dropping it.
+pub fn matches_search(note: &Note, needle: &str) -> bool {
+    find_match(note, needle).is_some()
+}
+
 fn find_match(note: &Note, needle: &str) -> Option<SearchMatch> {
     if contains_folded(&note.title, needle) {
         return Some(SearchMatch::Title);
@@ -244,7 +279,7 @@ fn clip(text: &str) -> String {
 /// string — measured 5× slower for the same answer, its lookahead buffering earning
 /// nothing when every mark is dropped anyway. The ASCII branches are the common case,
 /// not a micro-optimisation: code is ASCII end to end, prose between its accents.
-fn fold(text: &str) -> String {
+pub(crate) fn fold(text: &str) -> String {
     if text.is_ascii() {
         return text.to_ascii_lowercase();
     }
@@ -389,6 +424,7 @@ mod tests {
     fn request() -> NotesQuery {
         NotesQuery {
             space_id: None,
+            folder_id: None,
             search: String::new(),
             filter: NoteFilter::All,
             tags: Vec::new(),
@@ -458,6 +494,38 @@ mod tests {
         assert_eq!(keys(&view), [NoteSectionKey::Results]);
     }
 
+    /// ⚠️ The inside of a folder is already sorted by the fact of being there, so dating
+    /// it again would be classifying twice. `build_sections` still knows nothing about a
+    /// folder — this is the only place the two meet.
+    #[test]
+    fn an_opened_folder_is_a_flat_grid_rather_than_dated_sections() {
+        let view = build(
+            vec![note("a", "Un"), note("b", "Deux")],
+            Facets::default(),
+            &NotesQuery {
+                folder_id: Some("f-1".to_string()),
+                ..request()
+            },
+        );
+
+        assert!(view.is_filtering);
+        assert_eq!(keys(&view), [NoteSectionKey::Results]);
+        assert_eq!(view.matched, 2);
+    }
+
+    /// The date view is untouched: nothing sends a folder unless one has been opened.
+    #[test]
+    fn no_folder_leaves_the_sections_exactly_as_they_were() {
+        let view = build(
+            vec![note("a", "Un")],
+            Facets::default(),
+            &NotesQuery { ..request() },
+        );
+
+        assert!(!view.is_filtering);
+        assert_ne!(keys(&view), [NoteSectionKey::Results]);
+    }
+
     #[test]
     fn a_tag_that_normalizes_to_nothing_does_not_count_as_filtering() {
         let view = build(
@@ -522,10 +590,6 @@ mod tests {
 
     mod search {
         use super::*;
-
-        fn matches_search(note: &Note, needle: &str) -> bool {
-            find_match(note, needle).is_some()
-        }
 
         #[test]
         fn the_title_the_tags_and_the_content_are_all_searched() {

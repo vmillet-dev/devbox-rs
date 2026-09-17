@@ -1,0 +1,109 @@
+@use 'mixins' as *;
+
+// The host is the flex child; `.board` is what actually scrolls.
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+// The dotted ground, and the only thing that scrolls: a pan, never a zoom.
+.board {
+  flex: 1;
+  min-height: 0;
+  margin: 16px 24px 24px;
+  background: var(--bg-0);
+  background-image: radial-gradient(var(--bg-2) 1px, transparent 1px);
+  background-size: 20px 20px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  overflow: auto;
+}
+
+.board-surface {
+  position: relative;
+}
+
+.loose-label {
+  position: absolute;
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+// Dimmed in place: the card keeps its seat, it just stops asking for attention.
+// ⚠️ On the wrapper, not on `app-note-card`: the wrapper is what carries the class.
+.loose-card.dimmed {
+  opacity: 0.32;
+}
+
+.board-empty {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+  text-align: center;
+}
+
+.board-surface.drawing {
+  // A band is drawn by dragging the background itself, so it must take pointer events.
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.loose-card {
+  @include board-card;
+
+  position: absolute;
+}
+
+.loose-card .card-grip {
+  @include unstyled-control;
+
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  z-index: 2;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-2);
+  background: var(--bg-2);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0.4;
+}
+
+.loose-card:hover .card-grip,
+.loose-card .card-grip:hover,
+.loose-card .card-grip:focus-visible {
+  opacity: 1;
+  color: var(--text-0);
+}
+
+.loose-card .card-grip:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+// At the end of the cursor, and above everything it is being dragged over.
+.loose-card.dragging {
+  z-index: 20;
+  cursor: grabbing;
+  box-shadow: 0 14px 30px rgb(0 0 0 / 55%);
+  transform: rotate(-3deg);
+}
+
+.draw-band {
+  position: absolute;
+  z-index: 15;
+  border: 1px dashed var(--amber);
+  background: rgb(var(--amber-rgb) / 8%);
+  border-radius: 10px;
+  pointer-events: none;
+}

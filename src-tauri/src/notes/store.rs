@@ -6,15 +6,18 @@ use std::collections::BTreeMap;
 use diesel::prelude::*;
 use uuid::Uuid;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 
 use super::checklist;
-use super::model::{self, Note, NoteDraft, NoteLifecycle, NotePatch, NotePlacement, NoteTag};
+use super::model::{
+    self, Note, NoteDraft, NoteLifecycle, NotePatch, NotePlacement, NoteTag, SampleNote,
+};
 use super::placeholder;
 use super::view::{Facets, NoteFilter, NotesQuery};
 use crate::db::schema::{global_placeholders, note_tags, notes};
 use crate::db::{Library, iso8601};
 use crate::error::StorageError;
+use crate::folders::store as folders;
 use crate::spaces::model::Space;
 use crate::spaces::store as spaces;
 use crate::vault::key::Vault;
@@ -35,6 +38,7 @@ pub(super) struct NoteRow {
     lifecycle_kind: String,
     lifecycle_expires_at: Option<String>,
     kind: String,
+    folder_id: Option<String>,
 }
 
 /// ⚠️ Not a `TryFrom`: opening a row needs the key, and a trait cannot take one. The
@@ -71,6 +75,7 @@ impl NoteRow {
             source: vault.open(&row.source)?,
             id: row.id,
             space_id: row.space_id,
+            folder_id: row.folder_id,
             tags: Vec::new(),
             items: Vec::new(),
             placeholder_values: BTreeMap::new(),
@@ -101,6 +106,7 @@ impl NoteRow {
             lifecycle_kind: lifecycle_kind.to_string(),
             lifecycle_expires_at,
             kind: note.kind.to_string(),
+            folder_id: note.folder_id.clone(),
         })
     }
 }
@@ -130,6 +136,10 @@ struct NoteChanges {
     #[allow(clippy::option_option)]
     lifecycle_expires_at: Option<Option<String>>,
     kind: Option<String>,
+    /// Twice optional for the same reason, and only ever written by a move between
+    /// spaces: filing has a command of its own.
+    #[allow(clippy::option_option)]
+    folder_id: Option<Option<String>>,
 }
 
 /// ⚠️ Every row or none: a value that will not open stops the read rather than handing
@@ -239,6 +249,10 @@ pub fn fetch(
         query = query.filter(notes::space_id.eq(space_id.clone()));
     }
 
+    if let Some(folder_id) = &request.folder_id {
+        query = query.filter(notes::folder_id.eq(folder_id.clone()));
+    }
+
     match request.filter {
         NoteFilter::All => {}
         NoteFilter::Pinned => query = query.filter(notes::pinned.eq(true)),
@@ -345,23 +359,45 @@ pub(crate) fn create_in(
 pub fn seed(
     connection: &mut Library,
     space_name: &str,
-    drafts: Vec<NoteDraft>,
+    folder_names: &[String],
+    notes: Vec<SampleNote>,
     now: DateTime<Utc>,
 ) -> Result<Space, StorageError> {
     connection.transaction(|connection, vault| {
         let space = spaces::create_in(connection, vault, space_name)?;
 
-        for draft in drafts {
-            // Sequential, and `now` is shared: `created_at` is what orders the canvas,
-            // so the samples keep the order they were written in.
+        // ⚠️ Inside the same transaction as the space and the notes. A seeding that wrote
+        // the space but not the folders would be permanent: a space exists, so both of the
+        // front end's guards read "already seeded" and it never runs again.
+        //
+        // ⚠️ A millisecond apart, and *forward*: `folders::list` orders `created_at` ascending
+        // and breaks a tie on the id, which is a random UUID — sharing one instant would
+        // leave the board's zones in an order that differs from one install to the next.
+        let mut folder_ids: Vec<String> = Vec::with_capacity(folder_names.len());
+        for (index, name) in folder_names.iter().enumerate() {
+            let at = now + TimeDelta::milliseconds(i64::try_from(index).unwrap_or(0));
+            folder_ids.push(folders::create_in(connection, vault, &space.id, name, at)?.id);
+        }
+
+        // ⚠️ And *backward* for the notes, for the same reason read the other way: the
+        // canvas orders `updated_at` descending, so the first one declared needs the latest
+        // instant to come out first.
+        for (index, note) in notes.into_iter().enumerate() {
+            let at = now - TimeDelta::milliseconds(i64::try_from(index).unwrap_or(0));
+            let folder_id = note
+                .folder
+                .and_then(|index| folder_ids.get(usize::try_from(index).unwrap_or(usize::MAX)))
+                .cloned();
+
             create_in(
                 connection,
                 vault,
                 NoteDraft {
                     space_id: space.id.clone(),
-                    ..draft
+                    folder_id,
+                    ..note.draft
                 },
-                now,
+                at,
             )?;
         }
 
@@ -408,6 +444,7 @@ pub fn update(
                 lifecycle_kind: moved(lifecycle_moved, &row.lifecycle_kind),
                 lifecycle_expires_at: lifecycle_moved.then(|| row.lifecycle_expires_at.clone()),
                 kind: moved(note.kind != before.kind, &row.kind),
+                folder_id: (note.folder_id != before.folder_id).then(|| row.folder_id.clone()),
             })
             .execute(connection)?;
 
@@ -475,6 +512,8 @@ pub fn move_many(
         diesel::update(notes::table.filter(notes::id.eq_any(touched)))
             .set((
                 notes::space_id.eq(space_id),
+                // The folder stays behind with its space, as it does through a patch.
+                notes::folder_id.eq(None::<String>),
                 notes::updated_at.eq(iso8601::format(now)),
             ))
             .execute(connection)?;

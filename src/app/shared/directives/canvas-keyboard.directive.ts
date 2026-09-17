@@ -1,6 +1,7 @@
 import { Directive, ElementRef, inject } from '@angular/core';
 import { ShortcutGroup } from '@core/services/shortcuts/shortcut.model';
 import { DialogStack } from '@shared/layout/dialog/dialog-stack';
+import { FoldersStore } from '@core/state/folders.store';
 import { Note } from '@core/model/note.model';
 import { NoteCopyService } from '@core/state/note-copy.service';
 import { NoteSelectionStore } from '@core/state/note-selection.store';
@@ -12,6 +13,7 @@ interface CanvasContext {
   readonly focused: Note | null;
   readonly notes: NotesStore;
   readonly canvas: NotesQueryStore;
+  readonly folders: FoldersStore;
   readonly selection: NoteSelectionStore;
   readonly copy: (content: string) => void;
   readonly move: (direction: FocusDirection) => void;
@@ -28,6 +30,9 @@ interface CanvasKey {
   /** Answers whether it acted: only then is the browser's own behaviour cancelled. */
   readonly run?: (context: CanvasContext, key: string) => boolean;
 }
+
+/** ⚠️ Spelled once: the table below binds it and the written guide names it. */
+export const CHECK_KEY = 'X';
 
 const DIRECTIONS: Record<string, FocusDirection> = {
   ArrowLeft: 'prev',
@@ -79,7 +84,7 @@ const CANVAS_KEYS: readonly CanvasKey[] = [
     run: ({ focused, notes }) => given(focused, (note) => void notes.togglePinned(note.id)),
   },
   {
-    keys: ['X'],
+    keys: [CHECK_KEY],
     labelKey: 'shortcuts.canvas.check',
     on: ['x', 'X'],
     run: ({ focused, selection }) => given(focused, (note) => selection.toggleChecked(note.id)),
@@ -104,10 +109,12 @@ const CANVAS_KEYS: readonly CanvasKey[] = [
     keys: ['Escape'],
     labelKey: 'shortcuts.canvas.clearSelection',
     on: ['Escape'],
-    // Falls through: the selection first, then the filters.
-    run: ({ selection, canvas }) =>
+    // Falls through: the selection first, then the search and the facets, and only then
+    // out of the folder — leaving it is the biggest of the three, so it goes last.
+    run: ({ selection, canvas, folders }) =>
       when(selection.hasSelection(), () => selection.clearSelection()) ||
-      when(canvas.matched() !== null, () => canvas.clearFilters()),
+      when(canvas.hasUserFilters(), () => canvas.clearFilters()) ||
+      when(folders.activeFolderId() !== null, () => folders.selectFolder(null)),
   },
 ];
 
@@ -139,6 +146,7 @@ export class CanvasKeyboardDirective {
   private readonly selection = inject(NoteSelectionStore);
   private readonly notes = inject(NotesStore);
   private readonly canvas = inject(NotesQueryStore);
+  private readonly folders = inject(FoldersStore);
   private readonly copier = inject(NoteCopyService);
   private readonly dialogs = inject(DialogStack);
 
@@ -165,6 +173,7 @@ export class CanvasKeyboardDirective {
       focused: this.selection.focusedNote(),
       notes: this.notes,
       canvas: this.canvas,
+      folders: this.folders,
       selection: this.selection,
       copy: (content) => void this.copier.copy(content),
       move: (direction) => this.moveFocus(direction),

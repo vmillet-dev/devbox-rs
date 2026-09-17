@@ -6,10 +6,12 @@ import {
   NotePatch,
   NotePlacement,
   NoteTag,
+  SampleNote,
   TagUsage,
   TrashedNote,
 } from '@core/model/note.model';
 import { NotesQuery, NotesView } from '@core/model/note.model';
+import { Space } from '@core/model/space.model';
 import { checklistMarkdown } from './note.fixture';
 
 /** Mirrors `notes::trash::RETENTION`, so the double's `purgeAt` is plausible. */
@@ -97,6 +99,7 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
         updatedAt: now,
         footer: { kind: 'age', at: now },
         expiringSoon: false,
+        folder: null,
         placeholders: [],
         attachmentCount: 0,
         copyText: draft.kind === 'checklist' ? checklistMarkdown(draft.items) : null,
@@ -108,15 +111,22 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
   }
 
   /** Records what the first launch asked for, and files the notes into the space it names. */
-  seededSamples: { spaceName: string; drafts: readonly NoteDraft[] } | null = null;
+  seededSamples: {
+    spaceName: string;
+    folders: readonly string[];
+    notes: readonly SampleNote[];
+  } | null = null;
 
-  seedSamples(spaceName: string, drafts: readonly NoteDraft[]): Promise<void> {
+  seedSamples(spaceName: string, folders: readonly string[], notes: readonly SampleNote[]): Promise<Space> {
     return guard(this, () => {
       const spaceId = `fake-space-${++this.nextId}`;
-      this.seededSamples = { spaceName, drafts };
-      for (const draft of drafts) {
-        void this.create({ ...draft, spaceId });
+      this.seededSamples = { spaceName, folders, notes };
+      for (const note of notes) {
+        // The index is resolved by the engine; the double only has to keep it legible.
+        const folderId = note.folder === undefined ? null : `fake-folder-${note.folder}`;
+        void this.create({ ...note.draft, spaceId, folderId });
       }
+      return { id: spaceId, name: spaceName, pinned: false };
     });
   }
 
@@ -158,6 +168,9 @@ export class FakeNotesRepository implements Pick<NotesRepository, keyof NotesRep
           expiringSoon: false,
           placeholders: [],
           attachmentCount: 0,
+          // The trash shape carries no folder: a restored note comes back loose.
+          folderId: null,
+          folder: null,
           copyText: null,
           searchHit: null,
           // The trash shape drops the items; a spec needing them restored uses `setView`.

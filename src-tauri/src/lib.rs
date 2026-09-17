@@ -7,6 +7,7 @@ pub mod changelog;
 pub mod db;
 pub mod desktop;
 pub mod error;
+pub mod folders;
 pub mod notes;
 pub mod recovery;
 pub mod spaces;
@@ -27,6 +28,10 @@ use attachments::{
 };
 use changelog::app_changelog;
 use desktop::{set_global_shortcuts, set_window_behavior, sync_tray};
+use folders::{
+    board_view, create_folder, delete_folder, file_notes, file_notes_back, list_folders,
+    recolour_folder, rename_folder, save_board_layout,
+};
 use notes::{
     count_notes_tagged, create_note, delete_note, delete_notes, delete_tags, empty_trash,
     fill_placeholders, list_global_placeholders, list_tags, list_trash, merge_tags, move_notes,
@@ -80,6 +85,15 @@ fn ipc_builder() -> Builder<tauri::Wry> {
             set_placeholder_values,
             list_global_placeholders,
             set_global_placeholders,
+            list_folders,
+            board_view,
+            save_board_layout,
+            create_folder,
+            rename_folder,
+            recolour_folder,
+            delete_folder,
+            file_notes,
+            file_notes_back,
             list_spaces,
             create_space,
             rename_space,

@@ -76,6 +76,7 @@ fn draft(seed: usize, space_id: &str) -> NoteDraft {
 
     NoteDraft {
         space_id: space_id.to_string(),
+        folder_id: None,
         title: format!("Note {seed} — étape de déploiement"),
         language: Language::Rs,
         content: if checklist { String::new() } else { body(seed) },

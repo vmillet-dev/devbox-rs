@@ -1,6 +1,7 @@
 import type { ExportReport, ImportReport, SearchHit } from '@core/ipc/bindings';
 import { LanguageTag } from '@core/model/language.model';
 import { ChecklistItem, NoteKind } from './checklist.model';
+import type { NoteFolder } from './folder.model';
 
 export { type ChecklistItem, type NoteKind } from './checklist.model';
 
@@ -21,6 +22,10 @@ export type NoteFooter =
 export interface Note {
   readonly id: string;
   readonly spaceId: string;
+  /** `null` = unfiled, which is a legitimate state and the one a card says nothing about. */
+  readonly folderId: string | null;
+  /** Resolved by the back end: the card never joins `folderId` against a list it holds. */
+  readonly folder: NoteFolder | null;
   readonly title: string;
   readonly language: LanguageTag;
   readonly content: string;
@@ -44,9 +49,19 @@ export interface Note {
   readonly searchHit: SearchHit | null;
 }
 
+/**
+ * One seeded note, and which of the seeded folders it lands in. ⚠️ An **index**, not an
+ * id: the folders do not exist until the command that writes them runs.
+ */
+export interface SampleNote {
+  readonly folder: number | undefined;
+  readonly draft: NoteDraft;
+}
+
 export type NoteDraft = Omit<
   Note,
   | 'id'
+  | 'folder'
   | 'createdAt'
   | 'updatedAt'
   | 'footer'
@@ -57,7 +72,12 @@ export type NoteDraft = Omit<
   | 'searchHit'
 >;
 
-export type NotePatch = Partial<NoteDraft>;
+/**
+ * ⚠️ No `folderId`: filing has a command of its own (`FoldersRepository.fileMany`), so
+ * a patch can never refile a note as a side effect. The back end has no field for it
+ * either — the only move it makes is unfiling a note that changes space.
+ */
+export type NotePatch = Partial<Omit<NoteDraft, 'folderId'>>;
 
 /** `untriaged` = notes carrying a deadline, the ones whose fate is undecided. */
 export type NoteFilter = 'all' | 'pinned' | 'untriaged';
@@ -65,6 +85,8 @@ export type NoteFilter = 'all' | 'pinned' | 'untriaged';
 export interface NotesQuery {
   /** `null` = "all spaces", a choice and not an absence of one. */
   readonly spaceId: string | null;
+  /** `null` = every folder, filed or not. */
+  readonly folderId: string | null;
   readonly search: string;
   readonly filter: NoteFilter;
   /** Union semantics, like `languages`: at least one of them. Empty = all. */

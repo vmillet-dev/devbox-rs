@@ -128,6 +128,7 @@ export class PaletteStore {
     try {
       const view = await this.repository.query({
         spaceId: null,
+        folderId: null,
         search: query.trim(),
         filter: 'all',
         tags: [],

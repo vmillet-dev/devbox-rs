@@ -120,6 +120,30 @@ app-language-badge,
   color: var(--red);
 }
 
+/* ⚠️ Neutral pill with a square swatch. A tinted pill is what a tag is, and the two
+   must not be read as the same thing. */
+.card-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: auto;
+  padding: 1px 7px;
+  font-size: 9.5px;
+  color: var(--text-1);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+
+.folder-swatch {
+  @include folder-hues;
+
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--folder-hue);
+}
+
 .card-tags {
   display: flex;
   gap: 4px;

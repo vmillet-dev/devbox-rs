@@ -13,6 +13,7 @@ const BASE_VIEW: WireNotesView = {
 
 const BASE_QUERY: NotesQuery = {
   spaceId: 'space-1',
+  folderId: null,
   search: 'deploy',
   filter: 'all',
   tags: ['api'],

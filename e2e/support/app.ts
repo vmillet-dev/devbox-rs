@@ -297,6 +297,11 @@ export async function blur(): Promise<void> {
  * been told to re-query: `NotesRevision` is a front-end signal, and the back end does
  * not push.
  */
+/** ⚠️ The canvas keyboard ignores a keystroke aimed at a text field, by design. */
+export async function blurField(): Promise<void> {
+  await browser.execute(() => (document.activeElement as HTMLElement | null)?.blur());
+}
+
 export async function reloadCanvas(): Promise<void> {
   await browser.refresh();
   await waitForCanvas();

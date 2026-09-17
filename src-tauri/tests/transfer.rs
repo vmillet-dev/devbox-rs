@@ -21,6 +21,7 @@ fn t0() -> DateTime<Utc> {
 fn draft(space_id: &str, title: &str) -> NoteDraft {
     NoteDraft {
         space_id: space_id.to_string(),
+        folder_id: None,
         title: title.to_string(),
         language: Language::Sql,
         content: "select 1".to_string(),
@@ -399,4 +400,293 @@ fn an_attachment_the_archive_does_not_carry_is_reported() {
     assert_eq!(report.attachments_imported, 0);
 
     std::fs::remove_dir_all(&directory).ok();
+}
+
+mod folders_travelling {
+    use super::*;
+
+    use devbox_lib::folders::board::{BoardFrame, BoardPoint, CardPlacement, ZonePlacement};
+    use devbox_lib::folders::store as folders;
+    use devbox_lib::folders::store::board as geometry;
+
+    /// A library with its notes filed, and a board arranged — the state a real one is in.
+    fn arranged() -> (Library, String, String) {
+        let mut connection = open_in_memory().unwrap();
+        let sql = spaces::create(&mut connection, "SQL").unwrap().id;
+        let perf = folders::create(&mut connection, &sql, "Perf", t0()).unwrap();
+        let migrations = folders::create(&mut connection, &sql, "Migrations", t0()).unwrap();
+
+        let filed = notes::create(&mut connection, draft(&sql, "EXPLAIN lent"), t0()).unwrap();
+        let elsewhere = notes::create(&mut connection, draft(&sql, "Backfill"), t0()).unwrap();
+        notes::create(&mut connection, draft(&sql, "Dump nocturne"), t0()).unwrap();
+
+        folders::file_many(
+            &mut connection,
+            std::slice::from_ref(&filed.id),
+            Some(&perf.id),
+            t0(),
+        )
+        .unwrap();
+        folders::file_many(
+            &mut connection,
+            std::slice::from_ref(&elsewhere.id),
+            Some(&migrations.id),
+            t0(),
+        )
+        .unwrap();
+
+        geometry::save_layout(
+            &mut connection,
+            &[ZonePlacement {
+                folder_id: perf.id.clone(),
+                frame: BoardFrame {
+                    x: 900,
+                    y: 700,
+                    width: 520,
+                    height: 400,
+                },
+            }],
+            &[],
+        )
+        .unwrap();
+
+        (connection, sql, perf.id)
+    }
+
+    fn folder_names(connection: &mut Library, space_id: &str) -> Vec<String> {
+        let mut names: Vec<String> = folders::list(connection, Some(space_id))
+            .unwrap()
+            .into_iter()
+            .map(|folder| folder.name)
+            .collect();
+        names.sort();
+        names
+    }
+
+    fn folder_of(connection: &mut Library, title: &str) -> Option<String> {
+        notes::all(connection, None)
+            .unwrap()
+            .into_iter()
+            .find(|note| note.title == title)
+            .and_then(|note| note.folder_id)
+            .and_then(|id| {
+                folders::list(connection, None)
+                    .unwrap()
+                    .into_iter()
+                    .find(|folder| folder.id == id)
+                    .map(|folder| folder.name)
+            })
+    }
+
+    #[test]
+    fn a_library_comes_back_arranged_on_another_machine() {
+        let (mut source, _, _) = arranged();
+        let bundle = round_tripped(&exported(&mut source));
+
+        let mut target = open_in_memory().unwrap();
+        let report = merge(&mut target, bundle);
+
+        assert_eq!(report.notes_imported, 3);
+        assert_eq!(report.spaces_created, 1);
+        assert_eq!(report.folders_created, 2);
+
+        let space = spaces::list(&mut target).unwrap()[0].id.clone();
+        assert_eq!(folder_names(&mut target, &space), ["Migrations", "Perf"]);
+        assert_eq!(
+            folder_of(&mut target, "EXPLAIN lent").as_deref(),
+            Some("Perf")
+        );
+        assert_eq!(
+            folder_of(&mut target, "Backfill").as_deref(),
+            Some("Migrations")
+        );
+        assert_eq!(folder_of(&mut target, "Dump nocturne"), None);
+    }
+
+    /// Exporting one folder's worth of notes must not recreate the whole tree.
+    #[test]
+    fn only_the_folders_actually_cited_travel() {
+        let (mut source, space_id, perf_id) = arranged();
+        let filed: Vec<_> = notes::all(&mut source, None)
+            .unwrap()
+            .into_iter()
+            .filter(|note| note.folder_id.as_deref() == Some(perf_id.as_str()))
+            .collect();
+
+        let bundle = collect(&mut source, filed).unwrap();
+
+        assert_eq!(bundle.folders.len(), 1);
+        assert_eq!(bundle.folders[0].name, "Perf");
+        assert_eq!(bundle.spaces.len(), 1);
+        assert_eq!(bundle.spaces[0].id, space_id);
+    }
+
+    /// ⚠️ A board received from elsewhere must not land on top of the one you arranged.
+    /// Keeping the geometry off the `Folder` model is what makes this free.
+    #[test]
+    fn no_coordinate_ever_leaves_the_machine() {
+        let (mut source, _, _) = arranged();
+
+        let json = serde_json::to_string(&exported(&mut source)).unwrap();
+
+        for spelled in [
+            "\"x\"",
+            "\"y\"",
+            "\"w\"",
+            "\"h\"",
+            "\"frame\"",
+            "\"position\"",
+        ] {
+            assert!(!json.contains(spelled), "the export spells {spelled}");
+        }
+    }
+
+    #[test]
+    fn a_received_folder_is_laid_out_by_the_machine_that_receives_it() {
+        let (mut source, _, _) = arranged();
+        let bundle = round_tripped(&exported(&mut source));
+
+        let mut target = open_in_memory().unwrap();
+        merge(&mut target, bundle);
+
+        let space = spaces::list(&mut target).unwrap()[0].id.clone();
+        let placed = target
+            .transaction(|connection, _vault| geometry::frames(connection, &space))
+            .unwrap();
+
+        // Nothing was written: the board lays it out on its first read, here as anywhere.
+        assert!(placed.is_empty());
+    }
+
+    /// The rule spaces already follow, and for the same reason: merge, never replace.
+    #[test]
+    fn a_folder_of_the_same_name_is_reused_rather_than_duplicated() {
+        let (mut source, _, _) = arranged();
+        let bundle = round_tripped(&exported(&mut source));
+
+        let mut target = open_in_memory().unwrap();
+        let space = spaces::create(&mut target, "SQL").unwrap().id;
+        folders::create(&mut target, &space, "perf", t0()).unwrap();
+
+        let report = merge(&mut target, bundle);
+
+        assert_eq!(report.spaces_created, 0);
+        assert_eq!(report.folders_created, 1);
+        assert_eq!(folder_names(&mut target, &space), ["Migrations", "perf"]);
+        // Matched case-insensitively, so the note lands in the folder already there.
+        assert_eq!(
+            folder_of(&mut target, "EXPLAIN lent").as_deref(),
+            Some("perf")
+        );
+    }
+
+    /// Two spaces may both hold a "Perf": the match is per space, never per library.
+    #[test]
+    fn a_folder_is_matched_inside_its_own_space() {
+        let (mut source, _, _) = arranged();
+        let bundle = round_tripped(&exported(&mut source));
+
+        let mut target = open_in_memory().unwrap();
+        let elsewhere = spaces::create(&mut target, "Veille").unwrap().id;
+        folders::create(&mut target, &elsewhere, "Perf", t0()).unwrap();
+
+        let report = merge(&mut target, bundle);
+
+        assert_eq!(report.folders_created, 2);
+        assert_eq!(folder_names(&mut target, &elsewhere), ["Perf"]);
+    }
+
+    #[test]
+    fn importing_the_same_file_twice_creates_no_folder_the_second_time() {
+        let (mut source, _, _) = arranged();
+        let bundle = exported(&mut source);
+
+        let mut target = open_in_memory().unwrap();
+        merge(&mut target, round_tripped(&bundle));
+        let second = merge(&mut target, round_tripped(&bundle));
+
+        assert_eq!(second.folders_created, 0);
+        assert_eq!(second.notes_imported, 0);
+        assert_eq!(second.notes_skipped, 3);
+    }
+
+    /// ⚠️ `#[serde(default)]`, exactly as `kind` and `items` carry it: no `FORMAT_VERSION`
+    /// bump, because such a file still parses.
+    #[test]
+    fn an_export_written_before_folders_still_reads() {
+        let (mut source, _, _) = arranged();
+        let mut json: serde_json::Value = serde_json::to_value(exported(&mut source)).unwrap();
+        json.as_object_mut().unwrap().remove("folders");
+        for note in json["notes"].as_array_mut().unwrap() {
+            note.as_object_mut().unwrap().remove("folderId");
+        }
+
+        let read = model::read_bundle(&json.to_string()).unwrap();
+        let mut target = open_in_memory().unwrap();
+        let report = merge(&mut target, read);
+
+        assert_eq!(report.notes_imported, 3);
+        assert_eq!(report.folders_created, 0);
+        assert_eq!(folder_of(&mut target, "EXPLAIN lent"), None);
+    }
+
+    /// ⚠️ The id is the *sending* library's: a dangling one would be refused by the foreign
+    /// key, losing the whole import over a note that is merely unfiled.
+    #[test]
+    fn a_note_naming_a_folder_the_file_left_out_arrives_unfiled() {
+        let (mut source, _, _) = arranged();
+        let mut json: serde_json::Value = serde_json::to_value(exported(&mut source)).unwrap();
+        json["folders"] = serde_json::Value::Array(Vec::new());
+
+        let read = model::read_bundle(&json.to_string()).unwrap();
+        let mut target = open_in_memory().unwrap();
+        let report = merge(&mut target, read);
+
+        assert_eq!(report.notes_imported, 3);
+        assert_eq!(report.folders_created, 0);
+        assert_eq!(folder_of(&mut target, "EXPLAIN lent"), None);
+    }
+
+    #[test]
+    fn the_export_report_counts_the_folders_it_wrote() {
+        let (mut source, _, _) = arranged();
+
+        assert_eq!(exported(&mut source).folders.len(), 2);
+    }
+
+    /// A position is a local gesture, and it is never asked to travel.
+    #[test]
+    fn a_card_position_stays_on_the_machine_that_chose_it() {
+        let (mut source, space_id, _) = arranged();
+        let loose = notes::all(&mut source, None)
+            .unwrap()
+            .into_iter()
+            .find(|note| note.title == "Dump nocturne")
+            .unwrap();
+        geometry::save_layout(
+            &mut source,
+            &[],
+            &[CardPlacement {
+                note_id: loose.id.clone(),
+                position: BoardPoint { x: 640, y: 480 },
+            }],
+        )
+        .unwrap();
+
+        let bundle = round_tripped(&exported(&mut source));
+        let mut target = open_in_memory().unwrap();
+        merge(&mut target, bundle);
+
+        let space = spaces::list(&mut target).unwrap()[0].id.clone();
+        let placed = target
+            .transaction(|connection, _vault| geometry::positions(connection, &space))
+            .unwrap();
+        assert!(placed.is_empty());
+
+        // And the sending machine keeps its own, untouched.
+        let kept = source
+            .transaction(|connection, _vault| geometry::positions(connection, &space_id))
+            .unwrap();
+        assert_eq!(kept.get(&loose.id), Some(&BoardPoint { x: 640, y: 480 }));
+    }
 }

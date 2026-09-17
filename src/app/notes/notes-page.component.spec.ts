@@ -6,6 +6,7 @@ import { EVENT_SUBSCRIBER, EventSubscriber, GlobalAction } from '@core/ipc/app-e
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { StatusNotifier } from '@core/services/notifications/status.service';
 import { FILE_DROP_SUBSCRIBER, FileDropSubscriber } from '@core/services/window/file-drop.service';
+import { Folder } from '@core/model/folder.model';
 import { Note } from '@core/model/note.model';
 import { Space } from '@core/model/space.model';
 import { AttachmentsStore } from '@core/state/attachments.store';
@@ -14,6 +15,7 @@ import { NotesQueryStore } from '@core/state/notes-query.store';
 import { NotesStore } from '@core/state/notes.store';
 import { PaletteStore } from '@core/state/palette.store';
 import { PlaceholderFillStore } from '@core/state/placeholder-fill.store';
+import { FoldersStore } from '@core/state/folders.store';
 import { SpacesStore } from '@core/state/spaces.store';
 import { TagsStore } from '@core/state/tags.store';
 import { TrashStore } from '@core/state/trash.store';
@@ -21,12 +23,15 @@ import { FakeAppWindow } from '@testing/fake-app-window';
 import { FakeAttachmentsRepository } from '@testing/fake-attachments-repository';
 import { FakeClipboard } from '@testing/fake-clipboard';
 import { FakeFileDialog } from '@testing/fake-file-dialog';
+import { FakeFoldersRepository } from '@testing/fake-folders-repository';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { FakeTransferRepository } from '@testing/fake-transfer-repository';
 import { createNote } from '@testing/note.fixture';
 import { createSection } from '@testing/section.fixture';
 import { provideAppTesting } from '@testing/testing.providers';
 import { FilterChipsComponent } from './header/filter-chips/filter-chips.component';
+import { FolderBreadcrumbComponent } from './header/folder-breadcrumb/folder-breadcrumb.component';
+import { FolderSwitcherComponent } from './header/folder-switcher/folder-switcher.component';
 import { ImageLightboxComponent } from './overlays/image-lightbox/image-lightbox.component';
 import { NoteEditorOverlayComponent } from './overlays/note-editor-overlay/note-editor-overlay.component';
 import { NoteSectionComponent } from './canvas/note-section/note-section.component';
@@ -45,12 +50,22 @@ const SPACES: readonly Space[] = [
   { id: 'work', name: 'Work', pinned: false },
 ];
 
+const PERF: Folder = {
+  id: 'perf',
+  spaceId: 'space-1',
+  name: 'Perf',
+  colour: 'amber',
+  createdAt: new Date('2026-01-01T10:00:00Z'),
+};
+
 describe('NotesPageComponent', () => {
   let fixture: ComponentFixture<NotesPageComponent>;
   let store: NotesStore;
   let canvas: NotesQueryStore;
   let selection: NoteSelectionStore;
   let spaces: SpacesStore;
+  let folders: FoldersStore;
+  let foldersRepository: FakeFoldersRepository;
   let repository: FakeNotesRepository;
   let attachmentsRepository: FakeAttachmentsRepository;
   let transferRepository: FakeTransferRepository;
@@ -90,6 +105,7 @@ describe('NotesPageComponent', () => {
   async function setUp(notes: readonly Note[] = [createNote({ id: 'note-42' })]): Promise<void> {
     TestBed.resetTestingModule();
     repository = new FakeNotesRepository(notes);
+    foldersRepository = new FakeFoldersRepository([PERF]);
     attachmentsRepository = new FakeAttachmentsRepository();
     transferRepository = new FakeTransferRepository();
     fileDialog = new FakeFileDialog();
@@ -114,6 +130,7 @@ describe('NotesPageComponent', () => {
       provideAppTesting({
         notesRepository: repository,
         spaces: SPACES,
+        foldersRepository,
         attachmentsRepository,
         transferRepository,
         fileDialog,
@@ -130,6 +147,7 @@ describe('NotesPageComponent', () => {
     canvas = TestBed.inject(NotesQueryStore);
     selection = TestBed.inject(NoteSelectionStore);
     spaces = TestBed.inject(SpacesStore);
+    folders = TestBed.inject(FoldersStore);
     fixture.autoDetectChanges();
     await vi.waitFor(() => expect(spaces.spaces()).toHaveLength(SPACES.length));
     await vi.waitFor(() => expect(actionHandler).not.toBeNull());
@@ -241,6 +259,88 @@ describe('NotesPageComponent', () => {
     expect(toggleTag).toHaveBeenCalledWith('urgent');
   });
 
+  describe('descending into a folder', () => {
+    /** ⚠️ Inside a folder there is one place to go, and it is back. */
+    async function open(): Promise<void> {
+      spaces.selectSpace('space-1');
+      await vi.waitFor(() => expect(folders.folders()).toHaveLength(1));
+      folders.selectFolder('perf');
+      await fixture.whenStable();
+    }
+
+    it('shows the space switcher and no breadcrumb until a folder is opened', () => {
+      expect(maybeChild(SpaceSwitcherComponent)).not.toBeNull();
+      expect(maybeChild(FolderBreadcrumbComponent)).toBeNull();
+    });
+
+    it('replaces the switchers with the breadcrumb once one is', async () => {
+      await open();
+
+      expect(maybeChild(FolderBreadcrumbComponent)).not.toBeNull();
+      expect(maybeChild(SpaceSwitcherComponent)).toBeNull();
+      expect(maybeChild(FolderSwitcherComponent)).toBeNull();
+    });
+
+    it('comes back out through the breadcrumb', async () => {
+      await open();
+
+      child(FolderBreadcrumbComponent).closed.emit();
+      await fixture.whenStable();
+
+      expect(maybeChild(FolderBreadcrumbComponent)).toBeNull();
+      expect(maybeChild(SpaceSwitcherComponent)).not.toBeNull();
+    });
+
+    /**
+     * ⚠️ Escape falls through: the selection first, then the search, and only then out of
+     * the folder — leaving it is the biggest of the three, so it goes last.
+     */
+    it('comes back out on Escape, but not before the search has gone', async () => {
+      await open();
+      canvas.setSearchQuery('index');
+      await fixture.whenStable();
+
+      press('Escape');
+      await fixture.whenStable();
+      expect(canvas.searchQuery()).toBe('');
+      expect(folders.activeFolderId()).toBe('perf');
+
+      press('Escape');
+      await fixture.whenStable();
+      expect(folders.activeFolderId()).toBeNull();
+    });
+
+    /** One of exactly two places that file a new note; the palette is not one of them. */
+    it('gives a note made here the folder it was made in', async () => {
+      await open();
+
+      store.createNote();
+      await fixture.whenStable();
+
+      expect(store.selectedNote()?.folderId).toBe('perf');
+    });
+
+    it('leaves a note made outside a folder unfiled', async () => {
+      spaces.selectSpace('space-1');
+      await fixture.whenStable();
+
+      store.createNote();
+      await fixture.whenStable();
+
+      expect(store.selectedNote()?.folderId).toBeNull();
+    });
+
+    /** Deleting from here goes back, with the notes now loose. */
+    it('comes back out when the folder it is showing is deleted', async () => {
+      await open();
+
+      child(FolderBreadcrumbComponent).deleted.emit('perf');
+      await vi.waitFor(() => expect(folders.activeFolderId()).toBeNull());
+
+      expect(maybeChild(FolderBreadcrumbComponent)).toBeNull();
+    });
+  });
+
   describe('canvas', () => {
     beforeEach(async () => {
       repository.setView({
@@ -305,7 +405,7 @@ describe('NotesPageComponent', () => {
       await vi.waitFor(() => expect(loading.nativeElement.textContent).toContain('Chargement des notes'));
 
       expect(loading.debugElement.queryAll(By.directive(NoteSectionComponent))).toHaveLength(0);
-      expect(loading.nativeElement.querySelector('.canvas').getAttribute('aria-busy')).toBe('true');
+      expect(loading.nativeElement.querySelector('.canvas-region').getAttribute('aria-busy')).toBe('true');
       held.release();
     });
 

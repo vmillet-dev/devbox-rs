@@ -1,10 +1,12 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AppEventsService, GlobalAction } from '@core/ipc/app-events.service';
 import { DialogStack } from '@shared/layout/dialog/dialog-stack';
 import { AttachmentsStore } from '@core/state/attachments.store';
 import { LibraryStore } from '@core/state/library.store';
 import { NoteSelectionStore } from '@core/state/note-selection.store';
+import { BoardStore } from '@core/state/board.store';
+import { FoldersStore } from '@core/state/folders.store';
 import { NotesQueryStore } from '@core/state/notes-query.store';
 import { NotesRevision } from '@core/state/notes-revision';
 import { NotesStore } from '@core/state/notes.store';
@@ -15,10 +17,16 @@ import { SpacesStore } from '@core/state/spaces.store';
 import { TagsStore } from '@core/state/tags.store';
 import { TrashStore } from '@core/state/trash.store';
 import { CanvasKeyboardDirective } from '@shared/directives/canvas-keyboard.directive';
+import { BoardFrame } from '@core/model/board.model';
+import { BoardComponent, CardDrop } from './canvas/board/board.component';
+import { FolderNamePromptComponent } from './overlays/folder-name-prompt/folder-name-prompt.component';
 import { FilterChipsComponent } from './header/filter-chips/filter-chips.component';
+import { FolderRecolouring, FolderRenaming } from './header/folder-editor/folder-editor.component';
+import { FolderBreadcrumbComponent } from './header/folder-breadcrumb/folder-breadcrumb.component';
+import { FolderSwitcherComponent } from './header/folder-switcher/folder-switcher.component';
 import { LanguageRailComponent } from './header/language-rail/language-rail.component';
 import { NewNoteButtonComponent } from './header/new-note-button/new-note-button.component';
-import { NoteActivation } from './canvas/note-section/note-card/note-card.component';
+import { NoteActivation } from './canvas/note-card/note-card.component';
 import { NoteEditorOverlayComponent } from './overlays/note-editor-overlay/note-editor-overlay.component';
 import { NoteSectionComponent } from './canvas/note-section/note-section.component';
 import { PlaceholderFormComponent } from './overlays/placeholder-form/placeholder-form.component';
@@ -33,6 +41,7 @@ import {
 } from './header/space-switcher/space-switcher.component';
 import { TagManagerComponent } from './overlays/tag-manager/tag-manager.component';
 import { TagRailComponent } from './header/tag-rail/tag-rail.component';
+import { ViewSwitchComponent } from './header/view-switch/view-switch.component';
 import { TrashPanelComponent } from './overlays/trash-panel/trash-panel.component';
 import { UndoBarComponent } from './overlays/undo-bar/undo-bar.component';
 
@@ -42,6 +51,11 @@ import { UndoBarComponent } from './overlays/undo-bar/undo-bar.component';
     SpaceSwitcherComponent,
     SearchBoxComponent,
     FilterChipsComponent,
+    FolderSwitcherComponent,
+    FolderBreadcrumbComponent,
+    ViewSwitchComponent,
+    BoardComponent,
+    FolderNamePromptComponent,
     NewNoteButtonComponent,
     SelectionBarComponent,
     TagRailComponent,
@@ -66,6 +80,8 @@ export class NotesPageComponent {
   protected readonly selection = inject(NoteSelectionStore);
   protected readonly store = inject(NotesStore);
   protected readonly spaces = inject(SpacesStore);
+  protected readonly folders = inject(FoldersStore);
+  protected readonly board = inject(BoardStore);
   protected readonly palette = inject(PaletteStore);
   protected readonly trash = inject(TrashStore);
   protected readonly tags = inject(TagsStore);
@@ -109,11 +125,19 @@ export class NotesPageComponent {
     }
   }
 
-  /** The spaces reload afterwards — they had already read an empty database. */
+  /**
+   * The spaces reload afterwards — they had already read an empty database.
+   *
+   * ⚠️ And the seeded space is selected: with exactly one, "all spaces" is a distinction
+   * without a difference, and it is the state in which the board cannot be shown at all —
+   * a first launch would hide the feature behind a disabled button.
+   */
   private async seedSamples(): Promise<void> {
-    if (!(await this.samples.seedIfFirstRun())) return;
+    const seeded = await this.samples.seedIfFirstRun();
+    if (!seeded) return;
 
     this.spaces.reload();
+    this.spaces.selectSpace(seeded.id);
     this.revision.bump();
   }
 
@@ -124,6 +148,36 @@ export class NotesPageComponent {
 
   protected onSpaceDeleted({ id, targetSpaceId }: SpaceDeletion): void {
     void this.spaces.deleteSpace(id, targetSpaceId);
+  }
+
+  protected onFolderRenamed({ id, name }: FolderRenaming): void {
+    void this.folders.renameFolder(id, name);
+  }
+
+  protected onFolderRecoloured({ id, colour }: FolderRecolouring): void {
+    void this.folders.recolourFolder(id, colour);
+  }
+
+  /** Where a band was drawn, held until it has been given a name. */
+  protected readonly pendingZone = signal<BoardFrame | null>(null);
+
+  protected onCardDropped({ noteId, folderId, position }: CardDrop): void {
+    void this.board.dropCard(noteId, folderId, position);
+  }
+
+  /** Deleting from here goes back to the board, with the notes now loose on it. */
+  protected onFolderDeleted(id: string): void {
+    void this.folders.deleteFolder(id);
+  }
+
+  protected onZoneDrawn(frame: BoardFrame): void {
+    this.pendingZone.set(frame);
+  }
+
+  protected async onZoneNamed(frame: BoardFrame, name: string): Promise<void> {
+    this.pendingZone.set(null);
+    await this.board.createZone(name, frame);
+    this.folders.reload();
   }
 
   protected onNoteActivated({ noteId, toggleChecked, extendRange }: NoteActivation): void {

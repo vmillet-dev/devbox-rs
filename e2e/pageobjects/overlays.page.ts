@@ -1,6 +1,14 @@
 import { $, $$, browser } from '@wdio/globals';
 
-import { confirmTwice, readEach, setField, setNativeValue, submitFormOf, testid } from '../support/app.js';
+import {
+  confirmTwice,
+  readEach,
+  setField,
+  setNativeValue,
+  submitFormOf,
+  testid,
+  waitForCanvas,
+} from '../support/app.js';
 
 /** The space switcher, which is a menu, a create form and an edit panel in one. */
 export const spaces = {
@@ -63,6 +71,369 @@ export const spaces = {
   },
 
   deleteBlocked: () => $(testid('space-delete-blocked')),
+};
+
+/** The folder switcher: a menu, a create form and an edit panel in one, like `spaces`. */
+export const folders = {
+  async open(): Promise<void> {
+    if (!(await $(testid('folder-dropdown')).isExisting())) {
+      await $(testid('folder-switcher')).click();
+      await $(testid('folder-dropdown')).waitForExist({ timeout: 5_000 });
+    }
+  },
+
+  async close(): Promise<void> {
+    if (await $(testid('folder-dropdown')).isExisting()) {
+      await $(testid('folder-switcher')).click();
+      await $(testid('folder-dropdown')).waitForExist({ reverse: true, timeout: 5_000 });
+    }
+  },
+
+  label: () => $(testid('folder-switcher')).getText(),
+  option: (id: string) => $(`${testid('folder-option')}[data-folder-id="${id}"]`),
+
+  /** `null` is "every folder", filed or not — a choice rather than a loading state. */
+  allOption: () => $(testid('folder-option-all')),
+
+  names: (): Promise<string[]> => readEach(testid('folder-option'), 'text'),
+
+  async create(name: string): Promise<void> {
+    await $(testid('folder-create-open')).click();
+    // The form is revealed by that click: the field does not exist until it lands.
+    await setField(testid('folder-create-input'), name);
+    await $(testid('folder-create-submit')).click();
+  },
+
+  async rename(id: string, into: string): Promise<void> {
+    await $(`${testid('folder-edit')}[data-folder-id="${id}"]`).click();
+    await setField(testid('folder-rename-input'), into);
+    await $(testid('folder-rename-submit')).click();
+  },
+
+  /** ⚠️ Closes behind itself: the edit panel replaces the menu rather than sitting over it. */
+  async recolour(id: string, colour: string): Promise<void> {
+    await $(`${testid('folder-edit')}[data-folder-id="${id}"]`).click();
+    await $(`${testid('folder-colour')}[data-colour="${colour}"]`).click();
+    await folders.close();
+  },
+
+  /** ⚠️ No refuge to choose, unlike a space: the notes simply come out loose. */
+  async remove(id: string): Promise<void> {
+    await $(`${testid('folder-edit')}[data-folder-id="${id}"]`).click();
+    await confirmTwice($(testid('folder-delete')));
+  },
+
+  createBlocked: () => $(testid('folder-create-blocked')),
+};
+
+/** The Date / Tableau switch and the board it draws. */
+export const board = {
+  option: (mode: 'date' | 'board') => $(testid(`view-${mode}`)),
+
+  pressed: (mode: 'date' | 'board') => $(testid(`view-${mode}`)).getAttribute('aria-pressed'),
+
+  isShowing: () => $(testid('board')).isExisting(),
+
+  async waitForBoard(): Promise<void> {
+    await $(testid('board')).waitForExist({ timeout: 15_000 });
+    // Settled means the cards have arrived, not merely that the surface has.
+    await browser.pause(400);
+  },
+
+  /** Idempotent: clicking the showing view again would change nothing but still re-render. */
+  async show(mode: 'date' | 'board'): Promise<void> {
+    if ((await board.pressed(mode)) === 'true') return;
+
+    await board.option(mode).click();
+    if (mode === 'board') {
+      await board.waitForBoard();
+    } else {
+      await waitForCanvas();
+    }
+  },
+
+  zoneNames: (): Promise<string[]> => readEach(testid('board-zone-open'), 'text'),
+
+  /** Clicking a zone title is the descent. */
+  async openZone(name: string): Promise<void> {
+    await $(
+      `${testid('board-zone')}[data-folder-id="${await board.folderId(name)}"] ${testid('board-zone-open')}`,
+    ).click();
+  },
+
+  /**
+   * ⚠️ Read in one call, like `canvas.titles()`: a round trip per card leaves a window in
+   * which the board re-renders, and the list that comes back mixes two states.
+   */
+  zoneTitles(folderName: string): Promise<string[]> {
+    return browser.execute(
+      (zoneSelector: string, openSelector: string, cardTitle: string, wanted: string) =>
+        [...document.querySelectorAll(zoneSelector)]
+          .filter((zone) => (zone.querySelector(openSelector)?.textContent ?? '').trim() === wanted)
+          .flatMap((zone) =>
+            [...zone.querySelectorAll(cardTitle)].map((title) => (title.textContent ?? '').trim()),
+          ),
+      testid('board-zone'),
+      testid('board-zone-open'),
+      testid('note-card-title'),
+      folderName,
+    );
+  },
+
+  looseTitles: (): Promise<string[]> =>
+    readEach(testid('board-loose-card'), 'text', testid('note-card-title')),
+
+  async zoneCard(folderName: string, title: string) {
+    const zone = $(`${testid('board-zone')}[data-folder-id="${await board.folderId(folderName)}"]`);
+    const id = await browser.execute(
+      (zoneSelector: string, cardSelector: string, titleSelector: string, wanted: string) =>
+        [...(document.querySelector(zoneSelector)?.querySelectorAll(cardSelector) ?? [])]
+          .find((card) => (card.querySelector(titleSelector)?.textContent ?? '').trim() === wanted)
+          ?.getAttribute('data-note-id') ?? null,
+      `${testid('board-zone')}[data-folder-id="${await board.folderId(folderName)}"]`,
+      testid('note-card'),
+      testid('note-card-title'),
+      title,
+    );
+
+    if (id === null) {
+      throw new Error(`no card titled "${title}" in zone "${folderName}"`);
+    }
+    return zone.$(`${testid('note-card')}[data-note-id="${id}"]`);
+  },
+
+  async folderId(name: string): Promise<string> {
+    const id = await browser.execute(
+      (zoneSelector: string, openSelector: string, wanted: string) =>
+        [...document.querySelectorAll(zoneSelector)]
+          .find((zone) => (zone.querySelector(openSelector)?.textContent ?? '').trim() === wanted)
+          ?.getAttribute('data-folder-id') ?? null,
+      testid('board-zone'),
+      testid('board-zone-open'),
+      name,
+    );
+
+    if (id === null) {
+      throw new Error(`no zone named "${name}" on the board`);
+    }
+    return id;
+  },
+
+  /** The frames as the board actually placed them, which is what a restart must reproduce. */
+  zoneFrames(): Promise<{ left: string; top: string; width: string }[]> {
+    return browser.execute(
+      (selector: string) =>
+        [...document.querySelectorAll<HTMLElement>(selector)].map((zone) => ({
+          left: zone.style.left,
+          top: zone.style.top,
+          width: zone.style.width,
+        })),
+      testid('board-zone'),
+    );
+  },
+
+  /**
+   * A pointer drag, dispatched from inside the page.
+   *
+   * ⚠️ Synthetic, like every other input this suite sends: the embedded driver drops
+   * WebDriver actions. So this proves the wiring — grip to store to command to database —
+   * and not the WebView's own pointer capture, which the unit specs cover instead.
+   */
+  /** Drags a loose card until it lands inside the given zone. */
+  async dragCardInto(noteId: string, folderId: string): Promise<void> {
+    await browser.execute(
+      (cardSelector: string, zoneSelector: string, gripSelector: string) => {
+        const card = document.querySelector(cardSelector);
+        const zone = document.querySelector(zoneSelector);
+        const grip = document.querySelector(gripSelector);
+        const surface = document.querySelector('[data-testid="board-surface"]');
+        if (!card || !zone || !grip || !surface) throw new Error('nothing to drag');
+
+        const cardBox = card.getBoundingClientRect();
+        const zoneBox = zone.getBoundingClientRect();
+        const gripBox = grip.getBoundingClientRect();
+        // Where the card's own corner has to end up for the drop to land in the zone.
+        const dx = zoneBox.left + 60 - cardBox.left;
+        const dy = zoneBox.top + 80 - cardBox.top;
+
+        const from = { x: gripBox.left + gripBox.width / 2, y: gripBox.top + gripBox.height / 2 };
+        const send = (target: Element, type: string, x: number, y: number) =>
+          target.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              button: 0,
+              pointerId: 1,
+            }),
+          );
+
+        send(grip, 'pointerdown', from.x, from.y);
+        send(surface, 'pointermove', from.x + dx, from.y + dy);
+        send(surface, 'pointerup', from.x + dx, from.y + dy);
+      },
+      `${testid('board-loose-card')}[data-note-id="${noteId}"]`,
+      `${testid('board-zone')}[data-folder-id="${folderId}"]`,
+      board.cardGrip(noteId),
+    );
+    await browser.pause(1200);
+  },
+
+  async drag(gripSelector: string, to: { dx: number; dy: number }): Promise<void> {
+    await browser.execute(
+      (selector: string, dx: number, dy: number) => {
+        const grip = document.querySelector(selector);
+        const surface = document.querySelector('[data-testid="board-surface"]');
+        if (!grip || !surface) throw new Error(`nothing to drag at ${selector}`);
+
+        const box = grip.getBoundingClientRect();
+        const from = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+        const send = (target: Element, type: string, x: number, y: number) =>
+          target.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              button: 0,
+              pointerId: 1,
+            }),
+          );
+
+        send(grip, 'pointerdown', from.x, from.y);
+        send(surface, 'pointermove', from.x + dx, from.y + dy);
+        send(surface, 'pointerup', from.x + dx, from.y + dy);
+      },
+      gripSelector,
+      to.dx,
+      to.dy,
+    );
+    // Past the layout debounce, so the assertion reads what was actually written.
+    await browser.pause(1200);
+  },
+
+  /** Draws a band on the empty background, in surface coordinates. */
+  async drawZone(at: { x: number; y: number; width: number; height: number }): Promise<void> {
+    await browser.execute(
+      (x: number, y: number, width: number, height: number) => {
+        const surface = document.querySelector('[data-testid="board-surface"]');
+        if (!surface) throw new Error('no board surface');
+
+        const box = surface.getBoundingClientRect();
+        const send = (type: string, cx: number, cy: number) =>
+          surface.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              clientX: cx,
+              clientY: cy,
+              button: 0,
+              pointerId: 1,
+            }),
+          );
+
+        send('pointerdown', box.left + x, box.top + y);
+        send('pointermove', box.left + x + width, box.top + y + height);
+        send('pointerup', box.left + x + width, box.top + y + height);
+      },
+      at.x,
+      at.y,
+      at.width,
+      at.height,
+    );
+    await browser.pause(400);
+  },
+
+  cardGrip: (noteId: string) => `[data-note-id="${noteId}"] ${testid('board-card-grip')}`,
+  zoneGrip: (folderId: string) =>
+    `${testid('board-zone')}[data-folder-id="${folderId}"] ${testid('board-zone-grip')}`,
+  zoneResize: (folderId: string) =>
+    `${testid('board-zone')}[data-folder-id="${folderId}"] ${testid('board-zone-resize')}`,
+
+  /** The frame of one zone as the board actually placed it. */
+  frameOf(folderId: string): Promise<{ left: string; top: string; width: string; height: string }> {
+    return browser.execute(
+      (selector: string) => {
+        const zone = document.querySelector<HTMLElement>(selector);
+        if (!zone) throw new Error(`no zone ${selector}`);
+        return {
+          left: zone.style.left,
+          top: zone.style.top,
+          width: zone.style.width,
+          height: zone.style.height,
+        };
+      },
+      `${testid('board-zone')}[data-folder-id="${folderId}"]`,
+    );
+  },
+
+  /** Where a loose card sits, which is the only place a card has one. */
+  positionOf(noteId: string): Promise<{ left: string; top: string }> {
+    return browser.execute(
+      (selector: string) => {
+        const card = document.querySelector<HTMLElement>(selector);
+        if (!card) throw new Error(`no loose card ${selector}`);
+        return { left: card.style.left, top: card.style.top };
+      },
+      `${testid('board-loose-card')}[data-note-id="${noteId}"]`,
+    );
+  },
+
+  async nameZone(name: string): Promise<void> {
+    await $(testid('folder-name-input')).waitForExist({ timeout: 5_000 });
+    await setField(testid('folder-name-input'), name);
+    await $(testid('folder-name-submit')).click();
+    await browser.pause(800);
+  },
+
+  /** ⚠️ Dimmed, never dropped: the card is still there, it has only stopped shouting. */
+  isDimmed(title: string): Promise<boolean> {
+    return browser.execute(
+      (cardSelector: string, titleSelector: string, wanted: string) =>
+        [...document.querySelectorAll(cardSelector)]
+          .find((card) => (card.querySelector(titleSelector)?.textContent ?? '').trim() === wanted)
+          ?.classList.contains('dimmed') ?? false,
+      '.zone-card, .loose-card',
+      testid('note-card-title'),
+      title,
+    );
+  },
+};
+
+/** The breadcrumb, which replaces the switchers while a folder is open. */
+export const crumb = {
+  isShowing: () => $(testid('folder-breadcrumb')).isExisting(),
+
+  name: () => $(testid('folder-breadcrumb-name')).getText(),
+
+  back: () => $(testid('folder-breadcrumb-back')).click(),
+
+  swatchClass: () =>
+    browser.execute(
+      (selector: string) => document.querySelector(selector)?.className ?? '',
+      `${testid('folder-breadcrumb')} ~ * .crumb-swatch, ${testid('folder-breadcrumb')} .crumb-swatch`,
+    ),
+
+  /** ⚠️ Opens behind the ⋯, which is the only way to the folder's own actions from here. */
+  async openMenu(): Promise<void> {
+    if (!(await $(testid('folder-breadcrumb-panel')).isExisting())) {
+      await $(testid('folder-breadcrumb-menu')).click();
+      await $(testid('folder-breadcrumb-panel')).waitForExist({ timeout: 5_000 });
+    }
+  },
+
+  async rename(into: string): Promise<void> {
+    await crumb.openMenu();
+    await setField(testid('folder-rename-input'), into);
+    await $(testid('folder-rename-submit')).click();
+  },
+
+  /** ⚠️ No refuge to choose, unlike a space: the notes come out loose. */
+  async remove(): Promise<void> {
+    await crumb.openMenu();
+    await confirmTwice($(testid('folder-delete')));
+  },
 };
 
 export const trash = {
@@ -206,6 +577,9 @@ export const selectionBar = {
   copy: () => $(testid('selection-copy')).click(),
 
   moveTo: (spaceId: string) => setNativeValue(testid('selection-move'), spaceId),
+
+  /** The same control both ways: `null` picks the "take out of folder" entry. */
+  fileInto: (folderId: string | null) => setNativeValue(testid('selection-file'), folderId ?? '__unfile__'),
 
   async tag(tag: string): Promise<void> {
     const field = $(testid('selection-tag'));

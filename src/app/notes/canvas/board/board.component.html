@@ -1,0 +1,93 @@
+@let drawnBand = band();
+
+<div class="board" data-testid="board">
+  <!-- Sized by the back end from what is actually on it: the surface is what is panned.
+       ⚠️ The move and up handlers sit here and not on each draggable: the pointer is
+       captured by the element that was grabbed, and these are where its events land. -->
+  <div
+    class="board-surface"
+    data-testid="board-surface"
+    [class.drawing]="editable()"
+    [style.width.px]="width()"
+    [style.height.px]="height()"
+    (pointerdown)="startDraw($event)"
+    (pointermove)="onPointerMove($event)"
+    (pointerup)="onPointerUp($event)"
+    (pointercancel)="onPointerCancel($event)"
+  >
+    @for (zone of zones(); track zone.folder.id) {
+      <app-board-zone
+        [zone]="zone"
+        [frame]="frameOf(zone)"
+        [editable]="editable()"
+        [isDropTarget]="hoveredZone() === zone.folder.id"
+        [isMoving]="isDragging(zone.folder.id)"
+        [draggingNoteId]="gesture()?.kind === 'card' ? (gesture()?.id ?? null) : null"
+        (noteActivated)="noteActivated.emit($event)"
+        (opened)="folderOpened.emit($event)"
+        (headGrabbed)="startZoneMove($event, zone)"
+        (resizeGrabbed)="startZoneResize($event, zone)"
+        (cardGrabbed)="startCard($event.event, $event.entry, $event.frame)"
+        (renamed)="folderRenamed.emit($event)"
+        (recoloured)="folderRecoloured.emit($event)"
+        (deleted)="folderDeleted.emit($event)"
+      />
+    }
+
+    @if (loose().length > 0) {
+      <p
+        class="loose-label"
+        data-testid="board-loose-label"
+        [style.left.px]="16"
+        [style.top.px]="looseLabelTop()"
+      >
+        {{ 'board.loose' | transloco: { count: loose().length } }}
+      </p>
+      @for (entry of loose(); track entry.note.id) {
+        @let at = positionOf(entry);
+        <div
+          class="loose-card"
+          data-testid="board-loose-card"
+          [attr.data-note-id]="entry.note.id"
+          [class.dimmed]="!entry.matches"
+          [class.dragging]="isDragging(entry.note.id)"
+          [style.left.px]="at.x"
+          [style.top.px]="at.y"
+        >
+          @if (editable()) {
+            <!-- ⚠️ A grip and not the card itself: the card is a <button> that opens the
+                 note, and a drag started on it would have to swallow its own click. The
+                 keyboard twin is the selection bar — tick with X, then "file into…". -->
+            <button
+              type="button"
+              class="card-grip"
+              data-testid="board-card-grip"
+              [attr.aria-label]="'board.moveCard' | transloco: { title: entry.note.title }"
+              (pointerdown)="startCard($event, entry, { x: at.x, y: at.y, width: 0, height: 0 })"
+            >
+              <span aria-hidden="true">⠿</span>
+            </button>
+          }
+          <app-note-card [note]="entry.note" (opened)="noteActivated.emit($event)" />
+        </div>
+      }
+    }
+
+    @if (drawnBand) {
+      <!-- Decorative: the gesture is announced by the dialog the drop opens. -->
+      <div
+        class="draw-band"
+        data-testid="board-draw-band"
+        aria-hidden="true"
+        [style.left.px]="drawnBand.x"
+        [style.top.px]="drawnBand.y"
+        [style.width.px]="drawnBand.width"
+        [style.height.px]="drawnBand.height"
+      ></div>
+    }
+
+    @if (zones().length === 0 && loose().length === 0) {
+      <p class="board-empty" data-testid="board-empty">{{ 'board.empty' | transloco }}</p>
+    }
+  </div>
+</div>

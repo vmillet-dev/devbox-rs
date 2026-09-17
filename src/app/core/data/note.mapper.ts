@@ -107,6 +107,8 @@ export function toNote({ placeholderValues: _stored, ...dto }: WireNote): Note {
     // Declared optional by `#[serde(default)]`, which keeps older export files readable.
     kind: dto.kind ?? 'snippet',
     items: dto.items ?? [],
+    // `#[specta(optional)]`, so an absent key means unfiled rather than untouched here.
+    folderId: dto.folderId ?? null,
   };
 }
 

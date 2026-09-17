@@ -1,0 +1,5 @@
+DROP TABLE note_positions;
+ALTER TABLE folders DROP COLUMN h;
+ALTER TABLE folders DROP COLUMN w;
+ALTER TABLE folders DROP COLUMN y;
+ALTER TABLE folders DROP COLUMN x;

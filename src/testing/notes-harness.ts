@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { expect, vi } from 'vitest';
+import { Folder } from '@core/model/folder.model';
 import { Note } from '@core/model/note.model';
 import { Space } from '@core/model/space.model';
 import { NoteSelectionStore } from '@core/state/note-selection.store';
@@ -7,6 +8,7 @@ import { NotesQueryStore } from '@core/state/notes-query.store';
 import { NotesStore } from '@core/state/notes.store';
 import { SpacesStore } from '@core/state/spaces.store';
 import { FakeClipboard } from './fake-clipboard';
+import { FakeFoldersRepository } from './fake-folders-repository';
 import { FakeNotesRepository } from './fake-notes-repository';
 import { provideAppTesting } from './testing.providers';
 
@@ -16,6 +18,7 @@ export interface NotesHarness {
   readonly canvas: NotesQueryStore;
   readonly selection: NoteSelectionStore;
   readonly repository: FakeNotesRepository;
+  readonly folders: FakeFoldersRepository;
   readonly spaces: SpacesStore;
   readonly clipboard: FakeClipboard;
 }
@@ -30,10 +33,12 @@ export async function createNotesHarness(
   notes: Note[] = [],
   spaces: readonly Space[] = HARNESS_SPACES,
   clipboard: FakeClipboard = new FakeClipboard(),
+  folders: readonly Folder[] = [],
 ): Promise<NotesHarness> {
   const repository = new FakeNotesRepository(notes);
+  const foldersRepository = new FakeFoldersRepository(folders);
   TestBed.configureTestingModule({
-    providers: [provideAppTesting({ notesRepository: repository, spaces, clipboard })],
+    providers: [provideAppTesting({ notesRepository: repository, spaces, clipboard, foldersRepository })],
   });
 
   const canvas = TestBed.inject(NotesQueryStore);
@@ -46,6 +51,7 @@ export async function createNotesHarness(
     canvas,
     selection: TestBed.inject(NoteSelectionStore),
     repository,
+    folders: foldersRepository,
     spaces: spacesStore,
     clipboard,
   };

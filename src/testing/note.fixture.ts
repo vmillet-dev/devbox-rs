@@ -5,6 +5,8 @@ export function createNote(overrides: Partial<Note> = {}): Note {
   const note: Note = {
     id: 'note-1',
     spaceId: 'space-1',
+    folderId: null,
+    folder: null,
     title: 'Test note',
     language: 'txt',
     content: 'line one\nline two',

@@ -3,19 +3,24 @@ import { CLIPBOARD_ADAPTER } from '@core/services/clipboard/clipboard.service';
 import { FILE_DIALOG_ADAPTER } from '@core/services/dialogs/file-dialog.service';
 import { APP_WINDOW_ADAPTER } from '@core/services/window/app-window.service';
 import { AttachmentsRepository } from '@core/data/attachments.repository';
+import { BoardRepository } from '@core/data/board.repository';
+import { FoldersRepository } from '@core/data/folders.repository';
 import { NotesRepository } from '@core/data/notes.repository';
 import { SpacesRepository } from '@core/data/spaces.repository';
 import { TransferRepository } from '@core/data/transfer.repository';
 import { VaultRepository } from '@core/data/vault.repository';
 import { AppInfoService } from '@core/services/app-info/app-info.service';
+import { Folder } from '@core/model/folder.model';
 import { Note } from '@core/model/note.model';
 import { Space } from '@core/model/space.model';
 import { UpdaterService } from '@core/services/updates/updater.service';
 import { FakeAppInfo } from './fake-app-info';
 import { FakeAppWindow } from './fake-app-window';
 import { FakeAttachmentsRepository } from './fake-attachments-repository';
+import { FakeBoardRepository } from './fake-board-repository';
 import { FakeClipboard } from './fake-clipboard';
 import { FakeFileDialog } from './fake-file-dialog';
+import { FakeFoldersRepository } from './fake-folders-repository';
 import { FakeNotesRepository } from './fake-notes-repository';
 import { FakeSpacesRepository } from './fake-spaces-repository';
 import { FakeTransferRepository } from './fake-transfer-repository';
@@ -26,9 +31,12 @@ import { provideTranslocoTesting } from './provide-transloco-testing';
 interface DataDoubles {
   readonly notes?: readonly Note[];
   readonly spaces?: readonly Space[];
+  readonly folders?: readonly Folder[];
   /** Pass an existing fake to keep a handle on it (e.g. to set `failNext`). */
   readonly notesRepository?: FakeNotesRepository;
   readonly spacesRepository?: FakeSpacesRepository;
+  readonly foldersRepository?: FakeFoldersRepository;
+  readonly boardRepository?: FakeBoardRepository;
   readonly attachmentsRepository?: FakeAttachmentsRepository;
   readonly transferRepository?: FakeTransferRepository;
   readonly vaultRepository?: FakeVaultRepository;
@@ -49,6 +57,14 @@ export function provideAppTesting(doubles: DataDoubles = {}): Provider[] {
     {
       provide: SpacesRepository,
       useValue: doubles.spacesRepository ?? new FakeSpacesRepository(doubles.spaces ?? []),
+    },
+    {
+      provide: FoldersRepository,
+      useValue: doubles.foldersRepository ?? new FakeFoldersRepository(doubles.folders ?? []),
+    },
+    {
+      provide: BoardRepository,
+      useValue: doubles.boardRepository ?? new FakeBoardRepository(),
     },
     {
       provide: AttachmentsRepository,

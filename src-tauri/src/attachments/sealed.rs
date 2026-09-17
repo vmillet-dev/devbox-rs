@@ -97,6 +97,8 @@ pub fn sweep_plaintext(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicU32, Ordering};
+
     use super::*;
     use crate::vault::key::Cost;
 
@@ -113,17 +115,33 @@ mod tests {
         .unwrap()
     }
 
+    /// ⚠️ A counter, not the clock. `SystemTime::now()` is coarse enough on Windows that
+    /// two of these tests — they run on parallel threads — drew the same nanosecond, took
+    /// the same directory, and the first to finish removed it from under the second, which
+    /// then failed to write into a path that no longer existed. The process id keeps two
+    /// test binaries apart; the counter keeps two threads apart.
     fn scratch() -> std::path::PathBuf {
+        static NEXT: AtomicU32 = AtomicU32::new(0);
+
         let directory = std::env::temp_dir().join(format!(
-            "devbox-sealed-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            "devbox-sealed-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         std::fs::create_dir_all(&directory).unwrap();
 
         directory
+    }
+
+    /// The property the name has to have, asserted without waiting for a coincidence.
+    #[test]
+    fn two_scratch_directories_are_never_the_same_one() {
+        let first = scratch();
+        let second = scratch();
+
+        assert_ne!(first, second);
+        std::fs::remove_dir_all(&first).ok();
+        std::fs::remove_dir_all(&second).ok();
     }
 
     #[test]

@@ -63,9 +63,9 @@ src-tauri/          Rust back-end
 
 ### Feature-first, not layer-first
 
-The back-end is filed by **subject**. `notes.rs`, `spaces.rs`, `attachments.rs` and
-`transfer.rs` are the features, and each owns everything about itself: its model, its SQL, and
-the Tauri commands that expose it. Deleting `src/notes/` deletes the feature.
+The back-end is filed by **subject**. `notes.rs`, `spaces.rs`, `folders.rs`, `attachments.rs`
+and `transfer.rs` are the features, and each owns everything about itself: its model, its SQL,
+and the Tauri commands that expose it. Deleting `src/notes/` deletes the feature.
 
 `changelog.rs` is the smallest of them, and the odd one out: it owns no table and reads no
 database — the repository's `CHANGELOG.md` is baked into the binary by `include_str!` and
@@ -126,9 +126,9 @@ so their tests run without opening a database — section placement, timezone bo
 normalisation, search folding, footer choice and expiry thresholds, in a few milliseconds
 with no fixture setup.
 
-The two features are not fully independent, and that is visible rather than hidden:
-`notes/store.rs` calls `spaces::store::exists` before filing a note, and `spaces/store.rs`
-moves notes out before dropping a space. The Diesel schema therefore stays shared in
+The features are not fully independent, and that is visible rather than hidden:
+`notes/store.rs` calls `spaces::store::exists` before filing a note, `spaces/store.rs`
+moves notes out before dropping a space, and `folders/store.rs` writes `notes.folder_id`. The Diesel schema therefore stays shared in
 `db/schema.rs` — splitting it per feature would break `allow_tables_to_appear_in_same_query!`.
 
 Serde attributes sit on the model types rather than on a separate DTO family. At this size a
@@ -684,6 +684,260 @@ The delete control only appears when another space exists to receive the notes; 
 space the panel explains why rather than offering a button that could only fail. Each space
 row is a `role="none"` wrapper holding the select button and the `⋯` trigger, so the menu
 keeps its direct menuitem children. Arrow-key navigation stays on the select buttons only.
+
+### Folders inside a space
+
+A space is one flat pile ordered by when things were typed, which is the right default for
+"what was I doing yesterday" and useless for "where do I keep the SQL I wrote about indexing".
+A **folder** cuts a space into named, coloured regions, and a note belongs to exactly one or to
+none.
+
+`folders.rs` is a feature like any other, with its own model, store and commands. What it
+holds is deliberately small:
+
+| Piece                      | Where it lives                                              |
+| -------------------------- | ----------------------------------------------------------- |
+| name, colour, owning space | the `folders` table — domain, and it travels with an export |
+| which folder a note is in  | `notes.folder_id`, nullable, `ON DELETE SET NULL`           |
+
+⚠️ **`ON DELETE SET NULL`, never `CASCADE`.** Deleting a folder must not delete a note. It is
+also why `delete_folder` takes no refuge argument where `delete_space(id, targetSpaceId)`
+must: "no folder" is a legitimate state, so the notes simply come out loose. `spaces/`
+cascades into `folders/`, and that cascade then fires the `SET NULL` — a space's notes reach
+their refuge unfiled, which is correct, since a folder of the deleted space no longer exists.
+
+⚠️ **A folder belongs to one space, so a note cannot be filed across one.** `file_many`
+narrows to the folder's own space, and `NotePatch::apply` clears `folder_id` whenever
+`space_id` moves — otherwise a card would show a chip the space switcher can never reach.
+That rule lives in `notes/model.rs`, where a test reaches it without a database.
+
+**The colour is assigned, not chosen.** `FolderColour` is a `closed_enum!` of the five theme
+accents, and `create` rotates through them by the number of folders the space already holds,
+so two made back to back differ. It is changed afterwards from the switcher's edit panel.
+Counted rather than random: a deterministic colour is one a test can assert and a user can
+predict. Every consumer reads it through the `folder-hues` mixin as `--folder-hue`, so the
+five-colour map exists once.
+
+**Filing is a batch with a command of its own**, not a `NotePatch` field. `file_notes` answers
+the `NoteFiling`s it actually changed — which folder each note _left_, `null` for a loose one
+— and `file_notes_back` undoes exactly those. That is the shape `move_notes` already has, and
+for the same reason: rebuilding the set from the selection would unfile a note the batch never
+touched. A note already in the target folder is not reported, so a batch that changed nothing
+opens no undo window.
+
+**The card says where a note lives, and the back end is what resolved it.**
+`view::apply_folders` decorates `DisplayNote.folder` in a pass of its own, exactly as
+`apply_attachment_counts` and `apply_global_defaults` do. The front end never joins a
+`folderId` against a list it happens to hold. ⚠️ The chip is a **square swatch on a neutral
+pill** — never a coloured pill, which is what a tag is. A note with no folder gets no chip at
+all: the absence reads on its own, and an "unfiled" chip would soil every loose card.
+
+Filing happens from the selection bar, beside "move to another space"; the same control both
+ways, since taking a note out is a filing with no folder. The switcher in the header narrows
+the canvas to one folder and is where folders are created, renamed, recoloured and deleted —
+the same three-panel shape as the space switcher (see above). It offers no "unfiled" filter
+entry, for the reason the chip does not exist: that would be a second way to say the same
+thing.
+
+⚠️ **The board geometry is not in any of this.** Where a folder's zone sits, and where a loose
+note sits beside it, are local state that must never enter the `Note` or `Folder` models —
+`transfer::Bundle` deserialises them itself, so a coordinate stored there would travel in
+every export and land on top of the receiving machine's own arrangement.
+
+### The board: the second view of a space
+
+A switch in the header chooses between **Date** and **Tableau**. The date view is not
+replaced and stays the default; the board is another way to look at the same notes, and it
+is remembered **per space** — one key each, `devbox.notes.view.<spaceId>`, so arranging one
+space does not switch the others. ⚠️ It is unavailable on "all spaces", where a folder
+belongs to no board: the switch disables rather than disappears, and falls back to the date
+view.
+
+**The board has a query of its own.** `board_view` answers folders and positions, not
+sections — `build_sections` must never learn about a folder. It reads the whole space and
+marks each note `matches`, because the search, the quick filter, the tag rail and the
+language rail all **dim** on the board rather than narrow it. ⚠️ Reflowing the survivors
+into a list would throw away the spatial memory the board exists for, which is the one
+thing the date view cannot give.
+
+**Cards flow inside a zone and sit freely outside it.** That is the whole geometry:
+
+| What                 | Where it is stored                                   |
+| -------------------- | ---------------------------------------------------- |
+| a zone's frame       | `folders.x/y/w/h`, nullable — all four move together |
+| a loose card's place | `note_positions`, one row per **unfiled** note       |
+| a filed card's place | nowhere: it flows, in canvas order                   |
+
+⚠️ A `note_positions` row means "this note is loose". `file_many` deletes the rows of the
+notes it files, so the table's meaning stays exact and a zone never has two competing
+notions of where a card is. It is also why `#133` can say the inside of a folder is not
+spatial without contradicting anything.
+
+**The first layout is materialised, not computed on the fly.** `store::board::geometry`
+reads the frames and positions and writes one for anything that has never been laid out, in
+a single transaction. ⚠️ A read that writes, deliberately: computing a place without storing
+it would let the first drag land next to cards that have no stored place of their own, and
+the board would look shuffled at every launch. It is idempotent — the second read of a space
+writes nothing — and a folder added later lands in the slot reading order gives it rather
+than on top of the first zone, because the arrangement is computed against every folder and
+only the missing frames are written.
+
+The layout rules live in `folders/board.rs`, which imports neither Diesel nor Tauri:
+`arrange_zones` flows zones three across, each row clearing the tallest zone above it;
+`arrange_loose` flows loose cards four across underneath; `surface` sizes the pannable area
+from whatever reaches furthest. **Pan only, no zoom** — a zoom is a second thing to persist
+and to reset, and full-size cards are what makes panning worth having.
+
+⚠️ `apply_folders` deliberately does **not** run for the board: a chip naming the zone a
+card already sits in is noise, and a loose card has no folder to name. The card component is
+the same one the canvas draws, so it renders no chip simply because `folder` is `None`.
+
+On the front end, `notes/canvas/` is the region and the two views are alternatives inside
+it — `note-section/` for the date view, `board/` for the board, and `note-card/` risen to
+their nearest common ancestor. ⚠️ The region keeps the `canvas` test hook whichever view
+fills it: it is the address on screen, and the e2e helpers wait on it.
+
+### Arranging the board
+
+⚠️ **HTML5 drag and drop does not work in this WebView and cannot be turned on.**
+`dragDropEnabled` has to stay `true` for the native file drop that feeds attachments, which
+is exactly what stops the WebView from ever seeing `dragstart` and `drop`. Every gesture on
+the board is therefore pointer events — `pointerdown` + `setPointerCapture` +
+`pointermove` + `pointerup` — as checklist reordering already is.
+
+Four gestures, one state machine (`board.component.ts`), and the arithmetic in plain
+functions next to it (`board-gesture.ts`, which has no signals and no DOM):
+
+| Gesture       | Started from         | Ends as                                     |
+| ------------- | -------------------- | ------------------------------------------- |
+| move a card   | the card's ⠿ grip    | `file_notes` — the zone under it, or `null` |
+| move a zone   | the header's ⠿ grip  | a frame in the layout batch                 |
+| resize a zone | the corner handle    | a frame in the layout batch                 |
+| draw a zone   | the empty background | a folder, named on the spot, at that frame  |
+
+**A grip, not the card.** The card is a `<button>` that opens the note, so a drag started on
+it would have to swallow its own click. The grips are siblings, quiet at rest and never
+hidden — `visibility: hidden` would take them out of the tab order.
+
+⚠️ **The gesture commits on `pointerup` and nowhere else.** A drag that never travelled
+past `DRAG_THRESHOLD_PX` writes nothing — it was a click — and `pointercancel` throws the
+whole thing away rather than leaving a card at coordinates nobody chose.
+
+**Moving a zone carries its notes, and resizing one captures and releases nothing.** Both
+fall out of the flow rather than being coded: a filed card has no coordinates, so it is
+carried by its zone for free, and a stretched frame has nothing to capture. ⚠️ Unreal's own
+rule — a comment box owns whatever it overlaps — was considered and refused: it silently
+refiles notes the day a frame is stretched. **Membership comes from the drop, in both
+directions, and from nothing else.**
+
+**One write per gesture.** `BoardStore` stages what moved and writes it behind a 400 ms
+debounce as a single `save_board_layout`, one transaction. ⚠️ The staged geometry is laid
+_over_ the view rather than written into it, and it is cleared only once the write
+succeeded — dropping the overlay on a failure would snap every card back with nothing on
+screen saying why.
+
+⚠️ `save_board_layout` skips a card that has been filed since the drag: a position row
+means "this note is loose", and writing one back would undo what `file_many` just did.
+
+**The keyboard twin is not optional**, and it is the path that already existed: tick cards
+with `X`, then "Ranger dans" in the selection bar — the same batch command the drop uses,
+so the two cannot drift. The gesture adds to it; it does not replace it.
+
+### Descending into a folder
+
+A space shows its folders; a folder shows its notes. **Choosing a folder is opening it** —
+there is one piece of state, `FoldersStore.activeFolderId`, whether it was chosen from the
+switcher or by clicking a zone title on the board.
+
+While one is open, the space switcher, the view switch and the folder switcher all give way
+to a `SQL / ● Perf` breadcrumb: from inside a folder there is one place to go, and it is
+back. Leaving restores whichever view you came from, because the board's own mode is never
+touched.
+
+⚠️ **The inside of a folder is not spatial.** No zones, no coordinates, nothing to draw —
+it is already sorted by the fact of being there, and a second board inside the first would
+be a second set of positions to maintain for nothing.
+
+**It is a flat grid, and that is decided in Rust.** `notes::view::build` counts an opened
+folder as filtering, so the view comes back as a single `results` section. ⚠️
+`build_sections` still knows nothing about a folder — this is the only place the two meet,
+and the date view's own sections are untouched, because nothing sends a `folder_id` unless
+a folder has actually been opened.
+
+**A note created here arrives already filed.** That and a drop on the board are the only two
+places that file a new note. ⚠️ The quick-paste palette deliberately does not: it is used
+mid-task from another application, and a decision there would sit in the fastest path in the
+product.
+
+**Escape falls through**, in this order: the selection, then the search and the facets, then
+out of the folder. Leaving is the biggest of the three, so it goes last. ⚠️ The middle rung
+asks `hasUserFilters` and not `isFiltering` — the latter is the _view's_ answer and is true
+inside an opened folder, so Escape would clear a search that is not there and never fall
+through.
+
+**The folder's three actions live in one component.** `folder-editor/` holds the rename, the
+palette and the delete; the switcher, the breadcrumb and the zone menu on the board all
+project it, so they cannot drift apart. Deleting from the breadcrumb goes back, with the
+notes now loose.
+
+### A folder travels; its coordinates do not
+
+The folder is part of what a note is. Where its zone sat on a board is not.
+
+**Out.** `Bundle` gains the folders actually cited, beside the spaces it already carries,
+and each note carries its `folderId`. Only the cited ones travel, for the same reason only
+the cited spaces do: exporting one space should not recreate a whole tree on the other side.
+⚠️ `#[serde(default)]` on both new fields, exactly as `kind` and `items` carry it — an
+export written before folders must stay readable, and there is **no `FORMAT_VERSION` bump**
+because such a file still parses.
+
+⚠️ **No coordinates, and nothing had to be stripped to achieve that.** `Folder` carries no
+geometry: where a zone sits lives in columns only the board's own query reads. That is the
+whole reason the geometry was kept off the model in the first place, and a test reads the
+written file to prove no `x` ever reaches it.
+
+**In.** A folder is matched **by name inside the destination space**, case-insensitively,
+and created when absent — the rule spaces already follow. Spaces are merged first, because a
+folder needs its space to exist.
+
+⚠️ A note's `folderId` is the _sending_ library's, so it is remapped, and **dropped when the
+file did not carry the folder**: a dangling id would be refused by the foreign key, losing
+the whole import over a note that is merely unfiled. A folder whose space did not make it is
+dropped for the same reason its notes were.
+
+`ImportReport` gains `foldersCreated` next to `spacesCreated`, and a library that arrived
+arranged says so — every library operation reports, including when it changed nothing.
+
+### What a first launch teaches
+
+A virgin database has no space, so `SampleNotesService` seeds one — and since the folders
+milestone, **it arrives already arranged**: two folders, three of the four notes filed, and
+one deliberately left loose. Without that the board opens empty on a fresh install, and the
+one screen that explains what a folder is for shows no folder.
+
+⚠️ **The folders are written in the same transaction as the space and the notes.** The two
+guards in `seedIfFirstRun` only both say "virgin" for a database that has never been
+written to; a seeding that created the space and the notes but not the folders would leave
+a space standing, which both guards then read as "already seeded". It would never run again.
+
+⚠️ **Each seeded row is stamped a millisecond apart**, and in opposite directions:
+`folders::list` orders `created_at` **ascending**, the canvas orders `updated_at`
+**descending**. Sharing one instant left both orders falling back to `id` — a random UUID —
+so the zones and the sample cards came out arranged differently on each install.
+
+⚠️ **`seed_samples` answers the space it made**, and the page selects it. With exactly one
+space, "all spaces" is a distinction without a difference — and it is the one state in which
+the board cannot be shown at all, so a first launch would have hidden the feature behind a
+disabled button.
+
+A note names its folder by **index** into the folders the same command creates: they have no
+id until the transaction that writes them is under way.
+
+The written guide ("À propos → Prise en main") has a chapter per subject, listed in
+`getting-started-dialog.component.ts`. ⚠️ A chapter that names a key receives it as an
+interpolation — Transloco replaces an unknown `{{name}}` with the empty string, so a body
+cannot spell one out. `CHECK_KEY` is exported from the canvas keyboard directive for that:
+the table that binds it and the chapter that names it read the same constant.
 
 ### Editing a note
 
@@ -1838,6 +2092,22 @@ installed or shipped alongside the executable. The database file lives in Tauri'
   re-runs `CREATE TABLE spaces` nor keeps a second, drifting source of truth. A pre-Diesel
   binary reopening such a database now fails loudly at startup instead of writing into a schema
   it believes it understands.
+- **The board geometry is columns nothing else reads.** `folders.x/y/w/h` are nullable and
+  move together — `NULL` means "never laid out", which every folder made before the board
+  existed is. `note_positions` is keyed on `note_id` alone and holds a row only for an
+  **unfiled** note; filing one deletes its row. ⚠️ None of it is on the `Note` or `Folder`
+  model, and that is what makes `#134` free: `transfer::Bundle` deserialises both, so a
+  coordinate there would travel in every export and land on top of the arrangement the
+  receiving machine already has.
+- **A folder is a row, and membership is a column.** `folders` holds `(id, space_id, name,
+colour, created_at)` and `notes.folder_id` points into it. ⚠️ The column was added with no
+  `DEFAULT`, because SQLite only accepts an added `REFERENCES` column whose default is `NULL`
+  — which is what every existing note needs anyway. `folders.name` is sealed like
+  `spaces.name`, so uniqueness leaves SQL exactly as it did there: two seals of the same name
+  differ, and a unique index on ciphertext catches nothing. The order does not move —
+  `created_at` stays in the clear, and reading order is the order a board lays its zones out
+  in. `colour` carries no `CHECK`, following `language`: the list lives in the domain, and a
+  value a build cannot name degrades to the default rather than failing the read.
 - **A checklist's items are a child table, not a serialised column.** `note_items` is keyed
   `(note_id, position)` and written by wiping the note's rows and re-inserting them in order —
   the same shape as `note_tags`, for the same reason. It is _not_ read back after writing, and

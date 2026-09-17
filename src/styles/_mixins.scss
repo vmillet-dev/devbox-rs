@@ -213,3 +213,35 @@
   font-size: 10.5px;
   color: var(--text-1);
 }
+
+// ⚠️ A card on the board carries its own width, where the canvas gets one from its grid
+// column. Without it the flow inside a zone is the content's width, the second card wraps
+// out of sight, and `folders::board::CARD_WIDTH` — which every frame is computed from —
+// corresponds to nothing on screen. Keep the two in step.
+@mixin board-card {
+  position: relative;
+  width: 240px;
+}
+
+// The five folder colours, as `--folder-hue` on an `.is-<colour>` element. The list is
+// `FolderColour` in Rust; adding one there means adding it here, and the swatch is blue
+// until it is. Every consumer — chip, filter, zone, breadcrumb — reads the variable.
+@mixin folder-hues {
+  --folder-hue: var(--blue);
+
+  &.is-amber {
+    --folder-hue: var(--amber);
+  }
+
+  &.is-purple {
+    --folder-hue: var(--purple);
+  }
+
+  &.is-green {
+    --folder-hue: var(--green);
+  }
+
+  &.is-red {
+    --folder-hue: var(--red);
+  }
+}

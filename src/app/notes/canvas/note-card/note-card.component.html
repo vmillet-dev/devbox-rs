@@ -89,6 +89,12 @@
       <span [class.stale]="note().expiringSoon"
         >@if (footerLabel(); as label) {@if (label.kind === 'text') {{{ label.value }}} @else {{{ label.ref.key | transloco: label.ref.params }}}}</span
       >
+      @if (note().folder; as folder) {
+        <span class="card-folder" data-testid="note-card-folder">
+          <i class="folder-swatch" [class]="'is-' + folder.colour" aria-hidden="true"></i>
+          {{ folder.name }}
+        </span>
+      }
       <span class="card-tags" data-testid="note-card-tags">
         @for (tag of displayedTags(); track tag) {
           <span>#{{ tag }}</span>

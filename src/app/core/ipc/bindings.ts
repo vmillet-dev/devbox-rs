@@ -14,10 +14,10 @@ export const commands = {
 	 *  a space with nothing in it reads as "already seeded" to both of the front end's
 	 *  guards, and the canvas stays empty for the life of that install. The strings stay on
 	 *  the front end, where the translations are — only the atomicity comes from here.
-	 *  Answers nothing: the caller needs to know the library was seeded, not what was made,
-	 *  and it reloads the spaces either way.
+	 *  Answers the space it made: with exactly one, "all spaces" is a distinction without a
+	 *  difference, and the front end opens on it rather than on a board it cannot show.
 	 */
-	seedSamples: (spaceName: string, drafts: NoteDraft[]) => typedError<null, AppError>(__TAURI_INVOKE("seed_samples", { spaceName, drafts })),
+	seedSamples: (spaceName: string, folders: string[], notes: SampleNote[]) => typedError<Space, AppError>(__TAURI_INVOKE("seed_samples", { spaceName, folders, notes })),
 	updateNote: (id: string, patch: NotePatch) => typedError<DisplayNote, AppError>(__TAURI_INVOKE("update_note", { id, patch })),
 	/**
 	 *  Moves to the trash: the note comes back through [`restore_notes`] for
@@ -58,6 +58,48 @@ export const commands = {
 	listGlobalPlaceholders: () => typedError<{ [key in string]: string }, AppError>(__TAURI_INVOKE("list_global_placeholders")),
 	/**  Stores the whole set: what is not sent is what the user removed. */
 	setGlobalPlaceholders: (values: { [key in string]: string }) => typedError<{ [key in string]: string }, AppError>(__TAURI_INVOKE("set_global_placeholders", { values })),
+	/**  `None` = every space, like [`crate::notes::view::NotesQuery::space_id`]. */
+	listFolders: (spaceId: string | null) => typedError<Folder[], AppError>(__TAURI_INVOKE("list_folders", { spaceId })),
+	/**
+	 *  The second way to look at a space: folders as zones, their notes inside them, the
+	 *  loose ones beside them.
+	 * 
+	 *  ⚠️ It reads the whole space and marks what matches rather than narrowing — the quick
+	 *  filter, the rails and the search all **dim** on the board. Reflowing the survivors into
+	 *  a list would throw away the spatial memory the board exists for.
+	 * 
+	 *  ⚠️ `apply_folders` deliberately does not run: a chip naming the zone a card already
+	 *  sits in is noise, and a loose card has no folder to name.
+	 */
+	boardView: (query: BoardQuery) => typedError<BoardView, AppError>(__TAURI_INVOKE("board_view", { query })),
+	/**
+	 *  Where the zones and the loose cards ended up, written as one batch behind the front
+	 *  end's debounce.
+	 * 
+	 *  ⚠️ One command and one transaction for the whole gesture: a drag that ends outside the
+	 *  window, or an application that quits mid-gesture, must not leave half a board behind.
+	 *  Filing is **not** here — membership comes from [`file_notes`], which answers what it
+	 *  changed so the undo can put it back.
+	 */
+	saveBoardLayout: (zones: ZonePlacement[], cards: CardPlacement[]) => typedError<null, AppError>(__TAURI_INVOKE("save_board_layout", { zones, cards })),
+	createFolder: (draft: FolderDraft) => typedError<Folder, AppError>(__TAURI_INVOKE("create_folder", { draft })),
+	renameFolder: (id: string, name: string) => typedError<Folder, AppError>(__TAURI_INVOKE("rename_folder", { id, name })),
+	recolourFolder: (id: string, colour: FolderColour) => typedError<Folder, AppError>(__TAURI_INVOKE("recolour_folder", { id, colour })),
+	/**
+	 *  ⚠️ No refuge argument, unlike [`crate::spaces::delete_space`]: the notes come out
+	 *  loose, and "no folder" is a legitimate state rather than data loss.
+	 */
+	deleteFolder: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_folder", { id })),
+	/**
+	 *  A batch, like [`crate::notes::move_notes`]: the selection bar files a whole selection,
+	 *  and a drop on the board is a batch of one. `folderId` absent unfiles.
+	 */
+	fileNotes: (ids: string[], folderId: string | null) => typedError<NoteFiling[], AppError>(__TAURI_INVOKE("file_notes", { ids, folderId })),
+	/**
+	 *  The undo of [`file_notes`]: each note goes back to the folder it left, or back to
+	 *  being loose.
+	 */
+	fileNotesBack: (filings: NoteFiling[]) => typedError<number, AppError>(__TAURI_INVOKE("file_notes_back", { filings })),
 	listSpaces: () => typedError<Space[], AppError>(__TAURI_INVOKE("list_spaces")),
 	createSpace: (draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("create_space", { draft })),
 	renameSpace: (id: string, draft: SpaceDraft) => typedError<Space, AppError>(__TAURI_INVOKE("rename_space", { id, draft })),
@@ -163,6 +205,74 @@ export type Attachment = {
 	createdAt: string,
 };
 
+export type BoardFrame = {
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+};
+
+/**  `flatten`: the front end draws this with the same card component the canvas uses. */
+export type BoardNote = {
+	/**
+	 *  ⚠️ Dimmed in place rather than reflowed into a list: spatial memory is the only
+	 *  thing the board has that the date view does not, and a reflow throws it away.
+	 */
+	matches: boolean,
+	/**  `None` inside a zone, where a card flows; `Some` only on the free background. */
+	position: BoardPoint | null,
+} & DisplayNote;
+
+export type BoardPoint = {
+	x: number,
+	y: number,
+};
+
+export type BoardQuery = {
+	/**
+	 *  Required, unlike [`crate::notes::view::NotesQuery::space_id`]: a folder belongs to
+	 *  a space, so a board across all of them would have no zones to draw.
+	 */
+	spaceId: string,
+	search: string,
+	filter: NoteFilter,
+	tags: string[],
+	languages: Language[],
+	now: string,
+};
+
+export type BoardView = {
+	zones: BoardZone[],
+	loose: BoardNote[],
+	/**
+	 *  Attached to the space, like [`crate::notes::view::NotesView`]'s: facets drawn from
+	 *  already filtered notes would empty the rails on the first selection.
+	 */
+	availableTags: string[],
+	availableLanguages: Language[],
+	isFiltering: boolean,
+	matched: number,
+	/**  The surface to pan over, so the front end sizes it from what is actually on it. */
+	width: number,
+	height: number,
+};
+
+export type BoardZone = {
+	folder: Folder,
+	frame: BoardFrame,
+	notes: BoardNote[],
+};
+
+/**
+ *  One loose card that moved. ⚠️ Filing is not here: membership comes from
+ *  [`crate::folders::file_notes`], which answers what it changed so the undo can put it
+ *  back. A position is a local gesture and has no undo of its own.
+ */
+export type CardPlacement = {
+	noteId: string,
+	position: BoardPoint,
+};
+
 export type ChangelogRelease = {
 	/**  `0.1.1`, or whatever the heading names. Square brackets are dropped. */
 	version: string,
@@ -196,6 +306,11 @@ export type DisplayNote = {
 	/**  Filled in afterwards by whoever holds a connection: `decorate` reads no database. */
 	attachmentCount: number,
 	/**
+	 *  Resolved in a pass of its own, like [`Self::attachment_count`]: the front end
+	 *  never joins a `folder_id` against a list it happens to hold.
+	 */
+	folder: NoteFolder | null,
+	/**
 	 *  ⚠️ What copying yields when that is not the content. Decided here so
 	 *  `checklist::to_markdown` stays the only place the `- [x] ` syntax exists.
 	 */
@@ -211,7 +326,7 @@ export type DisplayNote = {
  *  ⚠️ Adding a variant breaks the front-end build until `CODE_KEYS`
  *  (`core/services/errors/error-notifier.service.ts`) and both locales have their key.
  */
-export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" | "attachmentNotFound" | "fileAccess" | "importFormat" | 
+export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" | "folderNotFound" | "duplicateFolderName" | "attachmentNotFound" | "fileAccess" | "importFormat" | 
 /**  The `field` parameter names the offending field. */
 "invalidInput" | 
 /**  Poisoned mutex: a command panicked while holding the connection. */
@@ -234,6 +349,7 @@ export type ErrorCode = "noteNotFound" | "spaceNotFound" | "duplicateSpaceName" 
 export type ExportReport = {
 	notes: number,
 	spaces: number,
+	folders: number,
 	/**
 	 *  What actually went into the archive. A record whose file has gone missing is left
 	 *  out rather than failing the export.
@@ -245,6 +361,27 @@ export type ExportReport = {
 	 *  one thing here most likely to leave the machine.
 	 */
 	protected: boolean,
+};
+
+export type Folder = {
+	id: string,
+	spaceId: string,
+	/**  Uniqueness is case-insensitive inside its space, decided by persistence. */
+	name: string,
+	colour?: FolderColour,
+	createdAt: string,
+};
+
+/**
+ *  Assigned on creation rather than chosen, and changed from the zone menu after:
+ *  drawing a folder must stay one gesture. The five are the theme's own accents, so
+ *  each already has a light-theme twin.
+ */
+export type FolderColour = "blue" | "amber" | "purple" | "green" | "red";
+
+export type FolderDraft = {
+	spaceId: string,
+	name: string,
 };
 
 /**
@@ -260,6 +397,12 @@ export type GlobalAction = "capture" | "new-note" | "palette";
  */
 export type ImportReport = {
 	spacesCreated: number,
+	/**
+	 *  Matched by name inside the destination space, and created when absent — the rule
+	 *  spaces already follow. Every library operation reports, including when it changed
+	 *  nothing.
+	 */
+	foldersCreated: number,
 	notesImported: number,
 	notesSkipped: number,
 	/**
@@ -286,6 +429,11 @@ export type Language = "json" | "js" | "ts" | "py" | "rs" | "go" | "java" | "cs"
 export type Note = {
 	id: string,
 	spaceId: string,
+	/**
+	 *  ⚠️ The folder travels with an export; where its zone sits on the board does not,
+	 *  and must never join this model — `transfer::Bundle` deserializes `Note` itself.
+	 */
+	folderId?: string | null,
 	title: string,
 	language: Language,
 	content: string,
@@ -312,6 +460,8 @@ export type Note = {
 
 export type NoteDraft = {
 	spaceId: string,
+	/**  Set by the two places that file a new note: the board and the inside of a folder. */
+	folderId?: string | null,
 	title: string,
 	language: Language,
 	content: string,
@@ -323,8 +473,27 @@ export type NoteDraft = {
 	items?: ChecklistItem[],
 };
 
+/**
+ *  Which folder each note left, which is the only thing that can put a filing back.
+ *  `folder_id` is `None` for a note that was loose.
+ */
+export type NoteFiling = {
+	noteId: string,
+	folderId?: string | null,
+};
+
 /**  `Untriaged` = notes with a deadline, those whose fate is not decided. */
 export type NoteFilter = "all" | "pinned" | "untriaged";
+
+/**
+ *  What a card shows, resolved by the back end: the front end never joins an id against
+ *  a list it happens to hold.
+ */
+export type NoteFolder = {
+	id: string,
+	name: string,
+	colour: FolderColour,
+};
 
 /**
  *  The decision, not the rendering: the dated variants carry a date and not a label,
@@ -389,6 +558,12 @@ export type NoteTag = {
 export type NotesQuery = {
 	/**  `None` = every space: a choice, not an absence of one. */
 	spaceId: string | null,
+	/**
+	 *  `None` = every folder, filed or not. Narrowing to "unfiled" is not offered: the
+	 *  absence of a chip already reads, and a filter for it would be a fourth way to say
+	 *  the same thing.
+	 */
+	folderId?: string | null,
 	search: string,
 	filter: NoteFilter,
 	/**  A note passes if it carries at least one of these tags. */
@@ -425,6 +600,18 @@ export type Placeholder = {
 	 *  being erased.
 	 */
 	value: string,
+};
+
+/**
+ *  One seeded note, and which of the seeded folders it lands in.
+ * 
+ *  ⚠️ An **index** into the folders the same command creates, not an id: they do not exist
+ *  until the transaction that writes them is under way. `None` stays loose, which the
+ *  first launch shows on purpose — "no folder" is a legitimate state.
+ */
+export type SampleNote = {
+	folder?: number | null,
+	draft: NoteDraft,
 };
 
 /**
@@ -509,6 +696,12 @@ export type VaultState =
 export type WindowBehavior = {
 	closeToTray: boolean,
 	minimizeToTray: boolean,
+};
+
+/**  One zone that moved. A batch of these is what a gesture eventually writes. */
+export type ZonePlacement = {
+	folderId: string,
+	frame: BoardFrame,
 };
 
 /* Tauri Specta runtime */

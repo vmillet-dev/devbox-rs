@@ -1,4 +1,5 @@
 import { Injectable, Signal, computed, inject, signal } from '@angular/core';
+import { FoldersRepository } from '../data/folders.repository';
 import { NotesRepository } from '../data/notes.repository';
 import { ClipboardService } from '@core/services/clipboard/clipboard.service';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
@@ -13,9 +14,11 @@ import {
   NotePlacement,
   NoteTag,
 } from '../model/note.model';
+import { NoteFiling } from '../model/folder.model';
 import { ClockService } from '@core/services/time/clock.service';
 import { debounced } from '@core/services/time/debounce';
 import { NoteSelectionStore } from './note-selection.store';
+import { FoldersStore } from './folders.store';
 import { NotesQueryStore } from './notes-query.store';
 import { SpacesStore } from './spaces.store';
 
@@ -31,7 +34,8 @@ export const UNDO_WINDOW_MS = 8000;
 export type Reversible =
   | { readonly kind: 'deletion'; readonly ids: readonly string[]; readonly count: number }
   | { readonly kind: 'move'; readonly previous: readonly NotePlacement[]; readonly count: number }
-  | { readonly kind: 'tag'; readonly added: readonly NoteTag[]; readonly count: number };
+  | { readonly kind: 'tag'; readonly added: readonly NoteTag[]; readonly count: number }
+  | { readonly kind: 'file'; readonly previous: readonly NoteFiling[]; readonly count: number };
 
 /** The note being created, not written until it is worth keeping. */
 export const DRAFT_ID = '__draft__';
@@ -49,9 +53,10 @@ function isWorthSaving(note: Note): boolean {
 }
 
 /** Empty title: the UI renders a translated placeholder, and storing one would freeze a language into the data. */
-function emptyDraft(spaceId: string, kind: NoteKind): NoteDraft {
+function emptyDraft(spaceId: string, kind: NoteKind, folderId: string | null = null): NoteDraft {
   return {
     spaceId,
+    folderId,
     title: '',
     language: FALLBACK_LANGUAGE,
     content: '',
@@ -64,9 +69,9 @@ function emptyDraft(spaceId: string, kind: NoteKind): NoteDraft {
   };
 }
 
-function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
+function emptyNote(spaceId: string, now: Date, kind: NoteKind, folderId: string | null = null): Note {
   return {
-    ...emptyDraft(spaceId, kind),
+    ...emptyDraft(spaceId, kind, folderId),
     id: DRAFT_ID,
     createdAt: now,
     updatedAt: now,
@@ -74,6 +79,7 @@ function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
     expiringSoon: false,
     placeholders: [],
     attachmentCount: 0,
+    folder: null,
     copyText: null,
     searchHit: null,
   };
@@ -82,6 +88,7 @@ function emptyNote(spaceId: string, now: Date, kind: NoteKind): Note {
 function toDraftPayload(note: Note): NoteDraft {
   return {
     spaceId: note.spaceId,
+    folderId: note.folderId,
     title: note.title,
     language: note.language,
     content: note.content,
@@ -147,6 +154,8 @@ function changedFields(note: Note, patch: NotePatch): NotePatch {
 @Injectable({ providedIn: 'root' })
 export class NotesStore {
   private readonly repository = inject(NotesRepository);
+  private readonly folders = inject(FoldersRepository);
+  private readonly openFolder = inject(FoldersStore);
   private readonly clipboard = inject(ClipboardService);
   private readonly clock = inject(ClockService);
   private readonly notifier = inject(ErrorNotifier);
@@ -233,6 +242,12 @@ export class NotesStore {
   }
 
   /** Opens the editor on a local draft; a note with no space at all is refused. */
+  /**
+   * ⚠️ A note made while a folder is open arrives already filed. That and a drop on the
+   * board are the only two places that file a new one: the quick-paste palette
+   * deliberately does not, because it is used mid-task from another application and a
+   * decision there would sit in the fastest path in the product.
+   */
   createNote(kind: NoteKind = 'snippet'): void {
     const spaceId = this.spaceForNewNote();
     if (!spaceId) return;
@@ -241,7 +256,7 @@ export class NotesStore {
     this._selectedNote.set(null);
     this.draftMaterialisation = null;
     this._editorSession.update((session) => session + 1);
-    this._draftNote.set(emptyNote(spaceId, this.clock.now(), kind));
+    this._draftNote.set(emptyNote(spaceId, this.clock.now(), kind, this.openFolder.activeFolderId()));
   }
 
   async captureFromClipboard(): Promise<void> {
@@ -298,6 +313,14 @@ export class NotesStore {
     this.openUndoWindow({ kind: 'move', previous, count: previous.length });
   }
 
+  /** `folderId` of `null` takes the selection out of whatever folder it was in. */
+  async fileSelection(folderId: string | null): Promise<void> {
+    const previous = await this.runOnSelection((ids) => this.folders.fileMany(ids, folderId));
+    if (previous === null) return;
+
+    this.openUndoWindow({ kind: 'file', previous, count: previous.length });
+  }
+
   async tagSelection(tag: string): Promise<void> {
     if (!tag.trim()) return;
 
@@ -347,6 +370,8 @@ export class NotesStore {
         return this.repository.moveBack(action.previous);
       case 'tag':
         return this.repository.untagMany(action.added);
+      case 'file':
+        return this.folders.fileBack(action.previous);
     }
   }
 

@@ -5,6 +5,7 @@ import { ClockService } from '@core/services/time/clock.service';
 import { SEARCH_DEBOUNCE_MS, debounced } from '@core/services/time/debounce';
 import { NotesRepository } from '../data/notes.repository';
 import { Note, NoteFilter, NoteSection, NotesQuery, NotesView } from '../model/note.model';
+import { FoldersStore } from './folders.store';
 import { NotesRevision } from './notes-revision';
 import { SpacesStore } from './spaces.store';
 
@@ -19,6 +20,7 @@ function localDayKey(now: Date): string {
 
 interface QueryParams {
   readonly spaceId: string | null;
+  readonly folderId: string | null;
   readonly search: string;
   readonly filter: NoteFilter;
   readonly tags: readonly string[];
@@ -45,6 +47,7 @@ const SAME: {
   readonly [K in keyof QueryParams]: (a: QueryParams[K], b: QueryParams[K]) => boolean;
 } = {
   spaceId: Object.is,
+  folderId: Object.is,
   search: Object.is,
   filter: Object.is,
   day: Object.is,
@@ -81,6 +84,7 @@ export class NotesQueryStore {
   private readonly repository = inject(NotesRepository);
   private readonly clock = inject(ClockService);
   private readonly spaces = inject(SpacesStore);
+  private readonly folders = inject(FoldersStore);
   private readonly revision = inject(NotesRevision);
 
   private readonly _searchQuery = signal('');
@@ -91,6 +95,8 @@ export class NotesQueryStore {
 
   /** Follows the typing without waiting: this is what the field shows. */
   readonly searchQuery = this._searchQuery.asReadonly();
+  /** What actually crosses the bridge — the board queries on the same settled value. */
+  readonly debouncedSearch = this._debouncedSearch.asReadonly();
   readonly activeFilter = this._activeFilter.asReadonly();
   readonly selectedTags = this._selectedTags.asReadonly();
   readonly selectedLanguages = this._selectedLanguages.asReadonly();
@@ -103,6 +109,7 @@ export class NotesQueryStore {
   private readonly queryParams = computed<QueryParams>(
     () => ({
       spaceId: this.spaces.activeSpaceId(),
+      folderId: this.folders.activeFolderId(),
       search: this._debouncedSearch().trim(),
       filter: this._activeFilter(),
       tags: [...this._selectedTags()].sort(),
@@ -120,6 +127,7 @@ export class NotesQueryStore {
       const now = untracked(() => this.clock.now());
       const query: NotesQuery = {
         spaceId: params.spaceId,
+        folderId: params.folderId,
         search: params.search,
         filter: params.filter,
         tags: params.tags,
@@ -154,6 +162,15 @@ export class NotesQueryStore {
   });
 
   readonly hasNoResults = computed(() => this.matched() === 0);
+
+  /**
+   * What `clearFilters` would give back. ⚠️ Not `isFiltering`, which is the view's own
+   * answer and is true inside an opened folder — Escape would then clear a search that is
+   * not there and never fall through to leaving the folder.
+   */
+  readonly hasUserFilters = computed(
+    () => this._searchQuery() !== '' || this._selectedTags().size > 0 || this._selectedLanguages().size > 0,
+  );
 
   /**
    * ⚠️ `view()` is read before the resource state: an `&&` the other way round would

@@ -205,6 +205,7 @@ mod tests {
             connection,
             NoteDraft {
                 space_id: space.id,
+                folder_id: None,
                 title: "T".to_string(),
                 language: Language::Txt,
                 content: String::new(),

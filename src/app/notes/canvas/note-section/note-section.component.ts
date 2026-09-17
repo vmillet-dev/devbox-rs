@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NoteSection } from '@core/model/note.model';
 import { NotesStore } from '@core/state/notes.store';
-import { NoteActivation, NoteCardComponent } from './note-card/note-card.component';
+import { NoteActivation, NoteCardComponent } from '../note-card/note-card.component';
 
 @Component({
   selector: 'app-note-section',
