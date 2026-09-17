@@ -17,70 +17,13 @@
     <div class="space-dropdown" data-testid="space-dropdown">
       @if (editing(); as edited) {
         <!-- The edit panel replaces the menu, like the create form. -->
-        <div class="space-edit-panel">
-          <p class="space-edit-title">{{ edited.name }}</p>
-
-          <button
-            type="button"
-            class="space-pin-toggle"
-            data-testid="space-pin"
-            [class.on]="edited.pinned"
-            [attr.aria-pressed]="edited.pinned"
-            (click)="pinRequested.emit(edited.id)"
-          >
-            <span aria-hidden="true">📌</span>
-            {{ (edited.pinned ? 'notes.unpinSpace' : 'notes.pinSpace') | transloco }}
-          </button>
-
-          <form class="space-create-form" (submit)="submitRename($event, renameInput.value)">
-            <input
-              #renameInput
-              type="text"
-              class="space-create-input"
-              data-testid="space-rename-input"
-              [attr.aria-label]="'notes.renameSpaceLabel' | transloco"
-              [value]="edited.name"
-            />
-            <button type="submit" class="space-create-submit" data-testid="space-rename-submit">
-              {{ 'notes.renameSpaceSubmit' | transloco }}
-            </button>
-          </form>
-
-          @if (moveTargets().length > 0) {
-            <div class="space-delete-group">
-              <label class="space-delete-label" [attr.for]="'space-move-target'">
-                {{ 'notes.moveNotesTo' | transloco }}
-              </label>
-              <div class="space-delete-row">
-                <!-- The target is mandatory: the space leaves with its notes
-                     (ON DELETE CASCADE) if nobody takes them in. -->
-                <select
-                  #targetSelect
-                  id="space-move-target"
-                  data-testid="space-move-target"
-                  class="space-create-input"
-                >
-                  @for (target of moveTargets(); track target.id) {
-                    <option [value]="target.id">{{ target.name }}</option>
-                  }
-                </select>
-                <button
-                  type="button"
-                  class="space-create-submit space-delete-submit"
-                  data-testid="space-delete"
-                  [class.confirming]="confirmingDelete()"
-                  (click)="onDeleteClick(targetSelect.value)"
-                >
-                  {{ (confirmingDelete() ? 'notes.deleteSpaceConfirm' : 'notes.deleteSpace') | transloco }}
-                </button>
-              </div>
-            </div>
-          } @else {
-            <p class="space-delete-blocked" data-testid="space-delete-blocked">
-              {{ 'notes.deleteSpaceNeedsAnother' | transloco }}
-            </p>
-          }
-        </div>
+        <app-space-editor
+          [space]="edited"
+          [moveTargets]="moveTargets()"
+          (renamed)="onRenamed($event)"
+          (pinRequested)="pinRequested.emit($event)"
+          (deleted)="onDeleted($event)"
+        />
       } @else if (creating()) {
         <!-- The form replaces the menu rather than adding to it: an input inside a
              role="menu" is neither valid ARIA nor navigable the way options are. -->

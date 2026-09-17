@@ -1,8 +1,8 @@
 import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
-import { spaces } from '../pageobjects/overlays.page.js';
-import { press, reloadCanvas } from '../support/app.js';
+import { rail, spaces } from '../pageobjects/overlays.page.js';
+import { press, reloadCanvas, testid } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -149,5 +149,47 @@ describe('Spaces', () => {
     const view = await bridge.queryNotes(query({ search: 'Only in Lectures' }));
     expect(view.matched).toBe(1);
     expect(view.sections[0]?.notes[0]?.spaceId).toBe(homeId);
+  });
+
+  /**
+   * ⚠️ Runs after everything above it, like the pinning suite: Mocha takes a nested suite
+   * once its siblings are done, and this one puts the rail away for a moment.
+   */
+  describe('the library rail', () => {
+    after(async () => {
+      await rail.show();
+    });
+
+    it('is the navigation, so the switchers stay out of the topbar', async () => {
+      expect(await rail.isShowing()).toBe(true);
+      expect(await browser.$(testid('space-switcher')).isExisting()).toBe(false);
+      expect(await browser.$(testid('folder-switcher')).isExisting()).toBe(false);
+    });
+
+    /** ⚠️ The drag is pointer events, which no keyboard has: the edge answers arrows too. */
+    it('is resized from its edge, and the width survives the page', async () => {
+      await rail.show();
+      const before = await rail.width();
+
+      await rail.widen();
+      await browser.pause(500);
+      expect(await rail.width()).toBeGreaterThan(before);
+
+      const widened = await rail.width();
+      await reloadCanvas();
+      expect(await rail.width()).toBe(widened);
+    });
+
+    /** Hidden or shown is a preference, so it has to survive the page it was set on. */
+    it('gives the switchers back when it is put away, and is remembered', async () => {
+      await rail.hide();
+      expect(await browser.$(testid('space-switcher')).isExisting()).toBe(true);
+      await browser.pause(500);
+
+      await reloadCanvas();
+
+      expect(await rail.isShowing()).toBe(false);
+      expect(await browser.$(testid('space-switcher')).isExisting()).toBe(true);
+    });
   });
 });

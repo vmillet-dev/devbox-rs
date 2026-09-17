@@ -117,6 +117,20 @@ describe('FoldersStore', () => {
     expect(harness.store.folders()).toHaveLength(1);
   });
 
+  /**
+   * ⚠️ The rail shows it at once from the adopted list; the board reads its zones through
+   * a query of its own and would not draw the new one until something else reloaded it.
+   */
+  it('bumps the revision on a creation, so the board draws the zone', async () => {
+    const harness = await createStore([]);
+    await inSpace(harness, 'sql');
+    const before = harness.revision.current();
+
+    await harness.store.createFolder('Perf');
+
+    expect(harness.revision.current()).toBeGreaterThan(before);
+  });
+
   /** A folder belongs to a space, so there is nothing to create it in. */
   it('refuses to create a folder while no space is chosen', async () => {
     const { store } = await createStore([]);
