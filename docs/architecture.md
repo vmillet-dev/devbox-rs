@@ -601,18 +601,23 @@ a task list reads `- [x] …` is a rule, and it now has exactly one home —
 `notes::checklist::to_markdown`, which sharing and exporting already used. The front end held
 a second copy of that syntax, and one of the two was going to drift.
 
-### A tickable card, and why it is two layers
+### A card is two layers, and the click surface is the lower one
 
-A card is a `<button>`, and a `<button>` may not contain another — the reason the `⋯` menu
-already lives in `.card-shell` rather than inside the card. Ticking a box from the canvas
-needs buttons _in_ the card's body, so a checklist card is built as two layers: the card
-button underneath, carrying the click surface and the keyboard focus the canvas moves around,
-and a sibling `.card-items` layer over it in `pointer-events: none`, where only the item
-checkboxes take pointer events back. Everything else falls through and opens the note.
+A `<button>` may not contain another, and a card's header carries three — the selection tick,
+the copy (or ⚡) and the `⋯`. While the card _was_ the button, those three had to be siblings
+positioned absolutely over it: each a few pixels off the badge's line, each reserving a
+hand-written width in the header so the title would not run under them. That is what made the
+top of a card read as scattered glyphs rather than a toolbar.
 
-This is the same trick the editor uses for its body, where the code viewer sits under the
-textarea. The card button keeps a `.card-items-space` spacer so the footer does not ride up
-under the list.
+So the card is **not** the button. `.card-open` is an empty `<button>` at `inset: 0`
+underneath, carrying the click surface, the keyboard focus the canvas moves around and the
+card's accessible name; `.card` is a `<div>` above it in `pointer-events: none`, and each
+control takes its own events back. The header is then an ordinary flex row — marks on the
+left, actions on the right, one baseline, no reserved widths — and the checklist's tickable
+items are simply in the flow instead of a floating layer of their own.
+
+It is the same trick the editor uses for its body, where the code viewer sits under the
+textarea; the card had it already, for its items alone.
 
 Ticking from the card matters more than it looks: crossing tasks off is the gesture a todo
 list exists for, and routing it through the editor would put a modal between the user and a

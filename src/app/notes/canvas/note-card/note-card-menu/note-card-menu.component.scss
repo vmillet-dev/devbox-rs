@@ -1,19 +1,16 @@
 @use 'mixins' as *;
 
-// The host card carries the `position: relative`; this anchors only its own dropdown.
+// ⚠️ In the card's header row now, not floating over its corner: `relative` is only what
+// anchors its own dropdown. It takes the pointer back from the card, which is transparent.
 :host {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
+  position: relative;
+  pointer-events: auto;
 }
 
 .card-menu-trigger {
   @include unstyled-control;
   display: block;
-  // ⚠️ Narrow: the card's head reserves the band this and the copy button take, and every
-  // pixel here is a pixel off a title that is already clamped to two lines.
-  padding: 2px 4px;
+  padding: 2px 5px;
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.2;

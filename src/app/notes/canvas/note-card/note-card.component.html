@@ -1,7 +1,5 @@
 @let menuTitle = note().title || ('notes.untitled' | transloco);
 
-<!-- ⚠️ A wrapper and not a root `<button>`: the action menu is itself a button, and a
-     button's content model forbids nesting one. -->
 <div
   class="card-shell"
   data-testid="note-card"
@@ -9,35 +7,31 @@
   [class.checked]="checked()"
   [class.checklist]="isChecklist()"
 >
-  <!-- ⚠️ <span> and not <div>: a <button> admits only phrasing content. -->
+  <!-- ⚠️ The click surface is a layer **under** the card, not the card itself: a `<button>`
+       cannot contain the buttons the header carries, and that is what used to push them
+       into absolute positions floating over the text, each a few pixels off the line. The
+       same two-layer trick the tickable items already use. -->
   <button
     #cardButton
     type="button"
-    class="card"
+    class="card-open"
     data-testid="note-card-open"
-    [class.pinned]="note().pinned"
-    [class.selected]="selected()"
+    [attr.aria-label]="menuTitle"
     (click)="onOpen($event)"
-  >
-    @if (note().pinned) {
-      <!-- The dot is decorative: without this text twin, a screen reader gets nothing. -->
-      <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
-    }
-    <!-- ⚠️ A band of its own, above the title and never beside it: inline, the badge and
-         the marks pushed the first line of the title into the middle of the card, and
-         what was left of it wrapped. This band is also the only one the floating buttons
-         reach, which is why the title below needs no gutter at all. -->
-    @if (!isChecklist() || hasMarks()) {
-      <span class="card-head">
+  ></button>
+
+  <div class="card" [class.pinned]="note().pinned" [class.selected]="selected()">
+    <!-- One row: what the note *is* on the left, what can be done to it on the right. -->
+    <div class="card-head">
+      <span class="card-marks">
+        @if (note().pinned) {
+          <span class="card-pin" data-testid="note-card-pin" aria-hidden="true">📌</span>
+          <!-- Decorative: without this text twin, a screen reader gets nothing. -->
+          <span class="visually-hidden">{{ 'notes.pinnedState' | transloco }}</span>
+        }
         <!-- No format for a todo list: "TXT" would announce a language nothing shows. -->
         @if (!isChecklist()) {
           <app-language-badge [language]="note().language" />
-        }
-        @if (hasPlaceholders()) {
-          <span class="card-fields" data-testid="note-card-fields" aria-hidden="true">⚡</span>
-          <span class="visually-hidden">
-            {{ 'notes.placeholdersCount' | transloco: { count: note().placeholders.length } }}
-          </span>
         }
         @if (note().attachmentCount > 0) {
           <span class="card-clip" data-testid="note-card-clip" aria-hidden="true"
@@ -48,7 +42,51 @@
           </span>
         }
       </span>
-    }
+
+      <!-- ⚠️ Their width is reserved whether they are showing or not: quiet at rest, they
+           must not shift the row the moment the pointer arrives. -->
+      <span class="card-actions">
+        <!-- `aria-pressed` rather than an `<input type=checkbox>`, which would inherit the
+             card's own styles. -->
+        <button
+          type="button"
+          class="card-action card-check"
+          data-testid="note-card-check"
+          [class.checked]="checked()"
+          [attr.aria-pressed]="checked()"
+          [attr.aria-label]="'notes.selectNote' | transloco: { title: menuTitle }"
+          (click)="onCheck($event)"
+        >
+          <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
+        </button>
+
+        <!-- ⚠️ A snippet with fields does not copy as is, so the ⚡ takes the copy's place —
+             and it stays showing at rest, because it is also what says the note has fields.
+             There used to be a second ⚡ beside the badge saying exactly that. -->
+        @if (hasPlaceholders()) {
+          <button
+            type="button"
+            class="card-action card-fill"
+            data-testid="note-card-fill"
+            [attr.aria-label]="'placeholders.title' | transloco"
+            (click)="onFill($event)"
+          >
+            <span aria-hidden="true">⚡</span>
+          </button>
+        } @else {
+          <app-copy-button [value]="copyText()" />
+        }
+
+        <app-note-card-menu
+          [noteTitle]="menuTitle"
+          [spaces]="spaces.spaces()"
+          [currentSpaceId]="note().spaceId"
+          (moveRequested)="onMove($event)"
+          (deleteRequested)="onDelete()"
+        />
+      </span>
+    </div>
+
     <span class="card-title" data-testid="note-card-title">
       @if (note().title) {
         {{ note().title }}
@@ -56,6 +94,7 @@
         {{ 'notes.untitled' | transloco }}
       }
     </span>
+
     @if (isChecklist()) {
       <!-- Decorative: the count beside it carries the same information as text. -->
       <span class="card-progress">
@@ -66,9 +105,33 @@
           {{ 'notes.checklistProgress' | transloco: { done: progress().done, total: progress().total } }}
         </span>
       </span>
-      <!-- Space reserved for the items laid over the top: they carry buttons, and a
-           <button> cannot contain another. -->
-      <span class="card-items-space"></span>
+
+      <!-- In the flow now that the card is not a button: the items used to be a layer of
+           their own, absolutely placed, because a `<button>` cannot hold one. -->
+      <ul class="card-items">
+        @for (item of visibleItems(); track $index) {
+          <li>
+            <button
+              type="button"
+              class="card-item"
+              data-testid="note-card-item"
+              role="checkbox"
+              [class.done]="item.done"
+              [attr.aria-checked]="item.done"
+              [attr.aria-label]="'notes.checklistToggle' | transloco: { text: item.text }"
+              (click)="onItemToggle($event, $index)"
+            >
+              <span class="item-box" aria-hidden="true">{{ item.done ? '☑' : '☐' }}</span>
+              <span class="item-text">{{ item.text }}</span>
+            </button>
+          </li>
+        }
+        @if (hiddenItemCount() > 0) {
+          <li class="card-items-more">
+            {{ 'notes.checklistMore' | transloco: { count: hiddenItemCount() } }}
+          </li>
+        }
+      </ul>
     } @else if (snippetIsCode()) {
       <app-code-viewer
         class="card-snippet"
@@ -86,6 +149,7 @@
         {{ snippet() }}
       </span>
     }
+
     <span class="card-footer">
       <!-- prettier-ignore -->
       <span [class.stale]="note().expiringSoon"
@@ -103,77 +167,5 @@
         }
       </span>
     </span>
-  </button>
-
-  <!-- ⚠️ A sibling of the button and not a child: inline with the title, a glyph wraps
-       onto a line of its own. Its text twin stays inside, next to the title. -->
-  @if (note().pinned) {
-    <span class="card-pin" data-testid="note-card-pin" aria-hidden="true">📌</span>
-  }
-
-  <!-- `aria-pressed` rather than an `<input type=checkbox>`, which would inherit the
-       parent button's styles. -->
-  <button
-    type="button"
-    class="card-check"
-    data-testid="note-card-check"
-    [class.checked]="checked()"
-    [attr.aria-pressed]="checked()"
-    [attr.aria-label]="'notes.selectNote' | transloco: { title: menuTitle }"
-    (click)="onCheck($event)"
-  >
-    <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
-  </button>
-
-  <!-- ⚠️ Siblings of the card button and not its children, because they are buttons. The
-       layer is transparent to clicks; only the boxes take them. -->
-  @if (isChecklist() && note().items.length > 0) {
-    <ul class="card-items">
-      @for (item of visibleItems(); track $index) {
-        <li>
-          <button
-            type="button"
-            class="card-item"
-            data-testid="note-card-item"
-            role="checkbox"
-            [class.done]="item.done"
-            [attr.aria-checked]="item.done"
-            [attr.aria-label]="'notes.checklistToggle' | transloco: { text: item.text }"
-            (click)="onItemToggle($event, $index)"
-          >
-            <span class="item-box" aria-hidden="true">{{ item.done ? '☑' : '☐' }}</span>
-            <span class="item-text">{{ item.text }}</span>
-          </button>
-        </li>
-      }
-      @if (hiddenItemCount() > 0) {
-        <li class="card-items-more">
-          {{ 'notes.checklistMore' | transloco: { count: hiddenItemCount() } }}
-        </li>
-      }
-    </ul>
-  }
-
-  <!-- A snippet with fields does not copy as is: the button opens the form. -->
-  @if (hasPlaceholders()) {
-    <button
-      type="button"
-      class="card-fill"
-      data-testid="note-card-fill"
-      [attr.aria-label]="'placeholders.title' | transloco"
-      (click)="onFill($event)"
-    >
-      <span aria-hidden="true">⚡</span>
-    </button>
-  } @else {
-    <app-copy-button [value]="copyText()" />
-  }
-
-  <app-note-card-menu
-    [noteTitle]="menuTitle"
-    [spaces]="spaces.spaces()"
-    [currentSpaceId]="note().spaceId"
-    (moveRequested)="onMove($event)"
-    (deleteRequested)="onDelete()"
-  />
+  </div>
 </div>
