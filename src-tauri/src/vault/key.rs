@@ -35,14 +35,17 @@ pub struct Cost {
 }
 
 impl Default for Cost {
-    /// ⚠️ Well above OWASP's floor of 19 MiB and two passes, deliberately. This is paid
-    /// **once per launch**, while the user is still lifting their hands off the keyboard,
-    /// and it is the only thing standing between a copied library and someone working
-    /// through a wordlist. Memory is the parameter that hurts a GPU, so it carries most
-    /// of the weight.
+    /// Paid **once per launch**, and the only thing standing between a copied library and
+    /// someone working through a wordlist.
     ///
-    /// Raising it again later locks nobody out: the cost travels in the key file, and a
-    /// library reopens at whatever it was written with. Measured at ~1.2 s here.
+    /// ⚠️ **52.6 ms per derivation in a release build** (`cargo bench -- unlock`), not the
+    /// ~1.2 s this claimed for a while — that figure came from `cargo test`, where Argon2
+    /// is unoptimised, and the two differ by twenty. What bounds an attacker here is the
+    /// 64 MiB, three times OWASP's floor and the parameter a GPU cannot buy its way out of;
+    /// the time never carried the defence, which is why the real number changes nothing.
+    ///
+    /// Raising it later locks nobody out: the cost travels in the key file, and a library
+    /// reopens at whatever it was written with.
     fn default() -> Self {
         Self {
             memory_kib: 64 * 1024,

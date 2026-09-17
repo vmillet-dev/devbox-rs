@@ -2681,7 +2681,21 @@ in the corpus or worse.
 | `update_note`                                  | 1.5 ms          | ×1.0          |
 | `list_global_placeholders`                     | 1.5 µs          | ×1.0          |
 
-Three things worth reading off that table.
+One row does not belong to that shape and is measured for a different reason:
+
+| Bench                                 | Cost        | Corpus |
+| ------------------------------------- | ----------- | ------ |
+| `Vault::derive` at the shipped `Cost` | **52.6 ms** | none   |
+
+⚠️ It seeds no corpus — deriving a key touches no database — and it is here rather than in a
+comment because **that number had been taken in a debug build**, where Argon2 is unoptimised:
+`vault::key::Cost::default` claimed ~1.2 s, twenty times what the shipped binary pays, and
+every argument about the margin rested on it. Criterion builds in release, so a benchmark
+cannot be read off the wrong profile by accident, which a hand-run measurement could. The
+parameters were left where they are: 64 MiB is three times OWASP's floor and it is the memory,
+not the time, that bounds an attacker with a GPU.
+
+Three things worth reading off the first table.
 
 **`query_notes` has gone past the debounce.** It runs on every keystroke behind a 150 ms
 debounce, and at 800 notes its 27 ms sat comfortably inside it. At 8000 it costs 403 ms: the
