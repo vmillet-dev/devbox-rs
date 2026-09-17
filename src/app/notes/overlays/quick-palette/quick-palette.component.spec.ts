@@ -110,17 +110,39 @@ describe('QuickPaletteComponent', () => {
     expect(fixture.nativeElement.querySelector('.palette-empty').textContent).toContain('Aucun');
   });
 
-  it('reports the choice made with the mouse', async () => {
+  /**
+   * ⚠️ A click **opens**: it is what a click on a note means everywhere else, and the
+   * window is already in front. It used to copy and put the window away, which read as a
+   * crash — nothing on screen said anything had been copied.
+   */
+  it('opens the note that was clicked, without copying it', async () => {
     let index: number | undefined;
+    let opened: string | undefined;
     let chosen = 0;
     fixture.componentInstance.highlightSet.subscribe((value) => (index = value));
+    fixture.componentInstance.openRequested.subscribe((id) => (opened = id));
     fixture.componentInstance.chosen.subscribe(() => (chosen += 1));
 
     (options()[1].querySelector('.palette-option-button') as HTMLButtonElement).click();
     await fixture.whenStable();
 
     expect(index).toBe(1);
+    expect(opened).toBe(RESULTS[1].id);
+    expect(chosen).toBe(0);
+  });
+
+  /** The paste path keeps a mouse of its own, beside the row rather than over it. */
+  it('copies from the control beside the row', async () => {
+    let chosen = 0;
+    let opened = 0;
+    fixture.componentInstance.chosen.subscribe(() => (chosen += 1));
+    fixture.componentInstance.openRequested.subscribe(() => (opened += 1));
+
+    (options()[1].querySelector('.palette-option-copy') as HTMLButtonElement).click();
+    await fixture.whenStable();
+
     expect(chosen).toBe(1);
+    expect(opened).toBe(0);
   });
   describe('the create row', () => {
     async function offerCreation(query: string): Promise<void> {
