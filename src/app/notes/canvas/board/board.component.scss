@@ -61,19 +61,25 @@
   position: absolute;
 }
 
+// ⚠️ The card's top edge, not its corner: the corner is the selection tick's, and the two
+// drawn on top of each other meant the grip took every pointer aimed at the tick. Same
+// strip as inside a zone.
 .loose-card .card-grip {
   @include unstyled-control;
 
   position: absolute;
-  left: 4px;
-  top: 4px;
+  left: 0;
+  right: 0;
+  top: 0;
   z-index: 2;
-  padding: 2px 5px;
-  border-radius: 4px;
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 8px;
+  border-radius: 9px 9px 0 0;
+  font-size: 9px;
   line-height: 1;
   color: var(--text-2);
-  background: var(--bg-2);
   cursor: grab;
   touch-action: none;
   opacity: 0.4;
@@ -84,6 +90,10 @@
 .loose-card .card-grip:focus-visible {
   opacity: 1;
   color: var(--text-0);
+}
+
+.loose-card .card-grip:hover {
+  background: var(--bg-3);
 }
 
 .loose-card .card-grip:focus-visible {

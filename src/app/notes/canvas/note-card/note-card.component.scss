@@ -64,9 +64,8 @@ app-copy-button:focus-within {
   padding-right: 46px;
   // ⚠️ And for the selection tick on the left, which floats over the card's own padding —
   // `checked` keeps it on with no pointer at all. A permanent gutter rather than one that
-  // appears with the tick, which would shift the title sideways under the pointer. Wider
-  // on the board, where the tick has a drag grip beside it (`board-card`).
-  padding-left: var(--card-head-gutter, 8px);
+  // appears with the tick, which would shift the title sideways under the pointer.
+  padding-left: 8px;
 }
 
 .card-title {
@@ -276,10 +275,10 @@ app-language-badge,
   @include unstyled-control;
   position: absolute;
   top: 8px;
-  // ⚠️ Tight into the corner, so the gutter the head reserves for it can be 8px — except
-  // on the board, where the corner is the drag grip's and the tick stands beside it. The
-  // two used to be drawn on top of each other, and the grip took every pointer.
-  left: var(--card-check-left, 2px);
+  // ⚠️ Tight into the corner, which is the tick's alone: on the board the drag grip used
+  // to be drawn on top of it, and took every pointer aimed at it. The grip is the card's
+  // top edge now, and asks the content for no room.
+  left: 2px;
   z-index: 1;
   padding: 2px 4px;
   font-size: 12px;

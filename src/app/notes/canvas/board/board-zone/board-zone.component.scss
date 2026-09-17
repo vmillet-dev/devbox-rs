@@ -88,12 +88,22 @@
   opacity: 0.4;
 }
 
+// ⚠️ The card's top edge, not its corner: the corner is the selection tick's, and the two
+// drawn on top of each other meant the grip took every pointer aimed at the tick. A strip
+// is also a target one cannot miss — and it asks the card's content for no room at all.
 .card-grip {
   position: absolute;
-  left: 4px;
-  top: 4px;
+  left: 0;
+  right: 0;
+  top: 0;
   z-index: 2;
-  background: var(--bg-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 8px;
+  padding: 0;
+  border-radius: 9px 9px 0 0;
+  font-size: 9px;
 }
 
 .zone-card {
@@ -108,6 +118,11 @@
 .zone-grip:focus-visible {
   opacity: 1;
   color: var(--text-0);
+}
+
+// The strip only says it is one under the pointer; at rest it is the card's own edge.
+.card-grip:hover {
+  background: var(--bg-3);
 }
 
 .card-grip:focus-visible,
