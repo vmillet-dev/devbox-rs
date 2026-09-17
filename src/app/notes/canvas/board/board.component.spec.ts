@@ -139,9 +139,53 @@ describe('BoardComponent', () => {
       surface().getBoundingClientRect = () => ({ left: 0, top: 0 }) as DOMRect;
     });
 
+    /** ⚠️ The card itself: the whole of it is the handle, there is no grip any more. */
     function grip(): HTMLElement {
-      return root().querySelector<HTMLElement>('[data-testid="board-loose-card"] .card-grip')!;
+      return root().querySelector<HTMLElement>('[data-testid="board-loose-card"] .card-title')!;
     }
+
+    /**
+     * ⚠️ The whole card is the handle, so a drag ends with a click on the card it moved —
+     * and that click must not also open the note.
+     */
+    it('swallows the click a drag leaves behind, and only that one', async () => {
+      const opened: string[] = [];
+      fixture.componentInstance.noteActivated.subscribe(({ noteId }) => opened.push(noteId));
+      const activate = () =>
+        fixture.debugElement
+          .query(By.css('[data-testid="board-loose-card"] app-note-card'))
+          .triggerEventHandler('opened', { noteId: 'loose-1', toggleChecked: false, extendRange: false });
+
+      pointer(grip(), 'pointerdown', 400, 400);
+      pointer(surface(), 'pointermove', 700, 500);
+      pointer(surface(), 'pointerup', 700, 500);
+      await fixture.whenStable();
+      activate();
+
+      expect(opened).toEqual([]);
+
+      // The next press starts clean: the note opens on a press that goes nowhere.
+      pointer(grip(), 'pointerdown', 400, 400);
+      pointer(grip(), 'pointerup', 400, 400);
+      await fixture.whenStable();
+      activate();
+
+      expect(opened).toEqual(['loose-1']);
+    });
+
+    /** A press aimed at a control is that control's, not the start of a drag. */
+    it('starts no gesture from a control of the card', async () => {
+      const seen: unknown[] = [];
+      fixture.componentInstance.cardDropped.subscribe((drop) => seen.push(drop));
+      const tick = root().querySelector<HTMLElement>('[data-testid="note-card-check"]')!;
+
+      pointer(tick, 'pointerdown', 400, 400);
+      pointer(surface(), 'pointermove', 150, 150);
+      pointer(surface(), 'pointerup', 150, 150);
+      await fixture.whenStable();
+
+      expect(seen).toEqual([]);
+    });
 
     /** ⚠️ A click must not persist anything: it is how a note is opened. */
     it('writes nothing when the pointer never travelled', async () => {
@@ -260,11 +304,18 @@ describe('BoardComponent', () => {
     });
 
     /** Without a space there is nothing to file into, so nothing may be grabbed either. */
-    it('offers no grips at all when the board is not editable', async () => {
+    it('moves nothing at all when the board is not editable', async () => {
+      const seen: unknown[] = [];
+      fixture.componentInstance.cardDropped.subscribe((drop) => seen.push(drop));
       fixture.componentRef.setInput('editable', false);
       await fixture.whenStable();
 
-      expect(root().querySelector('[data-testid="board-card-grip"]')).toBeNull();
+      pointer(grip(), 'pointerdown', 400, 400);
+      pointer(surface(), 'pointermove', 150, 150);
+      pointer(surface(), 'pointerup', 150, 150);
+      await fixture.whenStable();
+
+      expect(seen).toEqual([]);
       expect(root().querySelector('[data-testid="board-zone-resize"]')).toBeNull();
     });
   });

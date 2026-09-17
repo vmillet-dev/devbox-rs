@@ -73,23 +73,16 @@
     @for (entry of zone().notes; track entry.note.id) {
       <!-- ⚠️ Dimmed, never dropped: reflowing the survivors throws away the spatial
            memory the board exists for. -->
+      <!-- ⚠️ The whole card is the handle: pointer events already tell a drag from a click
+           by the distance travelled, so the grip that used to sit in the corner — over the
+           selection tick — buys nothing. A press that never travels still opens the note. -->
       <div
         class="zone-card"
         [attr.data-note-id]="entry.note.id"
         [class.dimmed]="!entry.matches"
         [class.lifted]="draggingNoteId() === entry.note.id"
+        (pointerdown)="grabCard($event, entry)"
       >
-        @if (editable()) {
-          <button
-            type="button"
-            class="card-grip"
-            data-testid="board-card-grip"
-            [attr.aria-label]="'board.moveCard' | transloco: { title: entry.note.title }"
-            (pointerdown)="grabCard($event, entry)"
-          >
-            <span aria-hidden="true">⠿</span>
-          </button>
-        }
         <app-note-card [note]="entry.note" (opened)="noteActivated.emit($event)" />
       </div>
     }

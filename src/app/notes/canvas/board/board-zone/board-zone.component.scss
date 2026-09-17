@@ -74,7 +74,6 @@
 }
 
 // Quiet at rest but never hidden: `visibility: hidden` would take it out of the tab order.
-.card-grip,
 .zone-grip {
   @include unstyled-control;
 
@@ -88,31 +87,10 @@
   opacity: 0.4;
 }
 
-// ⚠️ The card's top edge, not its corner: the corner is the selection tick's, and the two
-// drawn on top of each other meant the grip took every pointer aimed at the tick. A strip
-// is also a target one cannot miss — and it asks the card's content for no room at all.
-.card-grip {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 8px;
-  padding: 0;
-  border-radius: 9px 9px 0 0;
-  font-size: 9px;
-}
-
 .zone-card {
   @include board-card;
 }
 
-.zone-card:hover .card-grip,
-.card-grip:hover,
-.card-grip:focus-visible,
 .zone-head:hover .zone-grip,
 .zone-grip:hover,
 .zone-grip:focus-visible {
@@ -120,12 +98,6 @@
   color: var(--text-0);
 }
 
-// The strip only says it is one under the pointer; at rest it is the card's own edge.
-.card-grip:hover {
-  background: var(--bg-3);
-}
-
-.card-grip:focus-visible,
 .zone-grip:focus-visible,
 .zone-resize:focus-visible {
   outline: 2px solid var(--amber);
