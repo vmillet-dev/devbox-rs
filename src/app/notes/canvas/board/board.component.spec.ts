@@ -189,6 +189,66 @@ describe('BoardComponent', () => {
       expect(root().querySelector('[data-testid="board-zone-drop"]')).not.toBeNull();
     });
 
+    /**
+     * ⚠️ A filed card flows inside its zone and has no coordinates of its own, so nothing
+     * followed the pointer at all — half a gesture, with only the zone lighting up.
+     */
+    describe('a card dragged out of a zone', () => {
+      function zoneGrip(): HTMLElement {
+        return root().querySelector<HTMLElement>('.zone-card .card-grip')!;
+      }
+
+      function ghost(): HTMLElement | null {
+        return root().querySelector<HTMLElement>('[data-testid="board-ghost-card"]');
+      }
+
+      beforeEach(async () => {
+        fixture.componentRef.setInput('zones', [
+          fakeZone({
+            folder: PERF,
+            frame: { x: 0, y: 0, width: 300, height: 300 },
+            notes: [fakeBoardNote(createNote({ id: 'filed-1', title: 'EXPLAIN lent' }))],
+          }),
+        ]);
+        await fixture.whenStable();
+      });
+
+      it('is drawn under the pointer for the whole gesture', async () => {
+        pointer(zoneGrip(), 'pointerdown', 40, 40);
+        expect(ghost()).toBeNull();
+
+        pointer(surface(), 'pointermove', 500, 450);
+        await fixture.whenStable();
+
+        expect(ghost()).not.toBeNull();
+        expect(ghost()?.getAttribute('data-note-id')).toBe('filed-1');
+        // ⚠️ By the grab offset, not under the pointer: the card was grabbed 40px into its
+        // seat, so it travels 460 rather than jumping its own corner onto the cursor.
+        expect(ghost()?.style.left).toBe('460px');
+        expect(ghost()?.style.top).toBe('410px');
+      });
+
+      /** Its seat stays behind, faded: the drop can still be cancelled. */
+      it('leaves the card in its zone until the pointer lifts', async () => {
+        pointer(zoneGrip(), 'pointerdown', 40, 40);
+        pointer(surface(), 'pointermove', 500, 450);
+        await fixture.whenStable();
+
+        expect(root().querySelector('.zone-card.lifted')).not.toBeNull();
+      });
+
+      it('takes it away again when the gesture is cancelled', async () => {
+        pointer(zoneGrip(), 'pointerdown', 40, 40);
+        pointer(surface(), 'pointermove', 500, 450);
+        await fixture.whenStable();
+
+        pointer(surface(), 'pointercancel', 500, 450);
+        await fixture.whenStable();
+
+        expect(ghost()).toBeNull();
+      });
+    });
+
     /** ⚠️ A pointer the system took back must not leave a card where nobody put it. */
     it('throws the whole gesture away when the pointer is cancelled', async () => {
       const seen: unknown[] = [];

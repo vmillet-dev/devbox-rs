@@ -99,6 +99,19 @@
   transform: rotate(-3deg);
 }
 
+// The card a drag took out of a zone: at the end of the cursor, above everything, and
+// transparent to the pointer — the surface underneath is what decides where it lands.
+.ghost-card {
+  @include board-card;
+
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  cursor: grabbing;
+  box-shadow: 0 14px 30px rgb(0 0 0 / 55%);
+  transform: rotate(-3deg);
+}
+
 .draw-band {
   position: absolute;
   z-index: 15;

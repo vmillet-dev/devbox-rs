@@ -823,6 +823,15 @@ hidden — `visibility: hidden` would take them out of the tab order.
 past `DRAG_THRESHOLD_PX` writes nothing — it was a click — and `pointercancel` throws the
 whole thing away rather than leaving a card at coordinates nobody chose.
 
+**A card being dragged is drawn on the surface, wherever it was grabbed from.** A loose card
+has a position of its own, so `positionOf` simply moves it. ⚠️ A **filed** card has none — it
+flows inside its zone — so a drag out of one used to carry nothing at all: the seat faded and
+the pointer held empty air, with only the zone lighting up underneath. `travelling` draws that
+card as a ghost at the pointer, transparent to it (the surface below is what decides where it
+lands), starting from the seat `CardGrab` measured so it keeps its grab offset. The seat stays,
+faded, until the pointer lifts: the drop can still be cancelled, and a hole opening mid-drag
+would reflow the zone under the pointer.
+
 **Moving a zone carries its notes, and resizing one captures and releases nothing.** Both
 fall out of the flow rather than being coded: a filed card has no coordinates, so it is
 carried by its zone for free, and a stretched frame has nothing to capture. ⚠️ Unreal's own
