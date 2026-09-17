@@ -271,11 +271,11 @@ describe('SpaceSwitcherComponent', () => {
     }
 
     function renameInput(): HTMLInputElement | null {
-      return fixture.nativeElement.querySelector('.space-edit-panel .space-create-input');
+      return fixture.nativeElement.querySelector('[data-testid="space-rename-input"]');
     }
 
     function renameForm(): HTMLFormElement {
-      return fixture.nativeElement.querySelector('.space-edit-panel form');
+      return fixture.nativeElement.querySelector('.editor-panel form');
     }
 
     function targetSelect(): HTMLSelectElement | null {
@@ -283,7 +283,7 @@ describe('SpaceSwitcherComponent', () => {
     }
 
     function deleteButton(): HTMLButtonElement | null {
-      return fixture.nativeElement.querySelector('.space-delete-submit');
+      return fixture.nativeElement.querySelector('[data-testid="space-delete"]');
     }
 
     /** Opens the dropdown if needed — after Escape it is already back on the menu. */
@@ -365,7 +365,7 @@ describe('SpaceSwitcherComponent', () => {
 
       expect(deleteButton()).toBeNull();
       expect(targetSelect()).toBeNull();
-      expect(fixture.nativeElement.querySelector('.space-delete-blocked')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="space-delete-blocked"]')).not.toBeNull();
     });
 
     it('returns to the menu on a first Escape, and closes on the second', async () => {

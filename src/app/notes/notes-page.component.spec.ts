@@ -4,6 +4,7 @@ import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EVENT_SUBSCRIBER, EventSubscriber, GlobalAction } from '@core/ipc/app-events.service';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { StatusNotifier } from '@core/services/notifications/status.service';
 import { FILE_DROP_SUBSCRIBER, FileDropSubscriber } from '@core/services/window/file-drop.service';
 import { Folder } from '@core/model/folder.model';
@@ -40,6 +41,7 @@ import { QuickPaletteComponent } from './overlays/quick-palette/quick-palette.co
 import { SearchBoxComponent } from './header/search-box/search-box.component';
 import { SelectionBarComponent } from './header/selection-bar/selection-bar.component';
 import { SpaceSwitcherComponent } from './header/space-switcher/space-switcher.component';
+import { LibraryTreeComponent } from './sidebar/library-tree/library-tree.component';
 import { TagManagerComponent } from './overlays/tag-manager/tag-manager.component';
 import { TagRailComponent } from './header/tag-rail/tag-rail.component';
 import { TrashPanelComponent } from './overlays/trash-panel/trash-panel.component';
@@ -65,6 +67,7 @@ describe('NotesPageComponent', () => {
   let selection: NoteSelectionStore;
   let spaces: SpacesStore;
   let folders: FoldersStore;
+  let settings: SettingsStore;
   let foldersRepository: FakeFoldersRepository;
   let repository: FakeNotesRepository;
   let attachmentsRepository: FakeAttachmentsRepository;
@@ -148,6 +151,7 @@ describe('NotesPageComponent', () => {
     selection = TestBed.inject(NoteSelectionStore);
     spaces = TestBed.inject(SpacesStore);
     folders = TestBed.inject(FoldersStore);
+    settings = TestBed.inject(SettingsStore);
     fixture.autoDetectChanges();
     await vi.waitFor(() => expect(spaces.spaces()).toHaveLength(SPACES.length));
     await vi.waitFor(() => expect(actionHandler).not.toBeNull());
@@ -163,8 +167,8 @@ describe('NotesPageComponent', () => {
     spaces.selectSpace('work');
     await fixture.whenStable();
 
-    expect(child(SpaceSwitcherComponent).spaces()).toEqual(SPACES);
-    expect(child(SpaceSwitcherComponent).activeSpace()).toEqual(SPACES[1]);
+    expect(child(LibraryTreeComponent).spaces()).toEqual(SPACES);
+    expect(child(LibraryTreeComponent).activeSpaceId()).toBe('work');
     expect(child(SearchBoxComponent).query()).toBe('hello');
     expect(child(FilterChipsComponent).active()).toBe('pinned');
   });
@@ -172,30 +176,30 @@ describe('NotesPageComponent', () => {
   it('starts on "all spaces"', async () => {
     await fixture.whenStable();
 
-    expect(child(SpaceSwitcherComponent).activeSpace()).toBeNull();
+    expect(child(LibraryTreeComponent).activeSpaceId()).toBeNull();
   });
 
-  it('updates the active space when the switcher reports a space change', async () => {
-    child(SpaceSwitcherComponent).spaceChanged.emit('work');
+  it('updates the active space when the rail reports a space change', async () => {
+    child(LibraryTreeComponent).spaceChanged.emit('work');
     await fixture.whenStable();
 
-    expect(child(SpaceSwitcherComponent).activeSpace()).toEqual(SPACES[1]);
+    expect(child(LibraryTreeComponent).activeSpaceId()).toBe('work');
   });
 
-  it('goes back to "all spaces" when the switcher reports a null space', async () => {
-    child(SpaceSwitcherComponent).spaceChanged.emit('work');
+  it('goes back to "all spaces" when the rail reports a null space', async () => {
+    child(LibraryTreeComponent).spaceChanged.emit('work');
     await fixture.whenStable();
 
-    child(SpaceSwitcherComponent).spaceChanged.emit(null);
+    child(LibraryTreeComponent).spaceChanged.emit(null);
     await fixture.whenStable();
 
-    expect(child(SpaceSwitcherComponent).activeSpace()).toBeNull();
+    expect(child(LibraryTreeComponent).activeSpaceId()).toBeNull();
   });
 
-  it('creates a space when the switcher reports one', () => {
+  it('creates a space when the rail reports one', () => {
     const createSpace = vi.spyOn(spaces, 'createSpace').mockResolvedValue(null);
 
-    child(SpaceSwitcherComponent).spaceCreated.emit('Side project');
+    child(LibraryTreeComponent).spaceCreated.emit('Side project');
 
     expect(createSpace).toHaveBeenCalledWith('Side project');
   });
@@ -203,7 +207,7 @@ describe('NotesPageComponent', () => {
   it('renames a space without touching the canvas', async () => {
     const queries = repository.queryCount;
 
-    child(SpaceSwitcherComponent).spaceRenamed.emit({ id: 'work', name: 'Client work' });
+    child(LibraryTreeComponent).spaceRenamed.emit({ id: 'work', name: 'Client work' });
     await vi.waitFor(() => expect(spaces.spaces()[1].name).toBe('Client work'));
 
     expect(repository.queryCount).toBe(queries);
@@ -212,7 +216,7 @@ describe('NotesPageComponent', () => {
   it('reloads the canvas once a deleted space has handed its notes over', async () => {
     const queries = repository.queryCount;
 
-    child(SpaceSwitcherComponent).spaceDeleted.emit({ id: 'work', targetSpaceId: 'space-1' });
+    child(LibraryTreeComponent).spaceDeleted.emit({ id: 'work', targetSpaceId: 'space-1' });
 
     await vi.waitFor(() => expect(spaces.spaces()).toHaveLength(1));
     await vi.waitFor(() => expect(repository.queryCount).toBeGreaterThan(queries));
@@ -222,10 +226,61 @@ describe('NotesPageComponent', () => {
     const queries = repository.queryCount;
     vi.spyOn(spaces, 'deleteSpace').mockResolvedValue(false);
 
-    child(SpaceSwitcherComponent).spaceDeleted.emit({ id: 'work', targetSpaceId: 'space-1' });
+    child(LibraryTreeComponent).spaceDeleted.emit({ id: 'work', targetSpaceId: 'space-1' });
     await fixture.whenStable();
 
     expect(repository.queryCount).toBe(queries);
+  });
+
+  describe('the library rail', () => {
+    async function hideRail(): Promise<void> {
+      settings.showLibraryRail.write(false);
+      await fixture.whenStable();
+    }
+
+    /** ⚠️ Two places to change space is how a tree and a dropdown drift apart. */
+    it('keeps the switchers out of the topbar while it is showing', () => {
+      expect(maybeChild(LibraryTreeComponent)).not.toBeNull();
+      expect(maybeChild(SpaceSwitcherComponent)).toBeNull();
+      expect(maybeChild(FolderSwitcherComponent)).toBeNull();
+    });
+
+    it('gives them back when it is hidden', async () => {
+      await hideRail();
+
+      expect(maybeChild(LibraryTreeComponent)).toBeNull();
+      expect(maybeChild(SpaceSwitcherComponent)).not.toBeNull();
+      expect(maybeChild(FolderSwitcherComponent)).not.toBeNull();
+    });
+
+    it('is toggled from the topbar and from Ctrl+B', async () => {
+      fixture.debugElement.query(By.css('[data-testid="library-rail-toggle"]')).nativeElement.click();
+      await fixture.whenStable();
+      expect(settings.showLibraryRail()).toBe(false);
+
+      press('b', { ctrlKey: true });
+      await fixture.whenStable();
+      expect(settings.showLibraryRail()).toBe(true);
+    });
+
+    /** ⚠️ The space first: a folder is resolved against the active space's folders. */
+    it('opens a folder with the space that holds it', async () => {
+      child(LibraryTreeComponent).folderOpened.emit(PERF);
+      await fixture.whenStable();
+
+      expect(spaces.activeSpaceId()).toBe('space-1');
+      expect(folders.activeFolderId()).toBe('perf');
+    });
+
+    it('leaves the open folder behind when another space is chosen', async () => {
+      child(LibraryTreeComponent).folderOpened.emit(PERF);
+      await fixture.whenStable();
+
+      child(LibraryTreeComponent).spaceChanged.emit('work');
+      await fixture.whenStable();
+
+      expect(folders.activeFolderId()).toBeNull();
+    });
   });
 
   it('delegates search, filter and new-note requests to the store', () => {
@@ -268,12 +323,11 @@ describe('NotesPageComponent', () => {
       await fixture.whenStable();
     }
 
-    it('shows the space switcher and no breadcrumb until a folder is opened', () => {
-      expect(maybeChild(SpaceSwitcherComponent)).not.toBeNull();
+    it('shows no breadcrumb until a folder is opened', () => {
       expect(maybeChild(FolderBreadcrumbComponent)).toBeNull();
     });
 
-    it('replaces the switchers with the breadcrumb once one is', async () => {
+    it('replaces the view switch with the breadcrumb once one is', async () => {
       await open();
 
       expect(maybeChild(FolderBreadcrumbComponent)).not.toBeNull();
@@ -288,7 +342,7 @@ describe('NotesPageComponent', () => {
       await fixture.whenStable();
 
       expect(maybeChild(FolderBreadcrumbComponent)).toBeNull();
-      expect(maybeChild(SpaceSwitcherComponent)).not.toBeNull();
+      expect(maybeChild(LibraryTreeComponent)).not.toBeNull();
     });
 
     /**

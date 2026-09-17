@@ -7,6 +7,7 @@ import {
   Density,
   LOCALE_CHOICES,
   LocaleChoice,
+  RAIL_WIDTH,
   ResolvedTheme,
   SETTINGS_KEYS,
   THEME_CHOICES,
@@ -38,6 +39,17 @@ const asAccelerator: SettingCodec<string> = {
   format: (value) => value,
 };
 
+/** ⚠️ Clamped rather than rejected: a width out of range is a stale file, not a mistake. */
+function asPixels(bounds: { readonly min: number; readonly max: number }): SettingCodec<number> {
+  return {
+    parse: (stored) => {
+      const value = Number.parseInt(stored, 10);
+      return Number.isNaN(value) ? null : Math.min(bounds.max, Math.max(bounds.min, value));
+    },
+    format: String,
+  };
+}
+
 function asOneOf<T extends string>(values: readonly T[]): SettingCodec<T> {
   return {
     parse: (stored) => ((values as readonly string[]).includes(stored) ? (stored as T) : null),
@@ -66,6 +78,8 @@ export class SettingsStore {
   readonly minimizeToTray = this.setting('minimizeToTray', asBoolean);
   readonly closeToTray = this.setting('closeToTray', asBoolean);
   readonly paletteShortcut = this.setting('paletteShortcut', asAccelerator);
+  readonly showLibraryRail = this.setting('showLibraryRail', asBoolean);
+  readonly libraryRailWidth = this.setting('libraryRailWidth', asPixels(RAIL_WIDTH));
   readonly showPinnedFirst = this.setting('showPinnedFirst', asBoolean);
   readonly automaticBackups = this.setting('automaticBackups', asBoolean);
   readonly copyConfirmation = this.setting('copyConfirmation', asBoolean);

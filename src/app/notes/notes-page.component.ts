@@ -12,13 +12,16 @@ import { NotesRevision } from '@core/state/notes-revision';
 import { NotesStore } from '@core/state/notes.store';
 import { PlaceholderFillStore } from '@core/state/placeholder-fill.store';
 import { SampleNotesService } from '@core/state/sample-notes.service';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { PaletteStore } from '@core/state/palette.store';
 import { SpacesStore } from '@core/state/spaces.store';
 import { TagsStore } from '@core/state/tags.store';
 import { TrashStore } from '@core/state/trash.store';
 import { CanvasKeyboardDirective } from '@shared/directives/canvas-keyboard.directive';
 import { BoardFrame } from '@core/model/board.model';
+import { Folder } from '@core/model/folder.model';
 import { BoardComponent, CardDrop } from './canvas/board/board.component';
+import { LibraryTreeComponent } from './sidebar/library-tree/library-tree.component';
 import { FolderNamePromptComponent } from './overlays/folder-name-prompt/folder-name-prompt.component';
 import { FilterChipsComponent } from './header/filter-chips/filter-chips.component';
 import { FolderRecolouring, FolderRenaming } from './header/folder-editor/folder-editor.component';
@@ -34,11 +37,8 @@ import { ImageLightboxComponent } from './overlays/image-lightbox/image-lightbox
 import { QuickPaletteComponent } from './overlays/quick-palette/quick-palette.component';
 import { SearchBoxComponent } from './header/search-box/search-box.component';
 import { SelectionBarComponent } from './header/selection-bar/selection-bar.component';
-import {
-  SpaceDeletion,
-  SpaceRenaming,
-  SpaceSwitcherComponent,
-} from './header/space-switcher/space-switcher.component';
+import { SpaceDeletion, SpaceRenaming } from './header/space-editor/space-editor.component';
+import { SpaceSwitcherComponent } from './header/space-switcher/space-switcher.component';
 import { TagManagerComponent } from './overlays/tag-manager/tag-manager.component';
 import { TagRailComponent } from './header/tag-rail/tag-rail.component';
 import { ViewSwitchComponent } from './header/view-switch/view-switch.component';
@@ -53,6 +53,7 @@ import { UndoBarComponent } from './overlays/undo-bar/undo-bar.component';
     FilterChipsComponent,
     FolderSwitcherComponent,
     FolderBreadcrumbComponent,
+    LibraryTreeComponent,
     ViewSwitchComponent,
     BoardComponent,
     FolderNamePromptComponent,
@@ -88,6 +89,7 @@ export class NotesPageComponent {
   protected readonly library = inject(LibraryStore);
   protected readonly attachments = inject(AttachmentsStore);
   protected readonly fill = inject(PlaceholderFillStore);
+  protected readonly settings = inject(SettingsStore);
 
   private readonly samples = inject(SampleNotesService);
   private readonly revision = inject(NotesRevision);
@@ -139,6 +141,22 @@ export class NotesPageComponent {
     this.spaces.reload();
     this.spaces.selectSpace(seeded.id);
     this.revision.bump();
+  }
+
+  protected toggleLibraryRail(): void {
+    this.settings.showLibraryRail.write(!this.settings.showLibraryRail());
+  }
+
+  /** Choosing a space leaves whatever folder was open: the row means the space itself. */
+  protected onSpaceChosen(id: string | null): void {
+    this.folders.selectFolder(null);
+    this.spaces.selectSpace(id);
+  }
+
+  /** ⚠️ The space first: a folder is resolved against the active space's folders. */
+  protected onFolderOpened(folder: Folder): void {
+    this.spaces.selectSpace(folder.spaceId);
+    this.folders.selectFolder(folder.id);
   }
 
   protected onSpaceRenamed({ id, name }: SpaceRenaming): void {
