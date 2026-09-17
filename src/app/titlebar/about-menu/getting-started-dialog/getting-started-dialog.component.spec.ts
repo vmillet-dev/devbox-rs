@@ -31,7 +31,7 @@ describe('GettingStartedDialogComponent', () => {
   });
 
   it('opens on the notes and ends on import/export', () => {
-    expect(titles()).toHaveLength(9);
+    expect(titles()).toHaveLength(10);
     expect(titles()[0]).toContain('notes');
     expect(titles().at(-1)).toContain('Entrer et sortir');
   });
@@ -49,6 +49,7 @@ describe('GettingStartedDialogComponent', () => {
       '7',
       '8',
       '9',
+      '10',
     ]);
     expect(steps.every((step) => (step as HTMLElement).getAttribute('aria-hidden') === 'true')).toBe(true);
   });

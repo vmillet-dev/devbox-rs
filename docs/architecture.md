@@ -908,6 +908,37 @@ dropped for the same reason its notes were.
 `ImportReport` gains `foldersCreated` next to `spacesCreated`, and a library that arrived
 arranged says so — every library operation reports, including when it changed nothing.
 
+### What a first launch teaches
+
+A virgin database has no space, so `SampleNotesService` seeds one — and since the folders
+milestone, **it arrives already arranged**: two folders, three of the four notes filed, and
+one deliberately left loose. Without that the board opens empty on a fresh install, and the
+one screen that explains what a folder is for shows no folder.
+
+⚠️ **The folders are written in the same transaction as the space and the notes.** The two
+guards in `seedIfFirstRun` only both say "virgin" for a database that has never been
+written to; a seeding that created the space and the notes but not the folders would leave
+a space standing, which both guards then read as "already seeded". It would never run again.
+
+⚠️ **Each seeded row is stamped a millisecond apart**, and in opposite directions:
+`folders::list` orders `created_at` **ascending**, the canvas orders `updated_at`
+**descending**. Sharing one instant left both orders falling back to `id` — a random UUID —
+so the zones and the sample cards came out arranged differently on each install.
+
+⚠️ **`seed_samples` answers the space it made**, and the page selects it. With exactly one
+space, "all spaces" is a distinction without a difference — and it is the one state in which
+the board cannot be shown at all, so a first launch would have hidden the feature behind a
+disabled button.
+
+A note names its folder by **index** into the folders the same command creates: they have no
+id until the transaction that writes them is under way.
+
+The written guide ("À propos → Prise en main") has a chapter per subject, listed in
+`getting-started-dialog.component.ts`. ⚠️ A chapter that names a key receives it as an
+interpolation — Transloco replaces an unknown `{{name}}` with the empty string, so a body
+cannot spell one out. `CHECK_KEY` is exported from the canvas keyboard directive for that:
+the table that binds it and the chapter that names it read the same constant.
+
 ### Editing a note
 
 The editor overlay is where every note mutation starts (title, body, language, tags, pin,

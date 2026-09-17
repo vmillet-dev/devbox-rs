@@ -5,7 +5,8 @@ import { ClockService } from '@core/services/time/clock.service';
 import { PreferencesService } from '@core/services/preferences/preferences.service';
 import { NotesRepository } from '../data/notes.repository';
 import { SpacesRepository } from '../data/spaces.repository';
-import { NoteDraft } from '../model/note.model';
+import { NoteDraft, SampleNote } from '../model/note.model';
+import { Space } from '../model/space.model';
 
 /** ⚠️ Exported because `VaultStore` clears it: a library set aside has to seed again. */
 export const SEEDED_KEY = 'devbox.notes.samplesSeeded';
@@ -28,8 +29,18 @@ increment(): void {
   this.count.update((value) => value + 1);
 }`;
 
+/**
+ * ⚠️ Indexes into the folders below, not ids: they do not exist until the command that
+ * writes them runs. The order is the order the board lays its zones out in.
+ */
+const SNIPPETS = 0;
+const START_HERE = 1;
+
 const KEYS = {
   spaceName: 'notes.samples.space',
+  snippetsFolder: 'notes.samples.folders.snippets',
+  startHereFolder: 'notes.samples.folders.startHere',
+  checklistBoard: 'notes.samples.checklist.board',
   welcomeTitle: 'notes.samples.welcome.title',
   welcomeContent: 'notes.samples.welcome.content',
   welcomeSource: 'notes.samples.welcome.source',
@@ -68,19 +79,19 @@ export class SampleNotesService {
    * went missing, "no space at all" alone the day the last space disappears. Together
    * they only ever match a database that has never been written to.
    */
-  async seedIfFirstRun(): Promise<boolean> {
-    if (this.preferences.read(SEEDED_KEY) !== null) return false;
+  async seedIfFirstRun(): Promise<Space | null> {
+    if (this.preferences.read(SEEDED_KEY) !== null) return null;
 
     try {
       if ((await this.spaces.loadAll()).length > 0) {
         this.preferences.write(SEEDED_KEY, 'skipped');
-        return false;
+        return null;
       }
 
       return await this.seed();
     } catch {
       // No bridge (jsdom), or a database that will not open: the canvas reports it.
-      return false;
+      return null;
     }
   }
 
@@ -91,11 +102,14 @@ export class SampleNotesService {
     return Object.fromEntries(names.map((name, index) => [name, translated[index] ?? ''])) as SampleTexts;
   }
 
-  private async seed(): Promise<boolean> {
+  private async seed(): Promise<Space> {
     const text = await this.texts();
 
-    // ⚠️ No space of their own: one command writes the space and these four notes in a
-    // single transaction, and it is the one that decides where they land.
+    // ⚠️ No space of their own: one command writes the space, its folders and these four
+    // notes in a single transaction, and it is the one that decides where they land.
+    //
+    // ⚠️ One note is deliberately left loose. "No folder" is a legitimate state, and a
+    // first launch where everything is filed would teach the opposite.
     const drafts: NoteDraft[] = [
       {
         spaceId: UNFILED,
@@ -139,6 +153,7 @@ export class SampleNotesService {
           text.checklistCopy,
           text.checklistFields,
           text.checklistPalette,
+          text.checklistBoard,
           text.checklistSpace,
         ].map((label) => ({ text: label, done: false })),
       },
@@ -157,14 +172,22 @@ export class SampleNotesService {
       },
     ];
 
-    await this.notes.seedSamples(text.spaceName, drafts);
+    const folders = [text.snippetsFolder, text.startHereFolder];
+    // The welcome note and the checklist open the board; the two snippets fill a zone.
+    const filing: (number | undefined)[] = [START_HERE, SNIPPETS, undefined, SNIPPETS];
+    const notes: SampleNote[] = drafts.map((draft, index) => ({
+      folder: filing[index],
+      draft,
+    }));
+
+    const space = await this.notes.seedSamples(text.spaceName, folders, notes);
 
     // ⚠️ Written after, and only after: it says "this library has been seeded", which is
     // now something observed rather than hoped for. An interrupted seeding rolls back
     // whole, so the next launch finds no marker and no space, and seeds again.
     this.preferences.write(SEEDED_KEY, 'true');
 
-    return true;
+    return space;
   }
 
   /** End of the local day: midnight would make a note dated today expired on the spot. */

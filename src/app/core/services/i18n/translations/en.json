@@ -51,7 +51,7 @@
       "welcome": {
         "title": "Welcome to {{app}}",
         "source": "{{app}} / Getting started",
-        "content": "{{app}} keeps your notes, your snippets and your lists within reach of a shortcut.\n\n- Cards file themselves: pinned, today, this week, older.\n- Click a card to open it, or copy it without opening it.\n- Everything is local: the database lives in your user folder, nothing goes over the network.\n\nThese four notes are samples. Edit them, or send them to the trash: the \"About → Getting started\" menu tells the same story and does not go away."
+        "content": "{{app}} keeps your notes, your snippets and your lists within reach of a shortcut.\n\n- Cards file themselves: pinned, today, this week, older.\n- The square chip on a card says which folder it lives in. Try the \"Board\" view at the top: folders are regions there, and notes are dropped into them with the mouse.\n- Everything is local: the database lives in your user folder, nothing goes over the network.\n\nThese four notes are samples. Edit them, or send them to the trash: the \"About → Getting started\" menu tells the same story and does not go away."
       },
       "snippet": {
         "title": "psql connection",
@@ -63,7 +63,8 @@
         "copy": "Copy a note without opening it, from the card's button",
         "fields": "Copy \"psql connection\" and fill in its fields",
         "palette": "Open the quick-paste palette with Ctrl+Alt+P",
-        "space": "Create a space of your own and move a note into it"
+        "space": "Create a space of your own and move a note into it",
+        "board": "Switch to the Board view and drag a note into a zone"
       },
       "code": {
         "title": "Angular signals",
@@ -74,6 +75,10 @@
         "example": "example",
         "database": "sql",
         "angular": "angular"
+      },
+      "folders": {
+        "snippets": "Snippets",
+        "startHere": "Start here"
       }
     }
   },
@@ -439,7 +444,7 @@
       "extendWithClick": "Extend the selection with a click",
       "trash": "Send to the trash",
       "undo": "Undo the last deletion",
-      "clearSelection": "Clear the selection, then the filters"
+      "clearSelection": "Clear the selection, then the filters, then leave the folder"
     },
     "editor": {
       "close": "Close the editor, saving",
@@ -541,6 +546,10 @@
       "spaces": {
         "title": "Spaces to file things in",
         "body": "Every note lives in a space — \"Personal\", \"Work\", whatever you like. The switcher at the top left filters the canvas, and \"All spaces\" shows them together. Deleting a space always asks where its notes should go: they never disappear with it."
+      },
+      "folders": {
+        "title": "Folders, and a board",
+        "body": "A space stays one pile ordered by date, which answers \"what was I doing yesterday\" very well and \"where do I keep my SQL about indexing\" not at all. A folder cuts a space into named, coloured regions: the square chip on a card says where it lives, and a card with no chip is filed nowhere — which is a perfectly good state to be in.\n\nThe \"Date / Board\" switch opens the second view of the same space. A zone moves by its grip, resizes from its corner, and is drawn with the mouse on the empty background. Dragging a note into a zone files it; dropping it on the background takes it out. Moving a zone carries its notes, resizing one catches none. Without a mouse: {{check}} to tick cards, then \"File into\" in the selection bar.\n\nClicking a zone's title goes inside it: an ordinary grid, a search that does not leave the folder, and a note created there arrives already filed. Deleting a folder never deletes its notes — they simply become loose again."
       },
       "organise": {
         "title": "Finding things: search, tags, filters",

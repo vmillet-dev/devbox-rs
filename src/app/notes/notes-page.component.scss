@@ -8,10 +8,14 @@
   overflow: hidden;
 }
 
+// ⚠️ It wraps. The row was already at the window edge in French before the view switch
+// joined it, and without this the whole page scrolls sideways rather than the header
+// reflowing — the first thing a new user sees, cut off at the right.
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 10px 14px;
   padding: 14px 24px;
   border-bottom: 1px solid var(--line-soft);
   flex-shrink: 0;

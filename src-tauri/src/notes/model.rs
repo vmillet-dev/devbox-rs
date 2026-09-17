@@ -74,6 +74,20 @@ pub struct NoteDraft {
     pub items: Vec<ChecklistItem>,
 }
 
+/// One seeded note, and which of the seeded folders it lands in.
+///
+/// ⚠️ An **index** into the folders the same command creates, not an id: they do not exist
+/// until the transaction that writes them is under way. `None` stays loose, which the
+/// first launch shows on purpose — "no folder" is a legitimate state.
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SampleNote {
+    #[serde(default)]
+    #[specta(optional)]
+    pub folder: Option<u32>,
+    pub draft: NoteDraft,
+}
+
 /// ⚠️ A field set to `None` stays unchanged, and `#[specta(optional)]` makes the key
 /// omissible on the TypeScript side — without it the front sends `null` for what it does
 /// not touch, overwriting it.

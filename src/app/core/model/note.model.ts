@@ -49,6 +49,15 @@ export interface Note {
   readonly searchHit: SearchHit | null;
 }
 
+/**
+ * One seeded note, and which of the seeded folders it lands in. ⚠️ An **index**, not an
+ * id: the folders do not exist until the command that writes them runs.
+ */
+export interface SampleNote {
+  readonly folder: number | undefined;
+  readonly draft: NoteDraft;
+}
+
 export type NoteDraft = Omit<
   Note,
   | 'id'

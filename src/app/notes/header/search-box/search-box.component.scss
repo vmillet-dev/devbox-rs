@@ -2,6 +2,8 @@
 
 .search-bar {
   flex: 1;
+  // Lets it give ground before the row wraps: without it the input floors the shrink.
+  min-width: 220px;
   max-width: 520px;
   display: flex;
   align-items: center;

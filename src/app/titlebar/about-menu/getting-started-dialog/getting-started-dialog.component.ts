@@ -2,12 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, inject, output } from '@a
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SettingsStore } from '@core/services/settings/settings.store';
 import { DEFAULT_SHORTCUTS } from '@core/services/shortcuts/shortcut.model';
+import { CHECK_KEY } from '@shared/directives/canvas-keyboard.directive';
 import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 
 /** Each chapter names two keys, `gettingStarted.chapters.<id>.title` and `.body`. */
 const CHAPTERS = [
   'notes',
   'spaces',
+  'folders',
   'organise',
   'fields',
   'checklists',
@@ -40,5 +42,6 @@ export class GettingStartedDialogComponent {
     palette: this.settings.paletteShortcut(),
     capture: DEFAULT_SHORTCUTS.capture,
     newNote: DEFAULT_SHORTCUTS.newNote,
+    check: CHECK_KEY,
   }));
 }
