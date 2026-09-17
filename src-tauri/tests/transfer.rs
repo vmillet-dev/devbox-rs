@@ -314,11 +314,15 @@ fn an_attachment_travels_with_the_library() {
 
     assert_eq!(report.attachments_imported, 1);
     assert_eq!(report.attachments_missing, 0);
-    assert_eq!(attachments::list(&mut target, &note_id).unwrap().len(), 1);
+    let landed = attachments::list(&mut target, &note_id).unwrap();
+    assert_eq!(landed.len(), 1);
+    // ⚠️ Not `record.stored_name()`: the id is remapped on the way in, because it decides
+    // a write path and it came out of a file (#160). The bytes are what has to survive.
     assert_eq!(
-        std::fs::read(target_files.join(record.stored_name())).unwrap(),
+        std::fs::read(target_files.join(landed[0].stored_name())).unwrap(),
         b"\x89PNG"
     );
+    assert_ne!(landed[0].id, record.id);
 
     std::fs::remove_dir_all(&directory).ok();
 }

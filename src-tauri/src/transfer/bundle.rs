@@ -5,6 +5,7 @@ use std::path::Path;
 
 use chrono::Utc;
 use diesel::SqliteConnection;
+use uuid::Uuid;
 
 use super::file::Payload;
 use super::model::{self, Bundle, ImportReport, IncomingBundle};
@@ -188,9 +189,20 @@ fn restore_attachments(
             continue;
         }
 
+        // The archive is keyed by the *sending* library's stored name, so the bytes are
+        // taken before the id is replaced.
         let Some(bytes) = payload.take(&record.stored_name()) else {
             report.attachments_missing += 1;
             continue;
+        };
+
+        // ⚠️ Remapped like a space's or a folder's, and for a harder reason: this id came
+        // out of a file someone was sent, and it is half of the name the line below joins
+        // onto the attachments directory. `../vault` there overwrote the key file and the
+        // import reported success.
+        let record = Attachment {
+            id: Uuid::new_v4().to_string(),
+            ..record
         };
 
         std::fs::write(directory.join(record.stored_name()), &bytes)
@@ -208,4 +220,104 @@ pub fn space_names(connection: &mut Library) -> Result<BTreeMap<String, String>,
         .into_iter()
         .map(|space| (space.id, space.name))
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::open_in_memory;
+    use crate::notes::fixtures::note as sample;
+    use crate::transfer::file;
+    use crate::vault::key::Cost;
+
+    fn sending_vault() -> Vault {
+        Vault::derive(
+            "the sending library",
+            b"0123456789abcdef",
+            Cost {
+                memory_kib: 64,
+                passes: 1,
+                lanes: 1,
+            },
+        )
+        .unwrap()
+    }
+
+    fn scratch() -> std::path::PathBuf {
+        let directory = std::env::temp_dir().join(format!("devbox-traversal-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+
+        directory
+    }
+
+    /// ⚠️ The demonstration #160 was filed on. A bundle whose attachment record claims
+    /// `id = "../vault"` used to make the import write `profile/vault.json` — the wrapped
+    /// master key — with bytes the file chose, and report the import a success. Nobody
+    /// could open their library again.
+    #[test]
+    fn an_identifier_read_out_of_a_file_cannot_write_outside_the_attachments_directory() {
+        let profile = scratch();
+        let sending_files = profile.join("sending");
+        let receiving_files = profile.join("attachments");
+        std::fs::create_dir_all(&sending_files).unwrap();
+        std::fs::create_dir_all(&receiving_files).unwrap();
+        std::fs::write(profile.join("vault.json"), b"the wrapped master key").unwrap();
+
+        let note = sample();
+        let hostile = Attachment {
+            id: "../vault".to_string(),
+            note_id: note.id.clone(),
+            file_name: "note.json".to_string(),
+            mime_type: "application/json".to_string(),
+            byte_size: 4,
+            created_at: note.created_at,
+        };
+
+        let vault = sending_vault();
+        std::fs::write(
+            sending_files.join(hostile.stored_name()),
+            vault.seal_bytes(b"CLOBBERED").unwrap(),
+        )
+        .unwrap();
+
+        let bundle = Bundle {
+            version: model::FORMAT_VERSION,
+            exported_at: note.created_at,
+            spaces: vec![Space {
+                id: note.space_id.clone(),
+                name: "Personal".to_string(),
+                pinned: false,
+            }],
+            folders: Vec::new(),
+            notes: vec![note],
+            attachments: vec![hostile],
+        };
+
+        let path = profile.join("crafted.devbox").to_string_lossy().to_string();
+        file::write(&path, &bundle, &sending_files, &vault, None).unwrap();
+
+        let mut receiving = open_in_memory().unwrap();
+        let (incoming, mut payload) = file::read(&path, None).unwrap();
+        let report = merge(&mut receiving, incoming, &mut payload, &receiving_files).unwrap();
+
+        assert_eq!(report.attachments_imported, 1);
+        assert_eq!(
+            std::fs::read(profile.join("vault.json")).unwrap(),
+            b"the wrapped master key",
+            "the key file was rewritten by an import"
+        );
+
+        // The bytes did arrive — contained, under an id this library generated.
+        let landed: Vec<std::fs::DirEntry> = std::fs::read_dir(&receiving_files)
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(landed.len(), 1);
+        let landed = landed[0].path();
+        let stem = landed.file_stem().unwrap().to_string_lossy();
+        assert_eq!(landed.extension().unwrap(), "json");
+        assert!(Uuid::parse_str(&stem).is_ok(), "{stem}");
+
+        std::fs::remove_dir_all(&profile).ok();
+    }
 }
