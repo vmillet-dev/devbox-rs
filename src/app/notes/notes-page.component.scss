@@ -8,6 +8,23 @@
   overflow: hidden;
 }
 
+// The rail beside everything else, as an editor holds its project tree — the titlebar is
+// the only thing above it.
+.page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  // ⚠️ Without this the topbar's own width wins and the rail is pushed off screen.
+  min-width: 0;
+  min-height: 0;
+}
+
 // ⚠️ It wraps. The row was already at the window edge in French before the view switch
 // joined it, and without this the whole page scrolls sideways rather than the header
 // reflowing — the first thing a new user sees, cut off at the right.
@@ -77,6 +94,31 @@
   font-size: 10.5px;
   color: var(--text-2);
   text-align: center;
+}
+
+// First in the row, where the space switcher used to be: the rail is what replaced it.
+.rail-toggle {
+  @include unstyled-control;
+  @include surface(var(--bg-2), 8px);
+  padding: 7px 10px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.rail-toggle[aria-pressed='true'] {
+  color: var(--amber);
+}
+
+.rail-toggle:hover {
+  border-color: var(--amber-dim);
+  color: var(--text-0);
+}
+
+.rail-toggle:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
 // Next to the filters and not in the "File" menu: the trash is a view on the notes.

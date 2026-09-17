@@ -1,0 +1,115 @@
+@use 'mixins' as *;
+
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+  min-width: 240px;
+}
+
+.editor-title {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+// In the panel with the rename and the delete, not in the row: the row is the space's
+// own click surface and already carries the ⋯ that opens this.
+.editor-pin {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.editor-pin:hover {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+
+.editor-pin.on {
+  color: var(--amber);
+}
+
+.editor-form {
+  display: flex;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.editor-input {
+  @include text-field;
+  @include surface(var(--bg-1), 6px);
+
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--text-0);
+  font-family: var(--font-sans);
+}
+
+.editor-action {
+  @include unstyled-control;
+  @include surface($radius: 6px);
+
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.editor-action:hover {
+  @include accent-state;
+}
+
+.editor-delete:hover,
+.editor-delete:focus-visible,
+.editor-delete.confirming {
+  @include accent-state(var(--red), var(--red));
+}
+
+.editor-delete-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.editor-delete-row {
+  display: flex;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.editor-note {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.editor-blocked {
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.editor-pin:focus-visible,
+.editor-input:focus-visible,
+.editor-action:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}

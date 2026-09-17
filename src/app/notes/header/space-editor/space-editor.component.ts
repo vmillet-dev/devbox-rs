@@ -1,0 +1,69 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { Space } from '@core/model/space.model';
+
+export interface SpaceRenaming {
+  readonly id: string;
+  readonly name: string;
+}
+
+export interface SpaceDeletion {
+  readonly id: string;
+  /** The space that takes in the deleted one's notes. */
+  readonly targetSpaceId: string;
+}
+
+/**
+ * Pin, rename, delete — the three things a space can be told to do, in one panel so the
+ * switcher and the library rail cannot drift apart. `folder-editor` is its twin.
+ */
+@Component({
+  selector: 'app-space-editor',
+  imports: [TranslocoPipe],
+  templateUrl: './space-editor.component.html',
+  styleUrl: './space-editor.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class SpaceEditorComponent {
+  readonly space = input.required<Space>();
+  /** ⚠️ A space cannot be its own refuge: the cascade would take the notes after the move. */
+  readonly moveTargets = input.required<readonly Space[]>();
+
+  readonly renamed = output<SpaceRenaming>();
+  readonly pinRequested = output<string>();
+  readonly deleted = output<SpaceDeletion>();
+
+  /** Two steps: the WebView blocks on a native `confirm()`. */
+  protected readonly confirmingDelete = signal(false);
+
+  private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
+
+  focusName(): void {
+    this.renameInput()?.nativeElement.focus();
+  }
+
+  protected submitRename(event: Event, name: string): void {
+    event.preventDefault();
+    if (!name.trim()) return;
+
+    this.renamed.emit({ id: this.space().id, name });
+  }
+
+  protected onDeleteClick(targetSpaceId: string): void {
+    if (!targetSpaceId) return;
+
+    if (!this.confirmingDelete()) {
+      this.confirmingDelete.set(true);
+      return;
+    }
+    this.deleted.emit({ id: this.space().id, targetSpaceId });
+  }
+}

@@ -1,4 +1,4 @@
-import { Injectable, Signal, computed, effect, inject, resource, signal } from '@angular/core';
+import { Injectable, Signal, computed, effect, inject, linkedSignal, resource, signal } from '@angular/core';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { FoldersRepository } from '../data/folders.repository';
 import { Folder, FolderColour } from '../model/folder.model';
@@ -18,15 +18,43 @@ export class FoldersStore {
   private readonly revision = inject(NotesRevision);
   private readonly spaces = inject(SpacesStore);
 
+  /**
+   * ⚠️ Every space's folders and not the active space's: the rail draws the whole library
+   * as a tree. Narrowing back to one space is a partition of a list already in hand, which
+   * is also what lets a folder in another space be opened without a round trip first.
+   */
   private readonly foldersResource = resource({
-    params: () => ({ spaceId: this.spaces.activeSpaceId() }),
-    loader: ({ params }) => this.repository.loadAll(params.spaceId),
-    defaultValue: [] as readonly Folder[],
+    // ⚠️ Keyed on the revision and no longer on the active space, which used to be what
+    // reloaded it: the seeding writes its folders after this has already read an empty
+    // database, and nothing else would tell the rail they exist.
+    params: () => ({ revision: this.revision.current() }),
+    // ⚠️ No `defaultValue`: it would make `hasValue()` true with an empty list while a
+    // reload is in flight, and the retained value below would be that empty list.
+    loader: (): Promise<readonly Folder[]> => this.repository.loadAll(null),
   });
 
-  readonly folders = computed<readonly Folder[]>(() =>
-    this.foldersResource.hasValue() ? this.foldersResource.value() : [],
-  );
+  /**
+   * ⚠️ Retained across a reload, like `NotesQueryStore.view`: a write bumps the revision
+   * and the rail would blink empty each time. Writable on purpose — a write adopts what
+   * persistence answered, and the reload it triggers replaces it with the same thing.
+   */
+  private readonly known = linkedSignal<readonly Folder[] | undefined, readonly Folder[]>({
+    source: () => (this.foldersResource.hasValue() ? this.foldersResource.value() : undefined),
+    computation: (fresh, previous) => fresh ?? previous?.value ?? [],
+  });
+
+  /** In creation order, which is the order the board lays its zones out in. */
+  readonly allFolders: Signal<readonly Folder[]> = this.known.asReadonly();
+
+  /** `null` = every space, so every folder: the choice the switcher already made. */
+  readonly folders = computed<readonly Folder[]>(() => {
+    const spaceId = this.spaces.activeSpaceId();
+    return spaceId === null ? this.allFolders() : this.foldersOf(spaceId);
+  });
+
+  foldersOf(spaceId: string): readonly Folder[] {
+    return this.allFolders().filter((folder) => folder.spaceId === spaceId);
+  }
 
   readonly isLoading = this.foldersResource.isLoading;
   readonly loadError: Signal<Error | undefined> = this.foldersResource.error;
@@ -72,14 +100,14 @@ export class FoldersStore {
     );
     if (!created) return null;
 
-    this.foldersResource.set([...this.folders(), created]);
+    this.known.set([...this.allFolders(), created]);
     return created;
   }
 
   /** Not optimistic: the list adopts only what persistence returned. */
   async renameFolder(id: string, name: string): Promise<boolean> {
     const trimmed = name.trim();
-    const current = this.folders().find((folder) => folder.id === id);
+    const current = this.allFolders().find((folder) => folder.id === id);
     if (!trimmed || !current || current.name === trimmed) return false;
 
     const renamed = await this.notifier.attempt(
@@ -113,7 +141,7 @@ export class FoldersStore {
     );
     if (deleted === null) return false;
 
-    this.foldersResource.set(this.folders().filter((folder) => folder.id !== id));
+    this.known.set(this.allFolders().filter((folder) => folder.id !== id));
     if (this._activeFolderId() === id) {
       this.selectFolder(null);
     }
@@ -123,6 +151,6 @@ export class FoldersStore {
   }
 
   private adopt(folder: Folder): void {
-    this.foldersResource.set(this.folders().map((current) => (current.id === folder.id ? folder : current)));
+    this.known.set(this.allFolders().map((current) => (current.id === folder.id ? folder : current)));
   }
 }

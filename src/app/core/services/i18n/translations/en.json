@@ -112,6 +112,14 @@
     "deleteKeepsNotes": "The notes stay, simply without a folder.",
     "breadcrumbLabel": "Folder breadcrumb"
   },
+  "sidebar": {
+    "library": "Library",
+    "toggle": "Show or hide the library",
+    "expand": "Expand space {{name}}",
+    "collapse": "Collapse space {{name}}",
+    "noFolders": "No folder",
+    "resize": "Library width"
+  },
   "board": {
     "viewSwitchLabel": "Choose the view",
     "dateView": "Date",
@@ -435,6 +443,7 @@
     },
     "canvas": {
       "search": "Jump to the search field",
+      "library": "Show or hide the library",
       "move": "Move from card to card",
       "open": "Open the focused card",
       "copy": "Copy its content",

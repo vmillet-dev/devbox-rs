@@ -39,9 +39,9 @@ src/                Angular front-end
 │   │   └── services/   one folder per subject: i18n, errors, time, preferences,
 │   │                   settings, updates, app-info, clipboard, dialogs, window,
 │   │                   shortcuts, autostart, tray, notifications
-│   ├── notes/      the page at the root, then its three zones: header/ (above the
-│   │               canvas), canvas/ (the cards), overlays/ (drawn over the page),
-│   │               plus ui/ for what two of them share
+│   ├── notes/      the page at the root, then its four zones: sidebar/ (the library
+│   │               rail), header/ (above the canvas), canvas/ (the cards),
+│   │               overlays/ (drawn over the page), plus ui/ for what two of them share
 │   ├── titlebar/   titlebar.component, then file-menu/ and about-menu/ with the panels
 │   │               each of them opens, nested where they open from
 │   ├── banners/    error banner, status toast, update prompt — siblings of the outlet
@@ -176,10 +176,10 @@ Membership is decidable, not a matter of taste:
 **The zones come from the template, not from taste.** `notes/` used to hold eleven entries
 that mixed screen zones with invented categories — `tag-rail` sat outside `topbar/` while
 `search-box` sat inside, `image-lightbox` outside `overlays/` while the palette sat inside, and
-nothing said why. The page's template has exactly three zones: what sits above the canvas, the
-canvas, and what is drawn over the page. `header/`, `canvas/` and `overlays/` are those three,
-so finding a component is one question with three answers — above the notes, among them, or
-over them.
+nothing said why. The page's template has four zones: what sits beside the canvas, what sits
+above it, the canvas, and what is drawn over the page. `sidebar/`, `header/`, `canvas/` and
+`overlays/` are those four, so finding a component is one question with four answers — left of
+the notes, above them, among them, or over them.
 
 Two consequences worth stating. **Rendering something is not owning it:** the preferences
 panel hosts the variables page through `NgComponentOutlet`, and the shortcuts sheet imports
@@ -672,6 +672,46 @@ open the editor at the same time as the menu. The trigger is `opacity: 0` rather
 `display: none` — hiding it would take it out of the tab order and make the menu unreachable
 by keyboard. The menu emits no note id (it does not know one); the card attaches it, the same
 way the editor lets the store decide which note is open.
+
+### The library rail
+
+Navigating used to take two dropdowns that knew nothing about each other: the space switcher
+listed the spaces, and beside it the folder switcher listed the folders of whichever space was
+active. The two lists are a **tree**, and they were drawn as two flat menus opened one after
+the other. `notes/sidebar/library-tree/` draws that tree instead — every space, its folders
+under it, the way an editor holds a project — and the toolbar keeps the toggle that shows and
+hides it (`Ctrl+B`, and an entry in the shortcuts sheet, because the table that binds a key is
+the table that documents it).
+
+⚠️ **The rail replaces the two switchers while it is open**, and they come back when it is
+closed. Two places to change space is how a tree and a dropdown drift apart; the `@if` in the
+page's template is what keeps there being one.
+
+**Nothing moved house.** A space row keeps its `⋯` — pin, rename, delete-with-refuge — and a
+folder row keeps its own — rename, recolour, delete. Those panels are `space-editor/` and
+`folder-editor/`, projected by whoever shows them; extracting the first one out of the
+switcher is what let the rail have it without a copy. Creating a space sits at the head of the
+rail, creating a folder under the active space alone — a folder is made in the space one is
+in, and the row above is one click away from making that so.
+
+**The rail asks for a destination; the page turns it into state.** `folderOpened` carries the
+whole `Folder` rather than an id, because opening one in another space means switching space
+_first_: `FoldersStore.activeFolder` resolves against the active space's folders, and the two
+signals settle in that order. Choosing a space leaves whatever folder was open — the row means
+the space itself.
+
+⚠️ **`FoldersStore` holds every space's folders**, not the active space's. The rail needs the
+whole library, and partitioning a list already in hand is what lets a folder in another space
+be opened without a round trip in between; `folders()` narrows to the active space for the
+switcher and the selection bar, `foldersOf(id)` for anyone who names one.
+
+Shown or hidden is `AppSettings.showLibraryRail`, and how wide is `libraryRailWidth` — one
+line each in `SettingsStore`, restored at launch like every other preference, and deliberately
+absent from the preferences panel: they are states the window is in, not decisions to go and
+make. ⚠️ The width is dragged from the rail's edge with **pointer events**, like every other
+drag in this application — HTML5 drag and drop does not work in this WebView — and the edge is
+a `role="separator"` so the arrow keys move it too. It is clamped on the way in _and_ on the
+way out (`RAIL_WIDTH`), because a preferences file written by hand is an input like any other.
 
 ### Managing spaces from the switcher
 
