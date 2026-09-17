@@ -150,15 +150,20 @@ describe('The board', () => {
   });
 
   /**
-   * ⚠️ Two controls, two targets. The grip used to be drawn on top of the tick, with an
-   * opaque background and a higher `z-index`, so ticking a card on the board meant aiming
-   * at the few pixels of checkbox that stuck out from under it.
+   * ⚠️ The grip used to be drawn on top of the selection tick, with an opaque background
+   * and a higher `z-index`, so ticking a card on the board meant aiming at the few pixels
+   * of checkbox that stuck out from under it. There is no grip at all now — the card is
+   * its own handle — and the corner is the tick's.
    */
-  it('keeps the drag grip and the selection tick apart', async () => {
+  it('leaves the corner to the selection tick, having no grip left', async () => {
     await board.show('board');
+    expect(await browser.$(testid('board-card-grip')).isExisting()).toBe(false);
 
-    expect(await board.cornersOverlap('Dump nocturne')).toBe(false);
-    expect(await board.cornersOverlap('EXPLAIN lent sur join')).toBe(false);
+    await canvas.check('Dump nocturne');
+    expect(await canvas.isChecked('Dump nocturne')).toBe(true);
+
+    await canvas.check('Dump nocturne');
+    expect(await canvas.isChecked('Dump nocturne')).toBe(false);
   });
 
   /** Nothing is removed from the header: the board is a second view, not a replacement. */
