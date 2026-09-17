@@ -212,6 +212,24 @@ describe('BoardStore', () => {
     expect(harness.store.matched()).toBe(1);
   });
 
+  /**
+   * ⚠️ A `computed` reading `hasValue()` answers `null` for the whole round trip, so the
+   * board went blank on every reload — a card disappearing under the pointer that ticked it.
+   */
+  it('keeps what it is drawing while it re-reads', async () => {
+    const repository = new FakeBoardRepository({
+      zones: [fakeZone({ folder: PERF, notes: [fakeBoardNote(createNote({ id: 'a' }))] })],
+    });
+    const harness = await createStore(repository);
+    await onBoard(harness);
+    await vi.waitFor(() => expect(harness.store.zones()).toHaveLength(1));
+
+    harness.store.reload();
+
+    expect(harness.store.zones()).toHaveLength(1);
+    expect(harness.store.isLoading()).toBe(false);
+  });
+
   it('reports no count while nothing is dimming anything', async () => {
     const harness = await createStore();
 
