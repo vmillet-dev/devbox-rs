@@ -39,9 +39,9 @@ src/                Angular front-end
 │   │   └── services/   one folder per subject: i18n, errors, time, preferences,
 │   │                   settings, updates, app-info, clipboard, dialogs, window,
 │   │                   shortcuts, autostart, tray, notifications
-│   ├── notes/      the page at the root, then its three zones: header/ (above the
-│   │               canvas), canvas/ (the cards), overlays/ (drawn over the page),
-│   │               plus ui/ for what two of them share
+│   ├── notes/      the page at the root, then its four zones: sidebar/ (the library
+│   │               rail), header/ (above the canvas), canvas/ (the cards),
+│   │               overlays/ (drawn over the page), plus ui/ for what two of them share
 │   ├── titlebar/   titlebar.component, then file-menu/ and about-menu/ with the panels
 │   │               each of them opens, nested where they open from
 │   ├── banners/    error banner, status toast, update prompt — siblings of the outlet
@@ -176,10 +176,10 @@ Membership is decidable, not a matter of taste:
 **The zones come from the template, not from taste.** `notes/` used to hold eleven entries
 that mixed screen zones with invented categories — `tag-rail` sat outside `topbar/` while
 `search-box` sat inside, `image-lightbox` outside `overlays/` while the palette sat inside, and
-nothing said why. The page's template has exactly three zones: what sits above the canvas, the
-canvas, and what is drawn over the page. `header/`, `canvas/` and `overlays/` are those three,
-so finding a component is one question with three answers — above the notes, among them, or
-over them.
+nothing said why. The page's template has four zones: what sits beside the canvas, what sits
+above it, the canvas, and what is drawn over the page. `sidebar/`, `header/`, `canvas/` and
+`overlays/` are those four, so finding a component is one question with four answers — left of
+the notes, above them, among them, or over them.
 
 Two consequences worth stating. **Rendering something is not owning it:** the preferences
 panel hosts the variables page through `NgComponentOutlet`, and the shortcuts sheet imports
@@ -469,6 +469,15 @@ loop would be an injection cycle — so each writes through `NotesRevision` and 
 re-queries on its own. The last three do inject it, in that direction only: they orchestrate
 _around_ the open note rather than being read by it.
 
+⚠️ **`NotesStore` bumps that same revision**, rather than reloading the canvas it happens to
+hold. There are **two** views of the same notes: `NotesQueryStore.queryParams` and
+`BoardStore.queryParams` both read `NotesRevision`, and a write that reloaded only the first
+one is exactly what left a todo list ticked on the board still showing unticked until the view
+was switched. The same trap in the other direction: `NotesStore.find` resolves a note through
+`NotesQueryStore.findVisible` **and** `BoardStore.findVisible`, because the board _dims_ where
+the canvas _narrows_ — a card there can be ticked, moved or deleted while its note is nowhere
+in the canvas view, and an unresolved note is a gesture that writes nothing, silently.
+
 `TrashStore` and `TagsStore` load **on opening** rather than through a permanent `resource`:
 neither is displayed anywhere else, and a resource would re-query on every deletion.
 
@@ -686,6 +695,46 @@ open the editor at the same time as the menu. The trigger is `opacity: 0` rather
 by keyboard. The menu emits no note id (it does not know one); the card attaches it, the same
 way the editor lets the store decide which note is open.
 
+### The library rail
+
+Navigating used to take two dropdowns that knew nothing about each other: the space switcher
+listed the spaces, and beside it the folder switcher listed the folders of whichever space was
+active. The two lists are a **tree**, and they were drawn as two flat menus opened one after
+the other. `notes/sidebar/library-tree/` draws that tree instead — every space, its folders
+under it, the way an editor holds a project — and the toolbar keeps the toggle that shows and
+hides it (`Ctrl+B`, and an entry in the shortcuts sheet, because the table that binds a key is
+the table that documents it).
+
+⚠️ **The rail replaces the two switchers while it is open**, and they come back when it is
+closed. Two places to change space is how a tree and a dropdown drift apart; the `@if` in the
+page's template is what keeps there being one.
+
+**Nothing moved house.** A space row keeps its `⋯` — pin, rename, delete-with-refuge — and a
+folder row keeps its own — rename, recolour, delete. Those panels are `space-editor/` and
+`folder-editor/`, projected by whoever shows them; extracting the first one out of the
+switcher is what let the rail have it without a copy. Creating a space sits at the head of the
+rail, creating a folder under the active space alone — a folder is made in the space one is
+in, and the row above is one click away from making that so.
+
+**The rail asks for a destination; the page turns it into state.** `folderOpened` carries the
+whole `Folder` rather than an id, because opening one in another space means switching space
+_first_: `FoldersStore.activeFolder` resolves against the active space's folders, and the two
+signals settle in that order. Choosing a space leaves whatever folder was open — the row means
+the space itself.
+
+⚠️ **`FoldersStore` holds every space's folders**, not the active space's. The rail needs the
+whole library, and partitioning a list already in hand is what lets a folder in another space
+be opened without a round trip in between; `folders()` narrows to the active space for the
+switcher and the selection bar, `foldersOf(id)` for anyone who names one.
+
+Shown or hidden is `AppSettings.showLibraryRail`, and how wide is `libraryRailWidth` — one
+line each in `SettingsStore`, restored at launch like every other preference, and deliberately
+absent from the preferences panel: they are states the window is in, not decisions to go and
+make. ⚠️ The width is dragged from the rail's edge with **pointer events**, like every other
+drag in this application — HTML5 drag and drop does not work in this WebView — and the edge is
+a `role="separator"` so the arrow keys move it too. It is clamped on the way in _and_ on the
+way out (`RAIL_WIDTH`), because a preferences file written by hand is an input like any other.
+
 ### Managing spaces from the switcher
 
 The space switcher's dropdown has three mutually exclusive states: the menu, the creation
@@ -823,18 +872,35 @@ functions next to it (`board-gesture.ts`, which has no signals and no DOM):
 
 | Gesture       | Started from         | Ends as                                     |
 | ------------- | -------------------- | ------------------------------------------- |
-| move a card   | the card's ⠿ grip    | `file_notes` — the zone under it, or `null` |
+| move a card   | anywhere on the card | `file_notes` — the zone under it, or `null` |
 | move a zone   | the header's ⠿ grip  | a frame in the layout batch                 |
 | resize a zone | the corner handle    | a frame in the layout batch                 |
 | draw a zone   | the empty background | a folder, named on the spot, at that frame  |
 
-**A grip, not the card.** The card is a `<button>` that opens the note, so a drag started on
-it would have to swallow its own click. The grips are siblings, quiet at rest and never
-hidden — `visibility: hidden` would take them out of the tab order.
+**The card is its own handle.** There used to be a ⠿ grip in its corner, on the grounds that a
+drag started on the card "would have to swallow its own click" — but pointer events already
+tell the two apart by the distance travelled, so swallowing that click is one flag, not a
+design. ⚠️ `onCardActivated` drops exactly the click a committed drag leaves behind, and
+clears the flag on the next press: an abandoned drag must not eat a later click. ⚠️ A press on
+one of the card's own controls (`isCardControl` — the tick, the copy, the ⋯, a checklist item)
+starts nothing, because it is aimed at that control.
+
+The grip's real cost was where it sat: in the corner the selection tick occupies, drawn over
+it with a higher `z-index`, taking every pointer meant for it. The zone's own grip stays — a
+zone has no click of its own to tell a drag from.
 
 ⚠️ **The gesture commits on `pointerup` and nowhere else.** A drag that never travelled
 past `DRAG_THRESHOLD_PX` writes nothing — it was a click — and `pointercancel` throws the
 whole thing away rather than leaving a card at coordinates nobody chose.
+
+**A card being dragged is drawn on the surface, wherever it was grabbed from.** A loose card
+has a position of its own, so `positionOf` simply moves it. ⚠️ A **filed** card has none — it
+flows inside its zone — so a drag out of one used to carry nothing at all: the seat faded and
+the pointer held empty air, with only the zone lighting up underneath. `travelling` draws that
+card as a ghost at the pointer, transparent to it (the surface below is what decides where it
+lands), starting from the seat `CardGrab` measured so it keeps its grab offset. The seat stays,
+faded, until the pointer lifts: the drop can still be cancelled, and a hole opening mid-drag
+would reflow the zone under the pointer.
 
 **Moving a zone carries its notes, and resizing one captures and releases nothing.** Both
 fall out of the flow rather than being coded: a filed card has no coordinates, so it is
@@ -842,6 +908,8 @@ carried by its zone for free, and a stretched frame has nothing to capture. ⚠�
 rule — a comment box owns whatever it overlaps — was considered and refused: it silently
 refiles notes the day a frame is stretched. **Membership comes from the drop, in both
 directions, and from nothing else.**
+
+**Everything lands on the grid.** The surface draws a 20px dotted lattice and every gesture snaps to it (`GRID_PX`), so two zones dropped roughly side by side come out exactly aligned instead of three pixels off. The rounding lives in the three arithmetic functions and nowhere else: ⚠️ both corners of a drawn band are snapped rather than its size — rounding a width would leave the far edge between two dots whenever the near one moved — and a resize is snapped **before** it is clamped, because the minimum is `folders::board`'s and is not a multiple of the grid. ⚠️ Snapping cannot turn a click into a move: nothing is computed until the pointer has passed `DRAG_THRESHOLD_PX`, and a stored position is left alone until something is actually dragged.
 
 **One write per gesture.** `BoardStore` stages what moved and writes it behind a 400 ms
 debounce as a single `save_board_layout`, one transaction. ⚠️ The staged geometry is laid
@@ -1179,6 +1247,13 @@ not remember which space you filed it in. It also keeps its own state rather tha
 A snippet with fields goes through the fill form first — copying `psql -h {{host}}` verbatim
 gives an unusable command. `Tab` opens the note instead of copying it, which is what makes the
 palette double as a "find that note" shortcut.
+
+⚠️ **A click on a row opens the note; it does not copy it.** Copying hides the window, and a
+window that disappears on a click with nothing on screen saying why reads as the application
+crashing. Nobody clicked their way here from another application — the window is already in
+front — so the mouse gets the gesture a click on a note means everywhere else in the product,
+and the paste path gets a control of its own beside the row (⧉, which copies and hides, like
+`Enter`). The keyboard is untouched: it is the fast path and the muscle memory is the feature.
 
 **It captures as much as it retrieves.** As soon as the query is non-empty, a "créer une note"
 row is appended **after** the results — retrieving a snippet is the more frequent gesture and

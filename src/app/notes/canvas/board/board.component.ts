@@ -19,6 +19,7 @@ import {
   cardPosition,
   drawnTo,
   hasTravelled,
+  isCardControl,
   isWorthDrawing,
   movedTo,
   resizedTo,
@@ -97,6 +98,31 @@ export class BoardComponent {
     return zoneAt(this.zoneFrames(), { x: drag.to.x, y: drag.to.y });
   });
 
+  /**
+   * The card being dragged out of a zone, drawn on the surface at the pointer.
+   *
+   * ⚠️ A filed card **flows** inside its zone and has no coordinates of its own, so there
+   * is nothing to move: without this the pointer carries nothing at all, and the only
+   * feedback left is the zone lighting up under it. A loose card needs none — `positionOf`
+   * already moves the real one.
+   */
+  protected readonly travelling = computed<BoardNote | null>(() => {
+    const drag = this.gesture();
+    if (drag?.kind !== 'card' || !drag.moved) return null;
+
+    return (
+      this.zones()
+        .flatMap((zone) => zone.notes)
+        .find((entry) => entry.note.id === drag.id) ?? null
+    );
+  });
+
+  /** Where that card is right now, in surface coordinates. */
+  protected readonly travellingAt = computed<BoardPoint>(() => {
+    const drag = this.gesture();
+    return drag ? { x: drag.to.x, y: drag.to.y } : { x: 0, y: 0 };
+  });
+
   /** The band being drawn, drawn only once the pointer has actually travelled. */
   protected readonly band = computed<BoardFrame | null>(() => {
     const drag = this.gesture();
@@ -130,6 +156,28 @@ export class BoardComponent {
   protected startCard(event: PointerEvent, entry: BoardNote, frame: BoardFrame): void {
     this.begin(event, 'card', entry.note.id, frame);
   }
+
+  /** A loose card already knows where it sits; only its own controls are off limits. */
+  protected grabLoose(event: PointerEvent, entry: BoardNote, at: BoardPoint): void {
+    if (isCardControl(event.target)) return;
+
+    this.startCard(event, entry, { x: at.x, y: at.y, width: 0, height: 0 });
+  }
+
+  /**
+   * ⚠️ A drag ends with a click on the card it was dragging: the whole card is the handle
+   * now, so the click the pointer leaves behind must not also open the note. Cleared on
+   * the next press, or one abandoned drag would eat a legitimate click later.
+   */
+  protected onCardActivated(activation: NoteActivation): void {
+    if (this.travelled) {
+      this.travelled = false;
+      return;
+    }
+    this.noteActivated.emit(activation);
+  }
+
+  private travelled = false;
 
   protected startZoneMove(event: PointerEvent, zone: BoardZone): void {
     this.begin(event, 'move-zone', zone.folder.id, this.frameOf(zone));
@@ -173,6 +221,8 @@ export class BoardComponent {
 
     switch (drag.kind) {
       case 'card': {
+        // What tells the click that follows to be dropped rather than to open the note.
+        this.travelled = true;
         const position = cardPosition(drag, at);
         this.cardDropped.emit({
           noteId: drag.id,
@@ -202,6 +252,7 @@ export class BoardComponent {
   }
 
   private begin(event: PointerEvent, kind: Gesture['kind'], id: string, from: BoardFrame): void {
+    this.travelled = false;
     if (!this.editable() || event.button !== 0) return;
 
     event.preventDefault();

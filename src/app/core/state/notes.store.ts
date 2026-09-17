@@ -19,7 +19,9 @@ import { ClockService } from '@core/services/time/clock.service';
 import { debounced } from '@core/services/time/debounce';
 import { NoteSelectionStore } from './note-selection.store';
 import { FoldersStore } from './folders.store';
+import { BoardStore } from './board.store';
 import { NotesQueryStore } from './notes-query.store';
+import { NotesRevision } from './notes-revision';
 import { SpacesStore } from './spaces.store';
 
 export type { NoteFilter, NoteKind } from '../model/note.model';
@@ -161,6 +163,8 @@ export class NotesStore {
   private readonly notifier = inject(ErrorNotifier);
   private readonly spaces = inject(SpacesStore);
   private readonly notes = inject(NotesQueryStore);
+  private readonly board = inject(BoardStore);
+  private readonly revision = inject(NotesRevision);
   private readonly selection = inject(NoteSelectionStore);
 
   private readonly _selectedNote = signal<Note | null>(null);
@@ -303,7 +307,7 @@ export class NotesStore {
       this.closeOverlay();
     }
     this.openUndoWindow({ kind: 'deletion', ids: [resolved], count: 1 });
-    this.notes.reload();
+    this.revision.bump();
   }
 
   async moveSelection(spaceId: string): Promise<void> {
@@ -342,7 +346,7 @@ export class NotesStore {
 
     this.selection.clearSelection();
     this.openUndoWindow({ kind: 'deletion', ids, count });
-    this.notes.reload();
+    this.revision.bump();
   }
 
   async undoLastAction(): Promise<void> {
@@ -351,7 +355,7 @@ export class NotesStore {
 
     this.dismissUndo();
     const undone = await this.notifier.attempt('errors.undoFailed', () => this.reverse(action));
-    if (undone !== null) this.notes.reload();
+    if (undone !== null) this.revision.bump();
   }
 
   /** Hiding the banner gives up the undo, unlike the timer running out. */
@@ -389,7 +393,7 @@ export class NotesStore {
     if (this.persistedNoteId() === target) {
       this._selectedNote.set(saved);
     }
-    this.notes.reload();
+    this.revision.bump();
   }
 
   fillPlaceholders(content: string, values: Record<string, string>): Promise<string> {
@@ -445,7 +449,7 @@ export class NotesStore {
       this.selection.focusNote(created.id);
     }
 
-    this.notes.reload();
+    this.revision.bump();
     return created;
   }
 
@@ -460,7 +464,7 @@ export class NotesStore {
     if (ids.length === 0) return null;
 
     const done = await this.notifier.attempt('errors.bulkActionFailed', () => action(ids));
-    if (done !== null) this.notes.reload();
+    if (done !== null) this.revision.bump();
 
     return done;
   }
@@ -535,7 +539,7 @@ export class NotesStore {
     if (this.materialisedNote?.id === id) {
       this.materialisedNote = saved;
     }
-    this.notes.reload();
+    this.revision.bump();
   }
 
   /** The open note first: it may have left the filtered view without ceasing to be editable. */
@@ -549,6 +553,9 @@ export class NotesStore {
     const materialised = this.materialisedNote;
     if (materialised?.id === id) return materialised;
 
-    return this.notes.findVisible(id);
+    // ⚠️ The board too, and not the canvas alone: it **dims** where the canvas **narrows**,
+    // so a card there can be ticked, moved or deleted while its note is nowhere in the
+    // canvas view — and an unresolved note is a gesture that writes nothing, silently.
+    return this.notes.findVisible(id) ?? this.board.findVisible(id);
   }
 }

@@ -6,6 +6,8 @@ import { FakeClipboard } from '@testing/fake-clipboard';
 import { FakeNotesRepository } from '@testing/fake-notes-repository';
 import { createNote } from '@testing/note.fixture';
 import { HARNESS_SPACES, awaitQuery, createNotesHarness, visibleIds } from '@testing/notes-harness';
+import { BoardStore } from './board.store';
+import { NotesRevision } from './notes-revision';
 import { DRAFT_ID, UNDO_WINDOW_MS } from './notes.store';
 
 describe('NotesStore', () => {
@@ -150,6 +152,21 @@ describe('NotesStore', () => {
       expect(repository.queryCount).toBeGreaterThan(before);
     });
 
+    /**
+     * ⚠️ Through `NotesRevision` and not by reloading the canvas by hand: the board is a
+     * second view of the same notes, and a write it never hears about leaves a ticked
+     * item looking unticked until the view is switched.
+     */
+    it('bumps the revision, so the second view re-reads too', async () => {
+      const { store } = await createNotesHarness([createNote({ id: 'a', title: 'Old' })]);
+      const revision = TestBed.inject(NotesRevision);
+      const before = revision.current();
+
+      await store.applyPatch('a', { title: 'New' });
+
+      expect(revision.current()).toBeGreaterThan(before);
+    });
+
     it('skips persistence when the value has not changed', async () => {
       const { store, repository } = await createNotesHarness([createNote({ id: 'a', title: 'Same' })]);
       const update = vi.spyOn(repository, 'update');
@@ -282,6 +299,22 @@ describe('NotesStore', () => {
       );
 
       expect(update).not.toHaveBeenCalled();
+    });
+
+    /**
+     * ⚠️ The board dims where the canvas narrows: a card there can be ticked while its
+     * note is nowhere in the canvas view, and resolving it against that view alone made
+     * the click write nothing at all.
+     */
+    it('ticks a card the canvas has filtered out but the board is showing', async () => {
+      const note = createNote({ id: 'a', kind: 'checklist', items });
+      const { store, repository } = await createNotesHarness([]);
+      const update = vi.spyOn(repository, 'update');
+      vi.spyOn(TestBed.inject(BoardStore), 'findVisible').mockReturnValue(note);
+
+      await store.setChecklist('a', [{ text: 'Relire', done: true }]);
+
+      expect(update).toHaveBeenCalledWith('a', { items: [{ text: 'Relire', done: true }] });
     });
 
     it('writes when only the order changed', async () => {

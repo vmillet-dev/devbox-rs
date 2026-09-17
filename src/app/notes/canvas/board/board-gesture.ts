@@ -13,6 +13,20 @@ import { BoardFrame, BoardPoint } from '@core/model/board.model';
 /** Below this, a pointer that moved is a click that wobbled. */
 export const DRAG_THRESHOLD_PX = 4;
 
+/**
+ * Everything a gesture writes lands on this lattice, and it is the one already drawn: the
+ * surface's dotted background is 20px (`board.component.scss`), so a snapped board looks
+ * deliberate rather than merely tidy. Keep the two in step.
+ *
+ * ⚠️ Snapping never turns a click into a move: nothing here runs until the pointer has
+ * travelled past `DRAG_THRESHOLD_PX`, and `pointerup` commits nothing before then.
+ */
+export const GRID_PX = 20;
+
+export function snap(value: number): number {
+  return Math.round(value / GRID_PX) * GRID_PX;
+}
+
 /** Mirrors `folders::board`, which clamps again before writing. */
 export const MIN_ZONE_WIDTH = 264;
 export const MIN_ZONE_HEIGHT = 212;
@@ -35,6 +49,16 @@ export interface Gesture {
   readonly moved: boolean;
 }
 
+/**
+ * The card's own controls, which a drag must not start on: the press is aimed at them, and
+ * a gesture beginning there would have to swallow the click they are waiting for.
+ */
+const CARD_CONTROLS = '.card-check, .card-fill, .card-item, app-copy-button, app-note-card-menu';
+
+export function isCardControl(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(CARD_CONTROLS) !== null;
+}
+
 export function samePoint(a: BoardPoint, b: BoardPoint): boolean {
   return a.x === b.x && a.y === b.y;
 }
@@ -50,8 +74,8 @@ export function hasTravelled(origin: BoardPoint, at: BoardPoint): boolean {
 /** Keeps the grab offset: a frame follows the pointer, it does not jump under it. */
 export function movedTo(gesture: Gesture, at: BoardPoint): BoardFrame {
   return {
-    x: Math.max(0, gesture.from.x + (at.x - gesture.origin.x)),
-    y: Math.max(0, gesture.from.y + (at.y - gesture.origin.y)),
+    x: Math.max(0, snap(gesture.from.x + (at.x - gesture.origin.x))),
+    y: Math.max(0, snap(gesture.from.y + (at.y - gesture.origin.y))),
     width: gesture.from.width,
     height: gesture.from.height,
   };
@@ -66,18 +90,28 @@ export function resizedTo(gesture: Gesture, at: BoardPoint): BoardFrame {
   return {
     x: gesture.from.x,
     y: gesture.from.y,
-    width: Math.max(MIN_ZONE_WIDTH, gesture.from.width + (at.x - gesture.origin.x)),
-    height: Math.max(MIN_ZONE_HEIGHT, gesture.from.height + (at.y - gesture.origin.y)),
+    // ⚠️ Snapped first, clamped second: the minimum is `folders::board`'s and is not a
+    // multiple of the grid, so a zone squashed all the way is the one frame off it.
+    width: Math.max(MIN_ZONE_WIDTH, snap(gesture.from.width + (at.x - gesture.origin.x))),
+    height: Math.max(MIN_ZONE_HEIGHT, snap(gesture.from.height + (at.y - gesture.origin.y))),
   };
 }
 
-/** The rubber band, which reads the same whichever corner it was started from. */
+/**
+ * The rubber band, which reads the same whichever corner it was started from.
+ *
+ * ⚠️ Both corners are snapped, not the size: rounding a width would leave the far edge
+ * between two dots whenever the near one moved.
+ */
 export function drawnTo(origin: BoardPoint, at: BoardPoint): BoardFrame {
+  const left = Math.max(0, snap(Math.min(origin.x, at.x)));
+  const top = Math.max(0, snap(Math.min(origin.y, at.y)));
+
   return {
-    x: Math.max(0, Math.min(origin.x, at.x)),
-    y: Math.max(0, Math.min(origin.y, at.y)),
-    width: Math.abs(at.x - origin.x),
-    height: Math.abs(at.y - origin.y),
+    x: left,
+    y: top,
+    width: Math.max(0, snap(Math.max(origin.x, at.x)) - left),
+    height: Math.max(0, snap(Math.max(origin.y, at.y)) - top),
   };
 }
 

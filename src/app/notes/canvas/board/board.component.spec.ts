@@ -139,9 +139,53 @@ describe('BoardComponent', () => {
       surface().getBoundingClientRect = () => ({ left: 0, top: 0 }) as DOMRect;
     });
 
+    /** ⚠️ The card itself: the whole of it is the handle, there is no grip any more. */
     function grip(): HTMLElement {
-      return root().querySelector<HTMLElement>('[data-testid="board-loose-card"] .card-grip')!;
+      return root().querySelector<HTMLElement>('[data-testid="board-loose-card"] .card-title')!;
     }
+
+    /**
+     * ⚠️ The whole card is the handle, so a drag ends with a click on the card it moved —
+     * and that click must not also open the note.
+     */
+    it('swallows the click a drag leaves behind, and only that one', async () => {
+      const opened: string[] = [];
+      fixture.componentInstance.noteActivated.subscribe(({ noteId }) => opened.push(noteId));
+      const activate = () =>
+        fixture.debugElement
+          .query(By.css('[data-testid="board-loose-card"] app-note-card'))
+          .triggerEventHandler('opened', { noteId: 'loose-1', toggleChecked: false, extendRange: false });
+
+      pointer(grip(), 'pointerdown', 400, 400);
+      pointer(surface(), 'pointermove', 700, 500);
+      pointer(surface(), 'pointerup', 700, 500);
+      await fixture.whenStable();
+      activate();
+
+      expect(opened).toEqual([]);
+
+      // The next press starts clean: the note opens on a press that goes nowhere.
+      pointer(grip(), 'pointerdown', 400, 400);
+      pointer(grip(), 'pointerup', 400, 400);
+      await fixture.whenStable();
+      activate();
+
+      expect(opened).toEqual(['loose-1']);
+    });
+
+    /** A press aimed at a control is that control's, not the start of a drag. */
+    it('starts no gesture from a control of the card', async () => {
+      const seen: unknown[] = [];
+      fixture.componentInstance.cardDropped.subscribe((drop) => seen.push(drop));
+      const tick = root().querySelector<HTMLElement>('[data-testid="note-card-check"]')!;
+
+      pointer(tick, 'pointerdown', 400, 400);
+      pointer(surface(), 'pointermove', 150, 150);
+      pointer(surface(), 'pointerup', 150, 150);
+      await fixture.whenStable();
+
+      expect(seen).toEqual([]);
+    });
 
     /** ⚠️ A click must not persist anything: it is how a note is opened. */
     it('writes nothing when the pointer never travelled', async () => {
@@ -164,7 +208,8 @@ describe('BoardComponent', () => {
       pointer(surface(), 'pointerup', 150, 150);
       await fixture.whenStable();
 
-      expect(seen).toEqual([{ noteId: 'loose-1', folderId: 'perf', position: { x: 150, y: 150 } }]);
+      // Snapped to the grid the background draws: 150 lands on 160.
+      expect(seen).toEqual([{ noteId: 'loose-1', folderId: 'perf', position: { x: 160, y: 160 } }]);
     });
 
     /** Membership comes from the drop, in both directions. */
@@ -187,6 +232,68 @@ describe('BoardComponent', () => {
       await fixture.whenStable();
 
       expect(root().querySelector('[data-testid="board-zone-drop"]')).not.toBeNull();
+    });
+
+    /**
+     * ⚠️ A filed card flows inside its zone and has no coordinates of its own, so nothing
+     * followed the pointer at all — half a gesture, with only the zone lighting up.
+     */
+    describe('a card dragged out of a zone', () => {
+      /** ⚠️ The card itself: the whole of it is the handle, there is no grip any more. */
+      function zoneGrip(): HTMLElement {
+        return root().querySelector<HTMLElement>('.zone-card .card-title')!;
+      }
+
+      function ghost(): HTMLElement | null {
+        return root().querySelector<HTMLElement>('[data-testid="board-ghost-card"]');
+      }
+
+      beforeEach(async () => {
+        fixture.componentRef.setInput('zones', [
+          fakeZone({
+            folder: PERF,
+            frame: { x: 0, y: 0, width: 300, height: 300 },
+            notes: [fakeBoardNote(createNote({ id: 'filed-1', title: 'EXPLAIN lent' }))],
+          }),
+        ]);
+        await fixture.whenStable();
+      });
+
+      it('is drawn under the pointer for the whole gesture', async () => {
+        pointer(zoneGrip(), 'pointerdown', 40, 40);
+        expect(ghost()).toBeNull();
+
+        pointer(surface(), 'pointermove', 500, 450);
+        await fixture.whenStable();
+
+        expect(ghost()).not.toBeNull();
+        expect(ghost()?.getAttribute('data-note-id')).toBe('filed-1');
+        // ⚠️ By the grab offset, not under the pointer: the card was grabbed 40px into its
+        // seat, so it travels 460 rather than jumping its own corner onto the cursor —
+        // then snapped to the grid, which puts 410 on 420.
+        expect(ghost()?.style.left).toBe('460px');
+        expect(ghost()?.style.top).toBe('420px');
+      });
+
+      /** Its seat stays behind, faded: the drop can still be cancelled. */
+      it('leaves the card in its zone until the pointer lifts', async () => {
+        pointer(zoneGrip(), 'pointerdown', 40, 40);
+        pointer(surface(), 'pointermove', 500, 450);
+        await fixture.whenStable();
+
+        expect(root().querySelector('.zone-card.lifted')).not.toBeNull();
+      });
+
+      it('takes it away again when the gesture is cancelled', async () => {
+        pointer(zoneGrip(), 'pointerdown', 40, 40);
+        pointer(surface(), 'pointermove', 500, 450);
+        await fixture.whenStable();
+
+        pointer(surface(), 'pointercancel', 500, 450);
+        await fixture.whenStable();
+
+        expect(ghost()).toBeNull();
+      });
     });
 
     /** ⚠️ A pointer the system took back must not leave a card where nobody put it. */
@@ -228,7 +335,7 @@ describe('BoardComponent', () => {
       pointer(surface(), 'pointerup', 500, 450);
       await fixture.whenStable();
 
-      expect(seen[0]?.frame).toEqual({ x: 0, y: 0, width: 500, height: 450 });
+      expect(seen[0]?.frame).toEqual({ x: 0, y: 0, width: 500, height: 460 });
     });
 
     it('draws a band on the background and asks for a zone', async () => {
@@ -260,11 +367,18 @@ describe('BoardComponent', () => {
     });
 
     /** Without a space there is nothing to file into, so nothing may be grabbed either. */
-    it('offers no grips at all when the board is not editable', async () => {
+    it('moves nothing at all when the board is not editable', async () => {
+      const seen: unknown[] = [];
+      fixture.componentInstance.cardDropped.subscribe((drop) => seen.push(drop));
       fixture.componentRef.setInput('editable', false);
       await fixture.whenStable();
 
-      expect(root().querySelector('[data-testid="board-card-grip"]')).toBeNull();
+      pointer(grip(), 'pointerdown', 400, 400);
+      pointer(surface(), 'pointermove', 150, 150);
+      pointer(surface(), 'pointerup', 150, 150);
+      await fixture.whenStable();
+
+      expect(seen).toEqual([]);
       expect(root().querySelector('[data-testid="board-zone-resize"]')).toBeNull();
     });
   });

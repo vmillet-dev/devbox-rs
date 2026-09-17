@@ -1,4 +1,5 @@
 import { Directive, ElementRef, inject } from '@angular/core';
+import { SettingsStore } from '@core/services/settings/settings.store';
 import { ShortcutGroup } from '@core/services/shortcuts/shortcut.model';
 import { DialogStack } from '@shared/layout/dialog/dialog-stack';
 import { FoldersStore } from '@core/state/folders.store';
@@ -15,6 +16,7 @@ interface CanvasContext {
   readonly canvas: NotesQueryStore;
   readonly folders: FoldersStore;
   readonly selection: NoteSelectionStore;
+  readonly settings: SettingsStore;
   readonly copy: (content: string) => void;
   readonly move: (direction: FocusDirection) => void;
 }
@@ -59,6 +61,16 @@ function when(condition: boolean, action: () => void): boolean {
 /** In reading order, which is also the order the sheet lists them in. */
 const CANVAS_KEYS: readonly CanvasKey[] = [
   { keys: ['Ctrl', 'K'], labelKey: 'shortcuts.canvas.search' },
+  {
+    keys: ['Ctrl', 'B'],
+    labelKey: 'shortcuts.canvas.library',
+    on: ['b', 'B'],
+    ctrl: true,
+    run: ({ settings }) => {
+      settings.showLibraryRail.write(!settings.showLibraryRail());
+      return true;
+    },
+  },
   {
     keys: ['↑ ↓ ← →'],
     labelKey: 'shortcuts.canvas.move',
@@ -149,9 +161,13 @@ export class CanvasKeyboardDirective {
   private readonly folders = inject(FoldersStore);
   private readonly copier = inject(NoteCopyService);
   private readonly dialogs = inject(DialogStack);
+  private readonly settings = inject(SettingsStore);
 
   protected onKeydown(event: KeyboardEvent): void {
-    if (this.dialogs.hasOpenDialog() || isTypingTarget(event.target)) return;
+    // ⚠️ `defaultPrevented` too: this listens on the document, so a control that has
+    // already handled the key — the rail's resize edge — would see the canvas act on it
+    // as well, and the arrows would move the card focus while the rail is being widened.
+    if (this.dialogs.hasOpenDialog() || isTypingTarget(event.target) || event.defaultPrevented) return;
 
     const withCtrl = event.ctrlKey || event.metaKey;
     const entry = CANVAS_KEYS.find(
@@ -175,6 +191,7 @@ export class CanvasKeyboardDirective {
       canvas: this.canvas,
       folders: this.folders,
       selection: this.selection,
+      settings: this.settings,
       copy: (content) => void this.copier.copy(content),
       move: (direction) => this.moveFocus(direction),
     };

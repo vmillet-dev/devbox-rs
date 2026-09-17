@@ -23,7 +23,7 @@
         [isDropTarget]="hoveredZone() === zone.folder.id"
         [isMoving]="isDragging(zone.folder.id)"
         [draggingNoteId]="gesture()?.kind === 'card' ? (gesture()?.id ?? null) : null"
-        (noteActivated)="noteActivated.emit($event)"
+        (noteActivated)="onCardActivated($event)"
         (opened)="folderOpened.emit($event)"
         (headGrabbed)="startZoneMove($event, zone)"
         (resizeGrabbed)="startZoneResize($event, zone)"
@@ -45,6 +45,9 @@
       </p>
       @for (entry of loose(); track entry.note.id) {
         @let at = positionOf(entry);
+        <!-- ⚠️ The whole card is the handle: a press that travels moves it, one that does
+             not opens the note, and the distance is what tells them apart. The keyboard
+             twin is the selection bar — tick with X, then "file into…". -->
         <div
           class="loose-card"
           data-testid="board-loose-card"
@@ -53,24 +56,28 @@
           [class.dragging]="isDragging(entry.note.id)"
           [style.left.px]="at.x"
           [style.top.px]="at.y"
+          (pointerdown)="grabLoose($event, entry, at)"
         >
-          @if (editable()) {
-            <!-- ⚠️ A grip and not the card itself: the card is a <button> that opens the
-                 note, and a drag started on it would have to swallow its own click. The
-                 keyboard twin is the selection bar — tick with X, then "file into…". -->
-            <button
-              type="button"
-              class="card-grip"
-              data-testid="board-card-grip"
-              [attr.aria-label]="'board.moveCard' | transloco: { title: entry.note.title }"
-              (pointerdown)="startCard($event, entry, { x: at.x, y: at.y, width: 0, height: 0 })"
-            >
-              <span aria-hidden="true">⠿</span>
-            </button>
-          }
-          <app-note-card [note]="entry.note" (opened)="noteActivated.emit($event)" />
+          <app-note-card [note]="entry.note" (opened)="onCardActivated($event)" />
         </div>
       }
+    }
+
+    <!-- ⚠️ Drawn at the pointer and transparent to it: a card out of a zone has no seat of
+         its own to move, so this is the only thing that follows the drag. Its seat stays
+         behind, faded — the drop can still be cancelled. -->
+    @if (travelling(); as entry) {
+      @let ghostAt = travellingAt();
+      <div
+        class="ghost-card"
+        data-testid="board-ghost-card"
+        aria-hidden="true"
+        [attr.data-note-id]="entry.note.id"
+        [style.left.px]="ghostAt.x"
+        [style.top.px]="ghostAt.y"
+      >
+        <app-note-card [note]="entry.note" />
+      </div>
     }
 
     @if (drawnBand) {

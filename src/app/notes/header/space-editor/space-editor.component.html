@@ -1,0 +1,59 @@
+<div class="editor-panel">
+  <p class="editor-title">{{ space().name }}</p>
+
+  <button
+    type="button"
+    class="editor-pin"
+    data-testid="space-pin"
+    [class.on]="space().pinned"
+    [attr.aria-pressed]="space().pinned"
+    (click)="pinRequested.emit(space().id)"
+  >
+    <span aria-hidden="true">📌</span>
+    {{ (space().pinned ? 'notes.unpinSpace' : 'notes.pinSpace') | transloco }}
+  </button>
+
+  <form class="editor-form" (submit)="submitRename($event, renameInput.value)">
+    <input
+      #renameInput
+      type="text"
+      class="editor-input"
+      data-testid="space-rename-input"
+      [attr.aria-label]="'notes.renameSpaceLabel' | transloco"
+      [value]="space().name"
+    />
+    <button type="submit" class="editor-action" data-testid="space-rename-submit">
+      {{ 'notes.renameSpaceSubmit' | transloco }}
+    </button>
+  </form>
+
+  @if (moveTargets().length > 0) {
+    <div class="editor-delete-group">
+      <label class="editor-note" [attr.for]="'space-move-target'">
+        {{ 'notes.moveNotesTo' | transloco }}
+      </label>
+      <div class="editor-delete-row">
+        <!-- The target is mandatory: the space leaves with its notes (ON DELETE CASCADE)
+             if nobody takes them in. -->
+        <select #targetSelect id="space-move-target" data-testid="space-move-target" class="editor-input">
+          @for (target of moveTargets(); track target.id) {
+            <option [value]="target.id">{{ target.name }}</option>
+          }
+        </select>
+        <button
+          type="button"
+          class="editor-action editor-delete"
+          data-testid="space-delete"
+          [class.confirming]="confirmingDelete()"
+          (click)="onDeleteClick(targetSelect.value)"
+        >
+          {{ (confirmingDelete() ? 'notes.deleteSpaceConfirm' : 'notes.deleteSpace') | transloco }}
+        </button>
+      </div>
+    </div>
+  } @else {
+    <p class="editor-note editor-blocked" data-testid="space-delete-blocked">
+      {{ 'notes.deleteSpaceNeedsAnother' | transloco }}
+    </p>
+  }
+</div>

@@ -150,9 +150,6 @@ describe('Editing a note', () => {
     // `null` is a choice, not a loading state: the note filed in `Ops` is still listed.
     await canvas.waitForCard(title);
 
-    // Reopened, because selecting closes the menu with the row that has to be checked.
-    await spaces.open();
-    expect(await spaces.allOption().getAttribute('aria-checked')).toBe('true');
-    await spaces.close();
+    expect(await spaces.allOption().getAttribute('aria-current')).toBe('true');
   });
 });

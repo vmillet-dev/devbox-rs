@@ -3,7 +3,7 @@ import { browser, expect } from '@wdio/globals';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { board, folders, spaces } from '../pageobjects/overlays.page.js';
 import { reloadCanvas, testid, waitForCanvas } from '../support/app.js';
-import { bridge, draft, homeSpaceId } from '../support/bridge.js';
+import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
  * The board is drawn from geometry a real database stores, and the first layout is
@@ -147,6 +147,53 @@ describe('The board', () => {
     expect((await canvas.sectionKeys()).length).toBeGreaterThan(0);
 
     await board.show('board');
+  });
+
+  /**
+   * ⚠️ A card on the board is the same card, so its checkboxes are real ones — and the
+   * board has to hear about the write, which used to reload the canvas and nothing else.
+   */
+  it('ticks a todo list on the board, and shows it ticked without a view switch', async () => {
+    const list = await bridge.createNote(
+      draft({
+        spaceId,
+        title: 'Avant la release',
+        kind: 'checklist',
+        items: [
+          { text: 'Tag', done: false },
+          { text: 'Notes', done: false },
+        ],
+      }),
+    );
+    await reloadInSpace();
+    await board.show('board');
+    await board.waitForBoard();
+
+    const card = browser.$(`${testid('note-card')}[data-note-id="${list.id}"]`);
+    await card.$(testid('note-card-item')).click();
+    await browser.pause(900);
+
+    const view = await bridge.queryNotes(query({ spaceId, search: 'Avant la release' }));
+    expect(view.sections[0]?.notes[0]?.items?.[0]?.done).toBe(true);
+    // Drawn from what the board re-read, not from the date view behind it.
+    expect(await card.$(testid('note-card-item')).getAttribute('aria-checked')).toBe('true');
+  });
+
+  /**
+   * ⚠️ The grip used to be drawn on top of the selection tick, with an opaque background
+   * and a higher `z-index`, so ticking a card on the board meant aiming at the few pixels
+   * of checkbox that stuck out from under it. There is no grip at all now — the card is
+   * its own handle — and the corner is the tick's.
+   */
+  it('leaves the corner to the selection tick, having no grip left', async () => {
+    await board.show('board');
+    expect(await browser.$(testid('board-card-grip')).isExisting()).toBe(false);
+
+    await canvas.check('Dump nocturne');
+    expect(await canvas.isChecked('Dump nocturne')).toBe(true);
+
+    await canvas.check('Dump nocturne');
+    expect(await canvas.isChecked('Dump nocturne')).toBe(false);
   });
 
   /** Nothing is removed from the header: the board is a second view, not a replacement. */

@@ -76,7 +76,6 @@
 }
 
 // Quiet at rest but never hidden: `visibility: hidden` would take it out of the tab order.
-.card-grip,
 .zone-grip {
   @include unstyled-control;
 
@@ -90,21 +89,10 @@
   opacity: 0.4;
 }
 
-.card-grip {
-  position: absolute;
-  left: 4px;
-  top: 4px;
-  z-index: 2;
-  background: var(--bg-2);
-}
-
 .zone-card {
   @include board-card;
 }
 
-.zone-card:hover .card-grip,
-.card-grip:hover,
-.card-grip:focus-visible,
 .zone-head:hover .zone-grip,
 .zone-grip:hover,
 .zone-grip:focus-visible {
@@ -112,7 +100,6 @@
   color: var(--text-0);
 }
 
-.card-grip:focus-visible,
 .zone-grip:focus-visible,
 .zone-resize:focus-visible {
   outline: 2px solid var(--amber);

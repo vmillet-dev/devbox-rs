@@ -112,6 +112,14 @@
     "deleteKeepsNotes": "Les notes restent, simplement sans dossier.",
     "breadcrumbLabel": "Fil d’Ariane du dossier"
   },
+  "sidebar": {
+    "library": "Bibliothèque",
+    "toggle": "Afficher ou masquer la bibliothèque",
+    "expand": "Ouvrir l'espace {{name}}",
+    "collapse": "Replier l'espace {{name}}",
+    "noFolders": "Aucun dossier",
+    "resize": "Largeur de la bibliothèque"
+  },
   "board": {
     "viewSwitchLabel": "Choisir la vue",
     "dateView": "Date",
@@ -120,7 +128,6 @@
     "loose": "Hors dossier · {{count}}",
     "emptyZone": "Aucune note ici.",
     "empty": "Rien à disposer pour le moment.",
-    "moveCard": "Déplacer la note {{title}}",
     "moveZone": "Déplacer le dossier {{name}}",
     "resizeZone": "Redimensionner le dossier {{name}}",
     "dropHere": "Déposer ici",
@@ -336,7 +343,8 @@
     "searchLabel": "Rechercher un snippet à coller",
     "resultsLabel": "Snippets trouvés",
     "empty": "Aucun snippet ne correspond.",
-    "hint": "↑↓ naviguer · Entrée copier ou créer · Tab ouvrir · Échap fermer",
+    "hint": "↑↓ naviguer · Entrée copier · Tab ou clic ouvrir · Échap fermer",
+    "copyLabel": "Copier « {{title}} »",
     "close": "Fermer la palette",
     "createNote": "+ Créer une note « {{query}} »"
   },
@@ -435,6 +443,7 @@
     },
     "canvas": {
       "search": "Aller au champ de recherche",
+      "library": "Afficher ou masquer la bibliothèque",
       "move": "Se déplacer de carte en carte",
       "open": "Ouvrir la carte sous le focus",
       "copy": "Copier son contenu",

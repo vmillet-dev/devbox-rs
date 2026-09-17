@@ -1,4 +1,14 @@
-import { Injectable, Signal, computed, effect, inject, resource, signal, untracked } from '@angular/core';
+import {
+  Injectable,
+  Signal,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  resource,
+  signal,
+  untracked,
+} from '@angular/core';
 import { ErrorNotifier } from '@core/services/errors/error-notifier.service';
 import { PreferencesService } from '@core/services/preferences/preferences.service';
 import { ClockService } from '@core/services/time/clock.service';
@@ -15,7 +25,7 @@ import {
   BoardZone,
   NotesViewMode,
 } from '../model/board.model';
-import { NoteFilter } from '../model/note.model';
+import { Note, NoteFilter } from '../model/note.model';
 import { NotesQueryStore } from './notes-query.store';
 import { NotesRevision } from './notes-revision';
 import { SpacesStore } from './spaces.store';
@@ -152,10 +162,16 @@ export class BoardStore {
     },
   });
 
-  /** Kept during a reload, like the canvas's: the board must not blank on a keystroke. */
-  private readonly view = computed<BoardView | null>(() =>
-    this.viewResource.hasValue() ? this.viewResource.value() : null,
-  );
+  /**
+   * ⚠️ Kept during a reload, like `NotesQueryStore.view` — and it really is kept now: a
+   * `computed` reading `hasValue()` answers `null` for the whole round trip, so the board
+   * went blank on every reload. Harmless while only a filter reloaded it; not harmless now
+   * that a note write does, which is a card disappearing under the pointer that ticked it.
+   */
+  private readonly view = linkedSignal<BoardView | undefined, BoardView | null>({
+    source: () => (this.viewResource.hasValue() ? this.viewResource.value() : undefined),
+    computation: (fresh, previous) => fresh ?? previous?.value ?? null,
+  });
 
   /**
    * What a gesture has moved but not yet written. ⚠️ Laid over the view rather than
@@ -208,6 +224,21 @@ export class BoardStore {
 
   reload(): void {
     this.viewResource.reload();
+  }
+
+  /**
+   * The note a card on the board is showing, zone or background.
+   *
+   * ⚠️ The twin of `NotesQueryStore.findVisible`, and the board needs one of its own: it
+   * **dims** where the canvas **narrows**, so a card here can be ticked, moved or deleted
+   * while its note is nowhere in the canvas view.
+   */
+  findVisible(id: string): Note | null {
+    for (const zone of this.zones()) {
+      const found = zone.notes.find((entry) => entry.note.id === id);
+      if (found) return found.note;
+    }
+    return this.loose().find((entry) => entry.note.id === id)?.note ?? null;
   }
 
   /**
