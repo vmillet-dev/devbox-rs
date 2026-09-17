@@ -101,6 +101,10 @@ export class FoldersStore {
     if (!created) return null;
 
     this.known.set([...this.allFolders(), created]);
+    // ⚠️ The rail shows it at once from the line above; the **board** would not draw its
+    // zone until something else happened to reload it. `createZone` — the same folder made
+    // by drawing a band — has always bumped for exactly that reason.
+    this.revision.bump();
     return created;
   }
 
