@@ -128,7 +128,6 @@
     "loose": "Hors dossier · {{count}}",
     "emptyZone": "Aucune note ici.",
     "empty": "Rien à disposer pour le moment.",
-    "moveCard": "Déplacer la note {{title}}",
     "moveZone": "Déplacer le dossier {{name}}",
     "resizeZone": "Redimensionner le dossier {{name}}",
     "dropHere": "Déposer ici",

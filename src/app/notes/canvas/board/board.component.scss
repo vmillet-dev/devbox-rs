@@ -63,36 +63,6 @@
   position: absolute;
 }
 
-.loose-card .card-grip {
-  @include unstyled-control;
-
-  position: absolute;
-  left: 4px;
-  top: 4px;
-  z-index: 2;
-  padding: 2px 5px;
-  border-radius: 4px;
-  font-size: 12px;
-  line-height: 1;
-  color: var(--text-2);
-  background: var(--bg-2);
-  cursor: grab;
-  touch-action: none;
-  opacity: 0.4;
-}
-
-.loose-card:hover .card-grip,
-.loose-card .card-grip:hover,
-.loose-card .card-grip:focus-visible {
-  opacity: 1;
-  color: var(--text-0);
-}
-
-.loose-card .card-grip:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
-}
-
 // At the end of the cursor, and above everything it is being dragged over.
 .loose-card.dragging {
   z-index: 20;

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { BoardFrame, BoardNote, BoardZone } from '@core/model/board.model';
+import { isCardControl } from '../board-gesture';
 import { NoteActivation, NoteCardComponent } from '@notes/canvas/note-card/note-card.component';
 import {
   FolderEditorComponent,
@@ -66,8 +67,15 @@ export class BoardZoneComponent {
     this.deleted.emit(id);
   }
 
-  /** A card flows here, so its drag starts from where the zone is rather than from itself. */
+  /**
+   * A card flows here, so its drag starts from where the zone is rather than from itself.
+   *
+   * ⚠️ Not from its own controls: a press on the tick, the copy, the ⋯ or a checklist item
+   * is aimed at that control, and starting a gesture there would swallow its click.
+   */
   protected grabCard(event: PointerEvent, entry: BoardNote): void {
+    if (isCardControl(event.target)) return;
+
     const box = (event.currentTarget as HTMLElement).closest('.zone-card')?.getBoundingClientRect();
     const surface = (event.currentTarget as HTMLElement).closest('.board-surface')?.getBoundingClientRect();
 

@@ -128,7 +128,6 @@
     "loose": "No folder · {{count}}",
     "emptyZone": "No note here.",
     "empty": "Nothing to arrange yet.",
-    "moveCard": "Move the note {{title}}",
     "moveZone": "Move the folder {{name}}",
     "resizeZone": "Resize the folder {{name}}",
     "dropHere": "Drop here",

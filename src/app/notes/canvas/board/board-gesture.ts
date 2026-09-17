@@ -49,6 +49,16 @@ export interface Gesture {
   readonly moved: boolean;
 }
 
+/**
+ * The card's own controls, which a drag must not start on: the press is aimed at them, and
+ * a gesture beginning there would have to swallow the click they are waiting for.
+ */
+const CARD_CONTROLS = '.card-check, .card-fill, .card-item, app-copy-button, app-note-card-menu';
+
+export function isCardControl(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(CARD_CONTROLS) !== null;
+}
+
 export function samePoint(a: BoardPoint, b: BoardPoint): boolean {
   return a.x === b.x && a.y === b.y;
 }

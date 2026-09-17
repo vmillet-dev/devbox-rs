@@ -859,14 +859,22 @@ functions next to it (`board-gesture.ts`, which has no signals and no DOM):
 
 | Gesture       | Started from         | Ends as                                     |
 | ------------- | -------------------- | ------------------------------------------- |
-| move a card   | the card's ⠿ grip    | `file_notes` — the zone under it, or `null` |
+| move a card   | anywhere on the card | `file_notes` — the zone under it, or `null` |
 | move a zone   | the header's ⠿ grip  | a frame in the layout batch                 |
 | resize a zone | the corner handle    | a frame in the layout batch                 |
 | draw a zone   | the empty background | a folder, named on the spot, at that frame  |
 
-**A grip, not the card.** The card is a `<button>` that opens the note, so a drag started on
-it would have to swallow its own click. The grips are siblings, quiet at rest and never
-hidden — `visibility: hidden` would take them out of the tab order.
+**The card is its own handle.** There used to be a ⠿ grip in its corner, on the grounds that a
+drag started on the card "would have to swallow its own click" — but pointer events already
+tell the two apart by the distance travelled, so swallowing that click is one flag, not a
+design. ⚠️ `onCardActivated` drops exactly the click a committed drag leaves behind, and
+clears the flag on the next press: an abandoned drag must not eat a later click. ⚠️ A press on
+one of the card's own controls (`isCardControl` — the tick, the copy, the ⋯, a checklist item)
+starts nothing, because it is aimed at that control.
+
+The grip's real cost was where it sat: in the corner the selection tick occupies, drawn over
+it with a higher `z-index`, taking every pointer meant for it. The zone's own grip stays — a
+zone has no click of its own to tell a drag from.
 
 ⚠️ **The gesture commits on `pointerup` and nowhere else.** A drag that never travelled
 past `DRAG_THRESHOLD_PX` writes nothing — it was a click — and `pointercancel` throws the

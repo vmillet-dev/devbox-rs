@@ -384,7 +384,8 @@ export const board = {
     await browser.pause(400);
   },
 
-  cardGrip: (noteId: string) => `[data-note-id="${noteId}"] ${testid('board-card-grip')}`,
+  /** ⚠️ The card itself: the whole of it is the handle, there is no grip any more. */
+  cardGrip: (noteId: string) => `[data-note-id="${noteId}"] ${testid('note-card-title')}`,
   zoneGrip: (folderId: string) =>
     `${testid('board-zone')}[data-folder-id="${folderId}"] ${testid('board-zone-grip')}`,
   zoneResize: (folderId: string) =>

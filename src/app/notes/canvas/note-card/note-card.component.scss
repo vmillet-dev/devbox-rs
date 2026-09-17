@@ -275,7 +275,9 @@ app-language-badge,
   @include unstyled-control;
   position: absolute;
   top: 8px;
-  // Tight into the corner, so the gutter the head reserves for it can be 8px.
+  // ⚠️ Tight into the corner, which is the tick's alone: on the board the drag grip used
+  // to be drawn on top of it, and took every pointer aimed at it. The grip is the card's
+  // top edge now, and asks the content for no room.
   left: 2px;
   z-index: 1;
   padding: 2px 4px;
