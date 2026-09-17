@@ -12,23 +12,17 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Space } from '@core/model/space.model';
+import {
+  SpaceDeletion,
+  SpaceEditorComponent,
+  SpaceRenaming,
+} from '@notes/header/space-editor/space-editor.component';
 import { MenuPanelDirective } from '@shared/directives/menu-panel.directive';
 import { MenuTriggerDirective } from '@shared/directives/menu-trigger.directive';
 
-export interface SpaceDeletion {
-  readonly id: string;
-  /** The space that takes in the deleted one's notes. */
-  readonly targetSpaceId: string;
-}
-
-export interface SpaceRenaming {
-  readonly id: string;
-  readonly name: string;
-}
-
 @Component({
   selector: 'app-space-switcher',
-  imports: [TranslocoPipe, MenuPanelDirective],
+  imports: [TranslocoPipe, MenuPanelDirective, SpaceEditorComponent],
   hostDirectives: [MenuTriggerDirective],
   templateUrl: './space-switcher.component.html',
   styleUrl: './space-switcher.component.scss',
@@ -52,11 +46,8 @@ export class SpaceSwitcherComponent {
   /** ⚠️ The panel replaces the menu: input fields inside a `role="menu"` are not valid ARIA. */
   protected readonly editing = signal<Space | null>(null);
 
-  /** Two steps: the WebView blocks on a native `confirm()`. */
-  protected readonly confirmingDelete = signal(false);
-
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
-  private readonly renameInput = viewChild<ElementRef<HTMLInputElement>>('renameInput');
+  private readonly editor = viewChild(SpaceEditorComponent);
 
   /** A space cannot be its own refuge: the cascade would take the notes after the transfer. */
   protected readonly moveTargets = computed<readonly Space[]>(() => {
@@ -71,7 +62,7 @@ export class SpaceSwitcherComponent {
     effect(() => {
       if (!this.menu.open()) return;
       if (this.editing()) {
-        this.renameInput()?.nativeElement.focus();
+        this.editor()?.focusName();
       } else if (this.creating()) {
         this.nameInput()?.nativeElement.focus();
       }
@@ -94,7 +85,6 @@ export class SpaceSwitcherComponent {
 
   protected startEditing(space: Space): void {
     this.editing.set(space);
-    this.confirmingDelete.set(false);
   }
 
   /** `submit` and not `click`: the form then also answers Enter. */
@@ -106,24 +96,13 @@ export class SpaceSwitcherComponent {
     this.menu.close();
   }
 
-  protected submitRename(event: Event, name: string): void {
-    event.preventDefault();
-    const edited = this.editing();
-    if (!edited || !name.trim()) return;
-
-    this.spaceRenamed.emit({ id: edited.id, name });
+  protected onRenamed(renaming: SpaceRenaming): void {
+    this.spaceRenamed.emit(renaming);
     this.menu.close();
   }
 
-  protected onDeleteClick(targetSpaceId: string): void {
-    const edited = this.editing();
-    if (!edited || !targetSpaceId) return;
-
-    if (!this.confirmingDelete()) {
-      this.confirmingDelete.set(true);
-      return;
-    }
-    this.spaceDeleted.emit({ id: edited.id, targetSpaceId });
+  protected onDeleted(deletion: SpaceDeletion): void {
+    this.spaceDeleted.emit(deletion);
     this.menu.close();
   }
 
@@ -139,6 +118,5 @@ export class SpaceSwitcherComponent {
   private resetPanels(): void {
     this.creating.set(false);
     this.editing.set(null);
-    this.confirmingDelete.set(false);
   }
 }

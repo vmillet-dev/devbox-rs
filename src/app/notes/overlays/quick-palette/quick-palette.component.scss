@@ -38,7 +38,9 @@ app-dialog {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  width: 100%;
+  flex: 1;
+  // Or the title's ellipsis never triggers: a flex item is its content's width by default.
+  min-width: 0;
   padding: 7px 9px;
   border-radius: 7px;
   cursor: pointer;
@@ -46,6 +48,43 @@ app-dialog {
 
 .palette-option.highlighted .palette-option-button {
   background: var(--bg-3);
+}
+
+// The row is the open surface; the copy sits beside it rather than over it, so neither
+// gesture is aimed at the other.
+.palette-option {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.palette-option-copy {
+  @include unstyled-control;
+
+  flex-shrink: 0;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  // Quiet at rest but never hidden: `display: none` would take it out of the tab order.
+  opacity: 0;
+}
+
+.palette-option:hover .palette-option-copy,
+.palette-option.highlighted .palette-option-copy,
+.palette-option-copy:focus-visible {
+  opacity: 1;
+}
+
+.palette-option-copy:hover {
+  background: var(--bg-3);
+  color: var(--amber);
+}
+
+.palette-option-copy:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: -2px;
 }
 
 .palette-option-head {

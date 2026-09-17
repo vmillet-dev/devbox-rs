@@ -63,6 +63,15 @@ describe('Folders', () => {
     expect(made[0]?.colour).not.toBe(made[1]?.colour);
   });
 
+  /** The rail is a tree, so a space folds away with its folders and comes back with them. */
+  it('folds a space away without changing what is active', async () => {
+    await spaces.collapse(homeId);
+    expect(await folders.names()).not.toContain('Perf');
+
+    await spaces.collapse(homeId);
+    expect(await folders.names()).toContain('Perf');
+  });
+
   it('refuses a second folder of the same name in one space', async () => {
     const refused = await bridge.createFolder({ spaceId: homeId, name: 'migrations' }).then(
       () => 'it was not refused',

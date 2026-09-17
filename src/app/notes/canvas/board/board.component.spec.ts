@@ -164,7 +164,8 @@ describe('BoardComponent', () => {
       pointer(surface(), 'pointerup', 150, 150);
       await fixture.whenStable();
 
-      expect(seen).toEqual([{ noteId: 'loose-1', folderId: 'perf', position: { x: 150, y: 150 } }]);
+      // Snapped to the grid the background draws: 150 lands on 160.
+      expect(seen).toEqual([{ noteId: 'loose-1', folderId: 'perf', position: { x: 160, y: 160 } }]);
     });
 
     /** Membership comes from the drop, in both directions. */
@@ -288,7 +289,7 @@ describe('BoardComponent', () => {
       pointer(surface(), 'pointerup', 500, 450);
       await fixture.whenStable();
 
-      expect(seen[0]?.frame).toEqual({ x: 0, y: 0, width: 500, height: 450 });
+      expect(seen[0]?.frame).toEqual({ x: 0, y: 0, width: 500, height: 460 });
     });
 
     it('draws a band on the background and asks for a zone', async () => {
