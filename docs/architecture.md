@@ -989,6 +989,22 @@ dropped for the same reason its notes were.
 `ImportReport` gains `foldersCreated` next to `spacesCreated`, and a library that arrived
 arranged says so — every library operation reports, including when it changed nothing.
 
+⚠️ **An attachment's id is remapped too, and for a harder reason than a folder's.** It is
+half of `attachments::model::stored_name`, which is joined onto the attachments directory to
+decide a write path — and also handed to the sweeps that delete. An id read out of a file is
+whatever the file said: a record claiming `../vault` made the import overwrite the wrapped
+master key with bytes the file chose, and report success, locking the library for good. Two
+things hold it now, and the second is what matters:
+
+- `restore_attachments` gives every incoming record a fresh id before it writes. ⚠️ The
+  bytes are taken from the archive **first**, since the archive is keyed by the _sending_
+  library's `stored_name`.
+- `stored_name` itself cannot return a traversing path any more. The id half contributes
+  only `[A-Za-z0-9-_]`, the extension half was already filtered, so the result is always one
+  path component — whoever calls it, with whatever. The guard belongs in the model and not
+  at the import, because once a poisoned id is in the database every other
+  `directory.join(attachment.stored_name())` inherits it.
+
 ### What a first launch teaches
 
 A virgin database has no space, so `SampleNotesService` seeds one — and since the folders

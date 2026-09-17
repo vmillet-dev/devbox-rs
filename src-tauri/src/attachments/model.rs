@@ -32,6 +32,28 @@ impl Attachment {
     }
 }
 
+/// What an identifier is allowed to contribute to a file name. ⚠️ The application's own
+/// ids are UUIDs and pass through untouched; an id read out of an import file is whatever
+/// the file said, and a separator or a `..` there is an arbitrary path on disk — the whole
+/// of `stored_name` is joined onto the attachments directory, and also passed to the
+/// sweeps that *delete*. Filtering here is what makes a traversing name unrepresentable,
+/// rather than a rule every caller has to remember.
+fn contained(id: &str) -> String {
+    let kept: String = id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+
+    // Only reachable from an id this application did not generate, which the import
+    // boundary already replaces. Two of them collide, and losing one attachment's bytes
+    // to another inside the directory beats writing outside it.
+    if kept.is_empty() {
+        return "attachment".to_string();
+    }
+
+    kept
+}
+
 /// ⚠️ Lowercase and purely alphanumeric: anything else (separators, `..`, colons) would
 /// escape the attachments directory.
 fn extension_of(file_name: &str) -> Option<String> {
@@ -47,9 +69,11 @@ fn extension_of(file_name: &str) -> Option<String> {
 }
 
 pub fn stored_name(id: &str, file_name: &str) -> String {
+    let id = contained(id);
+
     match extension_of(file_name) {
         Some(extension) => format!("{id}.{extension}"),
-        None => id.to_string(),
+        None => id,
     }
 }
 
@@ -161,6 +185,47 @@ mod tests {
         for name in ["x.../../evil", "x.p g", "x.", "x.verylongextension"] {
             assert_eq!(stored_name("a-1", name), "a-1");
         }
+    }
+
+    /// ⚠️ The id half used to be prepended raw, and an import decided it: a record
+    /// claiming `../vault` overwrote the key file and the import reported success.
+    #[test]
+    fn a_hostile_identifier_cannot_leave_the_directory() {
+        use std::path::{Component, Path};
+
+        for id in [
+            "../vault",
+            "..\\vault",
+            "../../../../Users/me/Startup/run",
+            "/etc/passwd",
+            "C:\\Windows\\System32\\drivers\\etc\\hosts",
+            "..",
+            ".",
+            "",
+            "a/b",
+        ] {
+            for file_name in ["capture.png", "no-extension"] {
+                let name = stored_name(id, file_name);
+                let components: Vec<Component<'_>> = Path::new(&name).components().collect();
+
+                assert_eq!(
+                    components.len(),
+                    1,
+                    "{id:?} + {file_name:?} gave {name:?}, which is not one component"
+                );
+                assert!(
+                    matches!(components[0], Component::Normal(_)),
+                    "{id:?} + {file_name:?} gave {name:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_identifiers_the_application_generates_pass_through_untouched() {
+        let id = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+
+        assert_eq!(stored_name(id, "capture.png"), format!("{id}.png"));
     }
 
     #[test]
