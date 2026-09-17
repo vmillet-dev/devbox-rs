@@ -34,6 +34,24 @@ describe('Creating a note, and finding it again', () => {
     expect(view.matched).toBe(1);
   });
 
+  /**
+   * ⚠️ Measured, not asserted on a class: the title used to run inline after the badge and
+   * the marks, so it started in the middle of the card and what was left of it wrapped —
+   * and every attempt at reserving a band for the buttons cost the title a line of its own.
+   */
+  it('gives the title the whole width, under the badge rather than beside it', async () => {
+    const layout = await canvas.cardHeadLayout(title);
+
+    expect(layout).not.toBeNull();
+    // It starts at the card's own edge, exactly like the snippet under it…
+    expect(layout!.offset).toBe(0);
+    // …and it has as much room as the snippet, which nothing floats over.
+    expect(layout!.titleWidth).toBe(layout!.snippetWidth);
+    // …because the copy and ⋯ buttons hang over the card's top edge instead of taking a
+    // band above it, which on a todo list with no marks held nothing else at all.
+    expect(layout!.actionsAboveTop).toBe(true);
+  });
+
   it('materialises the draft exactly once, not once per committed field', async () => {
     // ⚠️ Closing commits the title then the content with no change detection between
     // them: the second call still carries `DRAFT_ID` while the row already exists.

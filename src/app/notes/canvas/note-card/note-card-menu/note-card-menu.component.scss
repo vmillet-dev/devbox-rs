@@ -1,31 +1,28 @@
 @use 'mixins' as *;
 
-// The host card carries the `position: relative`; this anchors only its own dropdown.
+// ⚠️ In the card's header row now, not floating over its corner: `relative` is only what
+// anchors its own dropdown. It takes the pointer back from the card, which is transparent.
 :host {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
+  position: relative;
+  pointer-events: auto;
 }
 
 .card-menu-trigger {
   @include unstyled-control;
   display: block;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.2;
   color: var(--text-2);
   cursor: pointer;
-  // Quiet at rest rather than hidden: `display: none` would take it out of the tab order.
-  opacity: 0;
 }
 
-// `:focus-within`: hover alone would leave the button invisible to the keyboard.
-:host-context(.card-shell:hover) .card-menu-trigger,
+// ⚠️ No `opacity` of its own any more: the card's action pill is what appears and goes,
+// and two rules deciding the same thing is how one of them ends up saying nothing.
+.card-menu-trigger:hover,
 .card-menu-trigger:focus-visible,
 .card-menu-trigger[aria-expanded='true'] {
-  opacity: 1;
   background: var(--bg-3);
   color: var(--text-0);
 }

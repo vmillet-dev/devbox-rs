@@ -56,28 +56,79 @@ describe('NoteCardComponent', () => {
     expect(badge.language()).toBe('json');
   });
 
-  /** Structural, not visual: jsdom lays nothing out, so this asserts a shared parent. */
-  it('puts the badge, the marks and the title in one block', async () => {
+  /**
+   * Structural, not visual: jsdom lays nothing out. ⚠️ The title is **outside** the band —
+   * inline after the badge and the marks it began in the middle of the card, and what was
+   * left of it wrapped.
+   */
+  it('keeps the title out of the band the badge and the marks sit on', async () => {
     fixture.componentRef.setInput('note', createNote({ title: 'My note', attachmentCount: 2 }));
     await fixture.whenStable();
 
     const head = fixture.nativeElement.querySelector('.card-head');
     expect(head.querySelector('app-language-badge')).not.toBeNull();
     expect(head.querySelector('[data-testid="note-card-clip"]')).not.toBeNull();
-    expect(head.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
+    expect(head.querySelector('[data-testid="note-card-title"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
   });
 
-  /** ⚠️ Outside the head, and outside the card button with it. */
-  it('drives the pin into the card corner rather than the line of text', async () => {
+  /**
+   * ⚠️ No band at all, and that is the point: the actions hang outside the card, so a todo
+   * list with nothing to mark starts on its title instead of on 26px of nothing.
+   */
+  it('draws no band on a todo list with nothing to mark', async () => {
+    fixture.componentRef.setInput('note', createNote({ title: 'My list', kind: 'checklist' }));
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('.card-head')).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-language-badge')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="note-card-title"]')).not.toBeNull();
+    // The controls are still there, outside the card.
+    expect(fixture.nativeElement.querySelector('[data-testid="note-card-check"]')).not.toBeNull();
+  });
+
+  /** ⚠️ A mark among the marks: it says what the note *is*, like the badge beside it. */
+  it('puts the pin with the marks rather than over the card corner', async () => {
     fixture.componentRef.setInput('note', createNote({ title: 'My note', pinned: true }));
     await fixture.whenStable();
 
     const pin = fixture.nativeElement.querySelector('[data-testid="note-card-pin"]');
     expect(pin).not.toBeNull();
-    expect(pin.closest('.card-head')).toBeNull();
-    expect(pin.closest('.card-shell')).not.toBeNull();
-    // The state still reaches a screen reader, from inside the card where it belongs.
-    expect(fixture.nativeElement.querySelector('.card .visually-hidden').textContent).toBe('Note épinglée');
+    expect(pin.closest('.card-head')).not.toBeNull();
+    // The glyph is decorative, so the state reaches a screen reader as text beside it.
+    expect(fixture.nativeElement.querySelector('.card-head .visually-hidden').textContent).toBe(
+      'Note épinglée',
+    );
+  });
+
+  /** ⚠️ One ⚡, not two: the mark says the copy will ask for the values before it copies. */
+  it('marks a snippet with fields once, and copies through the form', async () => {
+    fixture.componentRef.setInput(
+      'note',
+      createNote({ title: 'psql', placeholders: [{ name: 'host', defaultValue: '', value: '' }] }),
+    );
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="note-card-fields"]')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelector('[data-testid="note-card-fill"]')).not.toBeNull();
+    // And no plain copy beside it: the two never coexist.
+    expect(fixture.debugElement.query(By.directive(CopyButtonComponent))).toBeNull();
+  });
+
+  /**
+   * ⚠️ The click surface is a layer of its own under the card: a `<button>` cannot hold
+   * the buttons the header carries, which is what used to scatter them over the text.
+   */
+  it('opens from a layer under the card, not from the card itself', async () => {
+    fixture.componentRef.setInput('note', createNote({ title: 'My note' }));
+    await fixture.whenStable();
+
+    const surface = fixture.nativeElement.querySelector('[data-testid="note-card-open"]');
+    expect(surface.tagName).toBe('BUTTON');
+    expect(surface.getAttribute('aria-label')).toBe('My note');
+    // Nothing inside it: everything the card shows is drawn above it.
+    expect(surface.children).toHaveLength(0);
+    expect(fixture.nativeElement.querySelector('.card').tagName).toBe('DIV');
   });
 
   it('falls back to a translated placeholder for an untitled note', async () => {
@@ -343,7 +394,8 @@ describe('NoteCardComponent', () => {
     expect(card.classes['selected']).toBe(true);
   });
 
-  it('keeps the card button free of flow content, which a <button> may not contain', () => {
+  /** ⚠️ Still true, and now trivially so: the click surface holds nothing at all. */
+  it('keeps every button free of flow content, which a <button> may not contain', () => {
     expect(fixture.nativeElement.querySelectorAll('button div')).toHaveLength(0);
   });
 
@@ -353,7 +405,7 @@ describe('NoteCardComponent', () => {
     let emitted: string | undefined;
     fixture.componentInstance.opened.subscribe(({ noteId }) => (emitted = noteId));
 
-    fixture.debugElement.query(By.css('.card')).triggerEventHandler('click', new MouseEvent('click'));
+    fixture.debugElement.query(By.css('.card-open')).triggerEventHandler('click', new MouseEvent('click'));
 
     expect(emitted).toBe('note-42');
   });
@@ -363,7 +415,7 @@ describe('NoteCardComponent', () => {
     await fixture.whenStable();
     const activations: NoteActivation[] = [];
     fixture.componentInstance.opened.subscribe((activation) => activations.push(activation));
-    const card = fixture.debugElement.query(By.css('.card'));
+    const card = fixture.debugElement.query(By.css('.card-open'));
 
     card.triggerEventHandler('click', new MouseEvent('click', { ctrlKey: true }));
     card.triggerEventHandler('click', new MouseEvent('click', { shiftKey: true }));

@@ -1,46 +1,49 @@
 @use 'mixins' as *;
 
-// Anchors the action menu, and is what it watches to appear only on hover.
 .card-shell {
   position: relative;
 }
 
-.card {
+// ⚠️ The whole card, underneath everything it shows: opening a note is a click anywhere on
+// it, and the header's controls are real buttons in the flow above. The card itself cannot
+// be the `<button>` — a button holds no buttons — and that is what used to scatter them.
+.card-open {
   @include unstyled-control;
-  @include surface(var(--bg-1), 10px);
-  padding: var(--space-card);
+
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 10px;
   cursor: pointer;
+}
+
+// Transparent, so the ring is the only thing it ever draws — over the card, not under it.
+.card-open:focus-visible {
+  z-index: 2;
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+// ⚠️ Transparent to the pointer as a whole: what is under it is the click surface. The
+// controls take their own events back, one by one.
+.card {
+  @include surface(var(--bg-1), 10px);
+
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  padding: var(--space-card);
   display: flex;
   flex-direction: column;
   height: 150px;
   width: 100%;
-  position: relative;
   text-align: left;
   font-family: inherit;
 }
 
-.card:hover {
+.card-shell:hover .card {
   border-color: var(--line);
   background: var(--bg-2);
-}
-
-// Quiet at rest rather than hidden: `display: none` would take it out of the tab order.
-app-copy-button {
-  position: absolute;
-  top: 8px;
-  right: 34px;
-  z-index: 1;
-  opacity: 0;
-}
-
-.card-shell:hover app-copy-button,
-app-copy-button:focus-within {
-  opacity: 1;
-}
-
-.card:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
 }
 
 .card.selected {
@@ -48,10 +51,97 @@ app-copy-button:focus-within {
   box-shadow: 0 0 0 1px var(--amber-dim);
 }
 
-// ⚠️ A text block, not a flex row, and that is the whole point of this rule: as a row the
-// title is a column between the badge and the marks and wraps inside a third of the card.
-// Inline, it flows past them — its second line runs from the left edge, full width.
+.card-shell.checked .card {
+  border-color: var(--amber-dim);
+  background: rgba(var(--amber-rgb), 0.06);
+}
+
+// The marks and nothing else: a badge, a pin, a ⚡, a 📎. The actions hang outside the card,
+// so this band simply is not drawn when there is nothing to put in it.
 .card-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.card-pin,
+.card-clip,
+.card-fields {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+
+.card-fields {
+  color: var(--amber);
+}
+
+// ⚠️ Outside the card, over its top edge: inside, they were a band of their own above the
+// title, and on a card with no marks that band was 26px of nothing. A pill rather than
+// three loose glyphs — over the canvas they have to read as one group of controls.
+.card-actions {
+  position: absolute;
+  top: -9px;
+  right: 6px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-dropdown);
+  // Quiet at rest, never absent: `display: none` takes it out of the tab order.
+  opacity: 0;
+}
+
+// ⚠️ Anything setting `opacity` here would have to come after `unstyled-control`, whose
+// `all: unset` resets it — which is why the pill above carries that, not the buttons.
+.card-action {
+  @include unstyled-control;
+
+  pointer-events: auto;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+app-copy-button {
+  pointer-events: auto;
+}
+
+// ⚠️ And when the card is ticked: the pill is where the tick lives, so hiding it would
+// leave a selected card with nothing on it saying which control did that.
+.card-shell:hover .card-actions,
+.card-actions:focus-within,
+.card-shell.checked .card-actions {
+  opacity: 1;
+}
+
+.card-action:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+.card-check.checked {
+  color: var(--amber);
+}
+
+.card-action:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+// ⚠️ Full width, both lines, starting at the card's own edge: inline after the badge and
+// the marks, the title began in the middle of the card and what was left of it wrapped.
+.card-title {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -59,32 +149,8 @@ app-copy-button:focus-within {
   margin-bottom: 8px;
   font-size: 13px;
   line-height: 1.3;
-  // Reserves room for the copy and ⋯ buttons floating over the top-right corner, measured
-  // rather than guessed.
-  padding-right: 46px;
-  // ⚠️ And for the selection tick on the left, which floats over the card's own padding —
-  // `checked` keeps it on with no pointer at all. A permanent gutter rather than one that
-  // appears with the tick, which would shift the title sideways under the pointer.
-  padding-left: 8px;
-}
-
-.card-title {
   font-weight: 600;
   color: var(--text-0);
-}
-
-// Inline so the title flows past them, and before it so no glyph ends up alone on a line.
-.card-marks {
-  white-space: nowrap;
-}
-
-app-language-badge,
-.card-marks {
-  margin-right: 5px;
-}
-
-.card-marks > * + * {
-  margin-left: 5px;
 }
 
 // `app-code-viewer` brings the colouring only; the typography stays decided here.
@@ -184,32 +250,21 @@ app-language-badge,
   white-space: nowrap;
 }
 
-// Reserves the band the list covers, or the footer slides up under the items.
-.card-items-space {
-  display: block;
-  flex: 1;
-}
-
-// ⚠️ A sibling layer of the card button: it carries buttons, which cannot live inside
-// another one. Transparent to clicks — only the checkboxes take them. Anchored to the
-// bottom, since what precedes it has no fixed height.
+// In the flow: the card is no longer a button, so the items need no layer of their own.
 .card-items {
-  position: absolute;
-  inset: 0;
-  // 14px of card padding, plus the footer band at the bottom.
-  padding: var(--space-card) var(--space-card) 34px;
-  z-index: 1;
+  flex: 1;
   margin: 0;
+  padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  pointer-events: none;
   overflow: hidden;
 }
 
 .card-item {
   @include unstyled-control;
+
   pointer-events: auto;
   display: flex;
   align-items: baseline;
@@ -258,82 +313,4 @@ app-language-badge,
   padding-top: 2px;
   font-size: 10px;
   color: var(--text-2);
-}
-
-// ⚠️ Outside the card, into the grid gap, which is what keeps it clear of the copy and ⋯
-// buttons — anything drawn in their band is covered the moment the pointer arrives.
-.card-pin {
-  position: absolute;
-  top: -6px;
-  right: -4px;
-  z-index: 2;
-  font-size: 13px;
-  pointer-events: none;
-}
-
-.card-check {
-  @include unstyled-control;
-  position: absolute;
-  top: 8px;
-  // ⚠️ Tight into the corner, which is the tick's alone: on the board the drag grip used
-  // to be drawn on top of it, and took every pointer aimed at it. The grip is the card's
-  // top edge now, and asks the content for no room.
-  left: 2px;
-  z-index: 1;
-  padding: 2px 4px;
-  font-size: 12px;
-  color: var(--text-2);
-  cursor: pointer;
-  opacity: 0;
-}
-
-.card-shell:hover .card-check,
-.card-check:focus-visible,
-.card-check.checked {
-  opacity: 1;
-}
-
-.card-check.checked {
-  color: var(--amber);
-}
-
-.card-shell.checked .card {
-  border-color: var(--amber-dim);
-  background: rgba(var(--amber-rgb), 0.06);
-}
-
-// The copy button’s place, which it replaces: the two never coexist.
-.card-fill {
-  @include unstyled-control;
-  position: absolute;
-  top: 8px;
-  right: 34px;
-  z-index: 1;
-  padding: 3px 6px;
-  border-radius: 6px;
-  font-size: 11px;
-  color: var(--amber);
-  cursor: pointer;
-  opacity: 0;
-}
-
-.card-shell:hover .card-fill,
-.card-fill:focus-visible {
-  opacity: 1;
-}
-
-.card-fill:focus-visible,
-.card-check:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 1px;
-}
-
-.card-fields,
-.card-clip {
-  font-size: 10.5px;
-  color: var(--text-2);
-}
-
-.card-fields {
-  color: var(--amber);
 }

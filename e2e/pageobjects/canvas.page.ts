@@ -55,6 +55,45 @@ export const canvas = {
     return $(`${testid('note-card')}[data-note-id="${id}"]`);
   },
 
+  /**
+   * What a card's head has to work with, measured in the page. ⚠️ The buttons are drawn
+   * at `opacity: 0` until the pointer arrives, and opacity changes nothing about layout —
+   * so their boxes are readable without hovering, which is the only way this is not flaky.
+   */
+  cardHeadLayout(title: string): Promise<{
+    actionsAboveTop: boolean;
+    offset: number;
+    titleWidth: number;
+    snippetWidth: number;
+  } | null> {
+    return browser.execute(
+      (cardSelector: string, titleSelector: string, wanted: string) => {
+        const shell = [...document.querySelectorAll(cardSelector)].find(
+          (each) => (each.querySelector(titleSelector)?.textContent ?? '').trim() === wanted,
+        );
+        const card = shell?.querySelector('.card')?.getBoundingClientRect();
+        const titleBox = shell?.querySelector('.card-title')?.getBoundingClientRect();
+        const snippet = shell?.querySelector('.card-snippet')?.getBoundingClientRect();
+        const actions = shell?.querySelector('.card-actions')?.getBoundingClientRect();
+        if (!card || !titleBox || !snippet || !actions) return null;
+
+        return {
+          // The pill hangs over the card's top edge instead of being laid out inside it,
+          // which is what stops it costing the title a band of its own.
+          actionsAboveTop: actions.top < card.top,
+          // It starts at the card's own edge, exactly like the snippet under it.
+          offset: Math.round(titleBox.left - snippet.left),
+          // And it has the whole width to lay itself out in, both lines.
+          titleWidth: Math.round(titleBox.width),
+          snippetWidth: Math.round(snippet.width),
+        };
+      },
+      testid('note-card'),
+      testid('note-card-title'),
+      title,
+    );
+  },
+
   async waitForCard(title: string): Promise<void> {
     await browser.waitUntil(async () => (await canvas.titles()).includes(title), {
       timeout: 15_000,
@@ -70,12 +109,13 @@ export const canvas = {
   },
 
   /**
-   * ⚠️ Clicks the title and not the card: a checklist card carries its tickable items on
-   * a layer over the card button, and a click at the centre lands on an item.
+   * ⚠️ Clicks the card's own click surface, which is a layer **under** what it shows: the
+   * card's content is transparent to the pointer, so a click on the title reaches nothing
+   * at all. It is also what keeps a checklist's tickable items out of the way.
    */
   async openNote(title: string): Promise<void> {
     const card = await canvas.cardWithTitle(title);
-    await card.$(testid('note-card-title')).click();
+    await card.$(testid('note-card-open')).click();
     await $(testid('editor-title')).waitForExist({ timeout: 10_000 });
   },
 
