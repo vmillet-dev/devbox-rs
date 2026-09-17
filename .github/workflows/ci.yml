@@ -3,10 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
-  # `folders` is the v0.3.0 integration branch: PRs target it rather than main, and
-  # would otherwise merge unchecked. Drop it once the milestone has actually landed.
   pull_request:
-    branches: [main, folders]
+    branches: [main]
 
 # Stacked runs on a branch are cancelled. No tag run to spare any more: publishing lives
 # in `release.yml`, which has a concurrency group of its own.
