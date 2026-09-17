@@ -15,6 +15,8 @@
   margin: 16px 24px 24px;
   background: var(--bg-0);
   background-image: radial-gradient(var(--bg-2) 1px, transparent 1px);
+  // ⚠️ The lattice every gesture snaps to: `GRID_PX` in `board-gesture.ts`. Drift here and
+  // a snapped board stops looking snapped.
   background-size: 20px 20px;
   border: 1px solid var(--line-soft);
   border-radius: 10px;
@@ -64,6 +66,19 @@
 // At the end of the cursor, and above everything it is being dragged over.
 .loose-card.dragging {
   z-index: 20;
+  cursor: grabbing;
+  box-shadow: 0 14px 30px rgb(0 0 0 / 55%);
+  transform: rotate(-3deg);
+}
+
+// The card a drag took out of a zone: at the end of the cursor, above everything, and
+// transparent to the pointer — the surface underneath is what decides where it lands.
+.ghost-card {
+  @include board-card;
+
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
   cursor: grabbing;
   box-shadow: 0 14px 30px rgb(0 0 0 / 55%);
   transform: rotate(-3deg);

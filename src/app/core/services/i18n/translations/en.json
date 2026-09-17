@@ -112,6 +112,14 @@
     "deleteKeepsNotes": "The notes stay, simply without a folder.",
     "breadcrumbLabel": "Folder breadcrumb"
   },
+  "sidebar": {
+    "library": "Library",
+    "toggle": "Show or hide the library",
+    "expand": "Expand space {{name}}",
+    "collapse": "Collapse space {{name}}",
+    "noFolders": "No folder",
+    "resize": "Library width"
+  },
   "board": {
     "viewSwitchLabel": "Choose the view",
     "dateView": "Date",
@@ -335,7 +343,8 @@
     "searchLabel": "Search a snippet to paste",
     "resultsLabel": "Matching snippets",
     "empty": "No snippet matches.",
-    "hint": "↑↓ move · Enter copy or create · Tab open · Esc close",
+    "hint": "↑↓ move · Enter copy · Tab or click to open · Esc close",
+    "copyLabel": "Copy “{{title}}”",
     "close": "Close the palette",
     "createNote": "+ Create a note “{{query}}”"
   },
@@ -434,6 +443,7 @@
     },
     "canvas": {
       "search": "Jump to the search field",
+      "library": "Show or hide the library",
       "move": "Move from card to card",
       "open": "Open the focused card",
       "copy": "Copy its content",

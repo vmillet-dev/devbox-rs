@@ -63,6 +63,23 @@
       }
     }
 
+    <!-- ⚠️ Drawn at the pointer and transparent to it: a card out of a zone has no seat of
+         its own to move, so this is the only thing that follows the drag. Its seat stays
+         behind, faded — the drop can still be cancelled. -->
+    @if (travelling(); as entry) {
+      @let ghostAt = travellingAt();
+      <div
+        class="ghost-card"
+        data-testid="board-ghost-card"
+        aria-hidden="true"
+        [attr.data-note-id]="entry.note.id"
+        [style.left.px]="ghostAt.x"
+        [style.top.px]="ghostAt.y"
+      >
+        <app-note-card [note]="entry.note" />
+      </div>
+    }
+
     @if (drawnBand) {
       <!-- Decorative: the gesture is announced by the dialog the drop opens. -->
       <div

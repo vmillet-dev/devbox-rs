@@ -98,6 +98,31 @@ export class BoardComponent {
     return zoneAt(this.zoneFrames(), { x: drag.to.x, y: drag.to.y });
   });
 
+  /**
+   * The card being dragged out of a zone, drawn on the surface at the pointer.
+   *
+   * ⚠️ A filed card **flows** inside its zone and has no coordinates of its own, so there
+   * is nothing to move: without this the pointer carries nothing at all, and the only
+   * feedback left is the zone lighting up under it. A loose card needs none — `positionOf`
+   * already moves the real one.
+   */
+  protected readonly travelling = computed<BoardNote | null>(() => {
+    const drag = this.gesture();
+    if (drag?.kind !== 'card' || !drag.moved) return null;
+
+    return (
+      this.zones()
+        .flatMap((zone) => zone.notes)
+        .find((entry) => entry.note.id === drag.id) ?? null
+    );
+  });
+
+  /** Where that card is right now, in surface coordinates. */
+  protected readonly travellingAt = computed<BoardPoint>(() => {
+    const drag = this.gesture();
+    return drag ? { x: drag.to.x, y: drag.to.y } : { x: 0, y: 0 };
+  });
+
   /** The band being drawn, drawn only once the pointer has actually travelled. */
   protected readonly band = computed<BoardFrame | null>(() => {
     const drag = this.gesture();

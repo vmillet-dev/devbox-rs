@@ -10,24 +10,66 @@ import {
   waitForCanvas,
 } from '../support/app.js';
 
-/** The space switcher, which is a menu, a create form and an edit panel in one. */
+/** The rail itself: shown or hidden, and remembered across launches. */
+export const rail = {
+  isShowing: () => $(testid('library-rail')).isExisting(),
+
+  toggle: () => $(testid('library-rail-toggle')).click(),
+
+  async show(): Promise<void> {
+    if (await rail.isShowing()) return;
+
+    await rail.toggle();
+    await $(testid('library-rail')).waitForExist({ timeout: 5_000 });
+  },
+
+  async hide(): Promise<void> {
+    if (!(await rail.isShowing())) return;
+
+    await rail.toggle();
+    await $(testid('library-rail')).waitForExist({ reverse: true, timeout: 5_000 });
+  },
+
+  /** Measured rather than read off the preference: the rail has to actually be that wide. */
+  width: (): Promise<number> =>
+    browser.execute(
+      (selector: string) => Math.round(document.querySelector(selector)?.getBoundingClientRect().width ?? 0),
+      testid('library-rail'),
+    ),
+
+  /**
+   * Two arrows on the edge, the keyboard twin of dragging it. ⚠️ Focused from script: the
+   * edge swallows its own `pointerdown` to start a drag, and that is what would focus it.
+   */
+  async widen(): Promise<void> {
+    await browser.execute(
+      (selector: string) => (document.querySelector(selector) as HTMLElement | null)?.focus(),
+      testid('library-rail-edge'),
+    );
+    await browser.keys(['ArrowRight', 'ArrowRight']);
+  },
+};
+
+/**
+ * The spaces as the library rail draws them: every space is a row, and the ⋯ beside one
+ * opens the panel that pins, renames and deletes it.
+ */
 export const spaces = {
-  /** Ensures the dropdown is showing: clicking the trigger again would close it. */
+  /** The rail holds the rows, so "open" is "make sure the rail is showing". */
   async open(): Promise<void> {
-    if (!(await $(testid('space-dropdown')).isExisting())) {
-      await $(testid('space-switcher')).click();
-      await $(testid('space-dropdown')).waitForExist({ timeout: 5_000 });
-    }
+    await rail.show();
   },
 
+  /** Closes whatever panel a row's ⋯ left open; the rail itself stays. */
   async close(): Promise<void> {
-    if (await $(testid('space-dropdown')).isExisting()) {
-      await $(testid('space-switcher')).click();
-      await $(testid('space-dropdown')).waitForExist({ reverse: true, timeout: 5_000 });
+    const panel = $(`${testid('space-edit')}[aria-expanded="true"]`);
+    if (await panel.isExisting()) {
+      await panel.click();
     }
   },
 
-  label: () => $(testid('space-switcher')).getText(),
+  /** The row the canvas is showing — the only thing on screen saying which space that is. */
+  label: () => $('[data-testid^="space-option"][aria-current="true"]').getText(),
   option: (id: string) => $(`${testid('space-option')}[data-space-id="${id}"]`),
 
   /** `null` is "all spaces", and it is a choice rather than a loading state. */
@@ -42,6 +84,11 @@ export const spaces = {
     await $(testid('space-create-submit')).click();
   },
 
+  /** A space's folders are drawn under it; this is what folds them away. */
+  async collapse(id: string): Promise<void> {
+    await $(`${testid('space-twisty')}[data-space-id="${id}"]`).click();
+  },
+
   async rename(id: string, into: string): Promise<void> {
     await $(`${testid('space-edit')}[data-space-id="${id}"]`).click();
     await setField(testid('space-rename-input'), into);
@@ -49,14 +96,8 @@ export const spaces = {
   },
 
   /**
-   * ⚠️ `setNativeValue` and not `selectByAttribute`, like every other `<select>` here: it
-   * works either way today, but the day the control becomes signal-bound the driver's
-   * missing `change` would silently delete with the wrong refuge.
-   */
-  /** From the same panel as the rename and the delete, which the ⋯ opens. */
-  /**
-   * ⚠️ Closes behind itself: the edit panel replaces the menu rather than sitting over it,
-   * so `open()` would find the dropdown already showing and leave the next caller here.
+   * From the same panel as the rename and the delete, which the ⋯ opens. ⚠️ Closes behind
+   * itself: a panel left open covers the rows the next caller is looking for.
    */
   async togglePin(id: string): Promise<void> {
     await $(`${testid('space-edit')}[data-space-id="${id}"]`).click();
@@ -64,6 +105,11 @@ export const spaces = {
     await spaces.close();
   },
 
+  /**
+   * ⚠️ `setNativeValue` and not `selectByAttribute`, like every other `<select>` here: it
+   * works either way today, but the day the control becomes signal-bound the driver's
+   * missing `change` would silently delete with the wrong refuge.
+   */
   async remove(id: string, refugeId: string): Promise<void> {
     await $(`${testid('space-edit')}[data-space-id="${id}"]`).click();
     await setNativeValue(testid('space-move-target'), refugeId);
@@ -73,27 +119,22 @@ export const spaces = {
   deleteBlocked: () => $(testid('space-delete-blocked')),
 };
 
-/** The folder switcher: a menu, a create form and an edit panel in one, like `spaces`. */
+/** The folders, drawn in the rail under the space that holds them. */
 export const folders = {
   async open(): Promise<void> {
-    if (!(await $(testid('folder-dropdown')).isExisting())) {
-      await $(testid('folder-switcher')).click();
-      await $(testid('folder-dropdown')).waitForExist({ timeout: 5_000 });
-    }
+    await rail.show();
   },
 
+  /** Closes whatever panel a row's ⋯ left open; the rail itself stays. */
   async close(): Promise<void> {
-    if (await $(testid('folder-dropdown')).isExisting()) {
-      await $(testid('folder-switcher')).click();
-      await $(testid('folder-dropdown')).waitForExist({ reverse: true, timeout: 5_000 });
+    const panel = $(`${testid('folder-edit')}[aria-expanded="true"]`);
+    if (await panel.isExisting()) {
+      await panel.click();
     }
   },
 
-  label: () => $(testid('folder-switcher')).getText(),
+  label: () => $(`${testid('folder-option')}[aria-current="true"]`).getText(),
   option: (id: string) => $(`${testid('folder-option')}[data-folder-id="${id}"]`),
-
-  /** `null` is "every folder", filed or not — a choice rather than a loading state. */
-  allOption: () => $(testid('folder-option-all')),
 
   names: (): Promise<string[]> => readEach(testid('folder-option'), 'text'),
 
@@ -110,7 +151,7 @@ export const folders = {
     await $(testid('folder-rename-submit')).click();
   },
 
-  /** ⚠️ Closes behind itself: the edit panel replaces the menu rather than sitting over it. */
+  /** ⚠️ Closes behind itself: a panel left open covers the rows under it. */
   async recolour(id: string, colour: string): Promise<void> {
     await $(`${testid('folder-edit')}[data-folder-id="${id}"]`).click();
     await $(`${testid('folder-colour')}[data-colour="${colour}"]`).click();
@@ -122,8 +163,6 @@ export const folders = {
     await $(`${testid('folder-edit')}[data-folder-id="${id}"]`).click();
     await confirmTwice($(testid('folder-delete')));
   },
-
-  createBlocked: () => $(testid('folder-create-blocked')),
 };
 
 /** The Date / Tableau switch and the board it draws. */
@@ -503,6 +542,10 @@ export const palette = {
   empty: () => $(testid('palette-empty')),
 
   titles: (): Promise<string[]> => readEach(testid('palette-option'), 'text'),
+
+  /** A click on the row opens the note; the ⧉ beside it is the paste path. */
+  openRow: (index = 0) => $$(testid('palette-open'))[index],
+  copyRow: (index = 0) => $$(testid('palette-copy'))[index],
 
   async type(text: string): Promise<void> {
     await $(testid('palette-input')).setValue(text);
