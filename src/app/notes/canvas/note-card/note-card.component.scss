@@ -61,9 +61,9 @@ app-copy-button:focus-within {
   margin-bottom: 6px;
   min-height: 17px;
   padding-right: 52px;
-  // ⚠️ Nothing on the left either, normally: the selection tick fits inside the card's own
-  // padding. On the board it stands beside a drag grip and the band moves along.
-  padding-left: var(--card-head-gutter, 0);
+  // ⚠️ And nothing on the left: the selection tick fits inside the card's own padding, so
+  // the badge lines up with the title and the snippet rather than starting 8px in.
+  padding-left: 0;
 }
 
 // ⚠️ Full width, both lines, starting at the card's own edge: inline after the badge and
@@ -271,7 +271,7 @@ app-copy-button:focus-within {
   // ⚠️ Inside the card's own padding (`--space-card`), which is what lets the head reserve
   // nothing on the left: a wider tick would sit over the first glyphs of the badge the
   // moment it appeared.
-  left: var(--card-check-left, 0);
+  left: 0;
   z-index: 1;
   padding: 2px 1px;
   font-size: 11px;
