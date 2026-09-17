@@ -239,8 +239,9 @@ describe('BoardComponent', () => {
      * followed the pointer at all — half a gesture, with only the zone lighting up.
      */
     describe('a card dragged out of a zone', () => {
+      /** ⚠️ The card itself: the whole of it is the handle, there is no grip any more. */
       function zoneGrip(): HTMLElement {
-        return root().querySelector<HTMLElement>('.zone-card .card-grip')!;
+        return root().querySelector<HTMLElement>('.zone-card .card-title')!;
       }
 
       function ghost(): HTMLElement | null {
