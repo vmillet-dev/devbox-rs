@@ -20,6 +20,7 @@ use devbox_lib::notes::model::NotePatch;
 use devbox_lib::notes::store;
 use devbox_lib::notes::view::{NoteFilter, NotesQuery};
 use devbox_lib::transfer::{bundle, file};
+use devbox_lib::vault::key::{Cost, Vault};
 
 use corpus::{NOTES, build, now, run_query};
 
@@ -215,6 +216,33 @@ fn disk(c: &mut Criterion) {
     let _ = std::fs::remove_file(&path);
 }
 
+/// ⚠️ The one number in this codebase that had been measured in the wrong profile, and
+/// the reason it lives here now: criterion builds in release, so it cannot be read off a
+/// debug run by accident. What `Cost::default` costs is what an attacker pays per guess
+/// against a copied library, so it is the parameter the whole at-rest defence rests on.
+///
+/// It seeds no corpus — deriving a key touches no database — so it is cheap to run alone:
+/// `cargo bench -- unlock`.
+fn unlock(c: &mut Criterion) {
+    let mut group = c.benchmark_group("unlock");
+    group.sample_size(10);
+
+    group.bench_function("Vault::derive at the shipped cost", |b| {
+        b.iter(|| {
+            black_box(
+                Vault::derive(
+                    black_box("a passphrase"),
+                    b"0123456789abcdef",
+                    Cost::default(),
+                )
+                .expect("a key"),
+            )
+        });
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     whole_corpus_read,
@@ -222,6 +250,7 @@ criterion_group!(
     bulk,
     aggregation,
     corpus_rewrite,
-    disk
+    disk,
+    unlock
 );
 criterion_main!(benches);
