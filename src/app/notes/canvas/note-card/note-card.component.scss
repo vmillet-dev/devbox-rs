@@ -88,15 +88,25 @@
   flex-shrink: 0;
 }
 
-.card-action,
-app-copy-button {
+// ⚠️ `opacity` comes after the mixin and not before it: `all: unset` resets it, so a rule
+// setting it earlier is wiped and every card shows its controls at rest.
+.card-action {
+  @include unstyled-control;
+
   pointer-events: auto;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--text-2);
+  cursor: pointer;
+  // ⚠️ Quiet at rest, never absent: `display: none` would take them out of the tab order,
+  // and a width that appeared on hover would shift the row under the pointer.
+  opacity: 0;
 }
 
-// ⚠️ Quiet at rest, never absent: `display: none` would take them out of the tab order, and
-// a width that appeared on hover would shift the row under the pointer.
-.card-action,
 app-copy-button {
+  pointer-events: auto;
   opacity: 0;
 }
 
@@ -108,17 +118,6 @@ app-copy-button:focus-within,
 // It says the note has fields, so it is not a control that waits for a pointer.
 .card-fill {
   opacity: 1;
-}
-
-.card-action {
-  @include unstyled-control;
-
-  padding: 2px 5px;
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.2;
-  color: var(--text-2);
-  cursor: pointer;
 }
 
 .card-action:hover {
