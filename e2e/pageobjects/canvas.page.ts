@@ -137,6 +137,33 @@ export const canvas = {
     );
   },
 
+  /**
+   * How far each todo row is drawn **outside** the box that holds it, in pixels. ⚠️ Counting
+   * the rows in the DOM is not the same question: `.card-items` is `overflow: hidden` and
+   * anchored to the bottom, so a row that no longer fits is still there and simply gets cut
+   * off the top.
+   */
+  rowOverflow(title: string): Promise<number[] | null> {
+    return browser.execute(
+      (cardSelector: string, titleSelector: string, rowSelector: string, wanted: string) => {
+        const shell = [...document.querySelectorAll(cardSelector)].find(
+          (each) => (each.querySelector(titleSelector)?.textContent ?? '').trim() === wanted,
+        );
+        const list = shell?.querySelector('.card-items')?.getBoundingClientRect();
+        if (!list) return null;
+
+        return [...(shell?.querySelectorAll(rowSelector) ?? [])].map((row) => {
+          const box = row.getBoundingClientRect();
+          return Math.max(0, Math.round(list.top - box.top), Math.round(box.bottom - list.bottom));
+        });
+      },
+      testid('note-card'),
+      testid('note-card-title'),
+      testid('note-card-item'),
+      title,
+    );
+  },
+
   async waitForCard(title: string): Promise<void> {
     await browser.waitUntil(async () => (await canvas.titles()).includes(title), {
       timeout: 15_000,
