@@ -19,11 +19,12 @@ export const DENSITIES = ['comfortable', 'compact'] as const;
 export type Density = (typeof DENSITIES)[number];
 
 /**
- * ⚠️ Narrow enough to leave the canvas usable on a small window, wide enough for the
- * panels a row opens — they are 240px of form, and a rail narrower than that would cut
- * the delete button off.
+ * ⚠️ The floor is the tree's own, not the panels': `--editor-min-width` is what lets
+ * `space-editor` and `folder-editor` follow the rail rather than hold it open at their
+ * 240px. It opens at that floor — the width is remembered, so the default is a first
+ * launch and nothing else.
  */
-export const RAIL_WIDTH = { min: 220, max: 520, default: 288 } as const;
+export const RAIL_WIDTH = { min: 160, max: 520, default: 160 } as const;
 
 export interface AppSettings {
   readonly locale: LocaleChoice;

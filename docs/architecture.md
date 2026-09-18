@@ -735,6 +735,21 @@ drag in this application — HTML5 drag and drop does not work in this WebView �
 a `role="separator"` so the arrow keys move it too. It is clamped on the way in _and_ on the
 way out (`RAIL_WIDTH`), because a preferences file written by hand is an input like any other.
 
+**The floor is the tree's own, not the panels'.** It stopped at 220px, and that number had
+nothing to do with the rows: `space-editor` and `folder-editor` carry a `min-width` of 240px,
+which is what gives a _dropdown_ a width at all. Projected inline between the rows they need no
+such thing, so the minimum is handed down as `--editor-min-width` and the rail sets it to `0` —
+a custom property, because a rule spelled in the rail's stylesheet is rewritten with the rail's
+own `_ngcontent` and can never reach into a component's. The rows inside then **wrap rather than
+squeeze**: under about 230px the submit drops below the field. The floor is 160, and so is the
+default, the width being remembered like the window's own geometry — the default is a first
+launch and nothing else.
+
+⚠️ **A row's name is ellipsised by `.node-label`, a box of its own.** `text-overflow` is a
+property of a block container and `.node-name` is a flex one, which ignores it outright: the
+name was cut mid-letter. Nothing said so for as long as the rail could not be narrow enough to
+cut one.
+
 ### Managing spaces from the switcher
 
 The space switcher's dropdown has three mutually exclusive states: the menu, the creation

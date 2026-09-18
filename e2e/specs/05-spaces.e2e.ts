@@ -1,5 +1,6 @@
 import { browser, expect } from '@wdio/globals';
 
+import { RAIL_WIDTH } from '@core/services/settings/app-settings.model';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { rail, spaces } from '../pageobjects/overlays.page.js';
 import { eventually, press, reloadCanvas, testid } from '../support/app.js';
@@ -205,6 +206,28 @@ describe('Spaces', () => {
       const widened = await rail.width();
       await reloadCanvas();
       expect(await rail.width()).toBe(widened);
+    });
+
+    /**
+     * ⚠️ The two panels a ⋯ opens used to hold the floor up with a `min-width` of their
+     * own, and releasing it is the whole of #212: at the floor the delete control has to
+     * still be inside the rail, which only a laid-out window can say.
+     */
+    it('narrows to its floor with the space panel still inside it', async () => {
+      await rail.show();
+      await rail.narrow();
+      const narrowed = await eventually(
+        () => rail.width(),
+        (width) => width === RAIL_WIDTH.min,
+        'the rail never reached its floor',
+      );
+
+      await browser.$(testid('space-edit')).click();
+
+      expect(narrowed).toBe(RAIL_WIDTH.min);
+      // The rename submit and not the delete: the delete only exists while another space
+      // stands to take the notes in, and it is the same row either way.
+      expect(await rail.overflowOf(testid('space-rename-submit'))).toBe(0);
     });
 
     /** Hidden or shown is a preference, so it has to survive the page it was set on. */

@@ -1,11 +1,13 @@
 @use 'mixins' as *;
 
+// A dropdown needs the 240px to have a width at all; the rail hands down 0, and the
+// panel follows the rail rather than holding it open.
 .editor-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 4px;
-  min-width: 240px;
+  min-width: var(--editor-min-width, 240px);
 }
 
 .editor-title {
@@ -45,6 +47,7 @@
 
 .editor-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 0 4px;
 }
@@ -53,7 +56,9 @@
   @include text-field;
   @include surface(var(--bg-1), 6px);
 
-  flex: 1;
+  // A basis and not 0: it is what makes the row wrap once the button no longer fits
+  // beside the field, instead of squeezing the two of them.
+  flex: 1 1 112px;
   min-width: 0;
   padding: 6px 8px;
   font-size: 13px;
@@ -89,6 +94,7 @@
 
 .editor-delete-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 0 4px;
 }

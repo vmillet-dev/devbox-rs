@@ -75,6 +75,7 @@
 
 .rail-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 2px 4px;
 }
@@ -83,7 +84,8 @@
   @include text-field;
   @include surface(var(--bg-0), 6px);
 
-  flex: 1;
+  // A basis and not 0: what makes the row wrap rather than squeeze both onto one line.
+  flex: 1 1 96px;
   min-width: 0;
   padding: 5px 7px;
   font-size: 12.5px;
@@ -139,6 +141,15 @@
   text-align: left;
   // A name longer than the rail is cut, never wrapped: a wrapped row breaks the levels.
   white-space: nowrap;
+  overflow: hidden;
+}
+
+// ⚠️ The ellipsis belongs to a child and not to the row: `text-overflow` is a property of
+// a block container, and a flex one simply ignores it — the name was cut mid-letter. It
+// went unseen until the rail could be narrow enough to cut one (#212).
+.node-label {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -219,12 +230,22 @@
   background: var(--folder-hue);
 }
 
-// ⚠️ Not indented with its row: the panel is 240px of form, and the rail has exactly
-// that much room once its own padding is taken out.
+// Not indented with its row: the rail is narrow enough as it is. ⚠️ And its minimum is
+// released here, so the panel follows the rail where a dropdown needs 240px to have a
+// width at all — a custom property because a rule spelled here would be rewritten with
+// the rail's own `_ngcontent` and never reach the panel (#207).
 app-space-editor,
 app-folder-editor {
+  --editor-min-width: 0;
+
   display: block;
   margin: 2px 0 6px;
+}
+
+// Back out of the folder indent, which the row above needs and a form does not: at the
+// floor those 16px are the five colours on one line rather than four and one.
+.folders app-folder-editor {
+  margin-left: -16px;
 }
 
 .node-name:focus-visible,
