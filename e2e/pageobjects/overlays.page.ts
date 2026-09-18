@@ -496,9 +496,14 @@ export const trash = {
     await confirmTwice(row.$(testid('trash-purge')));
   },
 
-  /** Confirms on a second click, like every destructive control in the application. */
+  /**
+   * ⚠️ **Not** a second click on the same button, unlike the rest: nothing puts these notes
+   * back, so the trigger is replaced by a sentence saying how many and a separate confirm.
+   */
   async empty(): Promise<void> {
-    await confirmTwice($(testid('trash-empty')));
+    await $(testid('trash-empty')).click();
+    await $(testid('trash-empty-warning')).waitForExist({ timeout: 5_000 });
+    await $(testid('trash-empty-confirm')).click();
   },
 
   /** Matched in one call and used as a selector, like `canvas.cardWithTitle`. */

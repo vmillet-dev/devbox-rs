@@ -75,10 +75,8 @@
   @include accent-state;
 }
 
-.editor-delete:hover,
-.editor-delete:focus-visible,
-.editor-delete.confirming {
-  @include accent-state(var(--red), var(--red));
+.editor-delete {
+  @include destructive;
 }
 
 .editor-delete-group {

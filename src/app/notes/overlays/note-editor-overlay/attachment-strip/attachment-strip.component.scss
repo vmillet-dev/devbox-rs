@@ -81,9 +81,8 @@ button.strip-name {
   color: var(--amber);
 }
 
-.strip-remove:hover,
-.strip-remove.confirming {
-  color: var(--red);
+.strip-remove {
+  @include destructive;
 }
 
 .strip-add {

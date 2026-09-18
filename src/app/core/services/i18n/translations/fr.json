@@ -298,12 +298,15 @@
     "purge": "Supprimer définitivement",
     "purgeConfirm": "Confirmer ?",
     "emptyTrash": "Vider la corbeille",
-    "emptyTrashConfirm": "Tout effacer ?",
+    "emptyTrashConfirm": "Effacer définitivement",
     "deletedAt": "supprimée {{when}}",
     "purgesIn": "effacée dans {{count}} j",
     "purgesToday": "effacée aujourd'hui",
     "untitled": "Sans titre",
-    "checklistNote": "Liste de tâches"
+    "checklistNote": "Liste de tâches",
+    "emptyTrashCancel": "Annuler",
+    "emptyTrashWarning": "Effacer {{count}} notes pour de bon ? Rien ne les remettra.",
+    "emptyTrashWarningOne": "Effacer cette note pour de bon ? Rien ne la remettra."
   },
   "tagManager": {
     "title": "Gérer les tags",

@@ -83,10 +83,8 @@
   margin: 4px 4px 0;
 }
 
-.editor-delete:hover,
-.editor-delete:focus-visible,
-.editor-delete.confirming {
-  @include accent-state(var(--red), var(--red));
+.editor-delete {
+  @include destructive;
 }
 
 .editor-note {

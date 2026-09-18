@@ -85,8 +85,6 @@
   color: var(--text-2);
 }
 
-.card-menu-delete:hover,
-.card-menu-delete.confirming {
-  background: var(--bg-3);
-  color: var(--red);
+.card-menu-delete {
+  @include destructive;
 }
