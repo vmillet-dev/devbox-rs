@@ -15,6 +15,20 @@
   cursor: text;
 }
 
+// WCAG 2.2 AA (2.5.8) asks 24×24 of a control that is not inline in a sentence, and seven
+// of these sat between 17 and 23px — the worst being a todo list's tick, which is what got
+// reported as unhittable.
+//
+// ⚠️ The box grows, never the type: a bigger glyph would be a density change, and density
+// is deliberately about spacing alone. ⚠️ `min-*` and not `height`, so a control whose
+// label wraps still grows rather than clipping.
+@mixin hit-target($size: 24px) {
+  display: inline-flex;
+  align-items: center;
+  min-width: $size;
+  min-height: $size;
+}
+
 // The "card" surface: background, border, radius.
 @mixin surface($bg: var(--bg-2), $radius: 8px, $border-color: var(--line-soft)) {
   background: $bg;

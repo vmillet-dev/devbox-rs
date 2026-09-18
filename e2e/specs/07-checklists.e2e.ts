@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
-import { clipboardText, reloadCanvas } from '../support/app.js';
+import { clipboardText, reloadCanvas, testid } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -123,6 +123,38 @@ describe('Todo lists', () => {
       return;
     }
     expect(copied).toContain('- [x] Write the changelog');
+  });
+
+  /**
+   * ⚠️ WCAG 2.2 AA (2.5.8) asks 24x24, and this row was 18: it is the control that was
+   * reported as impossible to tick. Growing it is not free — the card is a fixed 150px and
+   * `.card-items` is `overflow: hidden`, so the second half of this asserts the card still
+   * shows what it claims rather than clipping a row the badge is still counting.
+   */
+  it('gives every control on a card a box a pointer can hit', async () => {
+    await canvas.waitForCard(title);
+    const sizes = await canvas.controlSizes();
+
+    // The smallest side of each kind, named, so a failure says which control shrank rather
+    // than only that one did.
+    const smallest = Object.entries(sizes).map(([name, boxes]) => {
+      expect(boxes.length).toBeGreaterThan(0);
+      return [name, Math.min(...boxes.map((box) => Math.min(box.width, box.height)))] as const;
+    });
+
+    expect(smallest.filter(([, side]) => side < 24)).toEqual([]);
+  });
+
+  it('still shows the items it counts, rather than clipping one', async () => {
+    const card = await canvas.cardWithTitle(title);
+    const shown = (await card.$$(testid('note-card-item')).getElements()).length;
+    const total = (await reread())?.items?.length ?? 0;
+
+    // Two on a card, and the badge accounts for exactly the rest.
+    expect(shown).toBe(Math.min(2, total));
+    if (total > shown) {
+      expect(await card.$('.card-items-more').getText()).toContain(String(total - shown));
+    }
   });
 
   it('shows progress on the card', async () => {

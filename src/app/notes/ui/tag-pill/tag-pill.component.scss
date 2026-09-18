@@ -1,6 +1,9 @@
 @use 'mixins' as *;
 
 .tag-pill {
+  @include hit-target;
+
+  justify-content: center;
   font: inherit;
   font-family: var(--font-mono), serif;
   font-size: 11px;
