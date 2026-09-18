@@ -89,8 +89,12 @@ describe('The board', () => {
   /** ⚠️ Dimmed in place: reflowing throws away the only thing the board has. */
   it('dims what a search does not match rather than removing it', async () => {
     await canvas.search('EXPLAIN');
-    await browser.pause(600);
 
+    await eventually(
+      () => board.isDimmed('Dump nocturne'),
+      (dimmed) => dimmed,
+      'the board to dim what the search does not match',
+    );
     expect(await board.zoneTitles('Perf')).toEqual(['EXPLAIN lent sur join']);
     expect(await board.looseTitles()).toEqual(['Dump nocturne']);
     expect(await board.isDimmed('Dump nocturne')).toBe(true);
@@ -174,9 +178,12 @@ describe('The board', () => {
 
     const card = browser.$(`${testid('note-card')}[data-note-id="${list.id}"]`);
     await card.$(testid('note-card-item')).click();
-    await browser.pause(900);
 
-    const view = await bridge.queryNotes(query({ spaceId, search: 'Avant la release' }));
+    const view = await eventually(
+      () => bridge.queryNotes(query({ spaceId, search: 'Avant la release' })),
+      (read) => read.sections[0]?.notes[0]?.items?.[0]?.done === true,
+      'the tick to reach the note behind the board',
+    );
     expect(view.sections[0]?.notes[0]?.items?.[0]?.done).toBe(true);
     // Drawn from what the board re-read, not from the date view behind it.
     expect(await card.$(testid('note-card-item')).getAttribute('aria-checked')).toBe('true');

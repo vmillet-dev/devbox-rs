@@ -1,8 +1,8 @@
-import { browser, expect } from '@wdio/globals';
+import { expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { crumb, folders, selectionBar, spaces } from '../pageobjects/overlays.page.js';
-import { reloadCanvas, testid, waitForCanvas } from '../support/app.js';
+import { eventually, reloadCanvas, testid, waitForCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -47,18 +47,25 @@ describe('Folders', () => {
   it('creates a folder from the switcher', async () => {
     await folders.open();
     await folders.create('Migrations');
-    await browser.pause(500);
 
-    expect((await bridge.listFolders(homeId)).map((folder) => folder.name)).toEqual(['Migrations']);
+    const made = await eventually(
+      () => bridge.listFolders(homeId),
+      (listed) => listed.some((folder) => folder.name === 'Migrations'),
+      'the new folder to be listed',
+    );
+    expect(made.map((folder) => folder.name)).toEqual(['Migrations']);
   });
 
   /** Assigned rather than chosen, so two made back to back never come out the same. */
   it('gives the next one a different colour without being asked', async () => {
     await folders.open();
     await folders.create('Perf');
-    await browser.pause(500);
 
-    const made = await bridge.listFolders(homeId);
+    const made = await eventually(
+      () => bridge.listFolders(homeId),
+      (listed) => listed.some((folder) => folder.name === 'Perf'),
+      'the second folder to be listed',
+    );
     expect(made.map((folder) => folder.name)).toEqual(['Migrations', 'Perf']);
     expect(made[0]?.colour).not.toBe(made[1]?.colour);
   });
@@ -96,9 +103,12 @@ describe('Folders', () => {
       await canvas.check('Locks sur jobs');
       await canvas.check('Cache hit ratio');
       await selectionBar.fileInto(perfId);
-      await browser.pause(800);
 
-      const view = await bridge.queryNotes(query({ spaceId: homeId, folderId: perfId }));
+      const view = await eventually(
+        () => bridge.queryNotes(query({ spaceId: homeId, folderId: perfId })),
+        (filed) => filed.matched === 2,
+        'both ticked notes to be filed',
+      );
       expect(view.matched).toBe(2);
     });
 
@@ -141,10 +151,13 @@ describe('Folders', () => {
     it('takes a selection back out of its folder', async () => {
       await canvas.check('Cache hit ratio');
       await selectionBar.fileInto(null);
-      await browser.pause(800);
-      await selectionBar.clear();
 
-      const view = await bridge.queryNotes(query({ spaceId: homeId, folderId: perfId }));
+      const view = await eventually(
+        () => bridge.queryNotes(query({ spaceId: homeId, folderId: perfId })),
+        (left) => left.matched === 1,
+        'the unfiled note to leave the folder',
+      );
+      await selectionBar.clear();
       expect(view.matched).toBe(1);
     });
 
@@ -168,12 +181,20 @@ describe('Folders', () => {
 
     await folders.open();
     await folders.rename(before.id, 'Schéma');
-    await browser.pause(500);
+    await eventually(
+      async () => (await bridge.listFolders(homeId)).find((folder) => folder.id === before.id),
+      (folder) => folder?.name === 'Schéma',
+      'the rename to land before the colour is changed',
+    );
+
     await folders.open();
     await folders.recolour(before.id, 'red');
-    await browser.pause(500);
 
-    const after = (await bridge.listFolders(homeId)).find((folder) => folder.id === before.id);
+    const after = await eventually(
+      async () => (await bridge.listFolders(homeId)).find((folder) => folder.id === before.id),
+      (folder) => folder?.colour === 'red',
+      'the new colour to be stored',
+    );
     expect(after?.name).toBe('Schéma');
     expect(after?.colour).toBe('red');
   });
@@ -196,9 +217,12 @@ describe('Folders', () => {
 
     await folders.open();
     await folders.remove(doomed.id);
-    await browser.pause(800);
 
-    expect((await bridge.listFolders(homeId)).map((folder) => folder.name)).not.toContain('Jetable');
+    await eventually(
+      () => bridge.listFolders(homeId),
+      (listed) => !listed.some((folder) => folder.name === 'Jetable'),
+      'the deleted folder to be gone',
+    );
     expect((await bridge.queryNotes(query({ spaceId: homeId }))).matched).toBe(corpus);
 
     // Standing, and now loose — the chip is what a `SET NULL` takes away.

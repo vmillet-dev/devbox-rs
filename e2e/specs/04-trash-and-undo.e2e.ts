@@ -113,10 +113,13 @@ describe('Deleting a note, and taking it back', () => {
     expect((await trash.titles()).length).toBeGreaterThan(1);
 
     await trash.empty();
-    await browser.pause(800);
 
     // The empty state replaces the list rather than leaving a header over nothing.
-    expect(await trash.emptyState().isExisting()).toBe(true);
+    await eventually(
+      () => trash.emptyState().isExisting(),
+      (showing) => showing,
+      'the trash to say it is empty',
+    );
     expect(await trash.rows().length).toBe(0);
     expect(await bridge.listTrash()).toHaveLength(0);
     await trash.close();

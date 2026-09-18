@@ -1,4 +1,4 @@
-import { browser, expect } from '@wdio/globals';
+import { expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { selectionBar, undoBar } from '../pageobjects/overlays.page.js';
@@ -51,8 +51,12 @@ describe('Selecting several notes at once', () => {
 
   it('tags every ticked note in one call, and only those', async () => {
     await selectionBar.tag('batch');
-    await browser.pause(800);
 
+    await eventually(
+      () => reread(second),
+      (note) => note?.tags.includes('batch') === true,
+      'the batch to reach the last note it was given',
+    );
     expect((await reread(first))?.tags).toEqual(['batch']);
     expect((await reread(second))?.tags).toEqual(['batch']);
     expect((await reread(untouched))?.tags).toEqual([]);
@@ -84,11 +88,14 @@ describe('Selecting several notes at once', () => {
 
   it('copies the selection as Markdown', async function () {
     await selectionBar.copy();
-    await browser.pause(800);
 
     // `copyConfirmation` is on by default, and the toast is the only thing saying the
     // copy happened.
-    expect(await banners.status().isExisting()).toBe(true);
+    await eventually(
+      () => banners.status().isExisting(),
+      (showing) => showing,
+      'the copy confirmation to appear',
+    );
 
     const copied = await clipboardText();
     if (copied === null) {
@@ -103,8 +110,12 @@ describe('Selecting several notes at once', () => {
 
   it('moves them to another space through the renamed argument', async () => {
     await selectionBar.moveTo(refugeId);
-    await browser.pause(800);
 
+    await eventually(
+      () => reread(second),
+      (note) => note?.spaceId === refugeId,
+      'the batch to reach the last note it was given',
+    );
     expect((await reread(first))?.spaceId).toBe(refugeId);
     expect((await reread(second))?.spaceId).toBe(refugeId);
     expect((await reread(untouched))?.spaceId).toBe(spaceId);

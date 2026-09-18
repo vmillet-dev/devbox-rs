@@ -1,8 +1,9 @@
-import { browser, expect } from '@wdio/globals';
+import { expect } from '@wdio/globals';
 import { existsSync, readFileSync } from 'node:fs';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { fileMenu, settings, titlebar } from '../pageobjects/titlebar.page.js';
+import { eventually } from '../support/app.js';
 import { preferencesPath } from '../support/profile.js';
 
 /**
@@ -15,15 +16,26 @@ import { preferencesPath } from '../support/profile.js';
  * so this file only says anything about the location on Linux. See `support/profile.ts`.
  */
 describe('Preferences reach the disk', () => {
-  /** Longer than the plugin's `autoSave` debounce, with room for a slow runner. */
-  const FLUSH_MS = 1_500;
-
   function stored(): Record<string, unknown> {
     const path = preferencesPath();
     if (!existsSync(path)) {
       throw new Error(`no preferences file at ${path}`);
     }
     return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+  }
+
+  /**
+   * ⚠️ The file *is* the condition, and it is polled from Node: the page can only say the
+   * in-memory map moved, which is the one thing this file exists not to trust. The fixed
+   * wait it replaces was longer than the plugin's `autoSave` debounce, and paid that worst
+   * case on every assertion.
+   */
+  function settled(key: string, want: unknown): Promise<Record<string, unknown>> {
+    return eventually(
+      async () => (existsSync(preferencesPath()) ? stored() : {}),
+      (file) => file[key] === want,
+      `${key} to reach the preferences file as ${String(want)}`,
+    );
   }
 
   before(canvas.open);
@@ -33,7 +45,7 @@ describe('Preferences reach the disk', () => {
     await fileMenu.openPreferences();
     await settings.select(settings.control.theme, 'dark');
     await settings.close();
-    await browser.pause(FLUSH_MS);
+    await settled('devbox.theme', 'dark');
 
     expect(existsSync(preferencesPath())).toBe(true);
   });
@@ -42,9 +54,8 @@ describe('Preferences reach the disk', () => {
     await fileMenu.openPreferences();
     await settings.select(settings.control.density, 'comfortable');
     await settings.close();
-    await browser.pause(FLUSH_MS);
 
-    const file = stored();
+    const file = await settled('devbox.density', 'comfortable');
     // ⚠️ One key per setting: a blob under one key would make a half-written file lose
     // every setting at once.
     expect(file['devbox.theme']).toBe('dark');
@@ -55,17 +66,15 @@ describe('Preferences reach the disk', () => {
     await fileMenu.openPreferences();
     await settings.select(settings.control.theme, 'light');
     await settings.close();
-    await browser.pause(FLUSH_MS);
 
     // There is no OK anywhere in the panel: closing it is not what saves.
-    expect(stored()['devbox.theme']).toBe('light');
+    expect((await settled('devbox.theme', 'light'))['devbox.theme']).toBe('light');
   });
 
   it('stores the locale the titlebar switch chose, like the panel does', async () => {
     await titlebar.setLocale('en');
-    await browser.pause(FLUSH_MS);
 
-    expect(stored()['devbox.locale']).toBe('en');
+    expect((await settled('devbox.locale', 'en'))['devbox.locale']).toBe('en');
     expect(await titlebar.activeLocale()).toBe('en');
   });
 

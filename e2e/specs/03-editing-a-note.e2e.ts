@@ -1,9 +1,9 @@
-import { browser, expect } from '@wdio/globals';
+import { expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
 import { spaces } from '../pageobjects/overlays.page.js';
-import { reloadCanvas, viewportSize } from '../support/app.js';
+import { eventually, reloadCanvas, viewportSize } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -133,9 +133,13 @@ describe('Editing a note', () => {
 
   it('moves the note to another space, through the renamed argument', async () => {
     await canvas.moveNote(title, refugeId);
-    await browser.pause(500);
 
-    expect((await reread())?.spaceId).toBe(refugeId);
+    const filed = await eventually(
+      async () => (await reread())?.spaceId,
+      (spaceId) => spaceId === refugeId,
+      'the note to be filed in the refuge',
+    );
+    expect(filed).toBe(refugeId);
   });
 
   it('leaves the note reachable from the space it moved to', async () => {

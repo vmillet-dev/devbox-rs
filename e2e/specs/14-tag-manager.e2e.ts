@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { tagManager } from '../pageobjects/overlays.page.js';
-import { reloadCanvas } from '../support/app.js';
+import { eventually, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -57,9 +57,10 @@ describe('Managing the tags of the whole corpus', () => {
     expect((await bridge.listTags()).map((usage) => usage.tag)).toContain('staging');
 
     await tagManager.cancel();
-    await browser.pause(400);
 
-    // Cancelling is the whole point of asking: nothing moved.
+    // ⚠️ A duration, deliberately: cancelling is the whole point of asking, so this
+    // asserts nothing moved — which is not a condition anything can wait on.
+    await browser.pause(400);
     expect(await tagsOf('Tagged alpha')).toEqual(['staging']);
   });
 
@@ -68,8 +69,12 @@ describe('Managing the tags of the whole corpus', () => {
 
     await tagManager.setTarget('recette');
     await tagManager.apply();
-    await browser.pause(800);
 
+    await eventually(
+      () => tagsOf('Tagged alpha'),
+      (tags) => tags.includes('recette'),
+      'the rename to reach the notes it was aimed at',
+    );
     expect(await tagsOf('Tagged alpha')).toEqual(['recette']);
     expect((await tagsOf('Tagged beta')).sort()).toEqual(['recette', 'urgent']);
     // Untouched: a rename acts on what was selected, not on every tag.
@@ -84,9 +89,13 @@ describe('Managing the tags of the whole corpus', () => {
     await tagManager.select('preprod');
     await tagManager.setTarget('recette');
     await tagManager.apply();
-    await browser.pause(800);
 
     // `(note_id, tag)` is NOCASE, so the target is swept along with the sources.
+    await eventually(
+      () => tagsOf('Tagged gamma'),
+      (tags) => tags.includes('recette'),
+      'the merge to reach the note that carried the source',
+    );
     expect(await tagsOf('Tagged gamma')).toEqual(['recette']);
     expect(await tagsOf('Tagged alpha')).toEqual(['recette']);
 
@@ -102,10 +111,14 @@ describe('Managing the tags of the whole corpus', () => {
     await tagManager.select('recette');
     await tagManager.setTarget('Recette');
     await tagManager.apply();
-    await browser.pause(800);
 
     // Same rows, different spelling: the value has to be rewritten rather than ignored
     // as a duplicate.
+    await eventually(
+      () => tagsOf('Tagged alpha'),
+      (tags) => tags.includes('Recette'),
+      'the case correction to be written rather than dropped',
+    );
     expect(await tagsOf('Tagged alpha')).toEqual(['Recette']);
   });
 
@@ -115,8 +128,12 @@ describe('Managing the tags of the whole corpus', () => {
 
     await tagManager.select('urgent');
     await tagManager.delete();
-    await browser.pause(800);
 
+    await eventually(
+      () => bridge.listTags(),
+      (tags) => !tags.some((usage) => usage.tag === 'urgent'),
+      'the deleted tag to leave the corpus',
+    );
     expect((await bridge.listTags()).map((usage) => usage.tag)).not.toContain('urgent');
     // The note survived its tag.
     expect(await tagsOf('Tagged beta')).toEqual(['Recette']);
@@ -129,9 +146,12 @@ describe('Managing the tags of the whole corpus', () => {
       ?.updatedAt;
 
     await bridge.renameTag('Recette', 'production');
-    await browser.pause(400);
 
-    const after = (await bridge.queryNotes(query({ search: 'Tagged alpha' }))).sections[0]?.notes[0];
+    const after = await eventually(
+      async () => (await bridge.queryNotes(query({ search: 'Tagged alpha' }))).sections[0]?.notes[0],
+      (note) => note?.tags.includes('production') === true,
+      'the global retag to reach the note',
+    );
     expect(after?.tags).toEqual(['production']);
     // The canvas sorts on that column and would float notes nobody reopened to the top.
     expect(after?.updatedAt).toBe(before);

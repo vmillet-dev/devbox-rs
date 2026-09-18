@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { board, selectionBar, spaces } from '../pageobjects/overlays.page.js';
-import { reloadCanvas, waitForCanvas } from '../support/app.js';
+import { eventually, reloadCanvas, waitForCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -134,9 +134,12 @@ describe('Arranging the board', () => {
   it('creates a folder from a band drawn on the background', async () => {
     await board.drawZone({ x: 60, y: 900, width: 420, height: 320 });
     await board.nameZone('Reporting');
-    await browser.pause(600);
 
-    const made = (await bridge.listFolders(spaceId)).find((folder) => folder.name === 'Reporting');
+    const made = await eventually(
+      async () => (await bridge.listFolders(spaceId)).find((folder) => folder.name === 'Reporting'),
+      (folder) => folder !== undefined,
+      'the drawn band to become a folder',
+    );
     expect(made).toBeDefined();
 
     await openBoard();
@@ -153,10 +156,16 @@ describe('Arranging the board', () => {
   it('files a note with no pointer at all, from the selection bar', async () => {
     await canvas.check('EXPLAIN lent sur join');
     await selectionBar.fileInto(migrationsId);
-    await browser.pause(900);
-    await selectionBar.clear();
 
-    const view = await bridge.queryNotes(query({ spaceId, folderId: migrationsId }));
+    const view = await eventually(
+      () => bridge.queryNotes(query({ spaceId, folderId: migrationsId })),
+      (filed) =>
+        filed.sections
+          .flatMap((section) => section.notes)
+          .some((note) => note.title === 'EXPLAIN lent sur join'),
+      'the keyboard filing to land',
+    );
+    await selectionBar.clear();
     expect(view.sections.flatMap((section) => section.notes).map((note) => note.title)).toContain(
       'EXPLAIN lent sur join',
     );
@@ -165,10 +174,16 @@ describe('Arranging the board', () => {
   it('takes it back out again with no pointer either', async () => {
     await canvas.check('EXPLAIN lent sur join');
     await selectionBar.fileInto(null);
-    await browser.pause(900);
-    await selectionBar.clear();
 
-    const view = await bridge.queryNotes(query({ spaceId, folderId: migrationsId }));
+    const view = await eventually(
+      () => bridge.queryNotes(query({ spaceId, folderId: migrationsId })),
+      (left) =>
+        !left.sections
+          .flatMap((section) => section.notes)
+          .some((note) => note.title === 'EXPLAIN lent sur join'),
+      'the keyboard unfiling to land',
+    );
+    await selectionBar.clear();
     expect(view.sections.flatMap((section) => section.notes).map((note) => note.title)).not.toContain(
       'EXPLAIN lent sur join',
     );
