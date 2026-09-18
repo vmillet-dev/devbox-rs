@@ -32,7 +32,7 @@
   <ul class="tree">
     <li>
       <div class="node-row">
-        <span class="node-twisty-space" aria-hidden="true"></span>
+        <span class="node-twisty-space node-icon" aria-hidden="true">✦</span>
         <button
           type="button"
           class="node-name"
@@ -41,8 +41,7 @@
           [attr.aria-current]="activeSpaceId() === null ? 'true' : null"
           (click)="chooseSpace(null)"
         >
-          <span class="node-icon" aria-hidden="true">✦</span>
-          {{ 'notes.allSpaces' | transloco }}
+          <span class="node-label">{{ 'notes.allSpaces' | transloco }}</span>
         </button>
       </div>
     </li>
@@ -81,7 +80,7 @@
               <span class="node-pin" aria-hidden="true">📌</span>
               <span class="visually-hidden">{{ 'notes.pinnedSpace' | transloco }}</span>
             }
-            {{ space.name }}
+            <span class="node-label">{{ space.name }}</span>
           </button>
           <button
             type="button"
@@ -126,7 +125,7 @@
                       [class]="'folder-swatch is-' + folder.colour"
                       aria-hidden="true"
                     ></i>
-                    {{ folder.name }}
+                    <span class="node-label">{{ folder.name }}</span>
                   </button>
                   <button
                     type="button"
@@ -178,7 +177,8 @@
                     data-testid="folder-create-open"
                     (click)="startCreatingFolder()"
                   >
-                    <span aria-hidden="true">＋</span> {{ 'folders.newFolder' | transloco }}
+                    <span aria-hidden="true">＋</span>
+                    <span class="node-label">{{ 'folders.newFolder' | transloco }}</span>
                   </button>
                 }
               </li>

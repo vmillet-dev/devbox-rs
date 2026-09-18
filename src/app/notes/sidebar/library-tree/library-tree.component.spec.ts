@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Folder } from '@core/model/folder.model';
 import { Space } from '@core/model/space.model';
+import { RAIL_WIDTH } from '@core/services/settings/app-settings.model';
 import { provideTranslocoTesting } from '@testing/provide-transloco-testing';
 import { LibraryTreeComponent } from './library-tree.component';
 
@@ -68,6 +69,23 @@ describe('LibraryTreeComponent', () => {
     // The 📌 is decorative, so the row carries a text twin next to it.
     expect(spaces[0]).toContain('Espace épinglé');
     expect(names('[data-testid="folder-option"]')).toEqual(['Perf', 'Migrations', 'Async']);
+  });
+
+  /**
+   * ⚠️ The name sits in a box of its own rather than loose in the row: `text-overflow` is
+   * a block container's property and the row is a flex one, which ignores it — a name too
+   * long for the rail was cut mid-letter instead of ellipsised.
+   */
+  it('gives every row name a box the ellipsis can apply to', () => {
+    expect(names('.node-label')).toEqual([
+      'Tous les espaces',
+      'SQL',
+      'Perf',
+      'Migrations',
+      'Nouveau dossier',
+      'Rust',
+      'Async',
+    ]);
   });
 
   it('opens on the whole library rather than on what was expanded before', () => {
@@ -165,15 +183,15 @@ describe('LibraryTreeComponent', () => {
 
     edge.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     await fixture.whenStable();
-    expect(widths).toEqual([304]);
+    expect(widths).toEqual([RAIL_WIDTH.default + 16]);
 
-    fixture.componentRef.setInput('width', 220);
+    fixture.componentRef.setInput('width', RAIL_WIDTH.min);
     await fixture.whenStable();
     edge.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
     await fixture.whenStable();
 
     // Already at the minimum: clamped to the same number, so nothing is emitted.
-    expect(widths).toEqual([304]);
+    expect(widths).toEqual([RAIL_WIDTH.default + 16]);
   });
 
   it('offers every other space as a refuge when a space is being deleted', async () => {
