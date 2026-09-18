@@ -15,6 +15,28 @@
   cursor: text;
 }
 
+// ⚠️ Red **at rest**, not only under the pointer. Every destructive control in the
+// application turned red on `:hover`, which warns at the moment the choice has already
+// been made — while choosing, "Supprimer définitivement" was pixel-identical to
+// "Restaurer" sitting beside it.
+//
+// Text and border, never a solid fill: one red button next to the single amber accent
+// reads as a second accent rather than as a warning. ⚠️ And the pressed-in state fills
+// with `--bg-3` rather than a red tint, because red text on a tint of itself falls under
+// AA (#191).
+@mixin destructive {
+  color: var(--red);
+  border-color: rgba(var(--red-rgb), 0.3);
+
+  &:hover,
+  &:focus-visible,
+  &.confirming {
+    background: var(--bg-3);
+    border-color: var(--red);
+    color: var(--red);
+  }
+}
+
 // WCAG 2.2 AA (2.5.8) asks 24×24 of a control that is not inline in a sentence, and seven
 // of these sat between 17 and 23px — the worst being a todo list's tick, which is what got
 // reported as unhittable.

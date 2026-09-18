@@ -62,11 +62,19 @@ export class TrashPanelComponent {
     this.purgeRequested.emit(id);
   }
 
-  protected onEmptyClick(): void {
-    if (!this.confirmingEmpty()) {
-      this.confirmingEmpty.set(true);
-      return;
-    }
+  /**
+   * ⚠️ Two strings and not one with a count: French keeps the singular at one where English
+   * does not, and this sentence is the last thing said before the notes stop existing.
+   */
+  protected readonly emptyWarning = computed<TranslationRef>(() => {
+    const count = this.notes().length;
+
+    return count === 1
+      ? { key: 'trash.emptyTrashWarningOne' }
+      : { key: 'trash.emptyTrashWarning', params: { count } };
+  });
+
+  protected confirmEmpty(): void {
     this.confirmingEmpty.set(false);
     this.emptyRequested.emit();
   }

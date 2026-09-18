@@ -298,12 +298,15 @@
     "purge": "Delete for good",
     "purgeConfirm": "Confirm?",
     "emptyTrash": "Empty the trash",
-    "emptyTrashConfirm": "Erase everything?",
+    "emptyTrashConfirm": "Erase for good",
     "deletedAt": "deleted {{when}}",
     "purgesIn": "erased in {{count}}d",
     "purgesToday": "erased today",
     "untitled": "Untitled",
-    "checklistNote": "To-do list"
+    "checklistNote": "To-do list",
+    "emptyTrashCancel": "Cancel",
+    "emptyTrashWarning": "Erase {{count}} notes for good? Nothing puts them back.",
+    "emptyTrashWarningOne": "Erase this note for good? Nothing puts it back."
   },
   "tagManager": {
     "title": "Manage tags",

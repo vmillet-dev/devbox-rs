@@ -62,16 +62,41 @@
       }
     </ul>
 
-    <div class="trash-footer">
-      <button
-        type="button"
-        class="trash-action danger"
-        data-testid="trash-empty"
-        [class.confirming]="confirmingEmpty()"
-        (click)="onEmptyClick()"
-      >
-        {{ (confirmingEmpty() ? 'trash.emptyTrashConfirm' : 'trash.emptyTrash') | transloco }}
-      </button>
+    <!-- ⚠️ The one action here that nothing puts back, so it is the one that says what it
+         would erase before it runs, and confirms somewhere other than on the button that
+         fired it — the same shape the tag manager already uses for a merge. -->
+    <div class="trash-footer" [class.confirming]="confirmingEmpty()">
+      @if (confirmingEmpty()) {
+        @let warning = emptyWarning();
+        <p class="trash-warning" role="alert" data-testid="trash-empty-warning">
+          {{ warning.key | transloco: warning.params }}
+        </p>
+        <button
+          type="button"
+          class="trash-action"
+          data-testid="trash-empty-cancel"
+          (click)="confirmingEmpty.set(false)"
+        >
+          {{ 'trash.emptyTrashCancel' | transloco }}
+        </button>
+        <button
+          type="button"
+          class="trash-action danger"
+          data-testid="trash-empty-confirm"
+          (click)="confirmEmpty()"
+        >
+          {{ 'trash.emptyTrashConfirm' | transloco }}
+        </button>
+      } @else {
+        <button
+          type="button"
+          class="trash-action danger"
+          data-testid="trash-empty"
+          (click)="confirmingEmpty.set(true)"
+        >
+          {{ 'trash.emptyTrash' | transloco }}
+        </button>
+      }
     </div>
   }
 </app-dialog>

@@ -130,9 +130,11 @@ app-dialog {
   cursor: pointer;
 }
 
-.delete-btn:hover,
-.delete-btn.confirming {
-  @include accent-state(var(--red), var(--red));
+// Away from "Copier", which it was three pixels from and shaped exactly like.
+.delete-btn {
+  @include destructive;
+
+  margin-left: 6px;
 }
 
 .editable-tag {

@@ -131,19 +131,45 @@ describe('TrashPanelComponent', () => {
       return fixture.nativeElement.querySelector('.trash-footer .trash-action');
     }
 
-    it('asks for a confirmation too, since it takes every note at once', async () => {
+    const find = (testId: string): HTMLButtonElement | null =>
+      fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
+
+    /**
+     * ⚠️ Nothing puts these notes back, so the confirmation is not the same button in the
+     * same place — that is the shape a double click defeats. It says how many it would
+     * erase first, like the tag manager does before a merge.
+     */
+    it('says what it would erase, and confirms on another button', async () => {
+      fixture.componentRef.setInput('notes', [trashed(), trashed({ id: 'n-2' })]);
+      await fixture.whenStable();
       let emitted = 0;
       fixture.componentInstance.emptyRequested.subscribe(() => (emitted += 1));
 
       emptyButton().click();
       await fixture.whenStable();
+
       expect(emitted).toBe(0);
-      expect(emptyButton().textContent).toContain('Tout effacer ?');
+      expect(find('trash-empty')).toBeNull();
+      expect(find('trash-empty-warning')?.textContent).toContain('2');
+
+      find('trash-empty-confirm')?.click();
+      await fixture.whenStable();
+
+      expect(emitted).toBe(1);
+      expect(find('trash-empty')).not.toBeNull();
+    });
+
+    it('withdraws the offer rather than leaving it armed', async () => {
+      let emitted = 0;
+      fixture.componentInstance.emptyRequested.subscribe(() => (emitted += 1));
 
       emptyButton().click();
       await fixture.whenStable();
-      expect(emitted).toBe(1);
-      expect(emptyButton().textContent).toContain('Vider la corbeille');
+      find('trash-empty-cancel')?.click();
+      await fixture.whenStable();
+
+      expect(emitted).toBe(0);
+      expect(find('trash-empty-warning')).toBeNull();
     });
 
     it('is not offered when there is nothing to erase', async () => {
