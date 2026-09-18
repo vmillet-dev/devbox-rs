@@ -193,7 +193,7 @@ describe('NoteCardComponent', () => {
           .map((node) => node.nativeElement.textContent.trim());
       }
 
-      it('slides its window to the item that matched', async () => {
+      it('keeps the item that matched, and spends the other row on what is left', async () => {
         fixture.componentRef.setInput(
           'note',
           createNote({
@@ -204,17 +204,17 @@ describe('NoteCardComponent', () => {
         );
         await fixture.whenStable();
 
-        expect(itemTexts()).toEqual(['Dry run of the release workflow', 'Tag pushed']);
+        expect(itemTexts()).toEqual(['Changelog written', 'Dry run of the release workflow']);
       });
 
-      it('leaves the window at the head when the match is already in it', async () => {
+      it('keeps a matched item that is already ticked, which nothing else would show', async () => {
         fixture.componentRef.setInput(
           'note',
           createNote({ kind: 'checklist', items, searchHit: { field: 'item', excerpt: 'Version bumped' } }),
         );
         await fixture.whenStable();
 
-        expect(itemTexts()).toEqual(['Version bumped', 'Lockfiles agree']);
+        expect(itemTexts()).toEqual(['Version bumped', 'Changelog written']);
       });
 
       /** ⚠️ The excerpt is clipped at 160 characters and never equals its own text. */
@@ -230,13 +230,10 @@ describe('NoteCardComponent', () => {
         );
         await fixture.whenStable();
 
-        expect(itemTexts()).toEqual(['Tag pushed', long]);
+        expect(itemTexts()).toEqual(['Changelog written', long]);
       });
 
-      /**
-       * ⚠️ The template counts within the window; the position in the note is what gets
-       * written. Without the offset a card silently edits the wrong line.
-       */
+      /** ⚠️ A row is not at the place it holds in the note; it is what it carries that gets written. */
       it('ticks the item it shows, not the one at the same place in the list', async () => {
         const store = TestBed.inject(NotesStore);
         const setChecklist = vi.spyOn(store, 'setChecklist').mockResolvedValue(undefined);
@@ -255,7 +252,7 @@ describe('NoteCardComponent', () => {
         await fixture.whenStable();
 
         const written = setChecklist.mock.calls[0][1];
-        expect(written.map((item) => item.done)).toEqual([true, true, false, true, false]);
+        expect(written.map((item) => item.done)).toEqual([true, true, true, false, false]);
       });
     });
 
@@ -539,6 +536,66 @@ describe('NoteCardComponent', () => {
 
       expect(fixture.nativeElement.querySelectorAll('.card-item')).toHaveLength(2);
       expect(text('[data-testid="note-card-more"]')).toBe('+3 autres');
+    });
+
+    describe('having more items than it has rows', () => {
+      function itemTexts(): string[] {
+        return [...fixture.nativeElement.querySelectorAll('.card-item .item-text')].map((node) =>
+          (node as HTMLElement).textContent?.trim(),
+        );
+      }
+
+      it('spends its two rows on what is still to do', async () => {
+        fixture.componentRef.setInput(
+          'note',
+          checklist([
+            { text: 'Relire', done: true },
+            { text: 'Deployer', done: false },
+            { text: 'Annoncer', done: false },
+          ]),
+        );
+        await fixture.whenStable();
+
+        expect(itemTexts()).toEqual(['Deployer', 'Annoncer']);
+      });
+
+      it('falls back on the last done ones rather than drawing nothing', async () => {
+        fixture.componentRef.setInput(
+          'note',
+          checklist(['Relire', 'Deployer', 'Annoncer', 'Archiver'].map((text) => ({ text, done: true }))),
+        );
+        await fixture.whenStable();
+
+        expect(itemTexts()).toEqual(['Annoncer', 'Archiver']);
+      });
+
+      it('counts every item it left out, wherever they sat', async () => {
+        fixture.componentRef.setInput(
+          'note',
+          checklist([1, 2, 3, 4, 5].map((n) => ({ text: 't' + n, done: n === 1 }))),
+        );
+        await fixture.whenStable();
+
+        expect(itemTexts()).toEqual(['t2', 't3']);
+        expect(text('[data-testid="note-card-more"]')).toBe('+3 autres');
+      });
+
+      it('ticks the item it drew, not the one at the same place in the list', async () => {
+        const setChecklist = vi.spyOn(TestBed.inject(NotesStore), 'setChecklist').mockResolvedValue();
+        fixture.componentRef.setInput(
+          'note',
+          checklist([
+            { text: 'Relire', done: true },
+            { text: 'Deployer', done: false },
+            { text: 'Annoncer', done: false },
+          ]),
+        );
+        await fixture.whenStable();
+
+        fixture.nativeElement.querySelectorAll('.card-item')[0].click();
+
+        expect(setChecklist.mock.calls[0][1].map((item) => item.done)).toEqual([true, true, false]);
+      });
     });
 
     it('shows no language badge, a checklist having no format to announce', () => {

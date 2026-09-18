@@ -129,24 +129,39 @@ export class NoteCardComponent {
   protected readonly progress = computed(() => checklistProgress(this.note().items));
   /**
    * The excerpt cannot replace the layer: these are real checkboxes a card can be
-   * ticked from. The window slides to the matching item instead.
+   * ticked from, so the card shows the matching item rather than quoting it.
    */
-  private readonly itemWindowStart = computed(() => {
+  private readonly matchedItem = computed(() => {
     const hit = this.searchHit();
-    if (hit?.field !== 'item') return 0;
+    if (hit?.field !== 'item') return -1;
 
-    const items = this.note().items;
-    const texts = items.map((item) => item.text);
-    return this.windowStart(items.length, this.indexOfHit(texts, hit.excerpt), MAX_VISIBLE_ITEMS);
+    const texts = this.note().items.map((item) => item.text);
+    return this.indexOfHit(texts, hit.excerpt);
   });
 
+  /**
+   * Two rows, spent on what is left to do. ⚠️ A matched item keeps its seat whatever its
+   * state — it is why the card is on screen — and a list with nothing left falls back on
+   * its *last* items, the top of a finished list saying the least about where it ended.
+   * Each row carries the position it holds in the note, which is what gets ticked.
+   */
   protected readonly visibleItems = computed(() => {
-    const from = this.itemWindowStart();
-    return this.note().items.slice(from, from + MAX_VISIBLE_ITEMS);
+    const items = this.note().items;
+    const seats = new Set<number>();
+    const matched = this.matchedItem();
+    if (matched >= 0) seats.add(matched);
+
+    for (const [at, item] of items.entries()) {
+      if (seats.size >= MAX_VISIBLE_ITEMS) break;
+      if (!item.done) seats.add(at);
+    }
+    for (let at = items.length - 1; at >= 0 && seats.size < MAX_VISIBLE_ITEMS; at--) {
+      seats.add(at);
+    }
+
+    return items.map((item, at) => ({ ...item, at })).filter((row) => seats.has(row.at));
   });
-  protected readonly hiddenItemCount = computed(() =>
-    Math.max(0, this.note().items.length - MAX_VISIBLE_ITEMS),
-  );
+  protected readonly hiddenItemCount = computed(() => this.note().items.length - this.visibleItems().length);
 
   protected readonly copyText = computed(() => noteCopyText(this.note()));
 
@@ -180,17 +195,12 @@ export class NoteCardComponent {
     this.selection.toggleChecked(this.note().id);
   }
 
-  /**
-   * ⚠️ The template counts within the window; the position in the note is what gets
-   * written. A search slides the window, so the two are not the same number.
-   */
-  protected onItemToggle(event: MouseEvent, indexInWindow: number): void {
+  protected onItemToggle(event: MouseEvent, at: number): void {
     event.stopPropagation();
-    const index = this.itemWindowStart() + indexInWindow;
 
     void this.notes.setChecklist(
       this.note().id,
-      this.note().items.map((item, at) => (at === index ? { ...item, done: !item.done } : { ...item })),
+      this.note().items.map((item, index) => (index === at ? { ...item, done: !item.done } : { ...item })),
     );
   }
 
