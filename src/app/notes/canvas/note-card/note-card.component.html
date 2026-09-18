@@ -70,6 +70,13 @@
         <span class="progress-count" data-testid="note-card-progress">
           {{ 'notes.checklistProgress' | transloco: { done: progress().done, total: progress().total } }}
         </span>
+        <!-- ⚠️ Here and not under the rows: inside the list it cost them 14px of a box that
+             is only 53 tall, and the first row was drawn outside it. -->
+        @if (hiddenItemCount() > 0) {
+          <span class="progress-more" data-testid="note-card-more">
+            {{ 'notes.checklistMore' | transloco: { count: hiddenItemCount() } }}
+          </span>
+        }
       </span>
 
       <!-- In the flow now that the card is not a button: the items used to be a layer of
@@ -90,11 +97,6 @@
               <span class="item-box" aria-hidden="true">{{ item.done ? '☑' : '☐' }}</span>
               <span class="item-text">{{ item.text }}</span>
             </button>
-          </li>
-        }
-        @if (hiddenItemCount() > 0) {
-          <li class="card-items-more">
-            {{ 'notes.checklistMore' | transloco: { count: hiddenItemCount() } }}
           </li>
         }
       </ul>

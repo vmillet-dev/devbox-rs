@@ -145,6 +145,21 @@ describe('Todo lists', () => {
     expect(smallest.filter(([, side]) => side < 24)).toEqual([]);
   });
 
+  /**
+   * ⚠️ The assertion #176 needed and did not have. Growing a row to 24px pushed the list past
+   * the 53px it gets inside a 150px card, and `.card-items` is anchored to the bottom — so
+   * the first row was drawn nine pixels above its own box and cut in half. Counting the rows
+   * and checking the badge both passed the whole time.
+   */
+  it('draws every row it shows inside the box that holds them', async () => {
+    await canvas.waitForCard(title);
+    const overflow = await canvas.rowOverflow(title);
+
+    expect(overflow).not.toBeNull();
+    expect(overflow?.length).toBeGreaterThan(0);
+    expect(overflow).toEqual(overflow?.map(() => 0));
+  });
+
   it('still shows the items it counts, rather than clipping one', async () => {
     const card = await canvas.cardWithTitle(title);
     const shown = (await card.$$(testid('note-card-item')).getElements()).length;
@@ -153,7 +168,7 @@ describe('Todo lists', () => {
     // Two on a card, and the badge accounts for exactly the rest.
     expect(shown).toBe(Math.min(2, total));
     if (total > shown) {
-      expect(await card.$('.card-items-more').getText()).toContain(String(total - shown));
+      expect(await card.$(testid('note-card-more')).getText()).toContain(String(total - shown));
     }
   });
 
