@@ -10,7 +10,7 @@ import { NotesRevision } from './notes-revision';
 
 /** Dated, so two exports do not overlap. */
 function defaultFileName(now: Date): string {
-  return `devbox-${now.toISOString().slice(0, 10)}.devbox`;
+  return `devnotes-${now.toISOString().slice(0, 10)}.devnotes`;
 }
 
 /**

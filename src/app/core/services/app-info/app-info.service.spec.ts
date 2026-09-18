@@ -19,8 +19,8 @@ describe('AppInfoService', () => {
   it('carries what Cargo.toml declares, down to the capability scope', () => {
     // ⚠️ Outside the scope declared for `opener:allow-open-url` the call is refused at
     // runtime, and nothing says so before then.
-    expect(APP_INFO.repository).toBe('https://github.com/vmillet-dev/devbox-rs');
-    expect(APP_INFO.name).toBe('DevBox');
+    expect(APP_INFO.repository).toBe('https://github.com/vmillet-dev/devnotes-rs');
+    expect(APP_INFO.name).toBe('DevNotes');
     expect(APP_INFO.author).toBe('Valentin MILLET');
     expect(APP_INFO.authorHandle).toBe('@vmillet-dev');
   });

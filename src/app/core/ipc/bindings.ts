@@ -178,13 +178,13 @@ export const commands = {
 };
 
 /* Constants */
-export const APP_METADATA = {"author":"Valentin MILLET","authorHandle":"@vmillet-dev","name":"DevBox","repository":"https://github.com/vmillet-dev/devbox-rs","rustVersion":"1.97.1"} as const;
+export const APP_METADATA = {"author":"Valentin MILLET","authorHandle":"@vmillet-dev","name":"DevNotes","repository":"https://github.com/vmillet-dev/devnotes-rs","rustVersion":"1.97.1"} as const;
 
 export const DEFAULT_SHORTCUTS = {"capture":"Ctrl+Alt+V","newNote":"Ctrl+Alt+N","palette":"Ctrl+Alt+P"} as const;
 
 export const FIELD_NAME_PATTERN = "^[A-Za-z0-9_-]+$" as const;
 
-export const GLOBAL_ACTION_EVENT = "devbox:action" as const;
+export const GLOBAL_ACTION_EVENT = "devnotes:action" as const;
 
 /* Types */
 export type AppError = {

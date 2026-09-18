@@ -200,7 +200,7 @@ describe('AboutMenuComponent', () => {
   });
 
   it('opens the about card and closes the menu', async () => {
-    await openPanel('À propos de DevBox');
+    await openPanel('À propos de DevNotes');
 
     expect(fixture.debugElement.query(By.directive(AboutDialogComponent))).not.toBeNull();
     expect(fixture.debugElement.query(By.css('.about-dropdown'))).toBeNull();
@@ -230,7 +230,7 @@ describe('AboutMenuComponent', () => {
   });
 
   it('returns focus to the trigger when a panel closes', async () => {
-    await openPanel('À propos de DevBox');
+    await openPanel('À propos de DevNotes');
 
     fixture.debugElement.query(By.css('.about-close')).triggerEventHandler('click');
     await fixture.whenStable();

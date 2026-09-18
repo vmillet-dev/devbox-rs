@@ -35,7 +35,7 @@ import { SpacesStore } from './spaces.store';
  * leaves the others alone must not have the switch follow them around.
  */
 function preferenceKey(spaceId: string): string {
-  return `devbox.notes.view.${spaceId}`;
+  return `devnotes.notes.view.${spaceId}`;
 }
 
 /**

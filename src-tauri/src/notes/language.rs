@@ -556,7 +556,10 @@ mod tests {
 
     #[test]
     fn toml_needs_both_a_section_and_an_assignment() {
-        assert_eq!(from_content("[package]\nname = \"devbox\""), Language::Toml);
+        assert_eq!(
+            from_content("[package]\nname = \"devnotes\""),
+            Language::Toml
+        );
         assert_ne!(from_content("[1, 2]\nx = 3"), Language::Toml);
     }
 
@@ -677,7 +680,7 @@ echo 'hi';"
 
     #[test]
     fn yaml_is_recognized_by_its_mappings_and_lists() {
-        assert_eq!(from_content("name: devbox\nversion: 1"), Language::Yml);
+        assert_eq!(from_content("name: devnotes\nversion: 1"), Language::Yml);
         assert_eq!(from_content("---\nsteps:\n  - build"), Language::Yml);
     }
 

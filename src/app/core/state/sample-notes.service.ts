@@ -9,7 +9,7 @@ import { NoteDraft, SampleNote } from '../model/note.model';
 import { Space } from '../model/space.model';
 
 /** ⚠️ Exported because `VaultStore` clears it: a library set aside has to seed again. */
-export const SEEDED_KEY = 'devbox.notes.samplesSeeded';
+export const SEEDED_KEY = 'devnotes.notes.samplesSeeded';
 
 /** The space these drafts belong to does not exist yet; `seed_samples` fills it in. */
 const UNFILED = '';
@@ -54,7 +54,7 @@ const KEYS = {
   checklistSpace: 'notes.samples.checklist.space',
   codeTitle: 'notes.samples.code.title',
   codeSource: 'notes.samples.code.source',
-  devboxTag: 'notes.samples.tags.devbox',
+  devnotesTag: 'notes.samples.tags.devnotes',
   exampleTag: 'notes.samples.tags.example',
   databaseTag: 'notes.samples.tags.database',
   angularTag: 'notes.samples.tags.angular',
@@ -118,7 +118,7 @@ export class SampleNotesService {
         language: 'md',
         content: text.welcomeContent,
         source: text.welcomeSource,
-        tags: [text.devboxTag],
+        tags: [text.devnotesTag],
         pinned: true,
         lifecycle: { kind: 'permanent' },
         kind: 'snippet',
@@ -144,7 +144,7 @@ export class SampleNotesService {
         language: 'txt',
         content: '',
         source: '',
-        tags: [text.devboxTag],
+        tags: [text.devnotesTag],
         pinned: false,
         lifecycle: { kind: 'permanent' },
         kind: 'checklist',

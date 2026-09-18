@@ -187,7 +187,7 @@ describe('BoardStore', () => {
 
     await onBoard(harness);
 
-    expect(write).toHaveBeenCalledWith('devbox.notes.view.sql', 'board');
+    expect(write).toHaveBeenCalledWith('devnotes.notes.view.sql', 'board');
   });
 
   it('reports what a search dimmed rather than what it removed', async () => {

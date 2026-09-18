@@ -44,7 +44,7 @@ describe('TitlebarComponent', () => {
   });
 
   it('renders the application name', () => {
-    expect(fixture.nativeElement.querySelector('.titlebar-title').textContent.trim()).toBe('DevBox');
+    expect(fixture.nativeElement.querySelector('.titlebar-title').textContent.trim()).toBe('DevNotes');
   });
 
   it('renders the three window-control dots, hidden from assistive tech', () => {

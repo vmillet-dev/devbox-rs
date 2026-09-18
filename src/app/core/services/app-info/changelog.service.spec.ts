@@ -35,6 +35,6 @@ describe('ChangelogService', () => {
    * shipped capability file in `app_info.rs`, on the side that owns it.
    */
   it('points at the releases page of the repository the binary declares', () => {
-    expect(RELEASES_URL).toBe('https://github.com/vmillet-dev/devbox-rs/releases');
+    expect(RELEASES_URL).toBe('https://github.com/vmillet-dev/devnotes-rs/releases');
   });
 });

@@ -124,7 +124,7 @@ mod tests {
         static NEXT: AtomicU32 = AtomicU32::new(0);
 
         let directory = std::env::temp_dir().join(format!(
-            "devbox-sealed-{}-{}",
+            "devnotes-sealed-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));

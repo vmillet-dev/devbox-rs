@@ -1,6 +1,6 @@
 # Changelog
 
-Notable changes to DevBox, newest first.
+Notable changes to DevNotes, newest first.
 
 **The newest section is generated.** `.github/workflows/release.yml` writes it from the pull
 requests merged since the last tag, then commits it **before** creating the tag — this file is
@@ -74,7 +74,7 @@ the release notes the updater hands over.
 - Keep the comments that say what the code cannot (#128)
 - Refilm the README, and drop the screenshot the GIF repeats (#113)
 - Give a card title its width back, and plant the pin in the corner (#114)
-- Say which platforms DevBox ships for, and stop implying macOS (#110)
+- Say which platforms DevNotes ships for, and stop implying macOS (#110)
 - Make the e2e suite pass, and fix the data loss it was reporting
 - Film the README on a full board (#105)
 - Show a note created while its editor was closing (#104)

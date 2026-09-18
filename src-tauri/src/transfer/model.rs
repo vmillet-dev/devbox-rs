@@ -102,7 +102,7 @@ pub fn read_bundle(json: &str) -> Result<IncomingBundle, StorageError> {
 
     if version > u64::from(FORMAT_VERSION) {
         return Err(StorageError::ImportFormat(format!(
-            "format version {version}, this version of DevBox reads up to {FORMAT_VERSION}"
+            "format version {version}, this version of DevNotes reads up to {FORMAT_VERSION}"
         )));
     }
 
@@ -115,7 +115,7 @@ pub fn read_bundle(json: &str) -> Result<IncomingBundle, StorageError> {
 }
 
 /// `Note` deserialises `language` and `kind` as closed enums, so one value from a newer
-/// DevBox would fail the whole import. This degrades instead, like the database read
+/// DevNotes would fail the whole import. This degrades instead, like the database read
 /// already does (`notes::store`, `TryFrom<NoteRow>`) — the title, body, tags and deadline
 /// all still arrive, and the report says how many were touched.
 ///
@@ -315,7 +315,7 @@ mod tests {
         assert!(message.contains("format version"));
     }
 
-    /// The file a newer DevBox writes once its `Language` has grown a variant.
+    /// The file a newer DevNotes writes once its `Language` has grown a variant.
     fn bundle_with(field: &str, value: serde_json::Value) -> String {
         let mut json = serde_json::json!({
             "version": FORMAT_VERSION,

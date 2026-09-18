@@ -7,7 +7,7 @@ state to clean up if it stops.
 ## The three steps
 
 1. **Bump the version.** `npm version <x.y.z> --no-git-tag-version` covers `package.json`
-   and its lockfile; `src-tauri/Cargo.toml` is edited by hand, then `cargo update -p devbox`
+   and its lockfile; `src-tauri/Cargo.toml` is edited by hand, then `cargo update -p devnotes`
    writes the Cargo lockfile. Merge to `main` and wait for CI to go green — the release
    refuses to start on a commit CI has not passed.
 
@@ -57,8 +57,8 @@ hand is fine until the next release regenerates it. Older sections are never tou
 Per platform, from one matrix build:
 
 - **Windows** — the NSIS installer (`*_x64-setup.exe`), the MSI (`*_x64_en-US.msi`) and the
-  standalone executable (`devbox-<version>-windows.exe`).
-- **Linux** — AppImage, `.deb`, `.rpm`, and the standalone binary (`devbox-<version>-linux`).
+  standalone executable (`devnotes-<version>-windows.exe`).
+- **Linux** — AppImage, `.deb`, `.rpm`, and the standalone binary (`devnotes-<version>-linux`).
 
 Plus `SHA256SUMS.txt` over all of them, and `latest.json` — the manifest the in-app updater
 reads.

@@ -1,18 +1,18 @@
 use chrono::{DateTime, Utc};
-use devbox_lib::db::Library;
+use devnotes_lib::db::Library;
 
-use devbox_lib::attachments::model::Attachment;
-use devbox_lib::attachments::store as attachments;
-use devbox_lib::db::{iso8601, open_in_memory};
-use devbox_lib::notes::checklist::NoteKind;
-use devbox_lib::notes::language::Language;
-use devbox_lib::notes::model::{NoteDraft, NoteLifecycle};
-use devbox_lib::notes::store as notes;
-use devbox_lib::spaces::store as spaces;
-use devbox_lib::transfer::bundle::{collect, merge as merge_bundle};
-use devbox_lib::transfer::file;
-use devbox_lib::transfer::file::Payload;
-use devbox_lib::transfer::model::{self, Bundle, ImportReport, IncomingBundle};
+use devnotes_lib::attachments::model::Attachment;
+use devnotes_lib::attachments::store as attachments;
+use devnotes_lib::db::{iso8601, open_in_memory};
+use devnotes_lib::notes::checklist::NoteKind;
+use devnotes_lib::notes::language::Language;
+use devnotes_lib::notes::model::{NoteDraft, NoteLifecycle};
+use devnotes_lib::notes::store as notes;
+use devnotes_lib::spaces::store as spaces;
+use devnotes_lib::transfer::bundle::{collect, merge as merge_bundle};
+use devnotes_lib::transfer::file;
+use devnotes_lib::transfer::file::Payload;
+use devnotes_lib::transfer::model::{self, Bundle, ImportReport, IncomingBundle};
 
 fn t0() -> DateTime<Utc> {
     iso8601::parse("2026-07-25T09:00:00.000Z").unwrap()
@@ -68,7 +68,7 @@ fn round_tripped(bundle: &Bundle) -> IncomingBundle {
     model::read_bundle(&serde_json::to_string(bundle).unwrap()).unwrap()
 }
 
-/// The file a newer DevBox would write: the same bundle, with a value in `field`
+/// The file a newer DevNotes would write: the same bundle, with a value in `field`
 /// that this build has never heard of.
 fn written_by_a_newer_version(bundle: &Bundle, field: &str, value: &str) -> IncomingBundle {
     let mut json: serde_json::Value = serde_json::to_value(bundle).unwrap();
@@ -255,7 +255,7 @@ fn seal_beside(directory: &std::path::Path, library: &Library, record: &Attachme
 fn attach(
     library: &mut Library,
     record: &Attachment,
-) -> Result<(), devbox_lib::error::StorageError> {
+) -> Result<(), devnotes_lib::error::StorageError> {
     let (db, vault) = library.split();
     attachments::create(db, vault, record)
 }
@@ -266,7 +266,7 @@ fn scratch() -> std::path::PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let directory = std::env::temp_dir().join(format!("devbox-transfer-{stamp}"));
+    let directory = std::env::temp_dir().join(format!("devnotes-transfer-{stamp}"));
     std::fs::create_dir_all(&directory).unwrap();
 
     directory
@@ -301,7 +301,7 @@ fn an_attachment_travels_with_the_library() {
     attach(&mut source, &record).unwrap();
 
     let target_path = directory
-        .join("library.devbox")
+        .join("library.devnotes")
         .to_string_lossy()
         .to_string();
     let packed = exported(&mut source);
@@ -342,7 +342,7 @@ fn importing_the_same_archive_twice_restores_the_attachment_once() {
     attach(&mut source, &record).unwrap();
 
     let target_path = directory
-        .join("library.devbox")
+        .join("library.devnotes")
         .to_string_lossy()
         .to_string();
     file::write(
@@ -382,7 +382,7 @@ fn an_attachment_the_archive_does_not_carry_is_reported() {
     attach(&mut source, &capture(&note_id)).unwrap();
 
     let target_path = directory
-        .join("library.devbox")
+        .join("library.devnotes")
         .to_string_lossy()
         .to_string();
     let written = file::write(
@@ -409,9 +409,9 @@ fn an_attachment_the_archive_does_not_carry_is_reported() {
 mod folders_travelling {
     use super::*;
 
-    use devbox_lib::folders::board::{BoardFrame, BoardPoint, CardPlacement, ZonePlacement};
-    use devbox_lib::folders::store as folders;
-    use devbox_lib::folders::store::board as geometry;
+    use devnotes_lib::folders::board::{BoardFrame, BoardPoint, CardPlacement, ZonePlacement};
+    use devnotes_lib::folders::store as folders;
+    use devnotes_lib::folders::store::board as geometry;
 
     /// A library with its notes filed, and a board arranged — the state a real one is in.
     fn arranged() -> (Library, String, String) {

@@ -57,25 +57,25 @@ describe('LocaleService', () => {
     const service = createService();
 
     expect(service.preference()).toBe('system');
-    expect(preferences().read('devbox.locale')).toBeNull();
+    expect(preferences().read('devnotes.locale')).toBeNull();
   });
 
   it('restores a previously persisted locale', () => {
-    preferences().write('devbox.locale', 'fr');
+    preferences().write('devnotes.locale', 'fr');
 
     expect(createService().activeLocale()).toBe('fr');
   });
 
   it('prefers a stored choice over the system language', () => {
     stubSystemLanguages('en-US');
-    preferences().write('devbox.locale', 'fr');
+    preferences().write('devnotes.locale', 'fr');
 
     expect(createService().activeLocale()).toBe('fr');
   });
 
   it('ignores an invalid persisted value and goes back to the system language', () => {
     stubSystemLanguages('fr-FR');
-    preferences().write('devbox.locale', 'de');
+    preferences().write('devnotes.locale', 'de');
 
     expect(createService().activeLocale()).toBe('fr');
   });
@@ -87,19 +87,19 @@ describe('LocaleService', () => {
     TestBed.tick();
 
     expect(service.activeLocale()).toBe('en');
-    expect(preferences().read('devbox.locale')).toBe('en');
+    expect(preferences().read('devnotes.locale')).toBe('en');
   });
 
   it('hands the decision back to the system when set to "system"', () => {
     stubSystemLanguages('fr-FR');
-    preferences().write('devbox.locale', 'en');
+    preferences().write('devnotes.locale', 'en');
     const service = createService();
 
     service.setLocale('system');
     TestBed.tick();
 
     expect(service.activeLocale()).toBe('fr');
-    expect(preferences().read('devbox.locale')).toBe('system');
+    expect(preferences().read('devnotes.locale')).toBe('system');
   });
 
   it('keeps the document language in sync, which drives screen-reader pronunciation', () => {

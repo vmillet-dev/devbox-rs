@@ -1,4 +1,4 @@
-//! ⚠️ What Cargo has no field for comes from `[package.metadata.devbox]` and
+//! ⚠️ What Cargo has no field for comes from `[package.metadata.devnotes]` and
 //! `rust-toolchain.toml`, both read by `build.rs` — Cargo does not pass
 //! `[package.metadata]` to the crate.
 //!
@@ -13,7 +13,7 @@ use specta::Type;
 #[derive(Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppMetadata {
-    /// What the user is shown, which is not the crate name (`devbox`).
+    /// What the user is shown, which is not the crate name (`devnotes`).
     pub(crate) name: &'static str,
     /// ⚠️ Must stay covered by the scope declared for `opener:allow-open-url` in
     /// `capabilities/default.json`, or opening it is refused at runtime.
@@ -25,11 +25,11 @@ pub(crate) struct AppMetadata {
 }
 
 pub(crate) const METADATA: AppMetadata = AppMetadata {
-    name: env!("DEVBOX_DISPLAY_NAME"),
+    name: env!("DEVNOTES_DISPLAY_NAME"),
     repository: env!("CARGO_PKG_REPOSITORY"),
-    author: env!("DEVBOX_AUTHOR"),
-    author_handle: env!("DEVBOX_AUTHOR_HANDLE"),
-    rust_version: env!("DEVBOX_RUST_VERSION"),
+    author: env!("DEVNOTES_AUTHOR"),
+    author_handle: env!("DEVNOTES_AUTHOR_HANDLE"),
+    rust_version: env!("DEVNOTES_RUST_VERSION"),
 };
 
 #[cfg(test)]

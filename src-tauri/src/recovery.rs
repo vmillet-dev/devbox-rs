@@ -24,7 +24,7 @@ pub(crate) const DIRECTORY: &str = "damaged";
 const ATTACHMENTS: &str = "attachments";
 
 /// What SQLite leaves beside the database; they belong to it and must travel with it.
-const SIDECARS: [&str; 2] = ["devbox.sqlite3-wal", "devbox.sqlite3-shm"];
+const SIDECARS: [&str; 2] = ["devnotes.sqlite3-wal", "devnotes.sqlite3-shm"];
 
 /// The name the rescued copy takes, beside the file it was rescued from.
 const RESCUED: &str = "rescued.sqlite3";
@@ -121,7 +121,7 @@ mod tests {
 
     fn scratch() -> PathBuf {
         let directory =
-            std::env::temp_dir().join(format!("devbox-recovery-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("devnotes-recovery-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&directory).unwrap();
 
         directory

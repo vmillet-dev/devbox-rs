@@ -1,11 +1,11 @@
 {
-  "name": "devbox",
+  "name": "devnotes",
   "version": "0.3.0",
   "description": "A developer's notes and snippets manager for the desktop",
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vmillet-dev/devbox-rs.git"
+    "url": "git+https://github.com/vmillet-dev/devnotes-rs.git"
   },
   "scripts": {
     "ng": "ng",

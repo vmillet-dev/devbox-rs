@@ -13,16 +13,16 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, TimeDelta, Utc};
-use devbox_lib::db::Library;
+use devnotes_lib::db::Library;
 
-use devbox_lib::attachments::store as attachments;
-use devbox_lib::db;
-use devbox_lib::notes::checklist::{ChecklistItem, NoteKind};
-use devbox_lib::notes::language::Language;
-use devbox_lib::notes::model::{NoteDraft, NoteLifecycle};
-use devbox_lib::notes::store;
-use devbox_lib::notes::view::{self, NotesQuery};
-use devbox_lib::spaces::store as spaces;
+use devnotes_lib::attachments::store as attachments;
+use devnotes_lib::db;
+use devnotes_lib::notes::checklist::{ChecklistItem, NoteKind};
+use devnotes_lib::notes::language::Language;
+use devnotes_lib::notes::model::{NoteDraft, NoteLifecycle};
+use devnotes_lib::notes::store;
+use devnotes_lib::notes::view::{self, NotesQuery};
+use devnotes_lib::spaces::store as spaces;
 
 pub(crate) const NOTES: usize = 8000;
 /// Roughly 13 kB of body.
@@ -133,7 +133,7 @@ pub(crate) fn build() -> Corpus {
 /// ⚠️ The size is a parameter only because #21 asks what a query costs as a corpus grows.
 /// Every other group takes [`NOTES`], so its numbers stay comparable across runs.
 pub(crate) fn build_of(notes: usize) -> Corpus {
-    let directory = std::env::temp_dir().join(format!("devbox-bench-{}", uuid::Uuid::new_v4()));
+    let directory = std::env::temp_dir().join(format!("devnotes-bench-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&directory).expect("a writable temporary directory");
 
     // The corpus is sealed like a real library, so the benchmarks measure what the

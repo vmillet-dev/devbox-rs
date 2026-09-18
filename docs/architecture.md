@@ -1,11 +1,11 @@
 # Architecture
 
-How DevBox is put together, and the conventions to follow when extending it.
+How DevNotes is put together, and the conventions to follow when extending it.
 For build/run instructions see the [README](../README.md).
 
 ## Overview
 
-DevBox is a Tauri v2 desktop app: an Angular single-page front-end rendered in a WebView,
+DevNotes is a Tauri v2 desktop app: an Angular single-page front-end rendered in a WebView,
 and a Rust process that owns everything native (storage, and later hashing and filesystem).
 The two halves talk only through Tauri's `invoke()` bridge.
 
@@ -810,7 +810,7 @@ every export and land on top of the receiving machine's own arrangement.
 
 A switch in the header chooses between **Date** and **Tableau**. The date view is not
 replaced and stays the default; the board is another way to look at the same notes, and it
-is remembered **per space** — one key each, `devbox.notes.view.<spaceId>`, so arranging one
+is remembered **per space** — one key each, `devnotes.notes.view.<spaceId>`, so arranging one
 space does not switch the others. ⚠️ It is unavailable on "all spaces", where a folder
 belongs to no board: the switch disables rather than disappears, and falls back to the date
 view.
@@ -1252,7 +1252,7 @@ not infallible.
 
 ### The quick-paste palette
 
-`Ctrl+Alt+P` reveals the window and emits `devbox:palette`; `PaletteStore` opens,
+`Ctrl+Alt+P` reveals the window and emits `devnotes:palette`; `PaletteStore` opens,
 searches, and on `Enter` copies the highlighted snippet and **hides the window** so the user
 lands back where they were pasting.
 
@@ -1383,7 +1383,7 @@ order on screen is the order in the array.
 
 There used to be a contribution registry here — three of them, in fact, one per extension
 point — so the chrome could stay ignorant of a feature it might not have. That indirection had
-exactly one purpose, a second tool, and [#23](https://github.com/vmillet-dev/devbox-rs/issues/23)
+exactly one purpose, a second tool, and [#23](https://github.com/vmillet-dev/devnotes-rs/issues/23)
 decided there would not be one. With a single feature it protected nothing and cost a real
 detour: reading what a menu entry did meant opening the notes page. They are gone.
 
@@ -1443,14 +1443,14 @@ matching a regex, so the pattern and `is_field_name` are held together by one te
 `the_pattern_and_the_rule_agree` — and by nothing else.
 
 `AutostartService` reads the system **first** and aligns the preference on what it finds:
-turning the entry off from the task manager has to uncheck the box, not see DevBox put it back.
+turning the entry off from the task manager has to uncheck the box, not see DevNotes put it back.
 
 **What the settings actually change**
 
 - **Theme** — `system` / `dark` / `light`, resolved into a `data-theme` attribute on
   `<html>` (see _Theming_). `system` follows `prefers-color-scheme` live.
 - **Density** — `data-density`, which swaps four spacing variables.
-- **Start with the system, minimise to tray, close to tray** — the last one was DevBox's fixed
+- **Start with the system, minimise to tray, close to tray** — the last one was the application's fixed
   behaviour and stays the default; both tray settings are still refused when there is no tray
   (`desktop::hides_on_close` / `hides_on_minimize`), since hiding a window nothing can call
   back is worse than closing it.
@@ -1536,7 +1536,7 @@ are not translated, and they could not be: Transloco reads `{{name}}` as an inte
 would replace a snippet's fields with empty strings on the way out.
 
 ⚠️ **Two guards decide a first launch, not one.** A preference marker
-(`devbox.notes.samplesSeeded`) alone would re-seed anyone whose preferences file went missing;
+(`devnotes.notes.samplesSeeded`) alone would re-seed anyone whose preferences file went missing;
 "no space at all" alone would re-seed the day the last space disappears. Together they only ever
 match a database that has never been written to. The marker is written **after** the seeding,
 because the seeding is one write: `seed_samples` creates the space and the four notes in a
@@ -1548,7 +1548,7 @@ about samples nobody asked for would only add noise.
 
 ### Import, export and copying out
 
-- **Export writes an archive**, `.devbox`, which is a zip: `bundle.json` at the root
+- **Export writes an archive**, `.devnotes`, which is a zip: `bundle.json` at the root
   (`transfer::model::Bundle` — a version, an instant, the spaces cited, the notes and the
   attachment records) and one entry per attachment under `attachments/`, named by its
   `stored_name`. The bundle is deflated, being repetitive text; the attachments are stored as
@@ -1577,10 +1577,10 @@ about samples nobody asked for would only add noise.
   more bytes, and the import path holds the file as a `String`, then a `serde_json::Value`,
   then a `Bundle` — three copies of every screenshot in memory, which a library of a hundred
   captures turns into a gigabyte. `file::Payload` hands entries over one at a time instead.
-- **⚠️ A new DevBox reads an old file; an old DevBox does not read a new one.** `file::read`
+- **⚠️ A new DevNotes reads an old file; an old DevNotes does not read a new one.** `file::read`
   sniffs the zip magic and falls back to parsing the whole file as JSON, so every `.json`
   export written before the archive still imports. The picker keeps `json` among its
-  extensions on the way in for exactly that reason, and offers only `devbox` on the way out.
+  extensions on the way in for exactly that reason, and offers only `devnotes` on the way out.
   `FORMAT_VERSION` is untouched: the container changed, the data shape did not.
 - **Import merges, it never replaces.** Spaces are matched by name, case-insensitively, and a
   note whose id is already taken is counted as skipped rather than overwritten — so the same
@@ -1837,8 +1837,8 @@ who remember to touch the select. Three things keep it honest:
 front something happened — goes through **`AppEventsService`** (`core/ipc/app-events.service.ts`),
 which wraps `listen` from `@tauri-apps/api/event`.
 
-**One topic, carrying a closed action.** There used to be three (`devbox:capture`,
-`devbox:new-note`, `devbox:palette`), spelled out on both sides, where a typo produced a
+**One topic, carrying a closed action.** There used to be three (`devnotes:capture`,
+`devnotes:new-note`, `devnotes:palette`), spelled out on both sides, where a typo produced a
 subscription that was silently inert and that nothing reported. Now `desktop::GlobalAction` is a
 `closed_enum!` and the topic is a single constant, and **both are generated**: `lib.rs` exports
 them with `.typ::<GlobalAction>()` and `.constant("GLOBAL_ACTION_EVENT", …)`, neither of which
@@ -1854,7 +1854,7 @@ every build. The about card completes the line with Angular's own `VERSION.full`
 same reason as the application's own version — a committed `bindings.ts` can lag behind a
 dependency bump, an answer from the bridge cannot. Every value comes from `Cargo.toml` — the
 standard fields through `CARGO_PKG_*`, and what Cargo has no field for through
-`[package.metadata.devbox]`, which `build.rs` hands to the crate as environment variables
+`[package.metadata.devnotes]`, which `build.rs` hands to the crate as environment variables
 read with `env!`. It is a constant and not a command on purpose: the titlebar reads the name
 **synchronously**, where a round trip would leave it empty for a frame. `core/services/app-info/`
 re-exports it once as `APP_INFO`, so nothing else imports `bindings.ts` for it.
@@ -1898,7 +1898,7 @@ would keep answering.
 - Neither the topic nor the action set is spelled twice any more: both are generated, so a
   typo cannot produce the silently inert subscription this used to risk.
 - A shortcut already taken by another application is **logged and ignored**, never fatal:
-  DevBox has to start without it.
+  DevNotes has to start without it.
 - `AppEventsService.on()` returns an unsubscribe immediately although the subscription only
   lands a tick later; a component destroyed in between would otherwise stay subscribed for the
   whole session.
@@ -1936,7 +1936,7 @@ read before Angular boots.
 
 ### System tray
 
-DevBox stays resident in the notification area, and **the window's close button only hides it**
+DevNotes stays resident in the notification area, and **the window's close button only hides it**
 — quitting goes through the tray menu. An app made to be one shortcut away would be pointless
 if closing it killed the shortcut. It is a preference now (see _Preferences_), still on by
 default; minimising to the tray is the same idea, off by default. Tauri emits nothing for
@@ -2064,7 +2064,7 @@ still verify. Binding it would mean threading the row identity through every sea
 call in the stores; it buys nothing against the threat above, where the attacker reads the
 file rather than edits it and hands it back.
 
-⚠️ Nor is it a defence against a machine already compromised while DevBox runs: the key is
+⚠️ Nor is it a defence against a machine already compromised while DevNotes runs: the key is
 in this process’s memory for the length of the session, and there is no idle re-lock.
 
 ### The pieces
@@ -2159,7 +2159,7 @@ on the way out: `read_attachment` decrypts into the `data:` URI the preview alre
 and `save_attachment` writes plaintext where the user chose to put it.
 
 ⚠️ `open_attachment` is the exception, and a deliberate one: the program that opens a
-document reads it from disk, so DevBox writes a decrypted copy under `app_data_dir()/open/`
+document reads it from disk, so DevNotes writes a decrypted copy under `app_data_dir()/open/`
 and opens that — one click, as before. Those copies are swept on the way out
 (`RunEvent::Exit`) and again at every launch, which is what covers one another application
 still held, and a crash. ⚠️ The profile and **not** the OS temporary directory: that one is
@@ -2362,7 +2362,7 @@ colour, created_at)` and `notes.folder_id` points into it. ⚠️ The column was
   on Windows, where both are `%APPDATA%\<identifier>`), readable from Rust and
   immune to a WebView cache wipe — unlike the `localStorage` it replaced. Two consumers:
   `LocaleService`, and the editor overlay's two display toggles — fullscreen
-  (`devbox.editorFullscreen`) and the fields drawer (`devbox.editorFieldsPanel`, open by
+  (`devnotes.editorFullscreen`) and the fields drawer (`devnotes.editorFieldsPanel`, open by
   default: a drawer folded on first sight hides the feature from whoever does not know it yet).
   - **The API stays synchronous** although the plugin's is not: both consumers read at
     construction time, and an async read would show the interface in one state then the
@@ -2373,7 +2373,7 @@ colour, created_at)` and `notes.folder_id` points into it. ⚠️ The column was
     builder bundles modules before Vitest sees them, so `vi.mock` on an external package
     intercepts only intermittently. Outside Tauri the loader rejects and the service degrades
     to a memory-only cache, which is how every other spec runs.
-  - `hydrate()` adopts any `devbox.*` key left in `localStorage` by an earlier version, then
+  - `hydrate()` adopts any `devnotes.*` key left in `localStorage` by an earlier version, then
     clears it. Without that, updating the app would silently reset the interface language.
   - Adding a plugin also means declaring its permission (`store:default`) in
     `src-tauri/capabilities/default.json`, or the call is refused at runtime.
@@ -2421,7 +2421,7 @@ Transloco's `transloco` pipe. French is the fallback locale.
 - `system` resolves through `resolveSystemLocale()` (`core/services/i18n/locale.model.ts`), which reads
   `navigator.languages` — the WebView takes it from the OS — and falls back to
   `SYSTEM_FALLBACK_LOCALE` (English) when the machine speaks neither language. Nothing is
-  persisted while the preference stays on `system`, so DevBox keeps following the OS.
+  persisted while the preference stays on `system`, so DevNotes keeps following the OS.
 - ⚠️ `DEFAULT_LOCALE` is a different thing: Transloco's fallback _bundle_, the file that
   answers when a key is missing from the other one.
 - `LocaleService.restore()` runs from the app initializer, **after** `SettingsStore.restore()`
@@ -2949,7 +2949,7 @@ Three things the embedded WebDriver server will not do, each with a helper in `s
 case the control is asserted on — it exists, it is labelled — and never clicked:
 
 - The OS-level global accelerator. WebDriver types into the WebView, not into the machine, so
-  the palette is opened by emitting the same `devbox:action` event the accelerator sends.
+  the palette is opened by emitting the same `devnotes:action` event the accelerator sends.
 - The native file picker. `window.__TAURI_INTERNALS__.invoke` — the funnel every `invoke` goes
   through — is `writable: false, configurable: false`, so nothing can stand in front of it and
   a picker opened by a click would block the application until a human clicked it. Import,
@@ -2962,7 +2962,7 @@ case the control is asserted on — it exists, it is labelled — and never clic
 - The system clipboard where the machine will not release it: on Windows a clipboard manager
   can hold the lock indefinitely, and a headless Linux runner may have no selection owner at
   all. `clipboardText()` answers `null` and the scenario calls `this.skip()` — skipped rather
-  than passed, because a bare `return` is a green test that asserted nothing. What DevBox owns
+  than passed, because a bare `return` is a green test that asserted nothing. What DevNotes owns
   is asserted anyway, through `DisplayNote.copyText`.
 
 #### In CI

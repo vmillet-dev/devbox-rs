@@ -16,8 +16,8 @@ export const FILE_DIALOG_ADAPTER = new InjectionToken<FileDialogAdapter>('FILE_D
 
 /** ⚠️ `json` stays on the way in: an export written before the archive existed is still
  * importable, and the picker has to let the user reach it. */
-const OPEN_FILTER = { name: APP_INFO.name, extensions: ['devbox', 'json'] };
-const SAVE_FILTER = { name: APP_INFO.name, extensions: ['devbox'] };
+const OPEN_FILTER = { name: APP_INFO.name, extensions: ['devnotes', 'json'] };
+const SAVE_FILTER = { name: APP_INFO.name, extensions: ['devnotes'] };
 
 /** `null` covers both a cancellation and the plugin being unavailable. */
 @Injectable({ providedIn: 'root' })
