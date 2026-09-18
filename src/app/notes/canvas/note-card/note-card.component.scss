@@ -310,8 +310,9 @@ app-copy-button {
   border-radius: 4px;
 }
 
-.card-items-more {
-  padding-top: 2px;
-  font-size: 10px;
+.progress-more {
+  flex-shrink: 0;
+  font-size: 9.5px;
   color: var(--text-2);
+  white-space: nowrap;
 }
