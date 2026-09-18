@@ -291,22 +291,28 @@ describe('NoteSelectionStore', () => {
       expect(selection.focusedIndex()).toBe(-1);
     });
 
-    it('focuses by position, which survives a rename', async () => {
+    /**
+     * ⚠️ By id, never by position. Focus used to be set with an index into `visibleNotes`
+     * while the caller had measured the grid in DOM order — the same list on the date view,
+     * a different one on the board, where the first arrow jumped two cards sideways.
+     */
+    it('focuses a note, and still knows where it sits', async () => {
       const { selection } = await createNotesHarness([createNote({ id: 'a' }), createNote({ id: 'b' })]);
 
-      selection.focusIndex(1);
+      selection.focusNote('b');
 
       expect(selection.focusedNoteId()).toBe('b');
       expect(selection.focusedIndex()).toBe(1);
     });
 
-    it('ignores a position outside the grid', async () => {
+    it('reports no position for a note that is not on the canvas', async () => {
       const { selection } = await createNotesHarness([createNote({ id: 'a' })]);
-      selection.focusIndex(0);
 
-      selection.focusIndex(9);
+      selection.focusNote('gone');
 
-      expect(selection.focusedNoteId()).toBe('a');
+      expect(selection.focusedNoteId()).toBe('gone');
+      expect(selection.focusedIndex()).toBe(-1);
+      expect(selection.focusedNote()).toBeNull();
     });
 
     it('follows the note being opened', async () => {

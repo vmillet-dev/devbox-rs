@@ -10,6 +10,11 @@ import { NotesQueryStore } from '@core/state/notes-query.store';
 import { NotesStore } from '@core/state/notes.store';
 import { CardBox, FocusDirection, nextFocusIndex } from '@core/utils/grid-navigation.util';
 
+/** A card as it is on screen: where it is, and which note it is. */
+interface MeasuredCard extends CardBox {
+  readonly id: string;
+}
+
 interface CanvasContext {
   readonly focused: Note | null;
   readonly notes: NotesStore;
@@ -199,23 +204,34 @@ export class CanvasKeyboardDirective {
 
   /** Measured: the column count depends on the window width. */
   private moveFocus(direction: FocusDirection): void {
-    const boxes = this.cardBoxes();
-    if (boxes.length === 0) return;
+    const cards = this.cardBoxes();
+    const first = cards[0];
+    if (!first) return;
 
-    const current = this.selection.focusedIndex();
+    // ⚠️ Found by id among what was just measured, never by a position in `visibleNotes`.
+    // That list is the date view's order — pinned first, then `updated_at` — and the board
+    // lays its cards out zone by zone, so an index resolved there landed the focus on an
+    // unrelated card: the first ArrowRight on the board jumped two cards sideways.
+    const focused = this.selection.focusedNoteId();
+    const current = cards.findIndex((card) => card.id === focused);
     if (current < 0) {
-      this.selection.focusIndex(0);
+      this.selection.focusNote(first.id);
       return;
     }
 
-    this.selection.focusIndex(nextFocusIndex(boxes, current, direction));
+    const next = cards[nextFocusIndex(cards, current, direction)];
+    if (next) {
+      this.selection.focusNote(next.id);
+    }
   }
 
-  /** In DOM order, which is the order `visibleNotes` is in. */
-  private cardBoxes(): readonly CardBox[] {
-    return Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.card-shell')).map((element) => {
-      const rect = element.getBoundingClientRect();
-      return { top: rect.top, left: rect.left };
-    });
+  /** In DOM order, which is the order they are on screen — the only one a grid move means. */
+  private cardBoxes(): readonly MeasuredCard[] {
+    return Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.card-shell'))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { id: element.dataset['noteId'] ?? '', top: rect.top, left: rect.left };
+      })
+      .filter((card) => card.id !== '');
   }
 }

@@ -11,9 +11,12 @@ import { CANVAS_SHORTCUT_GROUP, CanvasKeyboardDirective } from './canvas-keyboar
   selector: 'app-canvas-keyboard-host',
   hostDirectives: [CanvasKeyboardDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // ⚠️ `data-note-id` and not only a class: the directive resolves what it measured back to
+  // a note through that attribute, which is what keeps the board's order out of the date
+  // view's list. A stand-in without it is a card the grid cannot name.
   template: `
-    <div class="card-shell" id="card-1"></div>
-    <div class="card-shell" id="card-2"></div>
+    <div class="card-shell" id="card-1" data-note-id="note-1"></div>
+    <div class="card-shell" id="card-2" data-note-id="note-2"></div>
     <input id="field" />
   `,
 })
@@ -41,7 +44,7 @@ describe('CanvasKeyboardDirective', () => {
     fixture = TestBed.createComponent(CanvasKeyboardHostComponent);
     fixture.autoDetectChanges();
     await fixture.whenStable();
-    harness.selection.focusIndex(0);
+    harness.selection.focusNote('note-1');
   });
 
   /** ⚠️ Documenting a key and binding it are the same act: the sheet is derived here. */
