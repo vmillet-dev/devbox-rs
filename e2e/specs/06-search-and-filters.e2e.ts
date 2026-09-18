@@ -145,6 +145,21 @@ describe('Search, filters and facets', () => {
       await canvas.toggleLanguage('sh');
     });
 
+    /**
+     * ⚠️ #207: the rail cannot reach the badge. `.lang-tag` belongs to `app-language-badge`,
+     * so a rule written in the rail's own stylesheet is rewritten with the rail's
+     * `_ngcontent` attribute and never matches — the selection had no mark at all while
+     * `outlines` above still counted one. The badge's own hairline was that one.
+     */
+    it('marks the selected format on the badge that carries the ring', async () => {
+      const resting = await canvas.badgeRing('sh');
+      await canvas.toggleLanguage('sh');
+      const selected = await canvas.badgeRing('sh');
+      await canvas.toggleLanguage('sh');
+
+      expect(resting).not.toBeNull();
+      expect(selected).not.toBe(resting);
+    });
     it('drops the search, the tag and the language in one click', async () => {
       await canvas.search('Docker');
       await canvas.toggleTag('ops');

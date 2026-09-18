@@ -207,6 +207,22 @@ export const canvas = {
     );
   },
 
+  /**
+   * The colour of the hairline around one format's badge in the rail. ⚠️ Read on the badge
+   * and not on the chip: the chip is the click surface, the badge is what carries the ring,
+   * and they live in two different components — which is the whole trap (#207).
+   */
+  badgeRing(language: string): Promise<string | null> {
+    return browser.execute(
+      (chipSelector: string, wanted: string) => {
+        const chip = document.querySelector(`${chipSelector}[data-language="${wanted}"]`);
+        const badge = chip?.querySelector('.lang-tag');
+        return badge ? getComputedStyle(badge).borderTopColor : null;
+      },
+      testid('language-chip'),
+      language,
+    );
+  },
   async waitForCard(title: string): Promise<void> {
     await browser.waitUntil(async () => (await canvas.titles()).includes(title), {
       timeout: 15_000,
