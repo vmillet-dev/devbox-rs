@@ -3,7 +3,7 @@ import { browser, expect } from '@wdio/globals';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
 import { board, crumb, spaces } from '../pageobjects/overlays.page.js';
-import { blurField, press, reloadCanvas, testid, waitForCanvas } from '../support/app.js';
+import { blurField, eventually, press, reloadCanvas, testid, waitForCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -88,9 +88,21 @@ describe('Opening a folder', () => {
     await canvas.createSnippet();
     await editor.setTitle('Cache hit ratio');
     await editor.close();
-    await browser.pause(900);
 
-    const view = await bridge.queryNotes(query({ spaceId, folderId: perfId }));
+    // ⚠️ Two conditions and not one: the note has to exist before "filed" means anything,
+    // and keeping them apart is what tells a note never written from one written loose.
+    await eventually(
+      () => bridge.queryNotes(query({ spaceId, search: 'Cache hit ratio' })),
+      (found) => found.matched > 0,
+      'the note made here to be written at all',
+    );
+
+    const view = await eventually(
+      () => bridge.queryNotes(query({ spaceId, folderId: perfId })),
+      (filed) =>
+        filed.sections.flatMap((section) => section.notes).some((note) => note.title === 'Cache hit ratio'),
+      'the note made here to arrive filed',
+    );
     expect(view.sections.flatMap((section) => section.notes).map((note) => note.title)).toContain(
       'Cache hit ratio',
     );
@@ -98,9 +110,14 @@ describe('Opening a folder', () => {
 
   it('renames the folder from beside the breadcrumb', async () => {
     await crumb.rename('Performance');
-    await browser.pause(700);
 
-    expect(await crumb.name()).toBe('Performance');
+    expect(
+      await eventually(
+        () => crumb.name(),
+        (name) => name === 'Performance',
+        'the breadcrumb to carry the new name',
+      ),
+    ).toBe('Performance');
     expect((await bridge.listFolders(spaceId)).map((folder) => folder.name)).toContain('Performance');
   });
 
@@ -146,9 +163,12 @@ describe('Opening a folder', () => {
     const before = (await bridge.queryNotes(query({ spaceId }))).matched;
 
     await crumb.remove();
-    await browser.pause(900);
 
-    expect(await crumb.isShowing()).toBe(false);
+    await eventually(
+      () => crumb.isShowing(),
+      (showing) => !showing,
+      'the breadcrumb to go with the folder it named',
+    );
     expect((await bridge.listFolders(spaceId)).map((folder) => folder.name)).not.toContain('Performance');
     expect((await bridge.queryNotes(query({ spaceId }))).matched).toBe(before);
   });

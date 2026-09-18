@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { fileMenu, settings, titlebar } from '../pageobjects/titlebar.page.js';
-import { cursorOf, press, reopenSession } from '../support/app.js';
+import { cursorOf, eventually, press, reopenSession } from '../support/app.js';
 
 /**
  * A preference applies as it is typed, one key at a time.
@@ -76,7 +76,11 @@ describe('Preferences', () => {
 
   it('keeps the titlebar switch and the panel in agreement', async () => {
     await titlebar.setLocale('fr');
-    await browser.pause(300);
+    await eventually(
+      () => titlebar.activeLocale(),
+      (locale) => locale === 'fr',
+      'the titlebar to settle on the locale it was given',
+    );
     await fileMenu.openPreferences();
 
     expect(await settings.locale().getValue()).toBe('fr');

@@ -1,10 +1,10 @@
-import { browser, expect } from '@wdio/globals';
+import { expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
 import { fieldsForm } from '../pageobjects/overlays.page.js';
 import { settings, variables } from '../pageobjects/titlebar.page.js';
-import { clipboardText, reloadCanvas } from '../support/app.js';
+import { clipboardText, eventually, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -77,8 +77,12 @@ describe('{{fields}} in a snippet', () => {
     expect(await editor.hasCopyFilled()).toBe(true);
 
     await editor.copyFilled();
-    await browser.pause(800);
-    const filled = await clipboardText();
+    // ⚠️ An unreadable clipboard answers null at once, so only the readable case waits.
+    const filled = await eventually(
+      () => clipboardText(),
+      (text) => text === null || text.includes('-p 5432'),
+      'the filled copy to reach the clipboard',
+    );
     await editor.close();
 
     if (filled === null) {
@@ -118,9 +122,13 @@ describe('{{fields}} in a snippet', () => {
     await fieldsForm.field('host').setValue('db.internal');
     await fieldsForm.field('user').setValue('reader');
     await fieldsForm.submit();
-    await browser.pause(800);
+    await fieldsForm.form().waitForExist({ reverse: true, timeout: 10_000 });
 
-    const fields = (await reread())?.placeholders ?? [];
+    const fields = await eventually(
+      async () => (await reread())?.placeholders ?? [],
+      (stored) => stored.find((field) => field.name === 'host')?.value === 'db.internal',
+      'the typed values to be stored',
+    );
     expect(fields.find((field) => field.name === 'host')?.value).toBe('db.internal');
     expect(fields.find((field) => field.name === 'user')?.value).toBe('reader');
   });
@@ -155,9 +163,17 @@ describe('{{fields}} in a snippet', () => {
     await fieldsForm.form().waitForExist({ timeout: 10_000 });
     await fieldsForm.field('host').setValue('db.other');
     await fieldsForm.submit();
-    await browser.pause(800);
+    // ⚠️ The form closing is its own condition, and the next scenario opens a panel over
+    // this one: waiting on the stored value alone let the two dialogs overlap.
+    await fieldsForm.form().waitForExist({ reverse: true, timeout: 10_000 });
 
-    expect((await reread())?.updatedAt).toBe(before);
+    // The write is waited on through the value, then the column it must *not* have moved.
+    const after = await eventually(
+      () => reread(),
+      (note) => note?.placeholders.find((field) => field.name === 'host')?.value === 'db.other',
+      'the new value to be stored',
+    );
+    expect(after?.updatedAt).toBe(before);
   });
 
   it('lets a global variable propose a value without freezing it', async () => {

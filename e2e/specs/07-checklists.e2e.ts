@@ -105,21 +105,28 @@ describe('Todo lists', () => {
     await canvas.openNote(title);
     await editor.toggleItem(1);
     await editor.close();
-    await browser.pause(400);
 
     // `- [x] ` is `notes::checklist::to_markdown`'s syntax, reaching the card as
     // `DisplayNote.copyText`; the front end holds no second copy of it.
-    const copyText = (await reread())?.copyText;
+    const copyText = await eventually(
+      async () => (await reread())?.copyText,
+      (text) => text?.includes('- [ ] Tag the release') === true,
+      'the untick to come back in the rendered Markdown',
+    );
     expect(copyText).toContain('- [x] Write the changelog');
     expect(copyText).toContain('- [ ] Tag the release');
   });
 
   it('puts that same Markdown on the clipboard', async function () {
     const card = await canvas.cardWithTitle(title);
-    await card.$('[data-testid="copy-button"]').click();
-    await browser.pause(600);
+    await card.$(testid('copy-button')).click();
 
-    const copied = await clipboardText();
+    // ⚠️ An unreadable clipboard answers null at once, so only the readable case waits.
+    const copied = await eventually(
+      () => clipboardText(),
+      (text) => text === null || text.includes('- [x] Write the changelog'),
+      'the copy to reach the clipboard',
+    );
     if (copied === null) {
       // No readable clipboard on this runner. Skipped rather than returned: a bare
       // `return` is a green test that asserted nothing. See `clipboardText`.

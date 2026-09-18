@@ -45,9 +45,12 @@ describe('Spaces', () => {
   it('creates a space from the switcher', async () => {
     await spaces.open();
     await spaces.create('Veille');
-    await browser.pause(500);
 
-    const all = await bridge.listSpaces();
+    const all = await eventually(
+      () => bridge.listSpaces(),
+      (listed) => listed.some((space) => space.name === 'Veille'),
+      'the new space to be listed',
+    );
     expect(all.map((space) => space.name)).toContain('Veille');
   });
 
@@ -61,9 +64,12 @@ describe('Spaces', () => {
     const before = (await bridge.listSpaces()).find((space) => space.name === 'Veille');
     await spaces.open();
     await spaces.rename(before!.id, 'Lectures');
-    await browser.pause(500);
 
-    const after = (await bridge.listSpaces()).find((space) => space.id === before!.id);
+    const after = await eventually(
+      async () => (await bridge.listSpaces()).find((space) => space.id === before!.id),
+      (space) => space?.name === 'Lectures',
+      'the renamed space to come back under its new name',
+    );
     expect(after?.name).toBe('Lectures');
   });
 
@@ -92,17 +98,23 @@ describe('Spaces', () => {
 
       await spaces.open();
       await spaces.togglePin(id);
-      await browser.pause(500);
 
-      const pinned = await bridge.listSpaces();
+      const pinned = await eventually(
+        () => bridge.listSpaces(),
+        (listed) => listed[0]?.pinned === true,
+        'the pinned space to reach the head of the list',
+      );
       expect(pinned[0]?.id).toBe(id);
       expect(pinned[0]?.pinned).toBe(true);
 
       await spaces.open();
       await spaces.togglePin(id);
-      await browser.pause(500);
 
-      const loose = await bridge.listSpaces();
+      const loose = await eventually(
+        () => bridge.listSpaces(),
+        (listed) => listed.at(-1)?.pinned === false,
+        'the unpinned space to fall back to its name order',
+      );
       expect(loose.at(-1)?.id).toBe(id);
       expect(loose.at(-1)?.pinned).toBe(false);
     });
@@ -111,13 +123,20 @@ describe('Spaces', () => {
     it('survives a rename', async () => {
       await spaces.open();
       await spaces.togglePin(id);
-      await browser.pause(500);
+      await eventually(
+        () => bridge.listSpaces(),
+        (listed) => listed.find((space) => space.id === id)?.pinned === true,
+        'the space to be pinned before it is renamed',
+      );
 
       await spaces.open();
       await spaces.rename(id, 'Zzz renamed');
-      await browser.pause(500);
 
-      const after = (await bridge.listSpaces()).find((space) => space.id === id);
+      const after = await eventually(
+        async () => (await bridge.listSpaces()).find((space) => space.id === id),
+        (space) => space?.name === 'Zzz renamed',
+        'the pinned space to come back renamed',
+      );
       expect(after?.name).toBe('Zzz renamed');
       expect(after?.pinned).toBe(true);
     });
@@ -141,9 +160,12 @@ describe('Spaces', () => {
     const target = (await bridge.listSpaces()).find((space) => space.name === 'Lectures')!;
     await spaces.open();
     await spaces.remove(target.id, homeId);
-    await browser.pause(800);
 
-    expect((await bridge.listSpaces()).map((space) => space.name)).not.toContain('Lectures');
+    await eventually(
+      () => bridge.listSpaces(),
+      (listed) => !listed.some((space) => space.name === 'Lectures'),
+      'the absorbed space to be gone',
+    );
 
     // The note survived, in the refuge — a cascade would have taken it.
     const view = await bridge.queryNotes(query({ search: 'Only in Lectures' }));
@@ -189,8 +211,13 @@ describe('Spaces', () => {
     it('gives the switchers back when it is put away, and is remembered', async () => {
       await rail.hide();
       expect(await browser.$(testid('space-switcher')).isExisting()).toBe(true);
-      await browser.pause(500);
 
+      // ⚠️ The preference has to reach the file before the reload, or the rail comes back.
+      await eventually(
+        () => rail.isShowing(),
+        (showing) => !showing,
+        'the rail to be put away',
+      );
       await reloadCanvas();
 
       expect(await rail.isShowing()).toBe(false);
