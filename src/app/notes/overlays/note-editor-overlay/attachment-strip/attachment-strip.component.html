@@ -48,6 +48,7 @@
         type="button"
         class="strip-icon strip-remove"
         data-testid="attachment-remove"
+        [attr.data-attachment-id]="attachment.id"
         [class.confirming]="confirmingRemove() === attachment.id"
         [attr.aria-label]="'attachments.remove' | transloco: { name: attachment.fileName }"
         (click)="onRemoveClick(attachment.id)"
