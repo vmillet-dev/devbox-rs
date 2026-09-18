@@ -69,5 +69,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 /** Derived rather than hand-written: the key is the field name, prefixed. */
 export const SETTINGS_KEYS = Object.fromEntries(
-  Object.keys(DEFAULT_SETTINGS).map((field) => [field, `devbox.${field}`]),
+  Object.keys(DEFAULT_SETTINGS).map((field) => [field, `devnotes.${field}`]),
 ) as Readonly<Record<keyof AppSettings, string>>;

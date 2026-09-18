@@ -1,17 +1,17 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "devbox",
-  "identifier": "com.devbox.app",
+  "productName": "devnotes",
+  "identifier": "com.devnotes.app",
   "build": {
     "beforeDevCommand": "npm run start",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist/devbox/browser"
+    "frontendDist": "../dist/devnotes/browser"
   },
   "app": {
     "windows": [
       {
-        "title": "devbox",
+        "title": "devnotes",
         "width": 1100,
         "height": 720,
         "minWidth": 640,
@@ -39,7 +39,7 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZBMjJGNDA1RkVGMEEzNkYKUldSdm8vRCtCZlFpK3IzSFdQSFZ0YlM3VTh5eXNpVDhueWp2SzNPYyt6VmVHQVJ6eWs1ZDBzeE4K",
-      "endpoints": ["https://github.com/vmillet-dev/devbox-rs/releases/latest/download/latest.json"],
+      "endpoints": ["https://github.com/vmillet-dev/devnotes-rs/releases/latest/download/latest.json"],
       "windows": {
         "installMode": "passive"
       }

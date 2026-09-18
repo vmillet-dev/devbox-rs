@@ -28,11 +28,11 @@ describe('TrayService', () => {
 
     expect(syncTray).toHaveBeenCalled();
     expect(lastLabels()).toEqual({
-      open: 'Ouvrir DevBox',
+      open: 'Ouvrir DevNotes',
       newNote: 'Nouvelle note',
       capture: 'Coller le presse-papier',
       palette: 'Collage rapide',
-      quit: 'Quitter DevBox',
+      quit: 'Quitter DevNotes',
     });
   });
 
@@ -43,7 +43,7 @@ describe('TrayService', () => {
     TestBed.inject(TranslocoService).setActiveLang('en');
 
     expect(syncTray.mock.calls.length).toBeGreaterThan(before);
-    expect(lastLabels().quit).toBe('Quit DevBox');
+    expect(lastLabels().quit).toBe('Quit DevNotes');
   });
 
   it('stays silent when there is no tray to talk to', async () => {

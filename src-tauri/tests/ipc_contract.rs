@@ -6,21 +6,21 @@ use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
 
-use devbox_lib::attachments::model::Attachment;
-use devbox_lib::db::iso8601;
-use devbox_lib::error::StorageError;
-use devbox_lib::error::ValidationError;
-use devbox_lib::error::{AppError, ErrorCode};
-use devbox_lib::notes::checklist::{ChecklistItem, NoteKind};
-use devbox_lib::notes::language::Language;
-use devbox_lib::notes::model::{
+use devnotes_lib::attachments::model::Attachment;
+use devnotes_lib::db::iso8601;
+use devnotes_lib::error::StorageError;
+use devnotes_lib::error::ValidationError;
+use devnotes_lib::error::{AppError, ErrorCode};
+use devnotes_lib::notes::checklist::{ChecklistItem, NoteKind};
+use devnotes_lib::notes::language::Language;
+use devnotes_lib::notes::model::{
     DisplayNote, Note, NoteDraft, NoteLifecycle, NotePatch, TagUsage, decorate,
 };
-use devbox_lib::notes::trash;
-use devbox_lib::notes::view::{NoteFilter, NoteSection, NoteSectionKey, NotesQuery, NotesView};
-use devbox_lib::spaces::model::{Space, SpaceDraft};
-use devbox_lib::transfer;
-use devbox_lib::transfer::model::{Bundle, ImportReport};
+use devnotes_lib::notes::trash;
+use devnotes_lib::notes::view::{NoteFilter, NoteSection, NoteSectionKey, NotesQuery, NotesView};
+use devnotes_lib::spaces::model::{Space, SpaceDraft};
+use devnotes_lib::transfer;
+use devnotes_lib::transfer::model::{Bundle, ImportReport};
 
 const NOW: &str = "2026-07-25T09:00:00.000Z";
 
@@ -442,7 +442,7 @@ fn an_import_report_names_what_it_skipped() {
 
 #[test]
 fn an_export_bundle_reads_back_the_notes_it_wrote() {
-    // The file is a contract between two versions of DevBox, not only between Rust
+    // The file is a contract between two versions of DevNotes, not only between Rust
     // and the front end.
     let bundle = Bundle {
         version: transfer::model::FORMAT_VERSION,

@@ -17,9 +17,9 @@ describe('FileDialogService', () => {
   });
 
   it('hands back the chosen path', async () => {
-    adapter.openPath = 'C:/notes/devbox.json';
+    adapter.openPath = 'C:/notes/devnotes.json';
 
-    expect(await service.pickBundle()).toBe('C:/notes/devbox.json');
+    expect(await service.pickBundle()).toBe('C:/notes/devnotes.json');
   });
 
   it('reduces the plugin union to a single path', async () => {
@@ -45,13 +45,13 @@ describe('FileDialogService', () => {
   it('filters the bundle picker on the exchange format, old one included', async () => {
     await service.pickBundle();
 
-    expect(adapter.openCalls[0].filters?.[0].extensions).toEqual(['devbox', 'json']);
+    expect(adapter.openCalls[0].filters?.[0].extensions).toEqual(['devnotes', 'json']);
   });
 
   it('offers only the archive when saving', async () => {
-    await service.chooseBundleDestination('library.devbox');
+    await service.chooseBundleDestination('library.devnotes');
 
-    expect(adapter.saveCalls[0].filters?.[0].extensions).toEqual(['devbox']);
+    expect(adapter.saveCalls[0].filters?.[0].extensions).toEqual(['devnotes']);
   });
 
   it('leaves the attachment picker unfiltered', async () => {
@@ -61,12 +61,12 @@ describe('FileDialogService', () => {
   });
 
   it('proposes the given file name when saving', async () => {
-    adapter.savePath = 'C:/out/devbox-2026-08-27.json';
+    adapter.savePath = 'C:/out/devnotes-2026-08-27.json';
 
-    const chosen = await service.chooseBundleDestination('devbox-2026-08-27.json');
+    const chosen = await service.chooseBundleDestination('devnotes-2026-08-27.json');
 
-    expect(chosen).toBe('C:/out/devbox-2026-08-27.json');
-    expect(adapter.saveCalls[0].defaultPath).toBe('devbox-2026-08-27.json');
+    expect(chosen).toBe('C:/out/devnotes-2026-08-27.json');
+    expect(adapter.saveCalls[0].defaultPath).toBe('devnotes-2026-08-27.json');
   });
 
   it('reports a failed save dialog as no destination', async () => {

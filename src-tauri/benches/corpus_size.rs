@@ -16,8 +16,8 @@ use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
-use devbox_lib::notes::store;
-use devbox_lib::notes::view::{NoteFilter, NotesQuery};
+use devnotes_lib::notes::store;
+use devnotes_lib::notes::view::{NoteFilter, NotesQuery};
 
 use corpus::{Corpus, build_of, now, run_query};
 

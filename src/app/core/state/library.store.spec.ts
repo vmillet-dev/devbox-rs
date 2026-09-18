@@ -85,7 +85,7 @@ describe('LibraryStore', () => {
     });
 
     it('reports what came in, naming the file it read', async () => {
-      harness.dialog.openPath = 'C:/notes/devbox-2026-08-27.devbox';
+      harness.dialog.openPath = 'C:/notes/devnotes-2026-08-27.devnotes';
 
       expect(await harness.store.import()).toBe(true);
       expect(harness.status.status()).toEqual({
@@ -97,14 +97,14 @@ describe('LibraryStore', () => {
           attachments: '0',
           missing: '0',
           folders: '0',
-          path: 'devbox-2026-08-27.devbox',
+          path: 'devnotes-2026-08-27.devnotes',
         },
       });
     });
 
     /** A library received arranged is worth saying so: the folders are half of what came in. */
     it('says how many folders a library arrived with', async () => {
-      harness.dialog.openPath = 'C:/notes/devbox.devbox';
+      harness.dialog.openPath = 'C:/notes/devnotes.devnotes';
       harness.repository.importReport = {
         ...harness.repository.importReport,
         notesImported: 6,
@@ -118,7 +118,7 @@ describe('LibraryStore', () => {
 
     /** Every library operation reports, including when it changed nothing. */
     it('counts a library that brought folders but no new note as a change', async () => {
-      harness.dialog.openPath = 'C:/notes/devbox.devbox';
+      harness.dialog.openPath = 'C:/notes/devnotes.devnotes';
       harness.repository.importReport = {
         ...harness.repository.importReport,
         notesImported: 0,
@@ -129,7 +129,7 @@ describe('LibraryStore', () => {
       expect(await harness.store.import()).toBe(true);
     });
 
-    // A bundle from a newer DevBox imports rather than failing whole, and the note it
+    // A bundle from a newer DevNotes imports rather than failing whole, and the note it
     // brought down to a language this build knows is the only trace of it.
     it('says when a note came from a newer version', async () => {
       harness.dialog.openPath = 'C:/in.json';
@@ -149,7 +149,7 @@ describe('LibraryStore', () => {
     });
 
     it('counts the attachments that came back with the notes', async () => {
-      harness.dialog.openPath = 'C:/in.devbox';
+      harness.dialog.openPath = 'C:/in.devnotes';
       harness.repository.importReport = {
         foldersCreated: 0,
         spacesCreated: 0,
@@ -169,7 +169,7 @@ describe('LibraryStore', () => {
      *  thing that says why. It outranks the degraded notice on purpose: a missing file is
      *  a defect, a degraded field is a shrug. */
     it('says when the archive named an attachment it did not carry', async () => {
-      harness.dialog.openPath = 'C:/in.devbox';
+      harness.dialog.openPath = 'C:/in.devnotes';
       harness.repository.importReport = {
         foldersCreated: 0,
         spacesCreated: 0,
@@ -212,7 +212,7 @@ describe('LibraryStore', () => {
     });
 
     it('asks nothing of a file that is not protected', async () => {
-      harness.dialog.openPath = 'C:/in.devbox';
+      harness.dialog.openPath = 'C:/in.devnotes';
 
       expect(await harness.store.import()).toBe(true);
       expect(harness.store.passphraseRequest()).toBeNull();
@@ -220,7 +220,7 @@ describe('LibraryStore', () => {
     });
 
     it('asks for the phrase a protected file was sealed with, and hands it over', async () => {
-      harness.dialog.openPath = 'C:/in.devbox';
+      harness.dialog.openPath = 'C:/in.devnotes';
       harness.repository.fileIsProtected = true;
       harness.repository.expectedPassphrase = 'the shared phrase';
 
@@ -234,7 +234,7 @@ describe('LibraryStore', () => {
     /** ⚠️ A typo must not cost the import: the phrase is asked for again, and the refusal
      *  is said beside the field rather than in the error banner. */
     it('asks again when the phrase is refused', async () => {
-      harness.dialog.openPath = 'C:/in.devbox';
+      harness.dialog.openPath = 'C:/in.devnotes';
       harness.repository.fileIsProtected = true;
       harness.repository.expectedPassphrase = 'the shared phrase';
 
@@ -248,7 +248,7 @@ describe('LibraryStore', () => {
     });
 
     it('says the phrase was refused the second time it asks', async () => {
-      harness.dialog.openPath = 'C:/in.devbox';
+      harness.dialog.openPath = 'C:/in.devnotes';
       harness.repository.fileIsProtected = true;
       harness.repository.expectedPassphrase = 'the shared phrase';
 
@@ -263,7 +263,7 @@ describe('LibraryStore', () => {
     });
 
     it('imports nothing and reports no failure when the prompt is given up on', async () => {
-      harness.dialog.openPath = 'C:/in.devbox';
+      harness.dialog.openPath = 'C:/in.devnotes';
       harness.repository.fileIsProtected = true;
 
       const done = harness.store.import();
@@ -282,7 +282,7 @@ describe('LibraryStore', () => {
 
       await exportEverything(harness);
 
-      expect(harness.dialog.saveCalls[0].defaultPath).toBe('devbox-2026-08-27.devbox');
+      expect(harness.dialog.saveCalls[0].defaultPath).toBe('devnotes-2026-08-27.devnotes');
     });
 
     it('passes the active space through, or null for everything', async () => {
@@ -310,27 +310,27 @@ describe('LibraryStore', () => {
     });
 
     it('says how many notes went out, and where', async () => {
-      harness.dialog.savePath = 'C:/backups/devbox.devbox';
+      harness.dialog.savePath = 'C:/backups/devnotes.devnotes';
 
       await exportEverything(harness);
 
       expect(harness.status.status()).toEqual({
         key: 'file.exported',
-        params: { notes: '3', attachments: '0', path: 'devbox.devbox' },
+        params: { notes: '3', attachments: '0', path: 'devnotes.devnotes' },
       });
     });
 
     /** The attachments now travel, and a report that stayed silent about them would let a
      *  user believe an export of screenshots carried none. */
     it('counts the attachments that travelled with the notes', async () => {
-      harness.dialog.savePath = 'C:/backups/devbox.devbox';
+      harness.dialog.savePath = 'C:/backups/devnotes.devnotes';
       harness.repository.exportReport = { notes: 3, spaces: 1, folders: 0, attachments: 2, protected: false };
 
       await exportEverything(harness);
 
       expect(harness.status.status()).toEqual({
         key: 'file.exportedWithAttachments',
-        params: { notes: '3', attachments: '2', path: 'devbox.devbox' },
+        params: { notes: '3', attachments: '2', path: 'devnotes.devnotes' },
       });
     });
 
@@ -364,26 +364,26 @@ describe('LibraryStore', () => {
     /** ⚠️ The file is the one thing here most likely to leave the machine: the phrase goes
      *  through to the command, and the report says the file was sealed with it. */
     it('seals the file with the phrase that was given', async () => {
-      harness.dialog.savePath = 'C:/backups/devbox.devbox';
+      harness.dialog.savePath = 'C:/backups/devnotes.devnotes';
 
       await exportEverything(harness, null, { kind: 'phrase', value: 'a shared phrase' });
 
       expect(harness.repository.exportedTo?.passphrase).toBe('a shared phrase');
       expect(harness.status.status()).toEqual({
         key: 'file.exportedProtected',
-        params: { notes: '3', attachments: '0', path: 'devbox.devbox' },
+        params: { notes: '3', attachments: '0', path: 'devnotes.devnotes' },
       });
     });
 
     it('asks after the destination is known, naming the file it is about to write', async () => {
-      harness.dialog.savePath = 'C:/backups/devbox.devbox';
+      harness.dialog.savePath = 'C:/backups/devnotes.devnotes';
 
       const done = harness.store.export(null, NOW);
       await asking(harness);
 
       expect(harness.store.passphraseRequest()).toEqual({
         purpose: 'protect',
-        fileName: 'devbox.devbox',
+        fileName: 'devnotes.devnotes',
         refused: false,
       });
 
@@ -392,7 +392,7 @@ describe('LibraryStore', () => {
     });
 
     it('writes nothing when the prompt is cancelled', async () => {
-      harness.dialog.savePath = 'C:/out.devbox';
+      harness.dialog.savePath = 'C:/out.devnotes';
 
       const done = harness.store.export(null, NOW);
       await answer(harness, { kind: 'cancelled' });
@@ -406,7 +406,7 @@ describe('LibraryStore', () => {
   /** ⚠️ A dialog that vanished and came back on a typo would read as a fault, so the
    *  prompt stays up while the phrase is being derived from — and refuses a second answer. */
   it('keeps the prompt on screen while the phrase is being used', async () => {
-    harness.dialog.openPath = 'C:/in.devbox';
+    harness.dialog.openPath = 'C:/in.devnotes';
     harness.repository.fileIsProtected = true;
     harness.repository.expectedPassphrase = 'the shared phrase';
 

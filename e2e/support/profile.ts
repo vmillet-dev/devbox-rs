@@ -2,7 +2,7 @@ import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const IDENTIFIER = 'com.devbox.app.e2e';
+const IDENTIFIER = 'com.devnotes.app.e2e';
 
 /**
  * ⚠️ `app_data_dir()` is `data_dir()/identifier`, and the e2e build carries an identifier
@@ -49,7 +49,7 @@ export function vaultPath(): string {
  * the harness's own note, not the application's state.
  */
 export function homeSpaceMarker(): string {
-  return join(tmpdir(), 'devbox-e2e-home-space');
+  return join(tmpdir(), 'devnotes-e2e-home-space');
 }
 
 /**

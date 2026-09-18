@@ -5,17 +5,17 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 
-use devbox_lib::db::{Library, iso8601, open_in_memory};
-use devbox_lib::error::StorageError;
-use devbox_lib::folders::model::{FolderColour, NoteFiling};
-use devbox_lib::folders::store::{
+use devnotes_lib::db::{Library, iso8601, open_in_memory};
+use devnotes_lib::error::StorageError;
+use devnotes_lib::folders::model::{FolderColour, NoteFiling};
+use devnotes_lib::folders::store::{
     create, delete, file_many, list, recolour, rename, restore_filings,
 };
-use devbox_lib::notes::checklist::NoteKind;
-use devbox_lib::notes::language::Language;
-use devbox_lib::notes::model::{Note, NoteDraft, NoteLifecycle, NotePatch};
-use devbox_lib::notes::store::{create as create_note, update};
-use devbox_lib::spaces::store as spaces;
+use devnotes_lib::notes::checklist::NoteKind;
+use devnotes_lib::notes::language::Language;
+use devnotes_lib::notes::model::{Note, NoteDraft, NoteLifecycle, NotePatch};
+use devnotes_lib::notes::store::{create as create_note, update};
+use devnotes_lib::spaces::store as spaces;
 
 fn at(iso: &str) -> DateTime<Utc> {
     iso8601::parse(iso).expect("tests write valid instants")
@@ -54,7 +54,7 @@ fn note_in(connection: &mut Library, space_id: &str) -> Note {
 }
 
 fn folder_of(connection: &mut Library, note_id: &str) -> Option<String> {
-    use devbox_lib::db::schema::notes;
+    use devnotes_lib::db::schema::notes;
     use diesel::prelude::*;
 
     notes::table
@@ -65,7 +65,7 @@ fn folder_of(connection: &mut Library, note_id: &str) -> Option<String> {
 }
 
 fn updated_at_of(connection: &mut Library, note_id: &str) -> String {
-    use devbox_lib::db::schema::notes;
+    use devnotes_lib::db::schema::notes;
     use diesel::prelude::*;
 
     notes::table
@@ -498,10 +498,10 @@ fn a_draft_can_name_the_folder_it_is_born_in() {
 mod board {
     use super::*;
 
-    use devbox_lib::folders::board::{self, BoardFrame, BoardPoint, BoardQuery, BoardView};
-    use devbox_lib::folders::store::board as geometry;
-    use devbox_lib::notes::store::fetch;
-    use devbox_lib::notes::view::{NoteFilter, NotesQuery};
+    use devnotes_lib::folders::board::{self, BoardFrame, BoardPoint, BoardQuery, BoardView};
+    use devnotes_lib::folders::store::board as geometry;
+    use devnotes_lib::notes::store::fetch;
+    use devnotes_lib::notes::view::{NoteFilter, NotesQuery};
 
     fn request(space_id: &str) -> BoardQuery {
         BoardQuery {
@@ -841,11 +841,11 @@ mod board {
 mod gesture {
     use super::*;
 
-    use devbox_lib::folders::board::{
+    use devnotes_lib::folders::board::{
         BoardFrame, BoardPoint, CardPlacement, MIN_ZONE_HEIGHT, MIN_ZONE_WIDTH, ZonePlacement,
         clamp, clamp_point, zone_at,
     };
-    use devbox_lib::folders::store::board as geometry;
+    use devnotes_lib::folders::store::board as geometry;
 
     fn frames(connection: &mut Library, space_id: &str) -> HashMap<String, BoardFrame> {
         connection
@@ -1092,7 +1092,7 @@ mod gesture {
                 height: 10
             })
             .width,
-            devbox_lib::folders::board::MAX_SIDE
+            devnotes_lib::folders::board::MAX_SIDE
         );
     }
 }
@@ -1101,8 +1101,8 @@ mod gesture {
 /// says it once. Same reason the board resolves none.
 #[test]
 fn a_card_inside_an_opened_folder_carries_no_chip() {
-    use devbox_lib::folders::store::by_id;
-    use devbox_lib::notes::view::{self, NoteFilter, NotesQuery};
+    use devnotes_lib::folders::store::by_id;
+    use devnotes_lib::notes::view::{self, NoteFilter, NotesQuery};
 
     let mut connection = open_in_memory().unwrap();
     let sql = space(&mut connection, "SQL");
@@ -1133,13 +1133,13 @@ fn a_card_inside_an_opened_folder_carries_no_chip() {
     };
 
     // Scoped to the folder: the decoration pass is skipped, exactly as the command does.
-    let (notes, facets) = devbox_lib::notes::store::fetch(&mut connection, &scoped).unwrap();
+    let (notes, facets) = devnotes_lib::notes::store::fetch(&mut connection, &scoped).unwrap();
     let inside = view::build(notes, facets, &scoped);
     assert!(inside.sections[0].notes[0].folder.is_none());
 
     // Outside it, the chip is what says where the note lives.
     let folders = by_id(&mut connection, Some(&sql)).unwrap();
-    let (notes, facets) = devbox_lib::notes::store::fetch(&mut connection, &wide).unwrap();
+    let (notes, facets) = devnotes_lib::notes::store::fetch(&mut connection, &wide).unwrap();
     let mut outside = view::build(notes, facets, &wide);
     view::apply_folders(&mut outside, &folders);
     assert_eq!(

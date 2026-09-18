@@ -45,7 +45,7 @@ describe('First launch', () => {
 
   it('opens on a window wearing the application name', async () => {
     // From `Cargo.toml` through `APP_METADATA`, not `tauri.conf.json`'s lowercase name.
-    expect(await titlebar.title()).toBe('DevBox');
+    expect(await titlebar.title()).toBe('DevNotes');
   });
 
   it('seeds one space and four sample notes', async () => {

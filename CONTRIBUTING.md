@@ -1,9 +1,9 @@
-# Contributing to DevBox
+# Contributing to DevNotes
 
 Thanks for taking the time. This file covers what the compiler and CI cannot tell you: the
 handful of conventions that are load-bearing, and where the traps are.
 
-DevBox is licensed under the [GNU GPL v3.0](LICENSE). Opening a pull request means you agree
+DevNotes is licensed under the [GNU GPL v3.0](LICENSE). Opening a pull request means you agree
 to have your contribution distributed under those terms.
 
 ## Getting set up
@@ -51,7 +51,7 @@ you use day to day.
 | ----------------------- | ------------------------------------------------------- |
 | `npm start`             | Angular dev server only, port 1420                      |
 | `npm run tauri dev`     | The main loop: Angular dev server plus the Tauri window |
-| `npm run build`         | Production Angular build, into `dist/devbox/browser`    |
+| `npm run build`         | Production Angular build, into `dist/devnotes/browser`  |
 | `npm run tauri build`   | Full production build, into `src-tauri/target/release`  |
 | `npm test`              | Unit tests (Vitest on jsdom — no browser needed)        |
 | `npm run test:watch`    | The same, re-running on change                          |
@@ -95,7 +95,7 @@ read it before a structural change, and keep it in step when you make one.
 **Migrations are append-only.** A model change means a new `src-tauri/migrations/`
 directory, never an edit to one that already shipped — it has already run on installed
 databases. `src-tauri/src/db/schema.rs` is **hand-written**, not generated, so a new column
-means editing both it and the SQL. Deleting `app_data_dir()/devbox.sqlite3` is a legitimate
+means editing both it and the SQL. Deleting `app_data_dir()/devnotes.sqlite3` is a legitimate
 reset while developing.
 
 **The IPC surface is generated.** `src/app/core/ipc/bindings.ts` comes from the Rust

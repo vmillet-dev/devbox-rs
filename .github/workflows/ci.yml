@@ -57,8 +57,8 @@ jobs:
       # front-end build would serialise it for nothing: it validates Rust, not the bundle.
       - name: Placeholder frontendDist
         run: |
-          mkdir -p dist/devbox/browser
-          printf '<!doctype html><title>ci</title>' > dist/devbox/browser/index.html
+          mkdir -p dist/devnotes/browser
+          printf '<!doctype html><title>ci</title>' > dist/devnotes/browser/index.html
 
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
 
@@ -99,7 +99,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: front-dist
-          path: dist/devbox/browser
+          path: dist/devnotes/browser
           retention-days: 1
 
   build-rust:
@@ -117,8 +117,8 @@ jobs:
 
       - name: Placeholder frontendDist
         run: |
-          mkdir -p dist/devbox/browser
-          printf '<!doctype html><title>ci</title>' > dist/devbox/browser/index.html
+          mkdir -p dist/devnotes/browser
+          printf '<!doctype html><title>ci</title>' > dist/devnotes/browser/index.html
 
       - name: Build
         run: |
@@ -164,7 +164,7 @@ jobs:
           path: coverage
           retention-days: 7
 
-  # ⚠️ Windows is not redundant with Ubuntu here. DevBox ships primarily to Windows, and the
+  # ⚠️ Windows is not redundant with Ubuntu here. DevNotes ships primarily to Windows, and the
   # back-end reasons about `app_data_dir()`, path separators, file locking and SQLite — all of
   # which differ. Until this leg existed, nothing blocking ever ran the tests on the platform
   # most users are on: `test-e2e` covers Windows but is `continue-on-error`.
@@ -207,8 +207,8 @@ jobs:
 
       - name: Placeholder frontendDist
         run: |
-          mkdir -p dist/devbox/browser
-          printf '<!doctype html><title>ci</title>' > dist/devbox/browser/index.html
+          mkdir -p dist/devnotes/browser
+          printf '<!doctype html><title>ci</title>' > dist/devnotes/browser/index.html
 
       - name: Test
         run: |
@@ -267,7 +267,7 @@ jobs:
       - run: npm ci
 
       # `tauri build` chains `beforeBuildCommand` (the e2e front-end build) then cargo. The
-      # binary it produces carries the `com.devbox.app.e2e` identifier, so its profile is its
+      # binary it produces carries the `com.devnotes.app.e2e` identifier, so its profile is its
       # own: it cannot overwrite an existing library.
       - name: Build the e2e binary
         run: |

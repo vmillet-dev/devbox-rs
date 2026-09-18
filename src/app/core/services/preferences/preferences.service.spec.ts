@@ -36,21 +36,21 @@ describe('PreferencesService', () => {
     loadMock.mockResolvedValue(fakeStore());
     await service.hydrate();
 
-    service.write('devbox.test', 'value');
+    service.write('devnotes.test', 'value');
 
-    expect(service.read('devbox.test')).toBe('value');
+    expect(service.read('devnotes.test')).toBe('value');
   });
 
   it('returns null for an unknown key', () => {
-    expect(service.read('devbox.unknown')).toBeNull();
+    expect(service.read('devnotes.unknown')).toBeNull();
   });
 
   it('serves values the store held on disk', async () => {
-    loadMock.mockResolvedValue(fakeStore([['devbox.locale', 'en']]));
+    loadMock.mockResolvedValue(fakeStore([['devnotes.locale', 'en']]));
 
     await service.hydrate();
 
-    expect(service.read('devbox.locale')).toBe('en');
+    expect(service.read('devnotes.locale')).toBe('en');
   });
 
   it('pushes a written value to the store', async () => {
@@ -58,38 +58,38 @@ describe('PreferencesService', () => {
     loadMock.mockResolvedValue(store);
     await service.hydrate();
 
-    service.write('devbox.locale', 'en');
+    service.write('devnotes.locale', 'en');
 
-    expect(store.set).toHaveBeenCalledWith('devbox.locale', 'en');
+    expect(store.set).toHaveBeenCalledWith('devnotes.locale', 'en');
   });
 
   it('ignores non-string values rather than surfacing them as strings', async () => {
-    loadMock.mockResolvedValue(fakeStore([['devbox.weird', { nested: true }]]));
+    loadMock.mockResolvedValue(fakeStore([['devnotes.weird', { nested: true }]]));
 
     await service.hydrate();
 
-    expect(service.read('devbox.weird')).toBeNull();
+    expect(service.read('devnotes.weird')).toBeNull();
   });
 
   it('adopts preferences left in localStorage by an earlier version', async () => {
-    localStorage.setItem('devbox.locale', 'en');
+    localStorage.setItem('devnotes.locale', 'en');
     const store = fakeStore();
     loadMock.mockResolvedValue(store);
 
     await service.hydrate();
 
-    expect(service.read('devbox.locale')).toBe('en');
-    expect(store.set).toHaveBeenCalledWith('devbox.locale', 'en');
-    expect(localStorage.getItem('devbox.locale')).toBeNull();
+    expect(service.read('devnotes.locale')).toBe('en');
+    expect(store.set).toHaveBeenCalledWith('devnotes.locale', 'en');
+    expect(localStorage.getItem('devnotes.locale')).toBeNull();
   });
 
   it('lets the stored file win over a leftover localStorage value', async () => {
-    localStorage.setItem('devbox.locale', 'fr');
-    loadMock.mockResolvedValue(fakeStore([['devbox.locale', 'en']]));
+    localStorage.setItem('devnotes.locale', 'fr');
+    loadMock.mockResolvedValue(fakeStore([['devnotes.locale', 'en']]));
 
     await service.hydrate();
 
-    expect(service.read('devbox.locale')).toBe('en');
+    expect(service.read('devnotes.locale')).toBe('en');
   });
 
   it('leaves foreign localStorage keys alone', async () => {
@@ -108,8 +108,8 @@ describe('PreferencesService', () => {
 
     await expect(service.hydrate()).resolves.toBeUndefined();
 
-    service.write('devbox.test', 'value');
-    expect(service.read('devbox.test')).toBe('value');
+    service.write('devnotes.test', 'value');
+    expect(service.read('devnotes.test')).toBe('value');
   });
 
   it('does not reject when the store refuses a write', async () => {
@@ -118,7 +118,7 @@ describe('PreferencesService', () => {
     loadMock.mockResolvedValue(store);
     await service.hydrate();
 
-    expect(() => service.write('devbox.test', 'value')).not.toThrow();
-    expect(service.read('devbox.test')).toBe('value');
+    expect(() => service.write('devnotes.test', 'value')).not.toThrow();
+    expect(service.read('devnotes.test')).toBe('value');
   });
 });

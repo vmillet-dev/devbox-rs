@@ -244,7 +244,7 @@ mod tests {
     }
 
     fn scratch() -> std::path::PathBuf {
-        let directory = std::env::temp_dir().join(format!("devbox-traversal-{}", Uuid::new_v4()));
+        let directory = std::env::temp_dir().join(format!("devnotes-traversal-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&directory).unwrap();
 
         directory
@@ -293,7 +293,10 @@ mod tests {
             attachments: vec![hostile],
         };
 
-        let path = profile.join("crafted.devbox").to_string_lossy().to_string();
+        let path = profile
+            .join("crafted.devnotes")
+            .to_string_lossy()
+            .to_string();
         file::write(&path, &bundle, &sending_files, &vault, None).unwrap();
 
         let mut receiving = open_in_memory().unwrap();

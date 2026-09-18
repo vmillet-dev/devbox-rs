@@ -41,7 +41,7 @@ const SEALED_ENTRY: &str = "bundle.sealed";
 const RECIPE_ENTRY: &str = "recipe.json";
 
 /// What a zip opens with. An export written before the archive existed is plain JSON and
-/// is still read: a new DevBox reads an old file, an old DevBox does not read a new one.
+/// is still read: a new DevNotes reads an old file, an old DevNotes does not read a new one.
 const ZIP_MAGIC: [u8; 4] = [b'P', b'K', 0x03, 0x04];
 
 fn file_error(what: &str, error: &std::io::Error) -> StorageError {
@@ -395,7 +395,7 @@ mod tests {
     }
 
     fn scratch() -> PathBuf {
-        let directory = std::env::temp_dir().join(format!("devbox-{}", Uuid::new_v4()));
+        let directory = std::env::temp_dir().join(format!("devnotes-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&directory).unwrap();
 
         directory
@@ -412,7 +412,7 @@ mod tests {
     fn the_staging_file_sits_next_to_its_target() {
         let target = std::env::temp_dir()
             .join("documents")
-            .join("library.devbox");
+            .join("library.devnotes");
 
         let staged = staging_path(&target.to_string_lossy());
 
@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn two_exports_of_the_same_target_never_stage_the_same_file() {
-        let target = std::env::temp_dir().join("library.devbox");
+        let target = std::env::temp_dir().join("library.devnotes");
 
         let first = staging_path(&target.to_string_lossy());
         let second = staging_path(&target.to_string_lossy());
@@ -433,7 +433,7 @@ mod tests {
     #[test]
     fn an_export_leaves_no_staging_file_behind() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
 
         write(
             &target.to_string_lossy(),
@@ -450,14 +450,14 @@ mod tests {
             .map(|entry| entry.file_name())
             .collect();
 
-        assert_eq!(left, ["library.devbox"]);
+        assert_eq!(left, ["library.devnotes"]);
         std::fs::remove_dir_all(&directory).ok();
     }
 
     #[test]
     fn exporting_over_an_existing_file_replaces_it_whole() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
         std::fs::write(&target, "previous export, longer than what replaces it").unwrap();
 
         write(
@@ -479,7 +479,7 @@ mod tests {
         let directory = scratch();
 
         let error = write(
-            "/no/such/directory/library.devbox",
+            "/no/such/directory/library.devnotes",
             &bundle(),
             &directory,
             &library(),
@@ -494,7 +494,7 @@ mod tests {
     #[test]
     fn a_written_bundle_reads_back_as_itself() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
 
         write(
             &target.to_string_lossy(),
@@ -515,7 +515,7 @@ mod tests {
     #[test]
     fn an_attachment_travels_with_its_note() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
         let vault = library();
         seal_beside(&directory, &vault, b"\x89PNG");
 
@@ -546,7 +546,7 @@ mod tests {
     #[test]
     fn a_record_whose_file_is_gone_leaves_the_export_rather_than_failing_it() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
 
         let mut exported = bundle();
         exported.attachments = vec![record()];
@@ -564,7 +564,7 @@ mod tests {
         std::fs::remove_dir_all(&directory).ok();
     }
 
-    /// ⚠️ New DevBox reads what old DevBox wrote: a `.json` export predates the archive.
+    /// ⚠️ New DevNotes reads what old DevNotes wrote: a `.json` export predates the archive.
     #[test]
     fn a_json_export_from_before_the_archive_still_imports() {
         let directory = scratch();
@@ -584,7 +584,7 @@ mod tests {
     #[test]
     fn a_protected_export_carries_none_of_the_notes_in_the_clear() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
         let vault = library();
         seal_beside(&directory, &vault, b"a screenshot of something");
 
@@ -614,7 +614,7 @@ mod tests {
     #[test]
     fn a_protected_export_reads_back_whole_with_its_phrase() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
         let vault = library();
         seal_beside(&directory, &vault, b"\x89PNG");
 
@@ -645,7 +645,7 @@ mod tests {
     #[test]
     fn a_protected_export_asks_for_a_phrase_rather_than_failing() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
 
         write(
             &target.to_string_lossy(),
@@ -666,7 +666,7 @@ mod tests {
     #[test]
     fn the_wrong_phrase_is_refused_rather_than_read_as_nonsense() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
 
         write(
             &target.to_string_lossy(),
@@ -688,7 +688,7 @@ mod tests {
     #[test]
     fn whether_a_file_is_protected_is_answered_without_reading_the_bundle() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
         write(
             &target.to_string_lossy(),
             &bundle(),
@@ -715,7 +715,7 @@ mod tests {
     #[test]
     fn an_unprotected_export_is_not_reported_as_protected() {
         let directory = scratch();
-        let target = directory.join("library.devbox");
+        let target = directory.join("library.devnotes");
 
         write(
             &target.to_string_lossy(),

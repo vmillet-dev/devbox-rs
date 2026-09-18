@@ -15,7 +15,7 @@ import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
  */
 describe('Attachments', () => {
   const title = 'Note with a file';
-  const directory = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
+  const directory = mkdtempSync(join(tmpdir(), 'devnotes-e2e-'));
   const filePath = join(directory, 'runbook.txt');
   let noteId = '';
 
@@ -93,7 +93,7 @@ describe('Attachments', () => {
   it('gives two files of the same name two records', async () => {
     // `model::stored_name` derives the stored name from the record id: two `runbook.txt`
     // must not overwrite each other on disk.
-    const second = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
+    const second = mkdtempSync(join(tmpdir(), 'devnotes-e2e-'));
     const twin = join(second, 'runbook.txt');
     writeFileSync(twin, 'a different runbook\n');
 

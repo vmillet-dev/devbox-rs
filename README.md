@@ -1,7 +1,7 @@
-# DevBox
+# DevNotes
 
-[![CI](https://github.com/vmillet-dev/devbox-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/vmillet-dev/devbox-rs/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/vmillet-dev/devbox-rs)](https://github.com/vmillet-dev/devbox-rs/releases/latest)
+[![CI](https://github.com/vmillet-dev/devnotes-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/vmillet-dev/devnotes-rs/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/vmillet-dev/devnotes-rs)](https://github.com/vmillet-dev/devnotes-rs/releases/latest)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
 A notes and snippets manager for developers, on the desktop. Write a snippet once, find it
@@ -10,7 +10,7 @@ by tag or by full text, and paste it into any application from a global shortcut
 Search it, narrow it by tag, open it — and from any application, `Ctrl+Alt+P` brings up the
 palette, where `Enter` copies and the window steps aside:
 
-![A tour of DevBox: the board of notes, a search narrowing it and quoting the line that matched, a tag filter, a note open in the editor, then the quick-paste palette asking a snippet for its fields](docs/quick-paste.gif)
+![A tour of DevNotes: the board of notes, a search narrowing it and quoting the line that matched, a tag filter, a note open in the editor, then the quick-paste palette asking a snippet for its fields](docs/quick-paste.gif)
 
 Everything stays on your machine, encrypted with a passphrase you choose and type once at
 launch. Nothing is uploaded, there is no account, and the application works with the network
@@ -28,7 +28,7 @@ off.
 | **Bulk actions**      | select several notes, then move, tag, export or trash them in one go                              |
 | **Tag management**    | rename, merge or drop a tag across the whole library                                              |
 | **Attachments**       | drop a file on the editor or paste an image; open it, save it elsewhere, preview it inline        |
-| **Import / export**   | a `.devbox` archive both ways, attachments included — everything, one space, or the selection     |
+| **Import / export**   | a `.devnotes` archive both ways, attachments included — everything, one space, or the selection   |
 | **Copy as Markdown**  | the selection rendered for a pull request, a ticket or a chat message                             |
 | **Encrypted at rest** | one passphrase at launch; notes and attachments sealed on disk, exports optionally too            |
 
@@ -37,7 +37,7 @@ English, and it ships with a light and a dark theme.
 
 ## Your library is encrypted
 
-DevBox asks for a passphrase the first time it runs, and once at every launch after that.
+DevNotes asks for a passphrase the first time it runs, and once at every launch after that.
 It is what opens the library, and it is never stored anywhere — not in a keychain, not
 behind a "remember me". While the application runs the key lives in memory and nowhere
 else.
@@ -55,13 +55,13 @@ What is sealed on disk: note titles, bodies and sources, checklist items, space 
 library. An export written in the clear is the only copy that does not depend on it.
 
 ⚠️ **Opening an attachment** writes a decrypted copy — inside your own profile, never the
-shared temporary folder — because the program that opens it reads from disk. DevBox deletes
+shared temporary folder — because the program that opens it reads from disk. DevNotes deletes
 those copies when it quits, and sweeps whatever survived — a file another application still
 held, a crash — at the next launch.
 
 An export is the one file meant to leave the machine, so it is offered a key of its own:
 give it a passphrase and it travels sealed, attachments included, or write it in the clear
-for a file any DevBox can read. The application asks which, every time, and says which one
+for a file any DevNotes can read. The application asks which, every time, and says which one
 it wrote.
 
 ## Where your library lives, and how it is backed up
@@ -69,21 +69,21 @@ it wrote.
 Two files, and they only mean anything together — the database is sealed, and the key
 file is what opens it:
 
-|             |                                  |
-| ----------- | -------------------------------- |
-| **Windows** | `%APPDATA%\com.devbox.app\`      |
-| **Linux**   | `~/.local/share/com.devbox.app/` |
+|             |                                    |
+| ----------- | ---------------------------------- |
+| **Windows** | `%APPDATA%\com.devnotes.app\`      |
+| **Linux**   | `~/.local/share/com.devnotes.app/` |
 
-In it: `devbox.sqlite3`, `vault.json`, `attachments/`, and `preferences.json`. ⚠️ Copy the
+In it: `devnotes.sqlite3`, `vault.json`, `attachments/`, and `preferences.json`. ⚠️ Copy the
 database without the key file and you have copied something nobody can open again.
 
-DevBox takes a **rolling copy at launch**, at most one a day, and keeps the last three in
+DevNotes takes a **rolling copy at launch**, at most one a day, and keeps the last three in
 `backups/`. Each one is a full library — database and key file together — so restoring is
 copying a folder back. It is written with `VACUUM INTO` rather than by copying the file,
 because under WAL the database on its own is not a consistent snapshot. Turn it off in
 Preferences → Security if you would rather it did not.
 
-DevBox also checks the database is still sound every time it opens one. If it is not, it
+DevNotes also checks the database is still sound every time it opens one. If it is not, it
 says so rather than starting on it, and offers to set it aside: the database, its
 attachments and whatever could still be rescued from it move into `damaged/`, and the next
 unlock starts on a fresh library. Your passphrase does not change — so what was set aside,
@@ -95,34 +95,34 @@ For that, export somewhere else — or copy that folder to another machine.
 
 ## Install
 
-DevBox runs on **Windows and Linux**. There is no macOS build: it cannot be tested here,
+DevNotes runs on **Windows and Linux**. There is no macOS build: it cannot be tested here,
 and Gatekeeper wants a paid Apple Developer account with no free way around it on recent
 versions — shipping for a platform that can be neither tested nor distributed would be a
 promise nobody can keep.
 
-Download from the [latest release](https://github.com/vmillet-dev/devbox-rs/releases/latest).
+Download from the [latest release](https://github.com/vmillet-dev/devnotes-rs/releases/latest).
 
 **Windows**
 
-| File                             | Pick it if                                                     |
-| -------------------------------- | -------------------------------------------------------------- |
-| `devbox_<version>_x64-setup.exe` | You just want DevBox installed. This is the one to take.       |
-| `devbox_<version>_x64_en-US.msi` | You deploy software through group policy or a management tool. |
-| `devbox-<version>-windows.exe`   | You want no installer at all — run it from where it lands.     |
+| File                               | Pick it if                                                     |
+| ---------------------------------- | -------------------------------------------------------------- |
+| `devnotes_<version>_x64-setup.exe` | You just want DevNotes installed. This is the one to take.     |
+| `devnotes_<version>_x64_en-US.msi` | You deploy software through group policy or a management tool. |
+| `devnotes-<version>-windows.exe`   | You want no installer at all — run it from where it lands.     |
 
 **Linux**
 
-| File                              | Pick it if                            |
-| --------------------------------- | ------------------------------------- |
-| `devbox_<version>_amd64.AppImage` | Any distribution, nothing to install. |
-| `devbox_<version>_amd64.deb`      | Debian, Ubuntu and derivatives.       |
-| `devbox-<version>-1.x86_64.rpm`   | Fedora, RHEL and derivatives.         |
-| `devbox-<version>-linux`          | The bare executable, no packaging.    |
+| File                                | Pick it if                            |
+| ----------------------------------- | ------------------------------------- |
+| `devnotes_<version>_amd64.AppImage` | Any distribution, nothing to install. |
+| `devnotes_<version>_amd64.deb`      | Debian, Ubuntu and derivatives.       |
+| `devnotes-<version>-1.x86_64.rpm`   | Fedora, RHEL and derivatives.         |
+| `devnotes-<version>-linux`          | The bare executable, no packaging.    |
 
 ```bash
-chmod +x devbox_*_amd64.AppImage        # make the AppImage runnable, then launch it
-sudo apt install ./devbox_*_amd64.deb   # Debian and Ubuntu — pulls in what it needs
-sudo dnf install ./devbox-*.x86_64.rpm  # Fedora and RHEL
+chmod +x devnotes_*_amd64.AppImage        # make the AppImage runnable, then launch it
+sudo apt install ./devnotes_*_amd64.deb   # Debian and Ubuntu — pulls in what it needs
+sudo dnf install ./devnotes-*.x86_64.rpm  # Fedora and RHEL
 ```
 
 On Windows, the installer and the MSI are opened by double-clicking them; the standalone
@@ -131,7 +131,7 @@ On Windows, the installer and the MSI are opened by double-clicking them; the st
 Updates are offered inside the application, so you only download by hand once.
 
 Windows shows a SmartScreen warning the first time — choose **More info**, then **Run
-anyway**. It is about the identity of the publisher, not about the file: DevBox has no
+anyway**. It is about the identity of the publisher, not about the file: DevNotes has no
 code-signing certificate, while its updates are signed with minisign and verified before
 they install. Every release also publishes `SHA256SUMS.txt`.
 
@@ -169,7 +169,7 @@ IPC surface between them is generated from the Rust signatures.
 
 ## License
 
-DevBox is free software under the [GNU General Public License v3.0](LICENSE). You may use,
+DevNotes is free software under the [GNU General Public License v3.0](LICENSE). You may use,
 study, share and modify it; a distributed fork has to stay under the same terms and ship its
 source.
 

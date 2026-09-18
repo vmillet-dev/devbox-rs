@@ -45,7 +45,7 @@ describe('Preferences reach the disk', () => {
     await fileMenu.openPreferences();
     await settings.select(settings.control.theme, 'dark');
     await settings.close();
-    await settled('devbox.theme', 'dark');
+    await settled('devnotes.theme', 'dark');
 
     expect(existsSync(preferencesPath())).toBe(true);
   });
@@ -55,11 +55,11 @@ describe('Preferences reach the disk', () => {
     await settings.select(settings.control.density, 'comfortable');
     await settings.close();
 
-    const file = await settled('devbox.density', 'comfortable');
+    const file = await settled('devnotes.density', 'comfortable');
     // ⚠️ One key per setting: a blob under one key would make a half-written file lose
     // every setting at once.
-    expect(file['devbox.theme']).toBe('dark');
-    expect(file['devbox.density']).toBe('comfortable');
+    expect(file['devnotes.theme']).toBe('dark');
+    expect(file['devnotes.density']).toBe('comfortable');
   });
 
   it('rewrites the key as the value is changed, with no confirmation step', async () => {
@@ -68,13 +68,13 @@ describe('Preferences reach the disk', () => {
     await settings.close();
 
     // There is no OK anywhere in the panel: closing it is not what saves.
-    expect((await settled('devbox.theme', 'light'))['devbox.theme']).toBe('light');
+    expect((await settled('devnotes.theme', 'light'))['devnotes.theme']).toBe('light');
   });
 
   it('stores the locale the titlebar switch chose, like the panel does', async () => {
     await titlebar.setLocale('en');
 
-    expect((await settled('devbox.locale', 'en'))['devbox.locale']).toBe('en');
+    expect((await settled('devnotes.locale', 'en'))['devnotes.locale']).toBe('en');
     expect(await titlebar.activeLocale()).toBe('en');
   });
 

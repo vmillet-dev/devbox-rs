@@ -11,7 +11,7 @@ use diesel::prelude::*;
 use crate::error::StorageError;
 use crate::vault::key::Vault;
 
-pub const DB_FILE_NAME: &str = "devbox.sqlite3";
+pub const DB_FILE_NAME: &str = "devnotes.sqlite3";
 
 /// The connection, and the key everything it holds is sealed with.
 ///
@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn a_damaged_file_is_named_as_such_rather_than_opened() {
         let directory =
-            std::env::temp_dir().join(format!("devbox-damaged-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("devnotes-damaged-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&directory).unwrap();
         let path = directory.join(DB_FILE_NAME);
 
@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn a_database_that_will_not_open_says_which_file() {
         let directory =
-            std::env::temp_dir().join(format!("devbox-unopenable-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("devnotes-unopenable-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&directory).unwrap();
 
         // A directory is not a database file, so establishing it fails the way a corrupt

@@ -1,27 +1,27 @@
 [package]
-name = "devbox"
+name = "devnotes"
 version = "0.3.0"
 description = "A developer's notes and snippets manager for the desktop"
 authors = ["Valentin MILLET"]
 edition = "2024"
 rust-version = "1.88"
-repository = "https://github.com/vmillet-dev/devbox-rs"
+repository = "https://github.com/vmillet-dev/devnotes-rs"
 license = "GPL-3.0-only"
 readme = "../README.md"
-default-run = "devbox"
+default-run = "devnotes"
 autobenches = false
 
-[package.metadata.devbox]
-display-name = "DevBox"
+[package.metadata.devnotes]
+display-name = "DevNotes"
 author-handle = "@vmillet-dev"
 
 [lib]
-name = "devbox_lib"
+name = "devnotes_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 bench = false
 
 [[bin]]
-name = "devbox"
+name = "devnotes"
 path = "src/main.rs"
 bench = false
 

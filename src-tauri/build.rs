@@ -19,15 +19,15 @@ fn export_metadata() {
     let metadata = manifest
         .get("package")
         .and_then(|package| package.get("metadata"))
-        .and_then(|metadata| metadata.get("devbox"))
-        .expect("Cargo.toml declares [package.metadata.devbox]");
+        .and_then(|metadata| metadata.get("devnotes"))
+        .expect("Cargo.toml declares [package.metadata.devnotes]");
 
     for key in ["display-name", "author-handle"] {
         let value = metadata
             .get(key)
             .and_then(toml::Value::as_str)
-            .unwrap_or_else(|| panic!("[package.metadata.devbox] {key} is a string"));
-        let name = format!("DEVBOX_{}", key.to_uppercase().replace('-', "_"));
+            .unwrap_or_else(|| panic!("[package.metadata.devnotes] {key} is a string"));
+        let name = format!("DEVNOTES_{}", key.to_uppercase().replace('-', "_"));
 
         println!("cargo:rustc-env={name}={value}");
     }
@@ -36,9 +36,9 @@ fn export_metadata() {
     let authors = env::var("CARGO_PKG_AUTHORS").unwrap_or_default();
     let author = authors.split(';').next().unwrap_or_default();
 
-    println!("cargo:rustc-env=DEVBOX_AUTHOR={author}");
+    println!("cargo:rustc-env=DEVNOTES_AUTHOR={author}");
     println!(
-        "cargo:rustc-env=DEVBOX_RUST_VERSION={}",
+        "cargo:rustc-env=DEVNOTES_RUST_VERSION={}",
         pinned_toolchain(&manifest_dir)
     );
 }

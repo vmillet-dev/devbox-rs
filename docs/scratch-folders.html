@@ -249,7 +249,7 @@
 <body>
 
 <div class="harness">
-  <span class="harness-title">DevBox — dossiers</span>
+  <span class="harness-title">DevNotes — dossiers</span>
   <button data-screen="board" class="on">Tableau</button>
   <button data-screen="folder">Dossier ouvert</button>
   <button data-screen="date">Vue date</button>
@@ -262,7 +262,7 @@
     <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
     <span class="menu">Fichier</span>
     <span class="menu">À propos</span>
-    <div class="titlebar-title">DevBox</div>
+    <div class="titlebar-title">DevNotes</div>
     <span class="menu">FR</span>
   </div>
 
@@ -367,13 +367,13 @@
           <div class="card-top"><span class="lang sh">SH</span></div>
           <div class="card-title">Connexion prod</div>
           <div class="card-snippet">psql -h {{host}} -U {{user}}
-  -d devbox</div>
+  -d devnotes</div>
           <div class="card-footer"><span>2 champs</span><span class="tags"><span class="green">outil</span></span></div>
         </div>
         <div class="card" style="position:absolute; left:276px; top:426px;">
           <div class="card-top"><span class="lang sh">SH</span></div>
           <div class="card-title">Dump nocturne</div>
-          <div class="card-snippet">pg_dump -Fc devbox
+          <div class="card-snippet">pg_dump -Fc devnotes
   &gt; /backups/$(date +%F).dump</div>
           <div class="card-footer"><span>il y a 2 semaines</span></div>
         </div>
@@ -417,7 +417,7 @@
           <div class="card-top"><span class="lang sh">SH</span></div>
           <div class="card-title">Vacuum hebdomadaire</div>
           <div class="card-snippet">VACUUM ANALYZE;
-  REINDEX DATABASE devbox;</div>
+  REINDEX DATABASE devnotes;</div>
           <div class="card-footer"><span>il y a 6 j</span><span class="tags"><span class="green">cron</span></span></div>
         </div>
         <div class="card">
@@ -487,7 +487,7 @@
           <div class="card-top"><span class="lang sh">SH</span></div>
           <div class="card-title">Connexion prod</div>
           <div class="card-snippet">psql -h {{host}} -U {{user}}
-  -d devbox</div>
+  -d devnotes</div>
           <div class="card-footer">
             <span>2 champs</span>
             <span class="tags"><span class="green">outil</span></span>
@@ -519,7 +519,7 @@
         <div class="card">
           <div class="card-top"><span class="lang sh">SH</span></div>
           <div class="card-title">Dump nocturne</div>
-          <div class="card-snippet">pg_dump -Fc devbox
+          <div class="card-snippet">pg_dump -Fc devnotes
   &gt; /backups/$(date +%F).dump</div>
           <div class="card-footer"><span>il y a 2 semaines</span></div>
         </div>

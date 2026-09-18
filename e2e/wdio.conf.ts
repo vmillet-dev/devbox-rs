@@ -12,7 +12,7 @@ const repo = resolve(here, '..');
 const appBinary = resolve(
   repo,
   'src-tauri/target/debug',
-  process.platform === 'win32' ? 'devbox.exe' : 'devbox',
+  process.platform === 'win32' ? 'devnotes.exe' : 'devnotes',
 );
 
 /**

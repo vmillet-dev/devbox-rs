@@ -359,7 +359,7 @@ export async function emitGlobalAction(action: GlobalAction): Promise<void> {
   await browser.executeAsync((name: string, done: (value: unknown) => void) => {
     const tauri = (window as unknown as Record<string, any>)['__TAURI__'];
     tauri.event
-      .emit('devbox:action', name)
+      .emit('devnotes:action', name)
       .then(() => done(null))
       .catch(() => done(null));
   }, action);

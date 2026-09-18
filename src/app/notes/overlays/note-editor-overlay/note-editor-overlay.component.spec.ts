@@ -737,11 +737,11 @@ describe('NoteEditorOverlayComponent', () => {
       fullscreenButton().click();
       await fixture.whenStable();
 
-      expect(preferences().read('devbox.editorFullscreen')).toBe('true');
+      expect(preferences().read('devnotes.editorFullscreen')).toBe('true');
     });
 
     it('reopens fullscreen when the preference was stored in a previous session', async () => {
-      preferences().write('devbox.editorFullscreen', 'true');
+      preferences().write('devnotes.editorFullscreen', 'true');
       recreateOverlay();
       await openNote();
 
@@ -749,7 +749,7 @@ describe('NoteEditorOverlayComponent', () => {
     });
 
     it('ignores an invalid persisted value', async () => {
-      preferences().write('devbox.editorFullscreen', 'oui');
+      preferences().write('devnotes.editorFullscreen', 'oui');
       recreateOverlay();
       await openNote();
 
@@ -831,7 +831,7 @@ describe('NoteEditorOverlayComponent', () => {
       await fixture.whenStable();
 
       expect(fixture.nativeElement.querySelector('.panel-body')).toBeNull();
-      expect(preferences().read('devbox.editorFieldsPanel')).toBe('false');
+      expect(preferences().read('devnotes.editorFieldsPanel')).toBe('false');
     });
 
     it('copies filled rather than raw, and composes the text at the click', async () => {
