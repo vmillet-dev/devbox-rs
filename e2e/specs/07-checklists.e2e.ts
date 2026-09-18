@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
-import { clipboardText, reloadCanvas, testid } from '../support/app.js';
+import { clipboardText, eventually, reloadCanvas, testid } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -56,11 +56,15 @@ describe('Todo lists', () => {
     // ⚠️ The items sit on a layer above the card button, which is why they can be clicked
     // at all — a `<div>` inside a `<button>` would be invalid HTML.
     const card = await canvas.cardWithTitle(title);
-    await card.$('[data-testid="note-card-item"]').click();
-    await browser.pause(600);
+    // The rows are what is left to do, so the first one is not the item the editor ticked.
+    await card.$(testid('note-card-item')).click();
 
-    // Toggled back off: the editor ticked this same item a moment ago.
-    expect((await reread())?.items?.[0]?.done).toBe(false);
+    const done = await eventually(
+      async () => ((await reread())?.items ?? []).map((item) => item.done),
+      (state) => state[1] === true,
+      'the row the card drew to come back ticked',
+    );
+    expect(done).toEqual([true, true, false]);
   });
 
   it('offers a drag handle that says what it moves', async () => {
@@ -99,7 +103,7 @@ describe('Todo lists', () => {
 
   it('carries the Markdown Rust rendered, not one the front end rebuilt', async () => {
     await canvas.openNote(title);
-    await editor.toggleItem(0);
+    await editor.toggleItem(1);
     await editor.close();
     await browser.pause(400);
 
@@ -179,7 +183,83 @@ describe('Todo lists', () => {
     expect(progress).toContain('2');
   });
 
-  /** A card shows two items of a list; a search slides the window to the matching one. */
+  /**
+   * A card has two rows to say what a list is about, and what it is about is what is left.
+   * ⚠️ The progress bar already says how much is done, so a ticked row costs a seat and
+   * pays nothing back.
+   */
+  describe('a list with some of its items already done', () => {
+    const partly = 'Partly done';
+    const finished = 'Nothing left';
+    const seeded: string[] = [];
+
+    async function rows(of: string): Promise<string[]> {
+      const card = await canvas.cardWithTitle(of);
+      return card.$$(`${testid('note-card-item')} .item-text`).map((item) => item.getText());
+    }
+
+    before(async () => {
+      const spaceId = await homeSpaceId();
+      const first = await bridge.createNote(
+        draft({
+          spaceId,
+          title: partly,
+          kind: 'checklist',
+          items: [
+            { text: 'unpack the crate', done: true },
+            { text: 'wire the relay', done: false },
+            { text: 'seal the panel', done: false },
+            { text: 'call it a day', done: false },
+          ],
+        }),
+      );
+      const second = await bridge.createNote(
+        draft({
+          spaceId,
+          title: finished,
+          kind: 'checklist',
+          items: ['drain it', 'flush it', 'refill it'].map((text) => ({ text, done: true })),
+        }),
+      );
+      seeded.push(first.id, second.id);
+      await reloadCanvas();
+      await canvas.waitForCard(partly);
+    });
+
+    // ⚠️ The canvas is shared with every spec file that runs after this one.
+    after(async () => {
+      await bridge.deleteNotes(seeded);
+      await reloadCanvas();
+    });
+
+    it('spends its two rows on what is still to do', async () => {
+      expect(await rows(partly)).toEqual(['wire the relay', 'seal the panel']);
+    });
+
+    it('counts the ones it left out, ticked or not', async () => {
+      const card = await canvas.cardWithTitle(partly);
+
+      expect(await card.$(testid('note-card-more')).getText()).toContain('2');
+    });
+
+    it('gives the row up as soon as it is ticked', async () => {
+      const boxes = await (await canvas.cardWithTitle(partly)).$$(testid('note-card-item')).getElements();
+      await boxes[0]!.click();
+
+      const left = await eventually(
+        () => rows(partly),
+        (texts) => !texts.includes('wire the relay'),
+        'the ticked row to leave the preview',
+      );
+      expect(left).toEqual(['seal the panel', 'call it a day']);
+    });
+
+    it('shows its last items rather than nothing when everything is done', async () => {
+      expect(await rows(finished)).toEqual(['flush it', 'refill it']);
+    });
+  });
+
+  /** A card shows two items of a list; a search keeps the matching one among them. */
   describe('found by an item the card does not show', () => {
     const long = 'Deep list';
 
@@ -204,18 +284,18 @@ describe('Todo lists', () => {
       await canvas.clearSearch();
     });
 
-    it('slides its window to the item that matched', async () => {
+    it('keeps the item that matched among the two it shows', async () => {
       await canvas.search('kubeconfig');
       const card = await canvas.cardWithTitle(long);
       const texts = await card.$$('[data-testid="note-card-item"]').map((item) => item.getText());
 
       expect(texts.join(' ')).toContain('rotate the kubeconfig');
-      expect(texts.join(' ')).not.toContain('first step');
+      expect(texts.join(' ')).not.toContain('third step');
     });
 
     /**
-     * ⚠️ The template counts within the window, the position in the note is what gets
-     * written: ticking the first visible box must not tick the first box of the list.
+     * ⚠️ A row is not at the place it holds in the note: ticking the second visible box
+     * must not tick the second box of the list.
      */
     it('ticks the box it shows, not the one at the same place in the list', async () => {
       await canvas.search('kubeconfig');

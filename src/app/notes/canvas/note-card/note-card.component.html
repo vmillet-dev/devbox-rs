@@ -82,7 +82,7 @@
       <!-- In the flow now that the card is not a button: the items used to be a layer of
            their own, absolutely placed, because a `<button>` cannot hold one. -->
       <ul class="card-items">
-        @for (item of visibleItems(); track $index) {
+        @for (item of visibleItems(); track item.at) {
           <li>
             <button
               type="button"
@@ -92,7 +92,7 @@
               [class.done]="item.done"
               [attr.aria-checked]="item.done"
               [attr.aria-label]="'notes.checklistToggle' | transloco: { text: item.text }"
-              (click)="onItemToggle($event, $index)"
+              (click)="onItemToggle($event, item.at)"
             >
               <span class="item-box" aria-hidden="true">{{ item.done ? '☑' : '☐' }}</span>
               <span class="item-text">{{ item.text }}</span>
