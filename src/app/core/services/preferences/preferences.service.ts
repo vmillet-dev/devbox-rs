@@ -74,7 +74,7 @@ export class PreferencesService {
       for (let index = 0; index < localStorage.length; index++) {
         const key = localStorage.key(index);
         // Our keys only: dumping everything would pollute the preferences file for good.
-        if (!key?.startsWith('devbox.') || this.cache.has(key)) continue;
+        if (!key?.startsWith('devnotes.') || this.cache.has(key)) continue;
 
         const value = localStorage.getItem(key);
         if (value === null) continue;

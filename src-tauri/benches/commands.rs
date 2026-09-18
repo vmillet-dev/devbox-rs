@@ -16,11 +16,11 @@ use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use devbox_lib::notes::model::NotePatch;
-use devbox_lib::notes::store;
-use devbox_lib::notes::view::{NoteFilter, NotesQuery};
-use devbox_lib::transfer::{bundle, file};
-use devbox_lib::vault::key::{Cost, Vault};
+use devnotes_lib::notes::model::NotePatch;
+use devnotes_lib::notes::store;
+use devnotes_lib::notes::view::{NoteFilter, NotesQuery};
+use devnotes_lib::transfer::{bundle, file};
+use devnotes_lib::vault::key::{Cost, Vault};
 
 use corpus::{NOTES, build, now, run_query};
 
@@ -179,7 +179,7 @@ fn disk(c: &mut Criterion) {
     // The bundle is ~100 MB, so these two want their own sample size.
     group.sample_size(10);
 
-    let path = std::env::temp_dir().join("devbox-bench-export.devbox");
+    let path = std::env::temp_dir().join("devnotes-bench-export.devnotes");
     let target = path.to_string_lossy().to_string();
     // The corpus seeds no attachment, so the archive carries the bundle alone. What the
     // directory is does not matter; that it exists does.

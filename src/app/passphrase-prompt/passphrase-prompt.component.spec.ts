@@ -48,14 +48,14 @@ describe('PassphrasePromptComponent', () => {
    * adopt it, and wait for the very operation the prompt is blocking.
    */
   async function whileExporting(): Promise<{ done: Promise<void> }> {
-    dialog.savePath = 'C:/out/library.devbox';
+    dialog.savePath = 'C:/out/library.devnotes';
     const done = library.export(null, new Date('2026-08-27T09:00:00Z'));
     await vi.waitFor(() => expect(element('passphrase-prompt')).not.toBeNull());
     return { done };
   }
 
   async function whileImporting(): Promise<{ done: Promise<boolean> }> {
-    dialog.openPath = 'C:/in/library.devbox';
+    dialog.openPath = 'C:/in/library.devnotes';
     repository.fileIsProtected = true;
     repository.expectedPassphrase = 'a shared phrase';
     const done = library.import();
@@ -71,7 +71,7 @@ describe('PassphrasePromptComponent', () => {
     it('names the file it is about to write', async () => {
       const { done } = await whileExporting();
 
-      expect(element('passphrase-prompt')?.textContent).toContain('library.devbox');
+      expect(element('passphrase-prompt')?.textContent).toContain('library.devnotes');
 
       library.answerPassphrase({ kind: 'cancelled' });
       await done;

@@ -123,7 +123,7 @@ describe('SampleNotesService', () => {
     expect(await service.seedIfFirstRun()).toBeNull();
     expect(drafts()).toHaveLength(0);
     // Marked, so the check does not run on every launch from now on.
-    expect(preferences.read('devbox.notes.samplesSeeded')).not.toBeNull();
+    expect(preferences.read('devnotes.notes.samplesSeeded')).not.toBeNull();
   });
 
   it('stays silent when there is no database to write to', async () => {
@@ -143,7 +143,7 @@ describe('SampleNotesService', () => {
     notes.failNext = new Error('disk full');
 
     expect(await service.seedIfFirstRun()).toBeNull();
-    expect(preferences.read('devbox.notes.samplesSeeded')).toBeNull();
+    expect(preferences.read('devnotes.notes.samplesSeeded')).toBeNull();
 
     expect(await service.seedIfFirstRun()).not.toBeNull();
     expect(notes.seededSamples?.notes).toHaveLength(4);

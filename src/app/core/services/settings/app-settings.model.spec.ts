@@ -20,12 +20,12 @@ describe('app settings model', () => {
 
     expect(Object.keys(SETTINGS_KEYS).sort()).toEqual([...fields].sort());
     for (const field of fields) {
-      expect(SETTINGS_KEYS[field]).toBe(`devbox.${field}`);
+      expect(SETTINGS_KEYS[field]).toBe(`devnotes.${field}`);
     }
   });
 
   it('namespaces every key, since the store is shared with everything else', () => {
-    expect(Object.values(SETTINGS_KEYS).every((key) => key.startsWith('devbox.'))).toBe(true);
+    expect(Object.values(SETTINGS_KEYS).every((key) => key.startsWith('devnotes.'))).toBe(true);
     expect(new Set(Object.values(SETTINGS_KEYS)).size).toBe(Object.keys(SETTINGS_KEYS).length);
   });
 

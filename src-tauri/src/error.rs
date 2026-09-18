@@ -47,7 +47,7 @@ pub enum StorageError {
     ImportFormat(String),
     #[error("Note \"{id}\" unreadable: field \"{field}\" is out of format")]
     CorruptRow { id: String, field: &'static str },
-    #[error("Database carrying migration \"{0}\", unknown to this version of DevBox")]
+    #[error("Database carrying migration \"{0}\", unknown to this version of DevNotes")]
     SchemaTooRecent(String),
     #[error("Migration failed: {0}")]
     Migration(String),

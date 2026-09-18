@@ -1,10 +1,10 @@
-use devbox_lib::db::Library;
+use devnotes_lib::db::Library;
 use diesel::prelude::*;
 
-use devbox_lib::db::open_in_memory;
-use devbox_lib::db::schema::notes;
-use devbox_lib::error::StorageError;
-use devbox_lib::spaces::store::{create, delete, exists, list, rename, set_pinned};
+use devnotes_lib::db::open_in_memory;
+use devnotes_lib::db::schema::notes;
+use devnotes_lib::error::StorageError;
+use devnotes_lib::spaces::store::{create, delete, exists, list, rename, set_pinned};
 
 const T0: &str = "2026-07-25T09:00:00.000Z";
 

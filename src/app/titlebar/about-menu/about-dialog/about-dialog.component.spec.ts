@@ -44,7 +44,7 @@ describe('AboutDialogComponent', () => {
     const facts = fixture.nativeElement.querySelector('.about-facts').textContent;
     expect(facts).toContain('Valentin MILLET');
     expect(facts).toContain('@vmillet-dev');
-    expect(facts).toContain('github.com/vmillet-dev/devbox-rs');
+    expect(facts).toContain('github.com/vmillet-dev/devnotes-rs');
   });
 
   it('names the stack it was built with, read and not retyped', () => {

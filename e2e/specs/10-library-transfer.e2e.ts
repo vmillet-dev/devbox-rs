@@ -23,10 +23,10 @@ async function failureOf(running: Promise<unknown>): Promise<string> {
   );
 }
 describe('Import, export and share', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'devbox-e2e-'));
+  const directory = mkdtempSync(join(tmpdir(), 'devnotes-e2e-'));
 
   /** ⚠️ Forward slashes: `\` is an escape on the wire and a separator on Windows. */
-  const bundlePath = join(directory, 'library.devbox').replaceAll('\\', '/');
+  const bundlePath = join(directory, 'library.devnotes').replaceAll('\\', '/');
 
   /** Kept from `before`: the seeded space is named from a translation (see below). */
   let homeId = '';
@@ -102,11 +102,11 @@ describe('Import, export and share', () => {
   });
 
   /**
-   * `language` and `kind` are closed enums on both sides, so a note from a newer DevBox
+   * `language` and `kind` are closed enums on both sides, so a note from a newer DevNotes
    * arrives with that field brought down to the default rather than failing the file.
    */
   it('imports a bundle from a newer version instead of refusing it whole', async () => {
-    // ⚠️ Written as a bare `.json`, which is also the shape DevBox exported before the
+    // ⚠️ Written as a bare `.json`, which is also the shape DevNotes exported before the
     // archive: this doubles as the proof that an old export still imports.
     const exported = await bridge.queryNotes(query({ search: 'Worth exporting' }));
     const source = exported.sections[0]?.notes[0];
@@ -122,7 +122,7 @@ describe('Import, export and share', () => {
         notes: [
           {
             ...source,
-            id: 'written-by-a-newer-devbox',
+            id: 'written-by-a-newer-devnotes',
             title: 'Ahead of this build',
             language: 'from-the-future',
           },
@@ -145,7 +145,7 @@ describe('Import, export and share', () => {
    * disk rather than against what the application says about them.
    */
   it('seals an export with a phrase, and will not open it without that phrase', async () => {
-    const sealedPath = join(directory, 'sealed.devbox').replaceAll('\\', '/');
+    const sealedPath = join(directory, 'sealed.devnotes').replaceAll('\\', '/');
 
     const written = await bridge.exportNotes(sealedPath, null, 'an export passphrase');
     expect(written.protected).toBe(true);

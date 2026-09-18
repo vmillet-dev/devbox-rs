@@ -25,7 +25,7 @@ pub(crate) const DIRECTORY: &str = "backups";
 
 /// Where the front end writes its preferences, and the key it writes this one under.
 const PREFERENCES: &str = "preferences.json";
-const SETTING: &str = "devbox.automaticBackups";
+const SETTING: &str = "devnotes.automaticBackups";
 
 /// How many are kept. Enough to reach past the launch that went wrong without turning the
 /// data directory into a second library.
@@ -220,7 +220,7 @@ mod tests {
 
     fn scratch() -> PathBuf {
         let directory =
-            std::env::temp_dir().join(format!("devbox-backup-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("devnotes-backup-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&directory).unwrap();
 
         directory

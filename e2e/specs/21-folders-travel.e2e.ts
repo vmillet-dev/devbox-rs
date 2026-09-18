@@ -16,10 +16,10 @@ import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
  * it is meant to. `tests/transfer.rs` covers the genuinely fresh database.
  */
 describe('Folders travelling with a library', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'devbox-folders-'));
+  const directory = mkdtempSync(join(tmpdir(), 'devnotes-folders-'));
 
   /** ⚠️ Forward slashes: `\` is an escape on the wire and a separator on Windows. */
-  const bundlePath = join(directory, 'arranged.devbox').replaceAll('\\', '/');
+  const bundlePath = join(directory, 'arranged.devnotes').replaceAll('\\', '/');
 
   let homeId = '';
   let spaceId = '';

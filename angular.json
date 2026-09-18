@@ -6,7 +6,7 @@
     "analytics": false
   },
   "projects": {
-    "devbox": {
+    "devnotes": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -92,10 +92,10 @@
           },
           "configurations": {
             "production": {
-              "buildTarget": "devbox:build:production"
+              "buildTarget": "devnotes:build:production"
             },
             "development": {
-              "buildTarget": "devbox:build:development"
+              "buildTarget": "devnotes:build:development"
             }
           },
           "defaultConfiguration": "development"

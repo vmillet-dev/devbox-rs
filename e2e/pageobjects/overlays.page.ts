@@ -48,6 +48,31 @@ export const rail = {
     );
     await browser.keys(['ArrowRight', 'ArrowRight']);
   },
+
+  /** The same edge the other way, far enough to reach the floor from any width. */
+  async narrow(): Promise<void> {
+    await browser.execute(
+      (selector: string) => (document.querySelector(selector) as HTMLElement | null)?.focus(),
+      testid('library-rail-edge'),
+    );
+    await browser.keys(Array.from({ length: 30 }, () => 'ArrowLeft'));
+  },
+
+  /**
+   * How far a control sticks out past the rail's right edge. The panels a ⋯ opens are
+   * projected inline between the rows, so one holding a minimum of its own would spill
+   * over the edge instead of following it.
+   */
+  overflowOf: (selector: string): Promise<number> =>
+    browser.execute(
+      (railSelector: string, controlSelector: string) => {
+        const edge = document.querySelector(railSelector)?.getBoundingClientRect().right;
+        const control = document.querySelector(controlSelector)?.getBoundingClientRect().right;
+        return edge === undefined || control === undefined ? -1 : Math.round(Math.max(0, control - edge));
+      },
+      testid('library-rail'),
+      selector,
+    ),
 };
 
 /**

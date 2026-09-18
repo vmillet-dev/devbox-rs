@@ -1,27 +1,27 @@
 use std::collections::BTreeMap;
 
-use devbox_lib::db::Library;
+use devnotes_lib::db::Library;
 use diesel::prelude::*;
 
 use chrono::{DateTime, Utc};
 
-use devbox_lib::db::iso8601;
-use devbox_lib::db::open_in_memory;
-use devbox_lib::db::schema::{
+use devnotes_lib::db::iso8601;
+use devnotes_lib::db::open_in_memory;
+use devnotes_lib::db::schema::{
     note_items, note_placeholders, note_tags, notes as notes_table, spaces as spaces_table,
 };
-use devbox_lib::error::StorageError;
-use devbox_lib::notes::checklist::{ChecklistItem, NoteKind};
-use devbox_lib::notes::language::Language;
-use devbox_lib::notes::model::{Note, NoteDraft, NoteLifecycle, NotePatch, decorate};
-use devbox_lib::notes::store::trash::{expired_ids, list_trashed, purge, restore_many, trash};
-use devbox_lib::notes::store::{
+use devnotes_lib::error::StorageError;
+use devnotes_lib::notes::checklist::{ChecklistItem, NoteKind};
+use devnotes_lib::notes::language::Language;
+use devnotes_lib::notes::model::{Note, NoteDraft, NoteLifecycle, NotePatch, decorate};
+use devnotes_lib::notes::store::trash::{expired_ids, list_trashed, purge, restore_many, trash};
+use devnotes_lib::notes::store::{
     all, by_ids, count_notes_tagged, create, drop_tags, fetch, global_placeholder_values,
     insert_imported, move_many, replace_global_placeholder_values, restore_placements, retag, seed,
     set_placeholder_values, tag_many, tag_usage, untag_many, update,
 };
-use devbox_lib::notes::view::{self, NoteFilter, NotesQuery, NotesView};
-use devbox_lib::spaces::store as spaces;
+use devnotes_lib::notes::view::{self, NoteFilter, NotesQuery, NotesView};
+use devnotes_lib::spaces::store as spaces;
 
 /// ⚠️ The first launch used to be six round trips — one space, one marker, four notes —
 /// and a process killed between any two left a space standing with nothing in it, which
@@ -99,7 +99,7 @@ fn the_first_launch_writes_its_folders_with_everything_else() {
     )
     .unwrap();
 
-    let folders = devbox_lib::folders::store::list(&mut library, Some(&space.id)).unwrap();
+    let folders = devnotes_lib::folders::store::list(&mut library, Some(&space.id)).unwrap();
     assert_eq!(
         folders.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
         ["Snippets", "Prise en main"]
@@ -158,7 +158,7 @@ fn the_samples_are_read_back_in_the_order_they_were_declared() {
     )
     .unwrap();
 
-    let folders = devbox_lib::folders::store::list(&mut library, Some(&space.id)).unwrap();
+    let folders = devnotes_lib::folders::store::list(&mut library, Some(&space.id)).unwrap();
     assert_eq!(
         folders.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
         ["Un", "Deux", "Trois"]
@@ -218,14 +218,14 @@ fn a_seeding_that_fails_leaves_no_half_library() {
     assert_eq!(spaces::list(&mut library).unwrap().len(), before);
     assert!(list(&mut library).unwrap().is_empty());
     assert!(
-        devbox_lib::folders::store::list(&mut library, None)
+        devnotes_lib::folders::store::list(&mut library, None)
             .unwrap()
             .is_empty()
     );
 }
 
-fn sample(folder: Option<u32>, draft: NoteDraft) -> devbox_lib::notes::model::SampleNote {
-    devbox_lib::notes::model::SampleNote { folder, draft }
+fn sample(folder: Option<u32>, draft: NoteDraft) -> devnotes_lib::notes::model::SampleNote {
+    devnotes_lib::notes::model::SampleNote { folder, draft }
 }
 
 /// No such shortcut exists in production code: it would invite re-filtering on the
@@ -1059,7 +1059,7 @@ fn a_global_variable_shows_up_as_the_suggested_value_of_a_field() {
 
     let globals = values(&[("host", "db.internal")]);
     let mut display = decorate(created, t1());
-    devbox_lib::notes::model::apply_global_defaults(&mut display, &globals);
+    devnotes_lib::notes::model::apply_global_defaults(&mut display, &globals);
 
     let field = display
         .placeholders
@@ -2109,8 +2109,8 @@ fn a_stored_date_that_is_out_of_format_is_reported_rather_than_guessed() {
     let space_id = space(&mut connection, "Personal");
     let created = create(&mut connection, draft(&space_id), t0()).unwrap();
 
-    diesel::update(devbox_lib::db::schema::notes::table.find(&created.id))
-        .set(devbox_lib::db::schema::notes::created_at.eq("pas une date"))
+    diesel::update(devnotes_lib::db::schema::notes::table.find(&created.id))
+        .set(devnotes_lib::db::schema::notes::created_at.eq("pas une date"))
         .execute(connection.db())
         .unwrap();
 
@@ -2133,9 +2133,9 @@ fn a_stored_date_always_carries_its_milliseconds() {
 
     let created = create(&mut connection, draft(&space_id), round_second).unwrap();
 
-    let stored: String = devbox_lib::db::schema::notes::table
+    let stored: String = devnotes_lib::db::schema::notes::table
         .find(&created.id)
-        .select(devbox_lib::db::schema::notes::updated_at)
+        .select(devnotes_lib::db::schema::notes::updated_at)
         .first(connection.db())
         .unwrap();
 
@@ -2146,10 +2146,10 @@ fn a_stored_date_always_carries_its_milliseconds() {
 /// API: a note written through the store must not be findable by grepping the database.
 #[test]
 fn a_note_is_not_readable_in_the_file_it_was_written_to() {
-    use devbox_lib::db;
+    use devnotes_lib::db;
 
     let directory = std::env::temp_dir().join(format!(
-        "devbox-sealed-{}",
+        "devnotes-sealed-{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -2172,7 +2172,7 @@ fn a_note_is_not_readable_in_the_file_it_was_written_to() {
         // is sealed like anything else a reader would want.
         let mut globals = std::collections::BTreeMap::new();
         globals.insert("host".to_string(), "prod.internal".to_string());
-        devbox_lib::notes::store::replace_global_placeholder_values(&mut library, &globals)
+        devnotes_lib::notes::store::replace_global_placeholder_values(&mut library, &globals)
             .unwrap();
     }
 

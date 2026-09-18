@@ -31,9 +31,9 @@ import { TagPillComponent } from '@notes/ui/tag-pill/tag-pill.component';
 
 const TEXT_ENCODER = new TextEncoder();
 
-const FULLSCREEN_STORAGE_KEY = 'devbox.editorFullscreen';
+const FULLSCREEN_STORAGE_KEY = 'devnotes.editorFullscreen';
 
-const FIELDS_PANEL_STORAGE_KEY = 'devbox.editorFieldsPanel';
+const FIELDS_PANEL_STORAGE_KEY = 'devnotes.editorFieldsPanel';
 
 const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({
   value: value as LanguageTag,

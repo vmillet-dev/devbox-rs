@@ -103,7 +103,7 @@ describe('FileMenuComponent', () => {
       'Exporter la sélection…',
       'Copier la sélection en Markdown',
       'Préférences…',
-      'Quitter DevBox',
+      'Quitter DevNotes',
     ]);
   });
 
@@ -118,7 +118,7 @@ describe('FileMenuComponent', () => {
   });
 
   it('imports a bundle and closes, the report showing elsewhere', async () => {
-    fileDialog.openPath = 'C:\\bundles\\devbox-2026-01-01.json';
+    fileDialog.openPath = 'C:\\bundles\\devnotes-2026-01-01.json';
     await openMenu();
 
     optionLabelled('Importer').click();

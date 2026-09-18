@@ -129,13 +129,13 @@ pub fn unlock(directory: &Path, passphrase: &str) -> Result<Vault, StorageError>
 
     if file.version > FORMAT_VERSION {
         return Err(StorageError::Vault(format!(
-            "key file version {}, this version of DevBox reads up to {FORMAT_VERSION}",
+            "key file version {}, this version of DevNotes reads up to {FORMAT_VERSION}",
             file.version
         )));
     }
     if file.kdf.algorithm != "argon2id" {
         return Err(StorageError::Vault(format!(
-            "key derived with \"{}\", which this version of DevBox cannot reproduce",
+            "key derived with \"{}\", which this version of DevNotes cannot reproduce",
             file.kdf.algorithm
         )));
     }
@@ -195,7 +195,7 @@ mod tests {
     }
 
     fn scratch() -> PathBuf {
-        let directory = std::env::temp_dir().join(format!("devbox-vault-{}", Uuid::new_v4()));
+        let directory = std::env::temp_dir().join(format!("devnotes-vault-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&directory).unwrap();
 
         directory

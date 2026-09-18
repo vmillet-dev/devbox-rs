@@ -60,13 +60,13 @@ pub fn seal_with(passphrase: &str) -> Result<(Vault, Recipe), StorageError> {
 pub fn open_with(passphrase: &str, recipe: &Recipe) -> Result<Vault, StorageError> {
     if recipe.version > FORMAT_VERSION {
         return Err(StorageError::ImportFormat(format!(
-            "protected with format version {}, this version of DevBox reads up to {FORMAT_VERSION}",
+            "protected with format version {}, this version of DevNotes reads up to {FORMAT_VERSION}",
             recipe.version
         )));
     }
     if recipe.algorithm != "argon2id" {
         return Err(StorageError::ImportFormat(format!(
-            "protected with \"{}\", which this version of DevBox cannot reproduce",
+            "protected with \"{}\", which this version of DevNotes cannot reproduce",
             recipe.algorithm
         )));
     }

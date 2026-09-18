@@ -23,7 +23,7 @@ closed_enum! {
 }
 
 /// Exported as a constant too, so neither side spells it twice.
-pub(crate) const ACTION_EVENT: &str = "devbox:action";
+pub(crate) const ACTION_EVENT: &str = "devnotes:action";
 
 /// `unminimize` first: a minimized window merely shown stays in the taskbar.
 pub(crate) fn reveal(app: &AppHandle) {
@@ -216,7 +216,7 @@ pub(crate) fn hides_on_minimize(app: &AppHandle) -> bool {
     window_behavior(app).minimize_to_tray && tray_exists(app)
 }
 
-const TRAY_ID: &str = "devbox";
+const TRAY_ID: &str = "devnotes";
 
 const OPEN_ITEM: &str = "open";
 const NEW_NOTE_ITEM: &str = "new-note";
@@ -289,7 +289,7 @@ fn build_tray(app: &AppHandle, menu: &Menu<Wry>) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
-        .tooltip("DevBox")
+        .tooltip("DevNotes")
         // The menu stays on right click, where Windows expects it.
         .show_menu_on_left_click(false)
         .menu(menu)

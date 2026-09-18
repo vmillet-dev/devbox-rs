@@ -25,12 +25,12 @@ describe('StatusToastComponent', () => {
   });
 
   it('renders the report with its parameters interpolated', async () => {
-    notifier.notify({ key: 'file.exported', params: { notes: '3', path: 'devbox.json' } });
+    notifier.notify({ key: 'file.exported', params: { notes: '3', path: 'devnotes.json' } });
     await fixture.whenStable();
 
     const text = fixture.nativeElement.querySelector('.status-text').textContent;
     expect(text).toContain('3 notes exportées');
-    expect(text).toContain('devbox.json');
+    expect(text).toContain('devnotes.json');
   });
 
   it('reports an operation that changed nothing, which failure looks just like', async () => {
@@ -41,14 +41,14 @@ describe('StatusToastComponent', () => {
   });
 
   it('announces itself as a status, not an alert', async () => {
-    notifier.notify({ key: 'file.exported', params: { notes: '1', path: 'devbox.json' } });
+    notifier.notify({ key: 'file.exported', params: { notes: '1', path: 'devnotes.json' } });
     await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelector('.status-toast').getAttribute('role')).toBe('status');
   });
 
   it('clears the report when dismissed', async () => {
-    notifier.notify({ key: 'file.exported', params: { notes: '1', path: 'devbox.json' } });
+    notifier.notify({ key: 'file.exported', params: { notes: '1', path: 'devnotes.json' } });
     await fixture.whenStable();
 
     fixture.debugElement.query(By.css('.status-dismiss')).triggerEventHandler('click');
