@@ -3,7 +3,7 @@ import { browser, expect } from '@wdio/globals';
 import { canvas } from '../pageobjects/canvas.page.js';
 import { selectionBar, undoBar } from '../pageobjects/overlays.page.js';
 import { banners } from '../pageobjects/titlebar.page.js';
-import { clipboardText, reloadCanvas } from '../support/app.js';
+import { clipboardText, eventually, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -64,14 +64,21 @@ describe('Selecting several notes at once', () => {
    */
   it('offers to take a bulk tagging back, without stripping what was already there', async () => {
     await selectionBar.tag('reversible');
-    await browser.pause(800);
-    expect((await reread(first))?.tags).toContain('reversible');
+    await eventually(
+      () => reread(first),
+      (note) => note?.tags.includes('reversible') === true,
+      'the tag never reached the first note',
+    );
 
     await undoBar.bar().waitForDisplayed({ timeout: 10_000 });
     await undoBar.restore();
-    await browser.pause(800);
+    const undone = await eventually(
+      () => reread(first),
+      (note) => note?.tags.includes('reversible') === false,
+      'the tagging was never undone',
+    );
 
-    expect((await reread(first))?.tags).toEqual(['batch']);
+    expect(undone?.tags).toEqual(['batch']);
     expect((await reread(second))?.tags).toEqual(['batch']);
   });
 
@@ -115,14 +122,21 @@ describe('Selecting several notes at once', () => {
     await selectionBar.bar().waitForExist({ timeout: 10_000 });
 
     await selectionBar.moveTo(refugeId);
-    await browser.pause(800);
-    expect((await reread(untouched))?.spaceId).toBe(refugeId);
+    await eventually(
+      () => reread(untouched),
+      (note) => note?.spaceId === refugeId,
+      'the note never reached the refuge',
+    );
 
     await undoBar.bar().waitForDisplayed({ timeout: 10_000 });
     await undoBar.restore();
-    await browser.pause(800);
+    const back = await eventually(
+      () => reread(untouched),
+      (note) => note?.spaceId === spaceId,
+      'the move was never undone',
+    );
 
-    expect((await reread(untouched))?.spaceId).toBe(spaceId);
+    expect(back?.spaceId).toBe(spaceId);
   });
 
   it('drops the selection without touching the notes', async () => {

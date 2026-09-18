@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { trash, undoBar } from '../pageobjects/overlays.page.js';
-import { press, reloadCanvas } from '../support/app.js';
+import { eventually, press, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -28,7 +28,8 @@ describe('Deleting a note, and taking it back', () => {
     const card = await canvas.openCardMenu('Armed but not fired');
     await card.$('[data-testid="note-card-delete"]').click();
 
-    // One click only arms the confirmation.
+    // ⚠️ A duration, deliberately: this asserts the note is *still* there, and nothing
+    // happening is not a condition anything can wait on.
     await browser.pause(500);
     expect((await bridge.queryNotes(query({ search: 'Armed but not fired' }))).matched).toBe(1);
 
@@ -88,8 +89,11 @@ describe('Deleting a note, and taking it back', () => {
 
     await trash.open();
     await trash.purge('Purge me');
-    await browser.pause(500);
-    expect(await trash.titles()).not.toContain('Purge me');
+    await eventually(
+      () => trash.titles(),
+      (titles) => !titles.includes('Purge me'),
+      'the purged row never left the panel',
+    );
     await trash.close();
 
     expect((await bridge.listTrash()).map((row) => row.title)).not.toContain('Purge me');

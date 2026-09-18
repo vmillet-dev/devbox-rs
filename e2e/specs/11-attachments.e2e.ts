@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { editor } from '../pageobjects/editor.page.js';
-import { reloadCanvas } from '../support/app.js';
+import { eventually, reloadCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -108,14 +108,25 @@ describe('Attachments', () => {
   it('removes one on the second click, and only then', async () => {
     await canvas.openNote(title);
 
-    const remove = browser.$('[data-testid="attachment-remove"]');
+    // ⚠️ By its id, not by position: this note carries two attachments of the same name, so
+    // "the first remove button" is not a stable way to click the same one twice.
+    const [doomed] = await bridge.listAttachments(noteId);
+    const remove = browser.$(`[data-testid="attachment-remove"][data-attachment-id="${doomed?.id}"]`);
+
     await remove.click();
+    // ⚠️ A duration, deliberately: this asserts that nothing happened, and nothing
+    // happening is not a condition anything can wait on.
     await browser.pause(400);
     expect(await bridge.listAttachments(noteId)).toHaveLength(2);
 
     await remove.click();
-    await browser.pause(800);
-    expect(await bridge.listAttachments(noteId)).toHaveLength(1);
+    const left = await eventually(
+      () => bridge.listAttachments(noteId),
+      (list) => list.length === 1,
+      'the attachment was never removed',
+    );
+
+    expect(left.map((item) => item.id)).not.toContain(doomed?.id);
     await editor.close();
   });
 });
