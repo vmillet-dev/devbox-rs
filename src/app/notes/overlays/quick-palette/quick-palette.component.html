@@ -67,6 +67,9 @@
           [attr.aria-label]="
             'palette.copyLabel' | transloco: { title: note.title || ('notes.untitled' | transloco) }
           "
+          [attr.title]="
+            'palette.copyLabel' | transloco: { title: note.title || ('notes.untitled' | transloco) }
+          "
           (click)="highlightSet.emit(index); chosen.emit()"
         >
           <span aria-hidden="true">⧉</span>

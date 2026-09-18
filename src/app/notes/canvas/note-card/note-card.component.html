@@ -148,6 +148,7 @@
       [class.checked]="checked()"
       [attr.aria-pressed]="checked()"
       [attr.aria-label]="'notes.selectNote' | transloco: { title: menuTitle }"
+      [attr.title]="'notes.selectNote' | transloco: { title: menuTitle }"
       (click)="onCheck($event)"
     >
       <span aria-hidden="true">{{ checked() ? '☑' : '☐' }}</span>
@@ -161,6 +162,7 @@
         class="card-action card-fill"
         data-testid="note-card-fill"
         [attr.aria-label]="'placeholders.title' | transloco"
+        [attr.title]="'placeholders.title' | transloco"
         (click)="onFill($event)"
       >
         <span aria-hidden="true">⧉</span>

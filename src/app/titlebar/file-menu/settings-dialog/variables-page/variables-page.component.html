@@ -51,6 +51,7 @@
           class="variable-remove"
           data-testid="variable-remove"
           [attr.aria-label]="'settings.variables.remove' | transloco: { name: nameInput.value || '—' }"
+          [attr.title]="'settings.variables.remove' | transloco: { name: nameInput.value || '—' }"
           (click)="remove($index)"
         >
           <span aria-hidden="true">✕</span>

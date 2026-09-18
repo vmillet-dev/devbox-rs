@@ -12,6 +12,7 @@
       type="button"
       class="error-dismiss"
       [attr.aria-label]="'errors.dismiss' | transloco"
+      [attr.title]="'errors.dismiss' | transloco"
       (click)="notifier.dismiss()"
     >
       <span aria-hidden="true">✕</span>

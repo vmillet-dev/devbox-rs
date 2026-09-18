@@ -71,6 +71,7 @@
     class="selection-clear"
     data-testid="selection-clear"
     [attr.aria-label]="'selection.clear' | transloco"
+    [attr.title]="'selection.clear' | transloco"
     (click)="cleared.emit()"
   >
     <span aria-hidden="true">✕</span>

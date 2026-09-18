@@ -50,7 +50,7 @@ describe('ChecklistEditorComponent', () => {
     const fill = fixture.nativeElement.querySelector('.progress-fill') as HTMLElement;
 
     expect(fill.style.width).toBe('50%');
-    expect(fixture.nativeElement.querySelector('.progress-count').textContent.trim()).toBe('1/2 tâche(s)');
+    expect(fixture.nativeElement.querySelector('.progress-count').textContent.trim()).toBe('1/2 tâches');
   });
 
   it('commits a tick straight away, a discrete gesture having nothing to wait for', async () => {

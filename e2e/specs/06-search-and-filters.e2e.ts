@@ -1,7 +1,7 @@
 import { $, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
-import { blur, cursorOf, press, reloadCanvas, testid } from '../support/app.js';
+import { blur, cursorOf, press, reloadCanvas, testid, waitForCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId } from '../support/bridge.js';
 
 /**
@@ -80,6 +80,20 @@ describe('Search, filters and facets', () => {
     expect(await canvas.noResults().isExisting()).toBe(true);
   });
 
+  /**
+   * ⚠️ An empty state that only reports is a dead end: the one thing to do from here is the
+   * thing that emptied it, and `clearFilters()` was already sitting there unoffered.
+   */
+  it('offers the way out of the state that emptied it', async () => {
+    await canvas.search('nothing matches this');
+
+    await $(testid('canvas-clear-filters')).click();
+    await waitForCanvas();
+
+    expect(await canvas.searchQuery()).toBe('');
+    expect(await canvas.noResults().isExisting()).toBe(false);
+  });
+
   /** How big is this result, and why is that card in it. */
   describe('what a search says about itself', () => {
     /**
@@ -96,8 +110,11 @@ describe('Search, filters and facets', () => {
       // Against what is on screen: the corpus is shared with every file that ran before.
       expect(await canvas.matchedCount()).toContain(String((await canvas.titles()).length));
 
+      // ⚠️ In words, not as a digit. French keeps the singular at zero, so "0 résultat"
+      // would read as one — the count says "aucun résultat" instead, and this asserts the
+      // meaning rather than a character.
       await canvas.search('nothing matches this');
-      expect(await canvas.matchedCount()).toContain('0');
+      expect(await canvas.matchedCount()).toContain('aucun');
     });
 
     it('hides the count again once nothing is being filtered', async () => {

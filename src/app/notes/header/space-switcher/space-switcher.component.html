@@ -82,6 +82,7 @@
                 data-testid="space-edit"
                 [attr.data-space-id]="space.id"
                 [attr.aria-label]="'notes.spaceOptionsLabel' | transloco: { name: space.name }"
+                [attr.title]="'notes.spaceOptionsLabel' | transloco: { name: space.name }"
                 (click)="startEditing(space)"
               >
                 <span aria-hidden="true">⋯</span>

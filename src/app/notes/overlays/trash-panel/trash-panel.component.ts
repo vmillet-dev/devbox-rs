@@ -80,9 +80,15 @@ export class TrashPanelComponent {
   }
 }
 
-/** Rounded up: "erased in 1 d" while there is any time left. */
+/**
+ * ⚠️ Rounded to the nearest day, and neither of the other two will do. Rounding **up** put
+ * "erased in 31 d" one line under a panel saying notes are kept 30 days: `purgeAt` is
+ * `deletedAt + 30 days`, so a note just deleted has a few milliseconds under 30 left and
+ * any fraction became a whole extra day. Rounding **down** says 29 for the same note, which
+ * is the same contradiction the other way round.
+ */
 function purgeRef(purgeAt: Date, now: Date): TranslationRef {
-  const days = Math.ceil((purgeAt.getTime() - now.getTime()) / MS_PER_DAY);
+  const days = Math.round((purgeAt.getTime() - now.getTime()) / MS_PER_DAY);
 
   return days <= 0 ? { key: 'trash.purgesToday' } : { key: 'trash.purgesIn', params: { count: days } };
 }

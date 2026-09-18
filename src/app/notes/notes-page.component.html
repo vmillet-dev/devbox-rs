@@ -28,6 +28,7 @@
         data-testid="library-rail-toggle"
         [attr.aria-pressed]="settings.showLibraryRail()"
         [attr.aria-label]="'sidebar.toggle' | transloco"
+        [attr.title]="'sidebar.toggle' | transloco"
         (click)="toggleLibraryRail()"
       >
         <span aria-hidden="true">▤</span>
@@ -168,9 +169,24 @@
           } @else if (canvas.isLoading()) {
             <p class="canvas-state-text">{{ 'notes.loading' | transloco }}</p>
           } @else if (canvas.hasNoResults()) {
-            <p class="canvas-state-text" data-testid="canvas-no-results">
-              {{ 'notes.noResults' | transloco }}
-            </p>
+            <!-- ⚠️ With the way out, not only the news. `hasUserFilters` and not
+                 `isFiltering`: the latter is true inside a folder, and offering to clear
+                 filters that do not exist is worse than offering nothing. -->
+            <div class="canvas-state">
+              <p class="canvas-state-text" data-testid="canvas-no-results">
+                {{ 'notes.noResults' | transloco }}
+              </p>
+              @if (canvas.hasUserFilters()) {
+                <button
+                  type="button"
+                  class="canvas-retry"
+                  data-testid="canvas-clear-filters"
+                  (click)="canvas.clearFilters()"
+                >
+                  {{ 'notes.clearFiltersFromEmpty' | transloco }}
+                </button>
+              }
+            </div>
           } @else {
             @for (section of canvas.sections(); track section.key) {
               <app-note-section [section]="section" (noteActivated)="onNoteActivated($event)" />
