@@ -32,7 +32,7 @@
   <ul class="tree">
     <li>
       <div class="node-row">
-        <span class="node-twisty-space" aria-hidden="true"></span>
+        <span class="node-twisty-space node-icon" aria-hidden="true">✦</span>
         <button
           type="button"
           class="node-name"
@@ -41,7 +41,6 @@
           [attr.aria-current]="activeSpaceId() === null ? 'true' : null"
           (click)="chooseSpace(null)"
         >
-          <span class="node-icon" aria-hidden="true">✦</span>
           <span class="node-label">{{ 'notes.allSpaces' | transloco }}</span>
         </button>
       </div>

@@ -167,7 +167,7 @@
 .node-icon,
 .node-pin {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-2);
 }
 
@@ -189,7 +189,7 @@
   flex-shrink: 0;
   padding: 4px 3px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
   color: var(--text-2);
   cursor: pointer;
@@ -214,10 +214,23 @@
   color: var(--text-0);
 }
 
-// The "all spaces" row has no folders to open, and its name still has to line up.
+// ⚠️ The twisty and the ✦ that stands in for it are one column, sized once: it is what
+// puts the name of "all spaces" on the same edge as every space under it. The ✦ used to
+// sit inside the name, which pushed that one label right by its own width.
+.node-twisty,
 .node-twisty-space {
-  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 18px;
+}
+
+// ⚠️ ▾ is a *small* triangle by design: at the 12px the row's other marks use it draws a
+// speck of ink, and nobody could tell what it was. 16px is where it reads as a triangle —
+// measured against the rendered pixels, not guessed, and still lighter than the label.
+.node-twisty {
+  font-size: 16px;
 }
 
 .folder-swatch {
