@@ -19,6 +19,7 @@ use diesel::sql_types::Text;
 use crate::db::{DB_FILE_NAME, Library};
 use crate::error::StorageError;
 use crate::vault::file::FILE_NAME as VAULT_FILE_NAME;
+use crate::vault::key::{Cost, Vault};
 
 pub(crate) const DIRECTORY: &str = "backups";
 
@@ -114,6 +115,54 @@ pub(crate) fn rotate(
     Ok(Some(target))
 }
 
+/// What [`rewrap`] managed. ⚠️ `left` is not a failure to report as one: refusing to
+/// rotate the phrase because a backup's file is locked would block the revocation at the
+/// moment it is asked for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Rewrapped {
+    pub(crate) done: usize,
+    pub(crate) left: usize,
+}
+
+/// Rewraps every retained copy's key file under the new phrase.
+///
+/// ⚠️ This is what makes changing the passphrase revoke anything. `backups/` sits **inside
+/// the profile it copies**, so whoever copies the profile copies every phrase the user has
+/// ever retired — and the envelope means one master key for the life of the library, so any
+/// key file ever written is a permanent escrow for it (#157).
+///
+/// ⚠️ It writes the key it is **given** rather than opening each copy with the old phrase:
+/// a backup's file wraps that same master key whatever phrase was current when it was
+/// taken, so this revokes *every* retired phrase rather than only the last one. A copy
+/// with no key file predates the library being sealed and is left alone.
+///
+/// `damaged/` is deliberately absent: `recovery::set_aside` leaves `vault.json` where it
+/// is, so a set-aside library has no wrapping of its own to retire.
+pub(crate) fn rewrap(library: &Path, vault: &Vault, passphrase: &str, cost: Cost) -> Rewrapped {
+    let mut tally = Rewrapped::default();
+
+    for copy in existing(&library.join(DIRECTORY)) {
+        let path = copy.join(VAULT_FILE_NAME);
+        if !path.is_file() {
+            continue;
+        }
+
+        // Staged and renamed by `write_wrapped`: a key file half written is a backup lost.
+        match crate::vault::file::write_wrapped(&path, vault, passphrase, cost) {
+            Ok(()) => tally.done += 1,
+            Err(error) => {
+                log::warn!(
+                    "{}: still opens with the old passphrase: {error}",
+                    path.display()
+                );
+                tally.left += 1;
+            }
+        }
+    }
+
+    tally
+}
+
 /// ⚠️ Anything but a plain `"false"` keeps the copies. A preferences file that is
 /// missing, truncated, or written by a version that spells this differently must not
 /// silently switch a safety net off — the only thing that turns it off is somebody
@@ -175,6 +224,15 @@ mod tests {
         std::fs::create_dir_all(&directory).unwrap();
 
         directory
+    }
+
+    /// ⚠️ The shipped cost is ~52 ms a derivation and these tests derive a dozen times.
+    fn cheap() -> Cost {
+        Cost {
+            memory_kib: 64,
+            passes: 1,
+            lanes: 1,
+        }
     }
 
     fn at(offset_hours: i64) -> DateTime<Utc> {
@@ -303,6 +361,92 @@ mod tests {
         assert!(wanted(Some("False")), "and anything this build cannot read");
 
         assert!(!wanted(Some("false")));
+    }
+
+    /// ⚠️ The point of #157. Changing the passphrase is the gesture somebody makes when
+    /// they believe the old one leaked, and every retained copy kept a key file still
+    /// wrapped under it — in the same profile directory. It revoked nothing.
+    #[test]
+    fn changing_the_passphrase_stops_the_old_one_opening_a_backup() {
+        let directory = scratch();
+        let (mut connection, _) = library(&directory);
+        let target = rotate(&directory, &mut connection, at(0)).unwrap().unwrap();
+
+        let vault =
+            crate::vault::file::change_passphrase(&directory, "a passphrase", "a new one", cheap())
+                .unwrap();
+
+        // The gap itself, kept in the test: rewrapping the live file alone revokes nothing.
+        crate::vault::file::unlock(&target, "a passphrase")
+            .expect("the copy still opens with the retired phrase before the rewrap");
+
+        let tally = rewrap(&directory, &vault, "a new one", cheap());
+
+        assert_eq!(tally, Rewrapped { done: 1, left: 0 });
+        assert!(
+            crate::vault::file::unlock(&target, "a passphrase").is_err(),
+            "the retired passphrase still opens the backup"
+        );
+        // And the copy is not merely shut: it opens under the new one, on the same key.
+        crate::vault::file::unlock(&target, "a new one").unwrap();
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// ⚠️ Every retired phrase, not only the last: a copy is rewrapped from the key the
+    /// live file just gave up, so one taken two changes ago is reached as well. Opening
+    /// each copy with the phrase being retired would have missed exactly this one.
+    #[test]
+    fn a_copy_left_over_from_an_older_phrase_is_reached_too() {
+        let directory = scratch();
+        let (mut connection, _) = library(&directory);
+        let first = rotate(&directory, &mut connection, at(0)).unwrap().unwrap();
+
+        let vault = crate::vault::file::change_passphrase(
+            &directory,
+            "a passphrase",
+            "the second",
+            cheap(),
+        )
+        .unwrap();
+        // ⚠️ No rewrap here, so the first copy stays under the very first phrase.
+        let second = rotate(&directory, &mut connection, at(25))
+            .unwrap()
+            .unwrap();
+        crate::vault::file::write_wrapped(
+            &second.join(VAULT_FILE_NAME),
+            &vault,
+            "the second",
+            cheap(),
+        )
+        .unwrap();
+
+        let vault =
+            crate::vault::file::change_passphrase(&directory, "the second", "the third", cheap())
+                .unwrap();
+        let tally = rewrap(&directory, &vault, "the third", cheap());
+
+        assert_eq!(tally.done, 2);
+        for copy in [&first, &second] {
+            assert!(crate::vault::file::unlock(copy, "a passphrase").is_err());
+            assert!(crate::vault::file::unlock(copy, "the second").is_err());
+            crate::vault::file::unlock(copy, "the third").unwrap();
+        }
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    /// A copy taken before the library was sealed has no key file to retire.
+    #[test]
+    fn a_copy_with_no_key_file_is_left_alone_rather_than_counted() {
+        let directory = scratch();
+        let (mut connection, _) = library(&directory);
+        let target = rotate(&directory, &mut connection, at(0)).unwrap().unwrap();
+        std::fs::remove_file(target.join(VAULT_FILE_NAME)).unwrap();
+
+        let vault = crate::vault::file::unlock(&directory, "a passphrase").unwrap();
+        let tally = rewrap(&directory, &vault, "a new one", cheap());
+
+        assert_eq!(tally, Rewrapped { done: 0, left: 0 });
+        std::fs::remove_dir_all(&directory).ok();
     }
 
     /// A directory somebody dropped in there is not a backup, and must not hold the

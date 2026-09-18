@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, output, signal } 
 import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogComponent } from '@shared/layout/dialog/dialog.component';
 import { MINIMUM_PASSPHRASE_LENGTH } from '@core/model/vault.model';
-import { StatusNotifier } from '@core/services/notifications/status.service';
 import { VaultStore } from '@core/state/vault.store';
 
 /**
@@ -18,7 +17,6 @@ import { VaultStore } from '@core/state/vault.store';
 })
 export class ChangePassphraseDialogComponent {
   protected readonly vault = inject(VaultStore);
-  private readonly status = inject(StatusNotifier);
 
   readonly closed = output<void>();
 
@@ -75,8 +73,9 @@ export class ChangePassphraseDialogComponent {
     this.next.set('');
     this.confirmation.set('');
 
+    // ⚠️ The report comes from the store, which is what knows how much the change
+    // reached. This only closes.
     if (await this.vault.changePassphrase(from, to)) {
-      this.status.notify({ key: 'settings.security.changed' });
       this.closed.emit();
     }
   }

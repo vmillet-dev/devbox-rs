@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { commands } from '@core/ipc/bindings';
+import { PassphraseChange, commands } from '@core/ipc/bindings';
 import { unwrap } from '@core/ipc/ipc.error';
 import { VaultState } from '../model/vault.model';
 
@@ -26,7 +26,8 @@ export class VaultRepository {
     return unwrap('set_aside_damaged_library', await commands.setAsideDamagedLibrary());
   }
 
-  async changePassphrase(current: string, next: string): Promise<void> {
-    unwrap('change_passphrase', await commands.changePassphrase(current, next));
+  /** Answers what the change reached, which the interface has to say out loud. */
+  async changePassphrase(current: string, next: string): Promise<PassphraseChange> {
+    return unwrap('change_passphrase', await commands.changePassphrase(current, next));
   }
 }

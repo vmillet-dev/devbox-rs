@@ -228,6 +228,39 @@ describe('VaultStore', () => {
       expect(store.isUnlocked()).toBe(true);
     });
 
+    /**
+     * ⚠️ The half of #157 that matters. Rewrapping the live key file alone revokes
+     * nothing: every retained copy kept one wrapped under the phrase being retired, in
+     * the same profile directory.
+     */
+    it('says the retired phrase no longer opens the copies kept beside the library', async () => {
+      repository.rewrapped = { backupsRewrapped: 3, backupsLeft: 0 };
+
+      await store.changePassphrase('the old one', 'a longer phrase');
+
+      expect(TestBed.inject(StatusNotifier).status()?.key).toBe('settings.security.changed');
+    });
+
+    /** A copy it could not reach is the one thing the user has to be told about. */
+    it('names the copies it could not rewrap rather than claiming a clean revocation', async () => {
+      repository.rewrapped = { backupsRewrapped: 1, backupsLeft: 2 };
+
+      await store.changePassphrase('the old one', 'a longer phrase');
+
+      const said = TestBed.inject(StatusNotifier).status();
+      expect(said?.key).toBe('settings.security.changedSomeLeft');
+      expect(said?.params?.['count']).toBe(2);
+    });
+
+    /** French keeps the singular where a count would read wrong. */
+    it('has a sentence of its own for a single copy left behind', async () => {
+      repository.rewrapped = { backupsRewrapped: 0, backupsLeft: 1 };
+
+      await store.changePassphrase('the old one', 'a longer phrase');
+
+      expect(TestBed.inject(StatusNotifier).status()?.key).toBe('settings.security.changedOneLeft');
+    });
+
     it('treats a refused current phrase as a refusal, not a failure', async () => {
       repository.failNext = REFUSED;
 

@@ -16,6 +16,7 @@ use tauri::{AppHandle, Manager, State};
 
 use zeroize::Zeroize;
 
+use crate::count::saturating_u32;
 use crate::db::{self, Db};
 use crate::error::{AppError, StorageError, ValidationError};
 use key::Cost;
@@ -165,6 +166,16 @@ fn unlock_with(passphrase: &str, app: &AppHandle, db: &State<'_, Db>) -> Result<
     Ok(())
 }
 
+/// What a change reached, so the interface can say it. ⚠️ `backupsLeft` is the honest half:
+/// the application can only speak for the copies it knows about, and a key file the user
+/// put somewhere else still opens with the retired phrase.
+#[derive(Debug, Clone, Copy, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PassphraseChange {
+    pub backups_rewrapped: u32,
+    pub backups_left: u32,
+}
+
 /// A new phrase over the same library, from the preferences panel.
 ///
 /// ⚠️ Not a re-encryption: the key the notes are sealed with is the one being rewrapped,
@@ -178,7 +189,7 @@ pub fn change_passphrase(
     mut next: String,
     app: AppHandle,
     db: State<'_, Db>,
-) -> Result<(), AppError> {
+) -> Result<PassphraseChange, AppError> {
     // ⚠️ Wiped before this returns, whatever it returns — see `create_vault`.
     let result = change_with(&current, &next, &app, &db);
     current.zeroize();
@@ -192,19 +203,27 @@ fn change_with(
     next: &str,
     app: &AppHandle,
     db: &State<'_, Db>,
-) -> Result<(), AppError> {
+) -> Result<PassphraseChange, AppError> {
     validate(next)?;
 
-    // ⚠️ Asked and released rather than held: the two derivations below cost a second
-    // each, and keeping the connection for them would freeze every other command.
+    // ⚠️ Asked and released rather than held: the derivations below cost tens of
+    // milliseconds each, and keeping the connection for them would freeze every other
+    // command.
     if db.lock().map_err(|_| StorageError::Unavailable)?.is_none() {
         return Err(StorageError::Locked.into());
     }
 
     let directory = app.path().app_data_dir().map_err(storage)?;
-    file::change_passphrase(&directory, current, next, Cost::default())?;
+    // ⚠️ The live file first, and the whole change fails here if it cannot be written: it
+    // is the only one whose loss is fatal. The copies follow, and a copy that resists is
+    // counted rather than fatal — see `backup::rewrap`.
+    let vault = file::change_passphrase(&directory, current, next, Cost::default())?;
+    let copies = crate::backup::rewrap(&directory, &vault, next, Cost::default());
 
-    Ok(())
+    Ok(PassphraseChange {
+        backups_rewrapped: saturating_u32(copies.done),
+        backups_left: saturating_u32(copies.left),
+    })
 }
 
 /// Opens the library under the key and hands it to the rest of the application. The
