@@ -126,6 +126,25 @@ describe('Search, filters and facets', () => {
       expect(await $(testid('search-matched')).isExisting()).toBe(false);
     });
 
+    /**
+     * ⚠️ Both halves of #201, and both came from the hairline #196 gave the badge. On a card
+     * the band is `overflow: hidden` and a `<span>` is inline, so the badge's border hung
+     * outside the line box its host was sized to and was cut. In the rail the chip drew a
+     * second outline two pixels further out, at a different radius — two rings around one
+     * badge rather than a selection.
+     */
+    it('draws the badge whole, with one outline around the selected one', async () => {
+      await canvas.toggleLanguage('sh');
+
+      const boxes = await canvas.badgeBoxes();
+
+      expect(boxes).not.toBeNull();
+      expect(boxes?.cutByBand).toBe(0);
+      expect(boxes?.outlines).toBe(1);
+
+      await canvas.toggleLanguage('sh');
+    });
+
     it('drops the search, the tag and the language in one click', async () => {
       await canvas.search('Docker');
       await canvas.toggleTag('ops');

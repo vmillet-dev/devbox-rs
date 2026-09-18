@@ -138,6 +138,49 @@ export const canvas = {
   },
 
   /**
+   * What the language badge is drawn outside its band, and how many boxes the selected chip
+   * in the rail draws around it.
+   *
+   * ⚠️ Both come from the badge having a border of its own. The band is `overflow: hidden`,
+   * so a badge taller than its line box is cut; and a chip that draws its own outline around
+   * a badge that already has one reads as two rings rather than as a selection.
+   */
+  badgeBoxes(): Promise<{ cutByBand: number; outlines: number } | null> {
+    return browser.execute(() => {
+      const band = document.querySelector('.card-head');
+      const onCard = band?.querySelector('.lang-tag');
+      const chip = document.querySelector('.language-chip.on');
+      const inChip = chip?.querySelector('.lang-tag');
+      if (!band || !onCard || !chip || !inChip) return null;
+
+      // A border nobody can see is not an outline, whatever its width says. ⚠️ `transparent`
+      // computes to `rgba(…, 0)`, so the alpha is what decides — read by splitting rather
+      // than by matching, which is one escaping mistake fewer in a string sent to the page.
+      const drawn = (element: Element) => {
+        const style = getComputedStyle(element);
+        const channels = style.borderTopColor
+          .slice(style.borderTopColor.indexOf('(') + 1, style.borderTopColor.lastIndexOf(')'))
+          .split(',');
+        const alpha = channels.length > 3 ? Number(channels[3]) : 1;
+
+        return alpha > 0 && Number.parseFloat(style.borderTopWidth) > 0 ? 1 : 0;
+      };
+
+      const bandBox = band.getBoundingClientRect();
+      const badgeBox = onCard.getBoundingClientRect();
+
+      return {
+        cutByBand: Math.max(
+          0,
+          Math.round(bandBox.top - badgeBox.top),
+          Math.round(badgeBox.bottom - bandBox.bottom),
+        ),
+        outlines: drawn(chip) + drawn(inChip),
+      };
+    });
+  },
+
+  /**
    * How far each todo row is drawn **outside** the box that holds it, in pixels. ⚠️ Counting
    * the rows in the DOM is not the same question: `.card-items` is `overflow: hidden` and
    * anchored to the bottom, so a row that no longer fits is still there and simply gets cut

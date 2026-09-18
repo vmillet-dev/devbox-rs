@@ -1,6 +1,11 @@
 @use 'mixins' as *;
 
+// ⚠️ A box of its own, not an inline run. A `<span>` is inline by default, so its padding
+// and its border hang outside the line box its host is sized to — and `.card-head` is
+// `overflow: hidden`, which cut the badge by three pixels once #196 gave it a hairline.
 .lang-tag {
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-mono), serif;
   font-size: 9.5px;
   padding: 2px 6px;

@@ -31,11 +31,15 @@
   flex-shrink: 0;
 }
 
-.language-chip:hover {
+// ⚠️ The chip's own box stays invisible: the badge carries a hairline of its own since
+// #196, and a second outline two pixels further out — at a different radius — read as two
+// rings around one badge rather than as a selection. The padding stays, because it is what
+// the chip is clickable by.
+.language-chip:hover .lang-tag {
   border-color: var(--line);
 }
 
-.language-chip.on {
+.language-chip.on .lang-tag {
   border-color: var(--amber);
   background: var(--bg-2);
 }
