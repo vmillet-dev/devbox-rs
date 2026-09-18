@@ -12,6 +12,47 @@ Keep the shape — a `## ` heading per release, `### ` headings for the categori
 bullet per entry — or the entry will not be rendered. It is deliberately untranslated, like
 the release notes the updater hands over.
 
+## [0.3.1] - 2026-09-18
+
+### ✨ Added
+
+- Let the library rail go down to 160px (#213)
+- Spend a card's two rows on what is left to do (#206)
+- Cards and zones land where they are dropped, and nothing lines up (#172)
+- The library as a tree, in a rail that hides (#168)
+
+### 🔧 Changed
+
+- Make a destructive action look like one before it is pointed at (#194)
+
+### 🐛 Fixed
+
+- Wait on a condition in every scenario that reads after one (#209)
+- Hand the format ring down to the badge that draws it (#208)
+- Draw the badge whole, with one ring around the selected one (#205)
+- Draw every row of a todo list inside the card that holds it (#204)
+- Count with a plural rather than an apologetic "(s)" (#199)
+- Move the focus among the cards as they are on screen (#198)
+- Give a badge's label something to be read against (#196)
+- Wait on a condition, not on a duration (#195)
+- Give every control a box a pointer can hit (#193)
+- Make every text colour legible on the surface it is drawn on (#192)
+- Contain the name an attachment is written under (#187)
+- The title starts where the buttons end (#174)
+- The grip and the selection tick share one corner (#171)
+- A card dragged out of a folder leaves nothing under the pointer (#170)
+- A todo list on the board cannot be ticked (#169)
+- Choosing a note in the palette hides the window instead of opening it (#173)
+
+### 🔒 Security
+
+- Retire a passphrase everywhere this application put a copy (#189)
+- Measure the key derivation where it cannot be a debug number (#188)
+
+### 🧰 Under the hood
+
+- Rename the application to DevNotes (#211)
+
 ## [0.3.0] - 2026-09-17
 
 ### ✨ Added
