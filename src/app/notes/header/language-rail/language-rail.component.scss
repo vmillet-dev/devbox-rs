@@ -35,13 +35,18 @@
 // #196, and a second outline two pixels further out — at a different radius — read as two
 // rings around one badge rather than as a selection. The padding stays, because it is what
 // the chip is clickable by.
-.language-chip:hover .lang-tag {
-  border-color: var(--line);
+//
+// ⚠️ Which is why the state is handed down as a custom property and not written as a rule
+// on `.lang-tag`: that element belongs to `app-language-badge`, and emulated encapsulation
+// rewrites a selector spelled here with *this* component's `_ngcontent` attribute. It then
+// matches nothing, silently — and the selected format had no mark at all (#207).
+.language-chip:hover {
+  --badge-ring: var(--line);
 }
 
-.language-chip.on .lang-tag {
-  border-color: var(--amber);
-  background: var(--bg-2);
+.language-chip.on {
+  --badge-ring: var(--amber);
+  --badge-surface: var(--bg-2);
 }
 
 .language-chip:focus-visible {

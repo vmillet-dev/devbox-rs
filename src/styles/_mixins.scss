@@ -188,9 +188,11 @@
 // ⚠️ The hairline is what gives the chip a shape, and it is in the hue rather than in a
 // grey: `--bg-3` sits at 1.1:1 against the light theme's surfaces, so a neutral fill alone
 // left the badge as bare text on every light screen.
+// ⚠️ `--badge-ring` and `--badge-surface` are the only way in from outside: the badge is a
+// component of its own, so a consumer's stylesheet cannot reach `.lang-tag` with a rule.
 @mixin hue-badge($colour) {
-  background: var(--bg-3);
-  border: 1px solid color-mix(in srgb, #{$colour} 40%, transparent);
+  background: var(--badge-surface, var(--bg-3));
+  border: 1px solid var(--badge-ring, color-mix(in srgb, #{$colour} 40%, transparent));
   color: $colour;
 }
 
