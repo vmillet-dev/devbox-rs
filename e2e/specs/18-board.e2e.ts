@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { board, folders, spaces } from '../pageobjects/overlays.page.js';
-import { eventually, reloadCanvas, testid, waitForCanvas } from '../support/app.js';
+import { eventually, press, reloadCanvas, testid, waitForCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -197,6 +197,35 @@ describe('The board', () => {
 
     await canvas.check('Dump nocturne');
     expect(await canvas.isChecked('Dump nocturne')).toBe(false);
+  });
+
+  /**
+   * ⚠️ The board lays its cards out zone by zone, where the date view orders them pinned
+   * first and then by `updated_at`. The arrows measured the grid in DOM order and resolved
+   * the answer through `visibleNotes` — the date view's list — so the first ArrowRight here
+   * jumped two cards sideways, onto one nowhere near the pointer.
+   *
+   * Asserted as a relationship rather than from a fixed start: these files share a session,
+   * so what is focused when this runs is whatever the scenario before it left.
+   */
+  it('walks the cards as they are on screen, not as the date view lists them', async () => {
+    await board.show('board');
+    const order = await canvas.titles();
+    expect(order.length).toBeGreaterThan(1);
+
+    // ⚠️ Walked to a known end rather than started from wherever: these files share one
+    // session, so what holds the focus here is whatever the scenario before it left.
+    for (const _ of order) {
+      await press('ArrowLeft');
+    }
+
+    // The first card **on screen**. The date view lists the newest note first, and on this
+    // board that is the last of the three — which is what the focus used to land on.
+    expect(await canvas.focusedCardTitle()).toBe(order[0]);
+
+    await press('ArrowRight');
+
+    expect(await canvas.focusedCardTitle()).toBe(order[1]);
   });
 
   /** Nothing is removed from the header: the board is a second view, not a replacement. */

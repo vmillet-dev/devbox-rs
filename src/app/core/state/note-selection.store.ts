@@ -39,13 +39,6 @@ export class NoteSelectionStore {
     return index < 0 ? null : (this.notes.visibleNotes()[index] ?? null);
   }
 
-  focusIndex(index: number): void {
-    const note = this.notes.visibleNotes()[index];
-    if (note) {
-      this._focusedNoteId.set(note.id);
-    }
-  }
-
   toggleChecked(id: string): void {
     this._checkedIds.update((checked) => {
       const next = new Set(checked);

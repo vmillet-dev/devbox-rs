@@ -121,6 +121,22 @@ export const canvas = {
     );
   },
 
+  /**
+   * The card that really has the keyboard, read from `document.activeElement` rather than
+   * from a class. ⚠️ The ring a card draws is `:focus-visible` on its own click surface, so
+   * asserting on the store's idea of focus would not prove the keyboard went with it.
+   */
+  focusedCardTitle(): Promise<string | null> {
+    return browser.execute(
+      (cardSelector: string, titleSelector: string) => {
+        const owner = document.activeElement?.closest(cardSelector);
+        return owner ? ((owner.querySelector(titleSelector)?.textContent ?? '').trim() ?? null) : null;
+      },
+      testid('note-card'),
+      testid('note-card-title'),
+    );
+  },
+
   async waitForCard(title: string): Promise<void> {
     await browser.waitUntil(async () => (await canvas.titles()).includes(title), {
       timeout: 15_000,
