@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { rail, spaces } from '../pageobjects/overlays.page.js';
-import { press, reloadCanvas, testid } from '../support/app.js';
+import { eventually, press, reloadCanvas, testid } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -172,8 +172,13 @@ describe('Spaces', () => {
       const before = await rail.width();
 
       await rail.widen();
-      await browser.pause(500);
-      expect(await rail.width()).toBeGreaterThan(before);
+      const wider = await eventually(
+        () => rail.width(),
+        (width) => width > before,
+        'the rail never widened',
+      );
+
+      expect(wider).toBeGreaterThan(before);
 
       const widened = await rail.width();
       await reloadCanvas();

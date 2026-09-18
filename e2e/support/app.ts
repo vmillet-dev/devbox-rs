@@ -142,6 +142,36 @@ export async function clickToAddRow(button: string, row: string) {
   return last;
 }
 
+/**
+ * Waits for a read to answer something, and hands that answer back so the assertion reads
+ * what was waited for.
+ *
+ * ⚠️ A condition rather than a duration. `pause` before an `expect` is a guess at a round
+ * trip on a runner already sharing a CPU with a WebView: one scenario went red on Windows
+ * and green on a re-run of the very same commit (#190).
+ *
+ * ⚠️ A **negative** assertion is the one case a duration is the right tool — nothing
+ * arriving is not a condition anything can wait on. Those keep their `pause`, with a line
+ * saying so.
+ */
+export async function eventually<T>(
+  read: () => Promise<T>,
+  matches: (value: T) => boolean,
+  what: string,
+): Promise<T> {
+  let seen: T | undefined;
+
+  await browser.waitUntil(
+    async () => {
+      seen = await read();
+      return matches(seen);
+    },
+    { timeout: 10_000, timeoutMsg: `${what} — last saw ${JSON.stringify(seen)}` },
+  );
+
+  return read();
+}
+
 /** What `confirmTwice` needs of a button, so a chainable and an element both fit. */
 interface Confirmable {
   click(): Promise<void>;

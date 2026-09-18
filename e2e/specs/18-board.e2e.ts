@@ -2,7 +2,7 @@ import { browser, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
 import { board, folders, spaces } from '../pageobjects/overlays.page.js';
-import { press, reloadCanvas, testid, waitForCanvas } from '../support/app.js';
+import { eventually, press, reloadCanvas, testid, waitForCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId, query } from '../support/bridge.js';
 
 /**
@@ -97,8 +97,11 @@ describe('The board', () => {
     expect(await board.isDimmed('EXPLAIN lent sur join')).toBe(false);
 
     await canvas.clearSearch();
-    await browser.pause(600);
-    expect(await board.isDimmed('Dump nocturne')).toBe(false);
+    await eventually(
+      () => board.isDimmed('Dump nocturne'),
+      (dimmed) => !dimmed,
+      'the card stayed dimmed after the search was cleared',
+    );
   });
 
   /** The board would look shuffled at every launch otherwise. */

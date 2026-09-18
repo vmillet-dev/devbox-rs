@@ -15,30 +15,30 @@
 .lang-json,
 .lang-ts,
 .lang-xml {
-  @include tint-badge('--blue-rgb');
+  @include hue-badge(var(--blue));
 }
 
 .lang-js,
 .lang-html {
-  @include tint-badge('--amber-rgb');
+  @include hue-badge(var(--amber));
 }
 
 .lang-py,
 .lang-sh {
-  @include tint-badge('--green-rgb');
+  @include hue-badge(var(--green));
 }
 
 .lang-sql,
 .lang-css {
-  @include tint-badge('--purple-rgb');
+  @include hue-badge(var(--purple));
 }
 
 .lang-yml,
 .lang-toml {
-  @include tint-badge('--red-rgb');
+  @include hue-badge(var(--red));
 }
 
 .lang-txt,
 .lang-md {
-  @include tint-badge('--text-1-rgb');
+  @include hue-badge(var(--text-1));
 }

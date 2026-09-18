@@ -13,9 +13,8 @@ const STYLESHEET = readFileSync('src/styles/styles.scss', 'utf8');
 const AA = 4.5;
 
 /**
- * The four plain surfaces. ⚠️ **Not** every background text lands on: the tint-badge mixin
- * draws a hue on an 8–12% tint of itself, which moves the background toward the text and
- * costs about a point of contrast. Those composites are measured in #191, not here.
+ * The four plain surfaces. ⚠️ Not the only backgrounds text lands on — a badge draws its
+ * label on a **tint** of one of the hues, which is measured separately below.
  */
 const SURFACES = ['--bg-0', '--bg-1', '--bg-2', '--bg-3'];
 
@@ -50,6 +49,17 @@ function block(theme) {
   );
 }
 
+/**
+ * The strongest tint any badge is drawn on. ⚠️ It is `tint-badge`'s own default, and the
+ * highest alpha in use at a call site — a stronger one typed later would want this raised
+ * with it.
+ */
+const MAX_TINT = 0.15;
+
+/** The hues a badge tints its background with, and the label it then draws on that tint. */
+const TINTED = ['--amber', '--green', '--blue', '--red', '--purple', '--text-1'];
+const BADGE_INK = '--text-1';
+
 function luminance(hex) {
   const value = Number.parseInt(hex.slice(1), 16);
   const channels = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((raw) => {
@@ -58,6 +68,18 @@ function luminance(hex) {
   });
 
   return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+/** What a translucent fill actually composites to over an opaque surface. */
+function mix(hex, over, alpha) {
+  const channels = (value) => {
+    const n = Number.parseInt(value.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const [front, back] = [channels(hex), channels(over)];
+  const blended = front.map((value, index) => Math.round(value * alpha + back[index] * (1 - alpha)));
+
+  return '#' + blended.map((value) => value.toString(16).padStart(2, '0')).join('');
 }
 
 function contrast(a, b) {
@@ -81,6 +103,25 @@ for (const theme of ['dark', 'light']) {
           assert.ok(
             ratio >= AA,
             `${name} (${of(name)}) on ${surface} (${of(surface)}) is ${ratio.toFixed(2)}:1, AA asks ${AA}:1`,
+          );
+        }
+      }
+    });
+
+    /**
+     * ⚠️ A tint moves the background **toward** the colour it is made of, so a badge's label
+     * has less to work with than the plain surface underneath suggests. The hue used to be
+     * the label as well, which cost about a point and put light amber at 4.20:1.
+     */
+    it('draws a badge label legibly on the tint it sits on', () => {
+      for (const hue of TINTED) {
+        for (const surface of SURFACES) {
+          const tinted = mix(of(hue), of(surface), MAX_TINT);
+          const ratio = contrast(of(BADGE_INK), tinted);
+
+          assert.ok(
+            ratio >= AA,
+            `${BADGE_INK} on a ${MAX_TINT} ${hue} tint over ${surface} is ${ratio.toFixed(2)}:1, AA asks ${AA}:1`,
           );
         }
       }

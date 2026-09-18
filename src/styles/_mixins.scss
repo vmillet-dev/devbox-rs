@@ -160,15 +160,38 @@
   color: var(--text-2);
 }
 
-// Translucent background and solid text in the same hue, from an RGB variable so no
-// colour is duplicated in hex.
+// A state said with a translucent fill in one hue, from an RGB variable so no colour is
+// duplicated in hex.
+//
+// ⚠️ The label is **neutral**, not the hue. A tint moves the background toward the text, so
+// a hue drawn on a tint of itself loses about a point of contrast and lands under AA — the
+// light amber one was 4.20:1, the faintest text in the editor. The fill and the border carry
+// the colour; the label only has to be read.
+//
+// ⚠️ For a badge whose hue *is* the information rather than a state, this is the wrong
+// trade — see `hue-badge`.
 @mixin tint-badge($rgb-var, $bg-alpha: 0.15, $border-alpha: null) {
   background: rgba(var(#{$rgb-var}), $bg-alpha);
-  color: rgb(var(#{$rgb-var}));
+  color: var(--text-1);
 
   @if $border-alpha {
     border: 1px solid rgba(var(#{$rgb-var}), $border-alpha);
   }
+}
+
+// The opposite trade, for a badge whose **hue is the information** rather than a state: the
+// label keeps the colour and the fill goes neutral.
+//
+// ⚠️ On a tint of itself, three of the six language hues fall under AA in each theme — a
+// different three each time. Neutralising the label instead would erase the only thing the
+// badge is recognised by, so it is the fill that gives way.
+// ⚠️ The hairline is what gives the chip a shape, and it is in the hue rather than in a
+// grey: `--bg-3` sits at 1.1:1 against the light theme's surfaces, so a neutral fill alone
+// left the badge as bare text on every light screen.
+@mixin hue-badge($colour) {
+  background: var(--bg-3);
+  border: 1px solid color-mix(in srgb, #{$colour} 40%, transparent);
+  color: $colour;
 }
 
 // --- Help dialogs ---
