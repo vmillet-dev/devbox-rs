@@ -215,7 +215,7 @@ describe('The board', () => {
 
     // ⚠️ Walked to a known end rather than started from wherever: these files share one
     // session, so what holds the focus here is whatever the scenario before it left.
-    for (let step = 0; step < order.length; step += 1) {
+    for (const _ of order) {
       await press('ArrowLeft');
     }
 
