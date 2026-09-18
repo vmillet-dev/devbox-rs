@@ -29,7 +29,7 @@ describe('StatusToastComponent', () => {
     await fixture.whenStable();
 
     const text = fixture.nativeElement.querySelector('.status-text').textContent;
-    expect(text).toContain('3 note(s) exportée(s)');
+    expect(text).toContain('3 notes exportées');
     expect(text).toContain('devbox.json');
   });
 

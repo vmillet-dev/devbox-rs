@@ -52,9 +52,11 @@ describe('GlobalShortcutsService', () => {
     TestBed.tick();
     await Promise.resolve();
 
+    // ⚠️ The count travels beside the list: the sentence agrees three times over, and a
+    // list is not something a translation can count.
     expect(TestBed.inject(ErrorNotifier).notice()?.ref).toEqual({
       key: 'shortcuts.unavailable',
-      params: { list: 'Ctrl+Alt+P' },
+      params: { count: 1, list: 'Ctrl+Alt+P' },
     });
   });
 

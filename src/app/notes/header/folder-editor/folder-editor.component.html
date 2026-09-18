@@ -12,6 +12,7 @@
         [class.on]="folder().colour === colour"
         [attr.aria-checked]="folder().colour === colour"
         [attr.aria-label]="'folders.colour.' + colour | transloco"
+        [attr.title]="'folders.colour.' + colour | transloco"
         (click)="pickColour(colour)"
       ></button>
     }

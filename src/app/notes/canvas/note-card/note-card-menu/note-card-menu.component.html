@@ -6,6 +6,7 @@
   aria-haspopup="menu"
   [attr.aria-expanded]="menu.open()"
   [attr.aria-label]="'notes.noteOptionsLabel' | transloco: { title: noteTitle() }"
+  [attr.title]="'notes.noteOptionsLabel' | transloco: { title: noteTitle() }"
   (click)="toggle($event)"
 >
   <span aria-hidden="true">⋯</span>

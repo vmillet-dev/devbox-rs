@@ -65,7 +65,7 @@ describe('SearchBoxComponent', () => {
       fixture.componentRef.setInput('matched', 12);
       await fixture.whenStable();
 
-      expect(matchedText()).toBe('12 résultat(s) ✕');
+      expect(matchedText()).toBe('12 résultats ✕');
       expect(fixture.nativeElement.querySelector('.kbd')).toBeNull();
     });
 
@@ -74,7 +74,7 @@ describe('SearchBoxComponent', () => {
       fixture.componentRef.setInput('matched', 0);
       await fixture.whenStable();
 
-      expect(matchedText()).toBe('0 résultat(s) ✕');
+      expect(matchedText()).toBe('aucun résultat ✕');
     });
 
     it('shows the hint again when nothing is being filtered', async () => {

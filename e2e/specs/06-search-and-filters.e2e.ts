@@ -1,7 +1,7 @@
 import { $, expect } from '@wdio/globals';
 
 import { canvas } from '../pageobjects/canvas.page.js';
-import { blur, cursorOf, press, reloadCanvas, testid } from '../support/app.js';
+import { blur, cursorOf, press, reloadCanvas, testid, waitForCanvas } from '../support/app.js';
 import { bridge, draft, homeSpaceId } from '../support/bridge.js';
 
 /**
@@ -80,6 +80,20 @@ describe('Search, filters and facets', () => {
     expect(await canvas.noResults().isExisting()).toBe(true);
   });
 
+  /**
+   * ⚠️ An empty state that only reports is a dead end: the one thing to do from here is the
+   * thing that emptied it, and `clearFilters()` was already sitting there unoffered.
+   */
+  it('offers the way out of the state that emptied it', async () => {
+    await canvas.search('nothing matches this');
+
+    await $(testid('canvas-clear-filters')).click();
+    await waitForCanvas();
+
+    expect(await canvas.searchQuery()).toBe('');
+    expect(await canvas.noResults().isExisting()).toBe(false);
+  });
+
   /** How big is this result, and why is that card in it. */
   describe('what a search says about itself', () => {
     /**
@@ -96,8 +110,15 @@ describe('Search, filters and facets', () => {
       // Against what is on screen: the corpus is shared with every file that ran before.
       expect(await canvas.matchedCount()).toContain(String((await canvas.titles()).length));
 
+      // ⚠️ Not on the words. The zero case is written out — French calls zero `one`, so
+      // "0 résultat" would read as a singular — but **the suite runs in whatever language
+      // the machine is set to**: French here, English on CI. Asserting "aucun" passed
+      // locally and failed on both runners. What the scenario is about is that the badge
+      // still says something, so that is what it asks.
       await canvas.search('nothing matches this');
-      expect(await canvas.matchedCount()).toContain('0');
+      const atZero = (await canvas.matchedCount()).replace('✕', '').trim();
+      expect(atZero.length).toBeGreaterThan(0);
+      expect(await canvas.noResults().isExisting()).toBe(true);
     });
 
     it('hides the count again once nothing is being filtered', async () => {

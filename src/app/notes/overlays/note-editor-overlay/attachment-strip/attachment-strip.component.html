@@ -29,6 +29,7 @@
           class="strip-icon"
           [attr.aria-pressed]="previewId() === attachment.id"
           [attr.aria-label]="'attachments.openPreview' | transloco: { name: attachment.fileName }"
+          [attr.title]="'attachments.openPreview' | transloco: { name: attachment.fileName }"
           (click)="previewToggled.emit(attachment.id)"
         >
           <span aria-hidden="true">👁</span>
@@ -39,6 +40,7 @@
         type="button"
         class="strip-icon"
         [attr.aria-label]="'attachments.save' | transloco: { name: attachment.fileName }"
+        [attr.title]="'attachments.save' | transloco: { name: attachment.fileName }"
         (click)="saveRequested.emit(attachment.id)"
       >
         <span aria-hidden="true">⭳</span>
@@ -51,6 +53,7 @@
         [attr.data-attachment-id]="attachment.id"
         [class.confirming]="confirmingRemove() === attachment.id"
         [attr.aria-label]="'attachments.remove' | transloco: { name: attachment.fileName }"
+        [attr.title]="'attachments.remove' | transloco: { name: attachment.fileName }"
         (click)="onRemoveClick(attachment.id)"
       >
         <span aria-hidden="true">{{ confirmingRemove() === attachment.id ? '?' : '✕' }}</span>

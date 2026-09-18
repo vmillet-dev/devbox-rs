@@ -80,6 +80,7 @@
         data-testid="editor-fullscreen"
         [attr.aria-pressed]="fullscreen()"
         [attr.aria-label]="(fullscreen() ? 'editor.exitFullscreen' : 'editor.fullscreen') | transloco"
+        [attr.title]="(fullscreen() ? 'editor.exitFullscreen' : 'editor.fullscreen') | transloco"
         (click)="toggleFullscreen()"
       >
         <span aria-hidden="true">{{ fullscreen() ? '⤡' : '⤢' }}</span>
@@ -89,6 +90,7 @@
         class="icon-btn close-btn"
         data-testid="editor-close"
         [attr.aria-label]="'editor.close' | transloco"
+        [attr.title]="'editor.close' | transloco"
         (click)="requestClose()"
       >
         <span aria-hidden="true">✕</span>
@@ -118,6 +120,7 @@
               data-testid="editor-tag-remove"
               [attr.data-tag]="tag"
               [attr.aria-label]="'editor.removeTag' | transloco: { tag: tag }"
+              [attr.title]="'editor.removeTag' | transloco: { tag: tag }"
               (click)="removeTag(tag)"
             >
               <span aria-hidden="true">✕</span>

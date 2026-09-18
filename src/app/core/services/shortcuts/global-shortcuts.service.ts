@@ -30,8 +30,14 @@ export class GlobalShortcutsService {
       // No `Result` on the Rust side: it throws when the bridge is absent.
       const taken = await commands.setGlobalShortcuts(bindings);
       if (taken.length > 0) {
+        // ⚠️ The count travels beside the list: the sentence agrees three times over —
+        // the noun, the adjective and the participle — and a list cannot be counted by
+        // the translation.
         this.notifier.notify({
-          ref: { key: 'shortcuts.unavailable', params: { list: taken.join(', ') } },
+          ref: {
+            key: 'shortcuts.unavailable',
+            params: { count: taken.length, list: taken.join(', ') },
+          },
         });
       }
     } catch {

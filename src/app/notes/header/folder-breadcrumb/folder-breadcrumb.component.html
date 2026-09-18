@@ -23,6 +23,7 @@
     aria-haspopup="menu"
     [attr.aria-expanded]="menu.open()"
     [attr.aria-label]="'folders.optionsLabel' | transloco: { name: folder().name }"
+    [attr.title]="'folders.optionsLabel' | transloco: { name: folder().name }"
     (click)="menu.toggle()"
   >
     <span aria-hidden="true">⋯</span>

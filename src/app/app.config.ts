@@ -7,12 +7,13 @@ import {
   provideZonelessChangeDetection,
 } from '@angular/core';
 import { provideRouter, withHashLocation } from '@angular/router';
-import { provideTransloco } from '@jsverse/transloco';
+import { TRANSLOCO_TRANSPILER, provideTransloco } from '@jsverse/transloco';
 
 import { routes } from './app.routes';
 import { AppErrorHandler } from '@core/services/errors/app-error-handler';
 import { APP_LOCALES, DEFAULT_LOCALE } from '@core/services/i18n/locale.model';
 import { LocaleService } from '@core/services/i18n/locale.service';
+import { PluralTranspiler } from '@core/services/i18n/plural-transpiler';
 import { AppTranslocoLoader } from '@core/services/i18n/transloco-loader';
 import { AutostartService } from '@core/services/autostart/autostart.service';
 import { PreferencesService } from '@core/services/preferences/preferences.service';
@@ -41,6 +42,15 @@ export const appConfig: ApplicationConfig = {
       },
       loader: AppTranslocoLoader,
     }),
+
+    // ⚠️ French keeps the singular at zero where English does not, and four of these
+    // strings carry three independent counts in one sentence, each with its own agreement.
+    // A key per form would have meant eight variants of those alone.
+    //
+    // ⚠️ Ours rather than `@jsverse/transloco-messageformat`, which compiles each message
+    // with `new Function` — the CSP here is `script-src 'self'`, and the application boots
+    // onto an error banner with it. See `plural-transpiler.ts`.
+    { provide: TRANSLOCO_TRANSPILER, useClass: PluralTranspiler },
 
     // ⚠️ One initialiser for both steps rather than two chained: Angular starts them
     // together and awaits their promises as a block, so `restore()` would read a

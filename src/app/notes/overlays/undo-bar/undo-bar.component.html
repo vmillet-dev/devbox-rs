@@ -8,6 +8,7 @@
     class="undo-dismiss"
     data-testid="undo-dismiss"
     [attr.aria-label]="'undo.dismiss' | transloco"
+    [attr.title]="'undo.dismiss' | transloco"
     (click)="dismissed.emit()"
   >
     <span aria-hidden="true">✕</span>

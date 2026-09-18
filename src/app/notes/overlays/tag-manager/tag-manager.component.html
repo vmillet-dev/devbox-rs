@@ -6,6 +6,7 @@
       class="tags-close"
       data-testid="tag-manager-close"
       [attr.aria-label]="'tagManager.close' | transloco"
+      [attr.title]="'tagManager.close' | transloco"
       (click)="closed.emit()"
     >
       <span aria-hidden="true">✕</span>

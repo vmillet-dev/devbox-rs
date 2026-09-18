@@ -51,4 +51,33 @@ describe('the translation files', () => {
   ])('writes {{app}} instead (%s)', (_locale, translations) => {
     expect(strings(translations).some((value) => value.includes('{{app}}'))).toBe(true);
   });
+
+  /**
+   * ⚠️ "(s)" is not a plural, it is a refusal to choose one — and French does not agree
+   * with English about zero, or about where the mark goes on a past participle. Counting
+   * is the transpiler's job now.
+   */
+  it.each([
+    ['fr', fr],
+    ['en', en],
+  ])('counts with a plural rather than an apologetic "(s)" (%s)', (_locale, translations) => {
+    expect(strings(translations).filter((value) => value.includes('(s)'))).toEqual([]);
+  });
+
+  /**
+   * ⚠️ The messageformat transpiler replaces the default one, so `{` is syntax. A literal
+   * brace in a translated string would have to be escaped as `'{'`, and the failure mode is
+   * silent — the string renders as something else entirely rather than throwing.
+   */
+  it.each([
+    ['fr', fr],
+    ['en', en],
+  ])('leaves no brace that is neither an interpolation nor a plural (%s)', (_locale, translations) => {
+    const suspicious = strings(translations).filter((value) =>
+      // `{{name}}` and `{name…}` are both fine; a lone `{` with nothing after it is not.
+      /\{(?!\{)\s*(?:\}|$)/.test(value),
+    );
+
+    expect(suspicious).toEqual([]);
+  });
 });

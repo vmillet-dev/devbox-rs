@@ -6,6 +6,7 @@
       class="trash-close"
       data-testid="trash-close"
       [attr.aria-label]="'trash.close' | transloco"
+      [attr.title]="'trash.close' | transloco"
       (click)="closed.emit()"
     >
       <span aria-hidden="true">✕</span>

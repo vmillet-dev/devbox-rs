@@ -538,7 +538,7 @@ describe('NoteCardComponent', () => {
       await fixture.whenStable();
 
       expect(fixture.nativeElement.querySelectorAll('.card-item')).toHaveLength(2);
-      expect(text('.card-items-more')).toBe('+3 autre(s)');
+      expect(text('.card-items-more')).toBe('+3 autres');
     });
 
     it('shows no language badge, a checklist having no format to announce', () => {

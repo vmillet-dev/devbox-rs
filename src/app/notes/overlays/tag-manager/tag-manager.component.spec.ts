@@ -61,8 +61,8 @@ describe('TagManagerComponent', () => {
 
   it('lists each tag with the number of notes carrying it', () => {
     expect(items().map((item) => item.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
-      '#api 1 note(s)',
-      '#auth 4 note(s)',
+      '#api 1 note',
+      '#auth 4 notes',
     ]);
   });
 

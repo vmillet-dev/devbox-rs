@@ -63,6 +63,27 @@ describe('TrashPanelComponent', () => {
     expect(meta).toContain('30');
   });
 
+  /**
+   * ⚠️ The panel says notes are kept 30 days and this said 31 one line under it. The cause
+   * is not arithmetic on the retention — it is that `ClockService` ticks every 30 s, so the
+   * `now` a card renders against can be **behind** an instant Rust has just stamped. The
+   * gap then reads as 30 days *and change*, and rounding up made the change a whole day.
+   */
+  it('agrees with the retention rule stated above it, on a clock that has not ticked yet', async () => {
+    // Deleted 20 seconds after the clock last looked: `purgeAt` is that plus 30 days.
+    fixture.componentRef.setInput('notes', [
+      trashed({
+        deletedAt: new Date('2026-08-27T09:00:20Z'),
+        purgeAt: new Date('2026-09-26T09:00:20Z'),
+      }),
+    ]);
+    await fixture.whenStable();
+
+    const meta = rows()[0].querySelector('.trash-row-meta')?.textContent ?? '';
+    expect(meta).toContain('30');
+    expect(meta).not.toContain('31');
+  });
+
   it('counts the last day as still the user’s', async () => {
     fixture.componentRef.setInput('notes', [trashed({ purgeAt: new Date('2026-08-27T23:00:00Z') })]);
     await fixture.whenStable();

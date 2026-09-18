@@ -23,6 +23,7 @@
         class="zone-grip"
         data-testid="board-zone-grip"
         [attr.aria-label]="'board.moveZone' | transloco: { name: folder.name }"
+        [attr.title]="'board.moveZone' | transloco: { name: folder.name }"
         (pointerdown)="headGrabbed.emit($event)"
       >
         <span aria-hidden="true">⠿</span>
@@ -51,6 +52,7 @@
         aria-haspopup="menu"
         [attr.aria-expanded]="menuOpen()"
         [attr.aria-label]="'folders.optionsLabel' | transloco: { name: folder.name }"
+        [attr.title]="'folders.optionsLabel' | transloco: { name: folder.name }"
         (click)="menuOpen.set(!menuOpen())"
       >
         <span aria-hidden="true">⋯</span>
@@ -98,6 +100,7 @@
       class="zone-resize"
       data-testid="board-zone-resize"
       [attr.aria-label]="'board.resizeZone' | transloco: { name: folder.name }"
+      [attr.title]="'board.resizeZone' | transloco: { name: folder.name }"
       (pointerdown)="resizeGrabbed.emit($event)"
     ></button>
   }

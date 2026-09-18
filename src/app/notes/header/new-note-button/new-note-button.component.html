@@ -12,6 +12,7 @@
     aria-haspopup="menu"
     [attr.aria-expanded]="menu.open()"
     [attr.aria-label]="'notes.newNoteKindLabel' | transloco"
+    [attr.title]="'notes.newNoteKindLabel' | transloco"
     (click)="menu.toggle()"
   >
     <span aria-hidden="true">▾</span>

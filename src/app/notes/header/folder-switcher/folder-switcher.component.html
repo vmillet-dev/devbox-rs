@@ -83,6 +83,7 @@
                 data-testid="folder-edit"
                 [attr.data-folder-id]="folder.id"
                 [attr.aria-label]="'folders.optionsLabel' | transloco: { name: folder.name }"
+                [attr.title]="'folders.optionsLabel' | transloco: { name: folder.name }"
                 (click)="startEditing(folder)"
               >
                 <span aria-hidden="true">⋯</span>
