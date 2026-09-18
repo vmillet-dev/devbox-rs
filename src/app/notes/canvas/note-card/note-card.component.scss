@@ -103,7 +103,9 @@
 // `all: unset` resets it — which is why the pill above carries that, not the buttons.
 .card-action {
   @include unstyled-control;
+  @include hit-target;
 
+  justify-content: center;
   pointer-events: auto;
   padding: 2px 5px;
   border-radius: 6px;
@@ -264,10 +266,9 @@ app-copy-button {
 
 .card-item {
   @include unstyled-control;
+  @include hit-target;
 
   pointer-events: auto;
-  display: flex;
-  align-items: baseline;
   gap: 6px;
   width: 100%;
   padding: 1px 0;

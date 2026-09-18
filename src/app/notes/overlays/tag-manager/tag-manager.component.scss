@@ -20,6 +20,9 @@ app-dialog {
 
 .tags-close {
   @include unstyled-control;
+  @include hit-target;
+
+  justify-content: center;
   padding: 2px 6px;
   font-size: 12px;
   color: var(--text-2);

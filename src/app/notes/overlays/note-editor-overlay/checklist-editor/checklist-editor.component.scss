@@ -82,6 +82,9 @@
 
 .row-check {
   @include unstyled-control;
+  @include hit-target;
+
+  justify-content: center;
   padding: 2px;
   color: var(--text-2);
   cursor: pointer;

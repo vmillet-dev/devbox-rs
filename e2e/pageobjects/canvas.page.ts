@@ -94,6 +94,33 @@ export const canvas = {
     );
   },
 
+  /**
+   * The smallest box each control actually gets, measured in the page. ⚠️ Read from the
+   * rendered boxes and not from the stylesheet: padding, line-height and the mixin compose,
+   * and it is the composition that has to clear 24px.
+   */
+  controlSizes(): Promise<Record<string, { width: number; height: number }[]>> {
+    return browser.execute(
+      (itemSelector: string, pillSelector: string) => {
+        const boxes = (selector: string) =>
+          [...document.querySelectorAll(selector)].map((element) => {
+            const box = element.getBoundingClientRect();
+            return { width: Math.round(box.width), height: Math.round(box.height) };
+          });
+
+        return {
+          item: boxes(itemSelector),
+          action: boxes('.card-action'),
+          menu: boxes('.card-menu-trigger'),
+          copy: boxes('.copy-btn'),
+          tag: boxes(pillSelector),
+        };
+      },
+      testid('note-card-item'),
+      testid('tag-pill'),
+    );
+  },
+
   async waitForCard(title: string): Promise<void> {
     await browser.waitUntil(async () => (await canvas.titles()).includes(title), {
       timeout: 15_000,
