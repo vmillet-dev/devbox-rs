@@ -189,6 +189,9 @@ jobs:
             -Dsonar.projectKey=devnotes-front
             -Dsonar.organization=vmillet-dev
             -Dsonar.sources=src
+            -Dsonar.tests=src
+            -Dsonar.test.inclusions=src/**/*.spec.ts
+            -Dsonar.coverage.exclusions=src/**/*.spec.ts,src/main.ts,src/test.ts
             -Dsonar.javascript.lcov.reportPaths=coverage/devnotes/lcov.info
 
   test-rust:
