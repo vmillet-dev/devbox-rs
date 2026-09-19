@@ -165,31 +165,31 @@ jobs:
           retention-days: 7
 
   sonar-front:
-      name: Sonar Front
-      needs: test-front
-      runs-on: ubuntu-22.04
-      timeout-minutes: 15
-  
-      steps:
-        - uses: actions/checkout@v7
-          with:
-            fetch-depth: 0
-  
-        - uses: actions/download-artifact@v7
-          with:
-            name: front-coverage
-            path: coverage
-  
-        - name: SonarQube Scan
-          uses: SonarSource/sonarqube-scan-action@v7
-          env:
-            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          with:
-            args: >
-              -Dsonar.projectKey=devnotes-front
-              -Dsonar.organization=vmillet-dev
-              -Dsonar.sources=src
-              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+    name: Sonar Front
+    needs: test-front
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: front-coverage
+          path: coverage
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=devnotes-front
+            -Dsonar.organization=vmillet-dev
+            -Dsonar.sources=src
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
 
   test-rust:
     name: Test Rust (${{ matrix.os }})
@@ -244,7 +244,7 @@ jobs:
             --output-path coverage/lcov.info
 
           echo "\`test-rust\` (${{ matrix.os }}) — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
-          
+
       - name: Test
         if: runner.os == 'Windows'
         run: |
@@ -265,43 +265,43 @@ jobs:
           retention-days: 7
 
   sonar-rust:
-      name: Sonar Rust
-      needs: test-rust
-      runs-on: ubuntu-22.04
-      timeout-minutes: 20
-  
-      steps:
-        - uses: actions/checkout@v7
-          with:
-            fetch-depth: 0
-  
-        - uses: ./.github/actions/setup-rust
-          with:
-            shared-key: rust-sonar
-  
-        - name: Placeholder frontendDist
-          run: |
-            mkdir -p dist/devnotes/browser
-            printf '<!doctype html><title>ci</title>' > dist/devnotes/browser/index.html
-  
-        - name: Download Rust coverage
-          uses: actions/download-artifact@v7
-          with:
-            name: rust-coverage
-            path: coverage
-  
-        - name: SonarCloud Scan
-          uses: SonarSource/sonarqube-scan-action@v7
-          env:
-            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          with:
-            args: >
-              -Dsonar.organization=vmillet-dev
-              -Dsonar.projectKey=devnotes-rust
-              -Dsonar.sources=src-tauri
-              -Dsonar.rust.cargo.manifestPaths=src-tauri/Cargo.toml
-              -Dsonar.rust.lcov.reportPaths=coverage/lcov.info
-              -Dsonar.qualitygate.wait=true
+    name: Sonar Rust
+    needs: test-rust
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: rust-sonar
+
+      - name: Placeholder frontendDist
+        run: |
+          mkdir -p dist/devnotes/browser
+          printf '<!doctype html><title>ci</title>' > dist/devnotes/browser/index.html
+
+      - name: Download Rust coverage
+        uses: actions/download-artifact@v7
+        with:
+          name: rust-coverage
+          path: coverage
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=vmillet-dev
+            -Dsonar.projectKey=devnotes-rust
+            -Dsonar.sources=src-tauri
+            -Dsonar.rust.cargo.manifestPaths=src-tauri/Cargo.toml
+            -Dsonar.rust.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.qualitygate.wait=true
 
   # The only job that launches the assembled application: real binary, real WebView, real
   # SQLite file on disk. Both platforms of the release matrix are covered, and they do not
