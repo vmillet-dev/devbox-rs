@@ -189,7 +189,7 @@ jobs:
             -Dsonar.projectKey=devnotes-front
             -Dsonar.organization=vmillet-dev
             -Dsonar.sources=src
-            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.javascript.lcov.reportPaths=coverage/devnotes/lcov.info
 
   test-rust:
     name: Test Rust (${{ matrix.os }})
