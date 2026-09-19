@@ -164,42 +164,58 @@ jobs:
           path: coverage
           retention-days: 7
 
-  # ⚠️ Windows is not redundant with Ubuntu here. DevNotes ships primarily to Windows, and the
-  # back-end reasons about `app_data_dir()`, path separators, file locking and SQLite — all of
-  # which differ. Until this leg existed, nothing blocking ever ran the tests on the platform
-  # most users are on: `test-e2e` covers Windows but is `continue-on-error`.
+  sonar-front:
+      name: Sonar Front
+      needs: test-front
+      runs-on: ubuntu-22.04
+      timeout-minutes: 15
+  
+      steps:
+        - uses: actions/checkout@v7
+          with:
+            fetch-depth: 0
+  
+        - uses: actions/download-artifact@v7
+          with:
+            name: front-coverage
+            path: coverage
+  
+        - name: SonarQube Scan
+          uses: SonarSource/sonarqube-scan-action@v7
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          with:
+            args: >
+              -Dsonar.projectKey=devnotes-front
+              -Dsonar.organization=vmillet-dev
+              -Dsonar.sources=src
+              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+
   test-rust:
     name: Test Rust (${{ matrix.os }})
-    # `needs` is per job, not per matrix leg, so the Windows leg waits on a build whose
-    # cache it does not read. Deliberate: splitting it into a second job to save that
-    # minute would duplicate five steps, and `test-e2e` (about seven) is the critical
-    # path either way. Dropping `needs` instead would race the Ubuntu leg against the
-    # cache it exists to reuse.
     needs: build-rust
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+
     defaults:
       run:
         shell: bash
+
     strategy:
       fail-fast: false
       matrix:
         include:
-          # `rust-ubuntu` on purpose: the same key `build-rust` wrote, which is the whole
-          # point of depending on it.
           - os: ubuntu-22.04
             cache-key: rust-ubuntu
             save-cache: 'false'
+
           - os: windows-latest
             cache-key: rust-windows
             save-cache: 'true'
+
     steps:
       - uses: actions/checkout@v7
 
-      # On Ubuntu this restores `build-rust`'s target/ — including the SQLite compilation
-      # (`libsqlite3-sys` in `bundled` builds the C sources), which is most of this job's
-      # time. Windows has no such job ahead of it, so it seeds a cache of its own; the two
-      # keys differ, so neither races the other for a write.
       - uses: ./.github/actions/setup-rust
         with:
           shared-key: ${{ matrix.cache-key }}
@@ -210,11 +226,82 @@ jobs:
           mkdir -p dist/devnotes/browser
           printf '<!doctype html><title>ci</title>' > dist/devnotes/browser/index.html
 
+      - name: Install cargo-llvm-cov
+        if: runner.os == 'Linux'
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Test + coverage
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p coverage
+
+          start=$(date +%s)
+
+          cargo llvm-cov \
+            --manifest-path src-tauri/Cargo.toml \
+            --locked \
+            --lcov \
+            --output-path coverage/lcov.info
+
+          echo "\`test-rust\` (${{ matrix.os }}) — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+          
       - name: Test
+        if: runner.os == 'Windows'
         run: |
           start=$(date +%s)
-          cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+          cargo test \
+            --manifest-path src-tauri/Cargo.toml \
+            --locked
+
           echo "\`test-rust\` (${{ matrix.os }}) — $(($(date +%s) - start)) s" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Rust coverage
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rust-coverage
+          path: coverage/lcov.info
+          retention-days: 7
+
+  sonar-rust:
+      name: Sonar Rust
+      needs: test-rust
+      runs-on: ubuntu-22.04
+      timeout-minutes: 20
+  
+      steps:
+        - uses: actions/checkout@v7
+          with:
+            fetch-depth: 0
+  
+        - uses: ./.github/actions/setup-rust
+          with:
+            shared-key: rust-sonar
+  
+        - name: Placeholder frontendDist
+          run: |
+            mkdir -p dist/devnotes/browser
+            printf '<!doctype html><title>ci</title>' > dist/devnotes/browser/index.html
+  
+        - name: Download Rust coverage
+          uses: actions/download-artifact@v7
+          with:
+            name: rust-coverage
+            path: coverage
+  
+        - name: SonarCloud Scan
+          uses: SonarSource/sonarqube-scan-action@v7
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          with:
+            args: >
+              -Dsonar.organization=vmillet-dev
+              -Dsonar.projectKey=devnotes-rust
+              -Dsonar.sources=src-tauri
+              -Dsonar.rust.cargo.manifestPaths=src-tauri/Cargo.toml
+              -Dsonar.rust.lcov.reportPaths=coverage/lcov.info
+              -Dsonar.qualitygate.wait=true
 
   # The only job that launches the assembled application: real binary, real WebView, real
   # SQLite file on disk. Both platforms of the release matrix are covered, and they do not
@@ -222,16 +309,6 @@ jobs:
   # all Windows conflates `data_dir()` and `config_dir()` (both `%APPDATA%\<id>`) where Linux
   # keeps them apart. It is the only runner able to disprove a path — it has already caught a
   # `preferences.json` looked for in the wrong place.
-  #
-  # ⚠️ Blocking, and it was not always. `continue-on-error: true` stood here to buy the suite
-  # time to prove itself, and the bill came due: on `main` at `e4ed5d9` the Ubuntu leg failed
-  # on a real bug — a note keeping its title and losing the body typed after it — and the run
-  # was reported `success` all the same. `gh run list` said success, the badge said passing,
-  # and the failure sat there across three merges until someone went looking for it by hand.
-  #
-  # A job whose failure reads as a pass is worse than no job: it is a claim that nothing is
-  # wrong. So the flag is gone. The cost is the one it was avoiding — a genuinely flaky run
-  # blocks a merge until it is re-run — and that is the right way round.
   test-e2e:
     name: Test E2E (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
